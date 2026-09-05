@@ -63,8 +63,12 @@ starting. Everything that matters is specified in `docs/v1/`:
 
 ## Working a task
 
-1. Take the next unfinished task in `docs/v1/17-serial-task-plan.md`. Tasks
-   are serial: do not skip ahead and do not have two half-finished.
+1. Take the next unfinished task in `docs/v1/17-serial-task-plan.md`. A
+   finished task carries a `**Status.** Done.` line; add one to the task
+   you finish, in the same commit, so the plan says where the build is
+   without anyone reading the log (name the commit only when you already
+   know its sha — `git log --grep "^T012:"` finds it otherwise). Tasks are
+   serial: do not skip ahead and do not have two half-finished.
 2. Read the task's **Do**, **Tests**, and **Done** blocks and every spec
    section it cites. Do only that task.
 3. Implement, adding tests at the lowest layer that can express the

@@ -2,9 +2,10 @@
 
 The MVP's test suite is v1's acceptance harness (14). Every file below is
 ported to the v1 layout by the task named, and the rule is **ported test =
-deleted old test**: a row is ticked in the same commit that deletes the
-MVP file, so "MVP tests still running against MVP code" only ever goes
-down.
+ticked row** (D65): nothing is deleted, because the MVP is a separate
+checkout that this repository never writes to. A row is ticked in the
+commit that lands its v1 test, so what is left unticked is what v1 has
+not yet covered.
 
 Source is `tests/` in the MVP checkout. Targets are the v1 paths named by
 `docs/v1/17-serial-task-plan.md`.

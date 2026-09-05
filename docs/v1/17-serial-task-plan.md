@@ -48,7 +48,8 @@ here so it is decided once.
 - **Definition of done** is 13 §Definition of done: tests at the lowest
   layer that can express the behaviour; `tests/snapshots/openapi.json`
   regenerated if the wire changed; a row in 15 if a choice was made; the
-  relevant document updated.
+  relevant document updated; and a `**Status.** Done.` line on the task
+  here, in the same commit, so this document says where the build is.
 - **Phase gates.** The last task of each phase is a checkpoint: the
   examples run on `FakeACPAgent` through `ATHANORE_AGENT_COMMAND` and
   per-node scenarios (13 §Running examples on the fake; from T037
@@ -58,160 +59,42 @@ here so it is decided once.
 
 ## Phase 0 — Scaffold
 
-### T000 — Dev stack and driver workflows (a separate repo; done by hand)
+### T000 — Dev stack and driver seat (done by hand, in this repository)
 
-Why first: the intent is to execute T001–T079 by dispatching each one as
-a run of athanore **v0** (the MVP in this repository) to a pi agent in a
-Docker sandbox, reviewing from the v0 browser TUI. The MVP's
-`docker/pi-acp` image and `workflow/docker_acp` already prove the
-mechanism (pi-acp in a container, `docker run -i` as the ACP command,
-workspace bind-mounted at its host path, host networking so the task API
-URL resolves). This task turns that proof into a **new repository**,
-working name `athanore-build`, that depends on athanore v0 as a pinned
-package. Nothing here is added to this repository or shipped in it. This
-section is the specification to build from when development starts.
+Why first: T001–T079 are executed by dispatching each one as a run of
+athanore **v0** — the sibling checkout, tagged `v0.0.12` — to a pi agent
+in a Docker sandbox, reviewed from the v0 browser TUI.
 
-**Do.**
+This task was written here as a **separate `athanore-build` repository**
+built around a `v1` worktree, with its own `docker/sandbox` image and a
+`submit_plan.py`. It was built differently, and what exists is the
+specification now:
 
-1. **Freeze v0.** After committing `docs/v1/`, `git tag v0.0.11` here. The
-   driver repo pins `athanore @ git+<this repo>@v0.0.11`, so moving or
-   deleting MVP modules in later tasks never breaks the thing dispatching
-   them.
-2. **Worktree.** `git worktree add ../athanore-v1 -b v1` in this repo.
-   Agents edit the worktree; the main checkout is the reference the plan
-   calls "the MVP". A worktree's `.git` is a file pointing into the main
-   checkout's `.git/worktrees/`, so **both** paths are mounted read-write
-   at their host paths in every container that runs git. The driver
-   repo's `.env` (ignored) holds `WORKSPACE=/abs/path/athanore-v1`,
-   `MAIN_CHECKOUT=/abs/path/athanore`, `DOCKER_GID=$(getent group docker |
-   cut -d: -f3)`, `UID`/`GID`, `BUILDER_MODEL`, `WITH_BROWSERS=0`;
-   `OPENROUTER_API_KEY` is passed through from the shell, never written to
-   a file. Commit `.env.example`.
-3. **`docker/sandbox/Dockerfile`** (start from a copy of this repo's
-   `docker/pi-acp`). Keep everything the MVP image does: uid/gid mapping,
-   uv with a managed Python 3.13 on named volumes (`UV_PROJECT_ENVIRONMENT`,
-   `UV_CACHE_DIR`, `UV_LINK_MODE=copy`), pinned `pi` and `pi-acp`, baked
-   `models.json`/`settings.json`, `ENTRYPOINT ["pi-acp"]`. Add: `npm
-   install -g pnpm@10`; `sqlite3`, `jq`; `git config --system --add
-   safe.directory '*'`; a fixed identity (`GIT_AUTHOR_NAME=athanore-builder`,
-   `GIT_AUTHOR_EMAIL=builder@athanore.local`, committer pair); build arg
-   `WITH_BROWSERS=0` that, when `1`, runs `npx -y playwright@<pinned>
-   install --with-deps chromium` into `PLAYWRIGHT_BROWSERS_PATH=/home/agent/
-   ms-playwright` (a named volume; T068 flips the default). Image name
-   `athanore/sandbox`.
-4. **`docker/orchestrator/Dockerfile`.** `python:3.13-slim`; `git`,
-   `docker-ce-cli` from the Docker apt repo, `uv` (`COPY --from=ghcr.io/
-   astral-sh/uv`); `uv sync --frozen` of the driver repo, whose
-   `pyproject.toml` pins athanore v0 by tag; runs as uid 1000 with
-   `group_add: ["${DOCKER_GID}"]` so it can use the socket; `CMD ["uv",
-   "run", "python", "-m", "athanore_build", "--web", "--web-host",
-   "0.0.0.0"]` (the MVP's `--web` serves the browser TUI on 2424; the API
-   is 4002). The MVP database is pinned to a named volume through
-   `ATHANORE_ROOT_PATH`.
-5. **`athanore_build/`** — the v0 workflows, written against the MVP API
-   (`AthanoreWorkflow`, `AthanoreACPAgent`, `human_input`, `current_task`).
-   - `sandbox.py`: `docker_command(entrypoint=None, args=())` lifted from
-     `workflow/docker_acp` with the extra mounts (`WORKSPACE`,
-     `MAIN_CHECKOUT`, `~/.pi/agent/sessions` into `/home/agent/.pi/agent/
-     sessions` so `[stats]` lines carry real tokens, pnpm store,
-     `ms-playwright`) and `-e MVP_CHECKOUT=<MAIN_CHECKOUT>`;
-     `SandboxAgent(AthanoreACPAgent)` with `permission_policy="auto_allow"`
-     (the container is the guardrail), `elicitation_policy="decline"`,
-     `model` from `BUILDER_MODEL` (default `openrouter/qwen/qwen3.8-max`;
-     the LAN llama-server provider is in the image too), `timeout=3600`;
-     `run_gate(command)` = the same `docker run` with `--entrypoint bash
-     -lc`, 30-minute cap, returns exit code and the last 80 lines.
-   - `models.py`: `TaskReport(task_id, commit, summary, files: list[str],
-     tests_added: list[str], gate_ran: bool, open_points: str = "")`,
-     `ReviewVerdict(ok: bool, notes: str)`.
-   - `feature.py`, workflow `v1_feature` (the first seat; more attach the
-     same way): `implement(gate, *, payload)` (start; the MVP hands the
-     start node `{title, description}` → title is the task id, description
-     optional operator notes): system prompt "You are implementing exactly
-     one task of `docs/v1/17-serial-task-plan.md` in the checkout at cwd.
-     Read `docs/v1/README.md`, the task, and the spec sections it cites. Do
-     only that task. Run the gate (`./scripts/gate.sh`, added in T005; until
-     then `uv run pytest -q`) until green. Commit on branch `v1` with the
-     message prefix `Txxx:`. Append a deliverable to the work log, then
-     submit a TaskReport."; `output_model=TaskReport`; returns
-     `gate({**payload, "report": ...})`.
-     `gate(review, implement, *, payload)` deterministic: `run_gate`,
-     appends the tail to the work log, returns `review(payload)` on exit 0
-     or `implement({..., "feedback": tail, "loop": n+1})` otherwise; raises
-     after `BUILDER_MAX_LOOPS` (3) rounds so the MVP's retry/dead-letter
-     path ends the run as `failed` where the TUI shows it.
-     `review(implement, done, *, payload)`: a second `SandboxAgent` with a
-     reviewer prompt ("`git show <commit>`; compare against the task's
-     **Do**, **Tests**, **Done**; reject anything outside the task that
-     moved; verdict only"), `output_model=ReviewVerdict`; `ok` →
-     `done(payload)`, else `implement(...notes, loop+1)` under the same cap.
-     `done(*, payload)` terminal: when `BUILDER_ATTENDED=1`, `await
-     human_input(f"{task_id} passed review — continue?", options=
-     ["continue", "stop"])` so a human can inspect the commit in the TUI
-     before the next run is dispatched.
-   - `__main__.py`: `AthanoreServer(port=4002, workers=1)`;
-     `server.register(feature, Pool("sandbox", 1))`; `--web` flags
-     forwarded. Serial execution falls out of capacity 1 plus run list
-     order.
-   - `submit_plan.py`: parses the `### Txxx — title (ticket)` headings
-     (`T\d{3}[a-z]?`, so inserted tasks like T024a keep their place) of
-     this document in the worktree and submits one run per task in order
-     via `POST /api/workflows/v1_feature/runs`; `--from T001 --to T029`,
-     `--only T012`, `--dry-run`, `--notes "..."`; skips T000.
-6. **`compose.yaml`** in the driver repo:
-   - `sandbox`: image `athanore/sandbox`, build args as today plus
-     `WITH_BROWSERS`; `stdin_open: true`, `tty: false`, `init: true`,
-     `network_mode: host`; `environment: [OPENROUTER_API_KEY, MVP_CHECKOUT]`;
-     `working_dir: ${WORKSPACE}`; volumes `${WORKSPACE}:${WORKSPACE}`,
-     `${MAIN_CHECKOUT}:${MAIN_CHECKOUT}`, `${HOME}/.pi/agent/sessions:/home/
-     agent/.pi/agent/sessions`, `athanore-venv:/home/agent/venv`,
-     `athanore-uv-cache:/home/agent/.cache/uv`, `athanore-pnpm-store:/home/
-     agent/.local/share/pnpm/store`, `athanore-ms-playwright:/home/agent/
-     ms-playwright`. (`web/node_modules` stays inside the bind mount: a
-     named volume there would create a root-owned directory on the host
-     before `web/` exists.) Runnable as an ACP agent: `docker compose run
-     --rm -T sandbox`.
-   - `dev`: `extends: sandbox`, `entrypoint: ["bash", "-lc"]`, default
-     `command: ["./scripts/gate.sh"]`; humans run `docker compose run --rm
-     dev "<anything>"`.
-   - `orchestrator`: build `docker/orchestrator`, `network_mode: host`,
-     `init: true`, `group_add: ["${DOCKER_GID}"]`, environment
-     `OPENROUTER_API_KEY`, `WORKSPACE`, `MAIN_CHECKOUT`, `BUILDER_MODEL`,
-     `BUILDER_ATTENDED`, `BUILDER_MAX_LOOPS`, `ATHANORE_ROOT_PATH=/data`;
-     volumes `/var/run/docker.sock:/var/run/docker.sock`, `${WORKSPACE}:
-     ${WORKSPACE}` and `${MAIN_CHECKOUT}:${MAIN_CHECKOUT}` (the spawn's
-     `cwd` must exist inside the orchestrator too), `athanore-v0-data:
-     /data`, `${HOME}/.pi/agent/sessions:/home/agent/.pi/agent/sessions`.
-     The orchestrator passes **host** paths to the daemon, which is why
-     every path is mounted at its host path.
-   - `web` (profile `dev`, used from T058): sandbox image, `command:
-     pnpm --dir web dev --host 127.0.0.1 --port 5173`, proxying `/api`
-     to `:4002` per T007's Vite config.
-   - `postgres` (profile `pg`, used from T014): `postgres:17-alpine`,
-     `POSTGRES_PASSWORD=athanore`, port `5433`, volume; `dev` gets
-     `ATHANORE_TEST_PG_URL=postgresql+asyncpg://postgres:athanore@
-     127.0.0.1:5433/postgres` so the nightly suite runs locally with
-     `docker compose --profile pg up -d postgres`.
-7. **`README.md`** of the driver repo: build, start, submit the plan,
-   watch the TUI, answer a review gate, stop, reset volumes; the two model
-   choices (LAN llama-server is free but flaky; OpenRouter is the reliable
-   default); how to add another seat (one module, one `wf`, one
-   `register`).
+- The dev stack lives in this repository, not a second one (D64):
+  `compose.yaml`, `docker/dev/` (one image behind `dev`, `app`, `web` and
+  both ACP agents), `docker/orchestrator/` (v0's own image and venv), and
+  the `scripts/` wrappers, which do the same thing on the host and in the
+  container.
+- There is no worktree and no `v1` branch (D65). Work is on `main`, one
+  `feat/<task-id>` branch per task, merged `--no-ff` (D68).
+- The driver is `driver/`, written against v0's API and pinning v0 by
+  path. It dispatches through `./scripts/agent.sh` and gates through
+  `./scripts/test.sh`, so `compose.yaml` is the one definition of the
+  sandbox for humans, for v0, and for v1 after the port (D67). It listens
+  on 4102; the v1 app owns 4002.
+- The seat is `driver/athanore_build/feature.py`: `prepare → implement →
+  gate → review → qa → approve → merge`, three models, five deterministic
+  nodes, per-lane loop caps, and a queue that pauses behind a failure
+  (D68). Submitting a run is one `POST /api/workflows/v1_feature/runs`,
+  wrapped by `./scripts/drive.sh submit <task-id>`.
 
-**Tests (manual, recorded in the driver README).** `docker compose build`
-succeeds; the ACP handshake works:
-`echo '{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":1}}' | docker compose run --rm -T sandbox`;
-`docker compose run --rm dev "uv run pytest -q"` passes the MVP suite
-inside the container against the worktree; `docker compose run --rm dev
-"node --version && pnpm --version && git status"` works (proves the
-worktree mounts); `docker compose up -d orchestrator` answers
-`curl 127.0.0.1:4002/api/health` and serves the TUI on `:2424`;
-`submit_plan.py --dry-run` lists every task heading except T000; a throwaway run ("append a
-line to README.md") goes implement → gate → review → done in the TUI with
-a `[stats]` line carrying tokens.
+`AGENTS.md` §Commands is the operating manual for all of it and is kept
+current. Read it, not this section, for how the stack works.
 
-**Done.** `submit_plan.py --only T001` ends with T001 committed on `v1` by
-the sandbox agent, gate green, review `ok`, visible in the v0 TUI.
+**Status.** Done by hand. The pre-D68 seat was proven end to end (a
+throwaway run went implement → gate → review → done, committing
+`84da1f3` as `athanore-builder`); the current seat is exercised for the
+first time by T003.
 
 ### T001 — Repository hygiene for the v1 branch (14 §Repository changes)
 
@@ -226,6 +109,7 @@ a table of the MVP's 25 test files → target v1 test file, all unticked,
 Mark 15 open question 4 as closed by D59 in this branch.
 **Done.** `git status` clean after a `pnpm build` and an `athanore token
 rotate`; the ledger lists every file under `tests/`.
+**Status.** Done, `91683da`.
 
 ### T002 — `pyproject.toml` for v1 (A0.4 part, 14 §Repository changes)
 
@@ -233,11 +117,12 @@ rotate`; the ledger lists every file under `tests/`.
 `fastapi`, `httpx`, `pydantic>=2.7`, `uvicorn`; add
 `sqlalchemy[asyncio]>=2.0`, `aiosqlite`, `alembic`, `sse-starlette`,
 `pydantic-settings`, `structlog`, `typer`, `rich`, `python-ulid`.
-Keep `textual` and `netext` **for now** (removed in T055).
+No `textual`, `netext` or `textual-dev`: nothing here imports them and
+the TUI stays in v0, retiring with it (D65, D67, D13).
 `[project.optional-dependencies] postgres = ["asyncpg"]`.
 `[dependency-groups] dev`: `pytest`, `pytest-asyncio` (mode `auto`),
 `hypothesis`, `respx`, `freezegun`, `ruff`, `pyright`, `import-linter`,
-`pip-audit`, `textual-dev` (until T055).
+`pip-audit`.
 `[tool.uv.workspace] members = ["examples"]`; create
 `examples/pyproject.toml` (name `athanore-examples`, depends on
 `athanore` via `[tool.uv.sources] athanore = { workspace = true }`,
@@ -247,6 +132,8 @@ Hatch: `[tool.hatch.build.targets.wheel] packages = ["athanore"]`,
 `[tool.pytest.ini_options] asyncio_mode = "auto"`, `testpaths = ["tests"]`.
 **Done.** `uv sync --all-groups --all-extras` resolves; `uv.lock`
 committed.
+**Status.** Done, `21735e7` (with D65's departures: no `textual`,
+`netext` or `textual-dev`, and `main.py` deleted).
 
 ### T003 — Package skeleton and the graph move (A0.1)
 
@@ -1880,8 +1767,8 @@ tmp db, `ATHANORE_AGENT_COMMAND`). Specs: submit → graph shows progress
 server); shortcuts; inbox with no run selected; a fan-out closed by a
 join renders `k of n`. `@axe-core/playwright` a11y ≥ 95 on the dashboard.
 CI `web` job runs Playwright (Chromium only).
-**Dev stack.** Flip `WITH_BROWSERS=1` in `.env.example` and rebuild the
-sandbox so agents and humans can run Playwright inside `dev`.
+**Dev stack.** Already done (D68): `WITH_BROWSERS` defaults to 1 and the
+image ships chromium, because the driver's `qa` node drives Playwright.
 **Done.** CI green with the E2E job.
 
 ### T069 — Phase 4 checkpoint
@@ -2014,7 +1901,7 @@ SPA and runs `msgtest` on `FakeACPAgent`.
 
 | Doc 16 ticket | Tasks here |
 |---|---|
-| — (driver repo and dev stack, not in 16) | T000 |
+| — (dev stack and driver seat, not in 16) | T000 |
 | A0.1–A0.7 | T001–T008 |
 | A1.1–A1.7 | T009–T018 |
 | A1.8–A1.14 | T019–T029 |
