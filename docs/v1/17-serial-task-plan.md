@@ -22,7 +22,9 @@ here so it is decided once.
   sandbox and shows progress in the v0 browser TUI (D67). Humans, v0 and
   v1 all reach it through the same `scripts/` wrappers — `./scripts/
   test.sh`, `./scripts/agent.sh` — so a green gate means the same thing
-  on every machine and for every caller. Work happens on `main`.
+  on every machine and for every caller. Each task is built on its own
+  branch, `feat/<task-id>`, and merged `--no-ff` onto `main` once the
+  gate, the review and QA have passed (D68).
 - **Clean slate: no code moves from v0.** This repository holds no MVP
   code (D65). v0 is the neighbouring `athanore` checkout, tagged
   `v0.0.12`, and it is read as the behavioural specification — never
@@ -38,7 +40,8 @@ here so it is decided once.
 - New code lives only in the subpackages of 02 §Package layout.
   `athanore/__init__.py` becomes the v1 surface of 02 §Public API surface
   in T055.
-- **One commit per task**, message prefixed with the task id (`T012:`).
+- **One commit per task**, on the task's branch, message prefixed with
+  the task id (`T012:`).
   Each commit leaves `uv run pytest`, `ruff`, `pyright`, and
   `lint-imports` green from T005 onward, and `pnpm typecheck` green from
   T008 onward.

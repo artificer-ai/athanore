@@ -25,6 +25,11 @@ def parse_args(argv=None):
 
 if __name__ == "__main__":
     args = parse_args()
-    server = AthanoreServer(port=args.port, workers=1)
+    # max_retries=1: no engine-level retry of a node. Every node here is
+    # either deterministic (git, an exit code — a retry does the same
+    # thing) or a paid agent turn, and the workflow's own loop-backs are
+    # the retry policy. Retrying `review` three times on a task that has
+    # already blown its cap just buys three more reviews.
+    server = AthanoreServer(port=args.port, workers=1, max_retries=1)
     server.register(v1_feature, Pool("sandbox", capacity=1))
     server.run(web=args.web, web_host=args.web_host, web_port=args.web_port)

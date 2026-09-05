@@ -90,19 +90,44 @@
           }
         },
         {
-          "id": "qwen/qwen3.8-max",
-          "name": "Qwen3.8 Max (OpenRouter)",
+          "id": "qwen/qwen3.8-max-0902",
+          "name": "Qwen3.8 Max 0902 (OpenRouter)",
           "reasoning": true,
           "input": [
             "text",
             "image"
           ],
-          "contextWindow": 262144,
+          "contextWindow": 1000000,
           "maxTokens": 32768,
           "cost": {
-            "input": 0.4,
-            "output": 3,
+            "input": 2,
+            "output": 6,
             "cacheRead": 0,
+            "cacheWrite": 0
+          },
+          "thinkingLevelMap": {
+            "off": "low",
+            "minimal": "low",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "xhigh": "xhigh",
+            "max": "xhigh"
+          }
+        },
+        {
+          "id": "deepseek/deepseek-v4-pro-0813",
+          "name": "DeepSeek V4 Pro 0813 (OpenRouter)",
+          "reasoning": true,
+          "input": [
+            "text"
+          ],
+          "contextWindow": 1024000,
+          "maxTokens": 65536,
+          "cost": {
+            "input": 0.58,
+            "output": 1.74,
+            "cacheRead": 0.02,
             "cacheWrite": 0
           },
           "thinkingLevelMap": {

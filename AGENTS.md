@@ -52,7 +52,11 @@ starting. Everything that matters is specified in `docs/v1/`:
 - Target package layout and the per-module responsibilities are in
   `docs/v1/02-architecture.md` §Package layout. Create modules there, not
   elsewhere.
-- Work on `main`.
+- Work on a branch per task, `feat/<task-id>`, cut from `main`; the
+  driver's `prepare` node makes it and its `merge` node lands it
+  `--no-ff` on `main` when the gate, the review and QA have all passed
+  (D68). Working by hand, do the same. `main` is never committed to
+  directly.
 - The dev stack (`compose.yaml`, `docker/dev/`, `scripts/`) is here, not in
   a separate repository as T000 assumed (D64). It is dev machinery: no
   task may make `athanore/` depend on it.
@@ -66,7 +70,9 @@ starting. Everything that matters is specified in `docs/v1/`:
 3. Implement, adding tests at the lowest layer that can express the
    behaviour (`docs/v1/13-testing.md` §Pyramid).
 4. Run the gate until it is green (see Commands).
-5. One commit per task. Message prefixed with the task id: `T012: ...`.
+5. One commit per task, on the task's branch, message prefixed with the
+   task id: `T012: ...`. The merge commit onto `main` carries the same
+   prefix.
 6. Definition of done (`docs/v1/13-testing.md`): tests pass;
    `tests/snapshots/openapi.json` regenerated if the wire contract changed;
    a row in `15-decisions.md` if a choice was made; the document that
@@ -205,9 +211,10 @@ readable and `[stats]` lines carry real token counts (05 §Stats).
 
 The v1 tasks are executed by dispatching them to athanore **v0** — the
 MVP, in the sibling `athanore` checkout, tagged `v0.0.12`. It takes one
-task, hands it to a pi agent in `athanore/dev`, runs the gate, has a
-second agent review the commit, and shows the whole thing in its browser
-TUI.
+task, branches, hands it to a pi agent in `athanore/dev`, runs the gate,
+has a second model review the branch and a third exercise the running
+feature, waits for you, merges to `main`, and shows the whole thing in
+its browser TUI.
 
 ```sh
 ./scripts/drive.sh up                     # orchestrator + TUI on :2424
@@ -221,17 +228,48 @@ TUI.
 The seat is `driver/athanore_build/feature.py`, workflow `v1_feature`:
 
 ```
-implement ──▶ gate ──▶ review ──▶ done
-    ▲          │         │
-    └──────────┴─────────┘        both verdicts loop back, capped at
-                                  BUILDER_MAX_LOOPS (3), then the run fails
+prepare ─▶ implement ─▶ gate ─▶ review ─▶ qa ─▶ approve ─▶ merge
+              ▲           │        │       │       │
+              └───────────┴────────┴───────┘       └─▶ halted
+
+              every rejection loops back to implement, capped per lane at
+              BUILDER_MAX_LOOPS (3) and in total at BUILDER_MAX_ATTEMPTS
+              (6); past that the run fails and the queue is paused
 ```
 
-`gate` is deterministic — `./scripts/test.sh` in the sandbox, routing on
-the exit code — so no agent ever decides whether its own work passed.
-With `BUILDER_ATTENDED=1` (the default) `done` waits for you in the TUI
-before the next task goes out. Capacity 1 plus run order is the whole of
-"serial". Another seat is one module, one `wf`, one `register`.
+`prepare`, `gate`, `approve`, `merge` and `halted` are pure Python — git
+and an exit code decide, never an agent:
+
+- **prepare** refuses to run on a dirty checkout, then branches
+  `feat/<task-id>` from `main`. A failed task therefore never lands, and
+  its branch stays for you to read.
+- **gate** first checks git (still on the branch, nothing uncommitted, a
+  commit actually exists) and then runs `./scripts/test.sh` in the
+  sandbox, routing on the exit code — so no agent ever decides whether
+  its own work passed, and none of the three verdicts comes from the
+  model that wrote the code.
+- **review** reads the whole branch diff and the gate's output; **qa**
+  exercises the running feature (imports, CLI, the app's endpoints, the
+  SPA under Playwright) and reports what it actually ran.
+- **approve** is the human gate: with `BUILDER_ATTENDED=1` (the default)
+  it waits in the TUI, holding the pool's one slot, which is what keeps
+  the plan serial while you read. Answering `stop` pauses the rest of the
+  queue and ends the run at `halted`, unmerged.
+- **merge** lands the branch `--no-ff` on `main` and deletes it: one
+  merge commit per task, with its work underneath.
+
+A failing run pauses every queued run behind it, because the next task
+would otherwise branch from a `main` that is missing the work it builds
+on. Resume from the TUI once you have dealt with it. Capacity 1 plus run
+order is the rest of "serial". Another seat is one module, one `wf`, one
+`register`.
+
+`implement` runs on `BUILDER_IMPLEMENT_MODEL` (DeepSeek V4 Pro),
+`review` and `qa` on `BUILDER_REVIEW_MODEL` / `BUILDER_QA_MODEL`
+(Qwen3.8 Max). A model id that is not in `docker/dev/pi/models.json` is
+not an error: pi falls back to its own default and the run continues on
+the wrong model, so ids are pinned in `.env.example` and the models are
+declared in that file.
 
 v0 does not know how to run a container. It dispatches through
 `./scripts/agent.sh` and runs the gate through `./scripts/test.sh` — the

@@ -21,7 +21,8 @@ HEADING = re.compile(r"^###\s+(T\d{3}[a-z]?)\s+—\s+(.*)$")
 
 # Resolved against the checkout, not the cwd: the orchestrator runs
 # this from `driver/`.
-PLAN = os.path.join(os.environ.get("WORKSPACE", "."), "docs/v1/17-serial-task-plan.md")
+PLAN_DOC = "docs/v1/17-serial-task-plan.md"
+PLAN = os.path.join(os.environ.get("WORKSPACE", "."), PLAN_DOC)
 WORKFLOW = "v1_feature"
 
 
@@ -52,6 +53,22 @@ def select(tasks, *, only, start, end):
     return tasks[lo:hi]
 
 
+def description(task_id: str, title: str, notes: str) -> str:
+    """The run description is the implementer's specification. For a plan
+    task it is a pointer: the plan section and the specs it cites are the
+    real text, and they are in the checkout the agent is working in."""
+    text = (
+        f"{task_id} — {title}.\n\n"
+        f"The task is specified in `{PLAN_DOC}`, under the heading "
+        f"`### {task_id}`. That section's **Do**, **Tests** and **Done** "
+        "blocks are the specification; read it and every `docs/v1/` section "
+        "it cites before you write anything."
+    )
+    if notes.strip():
+        text += f"\n\nOperator notes: {notes.strip()}"
+    return text
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="submit_plan")
     p.add_argument("--plan", default=PLAN)
@@ -74,7 +91,7 @@ def main(argv=None) -> int:
             continue
         r = httpx.post(
             f"{args.url}/api/workflows/{WORKFLOW}/runs",
-            json={"title": task_id, "description": args.notes},
+            json={"title": task_id, "description": description(task_id, title, args.notes)},
             timeout=30,
         )
         if r.status_code >= 400:
