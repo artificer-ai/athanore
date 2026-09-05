@@ -14,25 +14,30 @@ here so it is decided once.
 
 ## Working rules for the whole sequence
 
-- **Everything runs in the dev stack.** T000 specifies a separate,
-  brand-new repository (working name `athanore-build`) that holds the
-  compose stack and the athanore **v0** workflows driving this plan: the
-  agent sandbox image, a `dev` shell on the same image, and an
-  `orchestrator` running v0 (pinned to tag `v0.0.11`) that dispatches
-  each task below to the sandbox and shows progress in the v0 browser
-  TUI. Humans and agents run the same commands (`docker compose run --rm
-  dev "uv run pytest -q"`), so a green gate means the same thing on every
-  machine. Agents work in a git worktree of this repository on branch
-  `v1`; nothing about the build machinery lives in this repository.
-- **Coexistence.** The MVP modules (`server.py`, `store.py`, `scheduler.py`,
-  `agents.py`, `stats.py`, `human.py`, `runtime.py`, `pools.py`,
-  `_util.py`, `tui.py`) stay in place and keep passing their tests until
-  the task that explicitly deletes them. New code lives only in the
-  subpackages of 02 §Package layout. `athanore/__init__.py` exports the
-  old names until T055 swaps them for the v1 surface plus aliases.
-- **Ported test = deleted old test.** When a task ports a test file, the
-  old file is removed in the same commit, so the count of "MVP tests
-  still running against MVP code" only ever goes down.
+- **Everything runs in the dev stack**, which lives in this repository,
+  not the separate `athanore-build` repo T000 described (D64): one image
+  (`docker/dev/`) behind the `dev` shell, the `app` server and both ACP
+  agents, plus an `orchestrator` running athanore **v0** (the sibling
+  checkout, tagged `v0.0.12`) that dispatches each task below to the
+  sandbox and shows progress in the v0 browser TUI (D67). Humans, v0 and
+  v1 all reach it through the same `scripts/` wrappers — `./scripts/
+  test.sh`, `./scripts/agent.sh` — so a green gate means the same thing
+  on every machine and for every caller. Work happens on `main`.
+- **Clean slate: no code moves from v0.** This repository holds no MVP
+  code (D65). v0 is the neighbouring `athanore` checkout, tagged
+  `v0.0.12`, and it is read as the behavioural specification — never
+  copied, never moved from. Where a task below says `git mv`, "port",
+  "delete the MVP module", or "the existing suite still passes", read it
+  as: **write it fresh in the v1 layout, with the named v0 file as the
+  reference for behaviour.** Nothing is moved into this repository, and
+  nothing is deleted from it that was never in it.
+- **Ported test = ticked ledger row.** "Port `tests/test_x.py`" means
+  write the v1 test covering what that file covered, then tick its row in
+  `docs/porting-ledger.md`. A **Done** block that says an MVP test file is
+  "deleted" means its ledger row is ticked.
+- New code lives only in the subpackages of 02 §Package layout.
+  `athanore/__init__.py` becomes the v1 surface of 02 §Public API surface
+  in T055.
 - **One commit per task**, message prefixed with the task id (`T012:`).
   Each commit leaves `uv run pytest`, `ruff`, `pyright`, and
   `lint-imports` green from T005 onward, and `pnpm typecheck` green from
@@ -214,7 +219,7 @@ the sandbox agent, gate green, review `ok`, visible in the v0 TUI.
 `web/test-results/`, `web/playwright-report/`. Add `docs/porting-ledger.md`:
 a table of the MVP's 25 test files → target v1 test file, all unticked,
 `test_tui.py` marked retired; later tasks tick rows as they port (the
-"ported test = deleted old test" rule above is how a row gets ticked).
+"ported test = ticked ledger row" rule above is how a row gets ticked).
 Mark 15 open question 4 as closed by D59 in this branch.
 **Done.** `git status` clean after a `pnpm build` and an `athanore token
 rotate`; the ledger lists every file under `tests/`.
@@ -237,8 +242,8 @@ empty package for now).
 Hatch: `[tool.hatch.build.targets.wheel] packages = ["athanore"]`,
 `artifacts = ["athanore/web/dist/**"]`.
 `[tool.pytest.ini_options] asyncio_mode = "auto"`, `testpaths = ["tests"]`.
-**Done.** `uv sync --all-groups --all-extras` resolves; existing suite
-still passes; `uv.lock` committed.
+**Done.** `uv sync --all-groups --all-extras` resolves; `uv.lock`
+committed.
 
 ### T003 — Package skeleton and the graph move (A0.1)
 
@@ -247,13 +252,14 @@ still passes; `uv.lock` committed.
 `store/migrations`, `plugins`, `plugins/builtin`, `api`, `api/schemas`,
 `api/routers`, `cli`, `testing`, `web` (with an empty `dist/.gitkeep`
 that is **not** ignored: add `!athanore/web/dist/.gitkeep`).
-`git mv athanore/graph.py athanore/graph/builder.py` unchanged;
+Write `athanore/graph/builder.py` fresh, with v0's `athanore/graph.py`
+as the behavioural reference — the three rules and the signature parsing
+are unchanged, so this is a faithful reimplementation, not a redesign.
 `athanore/graph/__init__.py` re-exports `AthanoreWorkflow, EdgeRef,
 GraphError, Node, Transition`. Create `athanore/workflow.py` with
 `Workflow = AthanoreWorkflow` for now (the real class arrives in T020).
-Fix imports in `server.py`, `scheduler.py`, `testing.py`, tests.
-**Done.** All MVP tests pass; `python -c "import athanore.graph,
-athanore.engine, athanore.store"` works.
+**Done.** `python -c "import athanore.graph, athanore.engine,
+athanore.store"` works.
 
 ### T004 — `AthanoreSettings` (A0.2)
 
@@ -299,8 +305,8 @@ manager using `structlog.contextvars`, `get_logger(name)`. Route stdlib
 over `athanore.store | athanore.events | athanore.graph | athanore.settings | athanore.logging`;
 forbidden contracts: `athanore.graph` may import nothing from `athanore`;
 `athanore.agents` may not import `athanore.store`; `athanore.store` may
-not import `athanore.engine`. Exclude the MVP flat modules from the
-contracts via `ignore_imports` until T055.
+not import `athanore.engine`. No `ignore_imports` escape hatch is
+needed: there are no MVP flat modules in this repository (D65).
 **Done.** `ruff check .`, `pyright`, `lint-imports` green (empty
 subpackages trivially pass).
 
@@ -651,9 +657,9 @@ shortest-path depth from start, every unreachable node is reported.
 and (from T049) plugin declarations. Methods now: `node(...)` delegating,
 `finalize() -> Graph` (idempotent, caches), `graph` property (raises if
 not finalized), `name`, `run(**settings)` shorthand (imports `Server`
-lazily; real implementation in T031). `AthanoreWorkflow = Workflow` in
-`athanore/graph/__init__.py` re-export path kept so the MVP modules keep
-importing.
+lazily; real implementation in T031). `AthanoreWorkflow = Workflow` kept in
+`athanore/graph/__init__.py` as the deprecated alias (14
+§Compatibility).
 **Tests.** `tests/test_workflow.py`: `finalize` twice returns the same
 `Graph`; node options round-trip.
 **Done.** MVP suite still green (it constructs `AthanoreWorkflow`).
@@ -973,8 +979,7 @@ mechanism, this covers the example's shape).
 
 ### T029 — Phase 1 checkpoint
 
-**Do.** Run the full suite (MVP remainder + new); confirm `lint-imports`
-still passes with the flat modules ignored; update 04 with the two
+**Do.** Run the full suite; confirm `lint-imports` passes; update 04 with the two
 implicit details decided here (empty-list return, `None` payload not
 passed). Tag `v1.0.0a1` locally (no push needed).
 
@@ -1241,9 +1246,8 @@ PiSessionStats(SessionStatsProvider)` wrapping the MVP `find_session_file`,
 test_pi_stats.py` receives the session-file tests from
 `tests/test_stats.py`. Port `tests/test_stats_workflow.py` and the
 remainder of `tests/test_agents.py`, `tests/test_stats.py` to
-`tests/agents/`. Delete MVP `athanore/stats.py`, `athanore/testing.py`,
-`athanore/human.py`, `athanore/agents.py` **only if** the MVP
-`server.py` no longer imports them; otherwise leave until T055.
+`tests/agents/`. (No MVP modules to delete: they were never in this
+repository, D65.)
 **Done.** `uv run pytest examples` and `tests/` green; `tests/test_stats.py`,
 `test_stats_workflow.py`, `test_agents.py` deleted.
 
@@ -1564,24 +1568,19 @@ the API `error` message on a 409.
 
 **Do.** `tests/api/test_e2e.py` (port `tests/test_e2e.py`,
 `test_api_surface.py`): submit → MockAgent submits → completion via API
-and SSE; fan-out via API; requests answered through the API. Then delete
-`athanore/server.py` (MVP), `store.py`, `scheduler.py`, `runtime.py`,
-`pools.py`, `_util.py`, `agents.py`, `human.py`, `stats.py`,
-`testing.py` (whatever T040 left), and **`tui.py`, `tests/test_tui.py`,
-`scripts/tui_screen.py`, `athanore/web/templates/`** — the TUI is a
-client of the MVP wire API, which no longer exists after this task, so
-its deletion moves here from A6.3 (record as a sequencing note under
-D13). Drop `textual`, `netext`, `textual-dev` from `pyproject.toml`.
-Remove the `ignore_imports` escape hatch from the import-linter config.
-Rewrite `athanore/__init__.py` to the 02 §Public API surface plus the
+and SSE; fan-out via API; requests answered through the API. There is no
+MVP teardown here (D65): no flat modules to delete, no `textual` /
+`netext` / `textual-dev` to drop, no `ignore_imports` hatch to remove,
+and no TUI — it stays in v0 and retires with it (D13, D67).
+Write `athanore/__init__.py` as the 02 §Public API surface plus the
 deprecated aliases (`warnings.warn` on attribute access via module
 `__getattr__`).
 **Tests.** `tests/test_public_api.py`: every name in 02 importable;
 aliases warn.
 **Done.** `find athanore -maxdepth 1 -name "*.py"` lists only
 `__init__.py`, `settings.py`, `logging.py`, `workflow.py`, `server.py`;
-`tests/test_e2e.py`, `test_api_surface.py`, `test_tui.py`,
-`test_gamedev.py` (moves to `examples/tests` in T075) accounted for.
+ledger rows for `test_e2e.py`, `test_api_surface.py` and `test_tui.py`
+(retired) ticked.
 
 ### T056 — Phase 3 checkpoint
 
@@ -1948,8 +1947,8 @@ state; `on` fires after commit; asset served with CSP.
 
 ### T074 — Move `workflow/` to `examples/` and port `feature_build` (A6.1)
 
-**Do.** `git mv workflow examples/workflows` (or flatten to
-`examples/{feature_build,gamedev,...}`); `examples/pyproject.toml`
+**Do.** Write `examples/{feature_build,gamedev,...}` fresh, with v0's
+`workflow/` package as the reference; `examples/pyproject.toml`
 gains `[project.entry-points."athanore.workflows"]` for each; port
 `feature_build`: `Workflow`, `ACPAgent`, `command=["npx","-y","pi-acp@X.Y.Z"]`
 pinned to the version in `uv.lock`/current install, `stats_provider=
@@ -1971,11 +1970,11 @@ panel/action from 09 §Declarations as the showcase (`/words` route,
 ### T076 — Port `claude_acp`, `docker_acp`, `examples/docker` (A6.1)
 
 **Do.** `claude_acp`: `command=["npx","-y","@agentclientprotocol/claude-agent-acp@X.Y.Z"]`,
-`model` only, `stats_provider=None`. `docker_acp`: `git mv docker examples/docker`; `command=["docker","run",
-"-i",…,"athanore/pi-acp"]`, `permission_policy="auto_allow"`, `public_url`
-set for the container; `compose.yaml` → `examples/docker/compose.yaml`
-(14 §Repository changes as written; the build stack lives in the driver
-repo, T000).
+`model` only, `stats_provider=None`. `docker_acp`: point it at the dev
+stack's sandbox rather than a new image — `command=["./scripts/agent.sh",
+"pi"]` (D64, D67) — with `permission_policy="auto_allow"` and
+`public_url` set for the container. No `examples/docker/` image of its
+own: `docker/dev` already is that image.
 **Done.** Both import and finalize under `examples/tests`.
 
 ### T077 — Live smoke scripts (A6.2)
