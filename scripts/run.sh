@@ -19,11 +19,10 @@ sync_python
 host="${ATHANORE_HOST:-127.0.0.1}"
 port="${ATHANORE_PORT:-4002}"
 
-if have_py athanore.cli; then
+if command -v athanore >/dev/null 2>&1; then
   exec uv run --no-sync athanore serve --host "$host" --port "$port" "$@"
 fi
 
-# T003 creates the package and T028 the CLI. Until then there is nothing
-# to serve, and saying so beats a stack trace.
-note "no athanore.cli yet (arrives in T028) — running the placeholder"
-exec uv run --no-sync python main.py
+# The CLI and its `serve` verb arrive in T052-T053. Until then there is
+# nothing to serve, and saying so beats a stack trace.
+die "no server yet: the \`athanore\` CLI and its \`serve\` verb arrive in T052-T053"

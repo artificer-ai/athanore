@@ -41,8 +41,14 @@ starting. Everything that matters is specified in `docs/v1/`:
 
 ## Current state of the tree
 
-- `main.py`, `pyproject.toml`, `.python-version`, `.gitignore` are `uv init`
-  placeholders. T001 and T002 replace them.
+- The `uv init` placeholders are gone: T001 rewrote `.gitignore`, T002
+  rewrote `pyproject.toml` and deleted `main.py`. `athanore/__init__.py`
+  exists but is empty; T003 creates the packages of 02 §Package layout.
+- This repository has **no MVP code** — the MVP lives in the neighbouring
+  `athanore` checkout and is the behavioural spec, not a coexisting
+  codebase (D65). Tasks that say "port `tests/test_x.py`" mean: write the
+  v1 test informed by that file and tick its row in
+  `docs/porting-ledger.md`.
 - Target package layout and the per-module responsibilities are in
   `docs/v1/02-architecture.md` §Package layout. Create modules there, not
   elsewhere.

@@ -70,9 +70,3 @@ dev_run() {
 sync_python() {
   uv sync --all-groups --all-extras
 }
-
-have_py() {
-  uv run --no-sync python -c \
-    "import importlib.util as u, sys; sys.exit(0 if u.find_spec('$1') else 1)" \
-    2>/dev/null
-}
