@@ -195,6 +195,48 @@ echo '{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":
 Host `~/.pi/agent/sessions` is mounted in, so pi's session JSONL is
 readable and `[stats]` lines carry real token counts (05 §Stats).
 
+### Driving the plan with v0
+
+The v1 tasks are executed by dispatching them to athanore **v0** — the
+MVP, in the sibling `athanore` checkout, tagged `v0.0.12`. It takes one
+task, hands it to a pi agent in `athanore/dev`, runs the gate, has a
+second agent review the commit, and shows the whole thing in its browser
+TUI.
+
+```sh
+./scripts/drive.sh up                     # orchestrator + TUI on :2424
+./scripts/drive.sh submit --dry-run       # what would be queued
+./scripts/drive.sh submit --only T003
+./scripts/drive.sh submit --from T003 --to T010
+./scripts/drive.sh logs
+./scripts/drive.sh down
+```
+
+The seat is `driver/athanore_build/feature.py`, workflow `v1_feature`:
+
+```
+implement ──▶ gate ──▶ review ──▶ done
+    ▲          │         │
+    └──────────┴─────────┘        both verdicts loop back, capped at
+                                  BUILDER_MAX_LOOPS (3), then the run fails
+```
+
+`gate` is deterministic — `./scripts/test.sh` in the sandbox, routing on
+the exit code — so no agent ever decides whether its own work passed.
+With `BUILDER_ATTENDED=1` (the default) `done` waits for you in the TUI
+before the next task goes out. Capacity 1 plus run order is the whole of
+"serial". Another seat is one module, one `wf`, one `register`.
+
+**v0 and v1 are both the `athanore` distribution** and must never share
+an environment (D67). They are separated by environment, not by
+renaming: v0 in the orchestrator's venv (a path source to the sibling
+checkout, `exclude`d from this workspace), v1 in `athanore/dev`. They
+meet only over `docker run -i` speaking ACP. The driver listens on 4102
+so it never collides with the v1 app on 4002.
+
+`driver/` is dev machinery, like the rest of the stack: nothing in
+`athanore/` may import it, and it targets v0's API, not v1's.
+
 ## Architecture rules that must hold
 
 - **Three rules only.** Signature is the graph, return value is the

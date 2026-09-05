@@ -15,22 +15,30 @@ in_container() { [ "${ATHANORE_IN_CONTAINER:-0}" = "1" ]; }
 die() { printf '%s\n' "$*" >&2; exit 1; }
 note() { printf '\033[2m%s\033[0m\n' "$*" >&2; }
 
+# Append a key only when it is missing, so a hand-edited `.env` survives
+# and a new key does not need a wipe.
+_env_default() {
+  grep -q "^$1=" "$ROOT/.env" 2>/dev/null && return 0
+  printf '%s=%s\n' "$1" "$2" >> "$ROOT/.env"
+}
+
 # `.env` holds only paths and ids, all derivable from the machine, so
 # write it rather than making the first run a chore. Never secrets.
 ensure_env() {
   local docker_gid
   if [ ! -f "$ROOT/.env" ]; then
-    docker_gid="$(getent group docker | cut -d: -f3)"
-    {
-      echo "# Written by scripts/_lib.sh. See .env.example for every key."
-      echo "WORKSPACE=$ROOT"
-      echo "HOST_HOME=$HOME"
-      echo "UID=$(id -u)"
-      echo "GID=$(id -g)"
-      echo "DOCKER_GID=${docker_gid:-999}"
-    } > "$ROOT/.env"
+    echo "# Written by scripts/_lib.sh. See .env.example for every key." \
+      > "$ROOT/.env"
     note "wrote $ROOT/.env"
   fi
+  docker_gid="$(getent group docker | cut -d: -f3)"
+  _env_default WORKSPACE "$ROOT"
+  _env_default HOST_HOME "$HOME"
+  _env_default UID "$(id -u)"
+  _env_default GID "$(id -g)"
+  _env_default DOCKER_GID "${docker_gid:-999}"
+  # The v0 checkout that drives the build (D67); a sibling by default.
+  _env_default MAIN_CHECKOUT "$(cd "$ROOT/.." && pwd)/athanore"
   # Bind-mount sources have to exist, or docker creates them as
   # root-owned directories.
   mkdir -p "$HOME/.pi/agent/sessions"

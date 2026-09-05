@@ -1,0 +1,24 @@
+[project]
+name = "athanore-build"
+version = "0"
+description = "v0 driver workflows that dispatch the v1 serial task plan"
+# v0 itself requires 3.13. This is dev machinery running v0, not
+# the v1 package, so it does not follow v1's 3.11 floor (D66).
+requires-python = ">=3.13"
+# textual-dev: v0 serves its browser TUI through textual-serve, which
+# is in v0's dev group and so not pulled in by a path dependency.
+dependencies = ["athanore", "httpx", "textual-dev"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["athanore_build"]
+
+# athanore **v0** — the MVP, the thing doing the dispatching. It is a
+# sibling checkout, not this project: v1 is also called `athanore` and
+# the two must never share an environment (D67). The orchestrator syncs
+# this project into its own venv at startup, when the mount exists.
+[tool.uv.sources]
+athanore = { path = "../../athanore" }

@@ -43,6 +43,10 @@ dev = [
 
 [tool.uv.workspace]
 members = ["examples"]
+# driver/ is athanore **v0** (the MVP driving this build). Same
+# distribution name as this project, so it must never resolve into this
+# workspace's environment (D67).
+exclude = ["driver"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["athanore"]
