@@ -239,11 +239,11 @@ specs it cites are in the checkout the agent works in, so the run carries
 a pointer, not a copy. Any other title is a free-form feature described
 by the notes you pass. Capacity 1 keeps a loop of them serial.
 
-A `docs/plans/<task-id>*.md` is picked up automatically and named in the
-run description. That is where a task's implementation plan goes when one
-is written ahead of dispatch: the fenced scope, the file-by-file steps and
-the verification a reviewer and QA will ask for. Write the plan, then
-submit.
+A `docs/plans/<task-id>*.md` is where a task's implementation plan goes:
+the fenced scope, the file-by-file steps, and the verification a reviewer
+and QA will ask for. The `implement` node looks for it when it runs, not
+when the run was submitted, so a plan written after a batch was queued
+still reaches the agent that builds that task.
 
 The seat is `driver/athanore_build/feature.py`, workflow `v1_feature`:
 
@@ -271,10 +271,12 @@ and an exit code decide, never an agent:
 - **review** reads the whole branch diff and the gate's output; **qa**
   exercises the running feature (imports, CLI, the app's endpoints, the
   SPA under Playwright) and reports what it actually ran.
-- **approve** is the human gate: with `BUILDER_ATTENDED=1` (the default)
-  it waits in the TUI, holding the pool's one slot, which is what keeps
-  the plan serial while you read. Answering `stop` pauses the rest of the
-  queue and ends the run at `halted`, unmerged.
+- **approve** is the human gate: with `BUILDER_ATTENDED=1` it waits in
+  the TUI, holding the pool's one slot, which is what keeps the plan
+  serial while you read, and answering `stop` pauses the rest of the
+  queue and ends the run at `halted`, unmerged. With `BUILDER_ATTENDED=0`
+  (what `.env` sets now) it routes straight to `merge`, and review and QA
+  are the last word before `main`.
 - **merge** lands the branch `--no-ff` on `main` and deletes it: one
   merge commit per task, with its work underneath.
 

@@ -31,6 +31,7 @@ from .sandbox import (
     branch_name,
     git,
     git_try,
+    plan_docs,
     run_gate,
     unique_branch,
 )
@@ -247,6 +248,14 @@ async def implement(gate, *, payload):
     prompt = f"Implement {task_id} on branch `{branch}`."
     if description:
         prompt += f"\n\n{description}"
+    plans = plan_docs(task_id)
+    if plans:
+        prompt += (
+            "\n\nThe implementation plan is "
+            + ", ".join(f"`{p}`" for p in plans)
+            + ". Follow it: it fences the scope against the tasks either side "
+            "and says what done means."
+        )
     if feedback:
         prompt += (
             "\n\nA previous attempt did not pass. Fix this, and only this:\n"
@@ -256,7 +265,10 @@ async def implement(gate, *, payload):
     result = await ImplementerAgent().run(prompt)
     report = result.output.model_dump()
     _log("implement", f"{task_id}: {report['headline']}")
-    return gate({**payload, "report": report})
+    # The first attempt names the task; later attempts name the fix. The
+    # merge commit wants the former.
+    headline = str(payload.get("headline") or report["headline"])
+    return gate({**payload, "report": report, "headline": headline})
 
 
 @wf.node()
@@ -396,7 +408,7 @@ async def merge(*, payload):
     one commit."""
     task_id, branch, base = _task_id(payload), payload["branch"], payload["base"]
     report = payload.get("report") or {}
-    headline = str(report.get("headline") or "").strip()
+    headline = str(payload.get("headline") or report.get("headline") or "").strip()
 
     # QA runs after the gate and may have scribbled on tracked files while
     # exercising the app. Everything real was committed before the gate, so

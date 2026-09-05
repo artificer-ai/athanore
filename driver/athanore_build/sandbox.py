@@ -15,6 +15,7 @@ something an agent can talk its way through.
 """
 
 import asyncio
+import glob
 import os
 import re
 
@@ -103,6 +104,14 @@ def branch_name(task_id: str) -> str:
     Case is kept: the task ids in the plan are `T003`, not `t003`."""
     slug = re.sub(r"[^A-Za-z0-9._-]+", "-", task_id).strip("-.")
     return f"feat/{slug or 'task'}"
+
+
+def plan_docs(task_id: str) -> list[str]:
+    """`docs/plans/<task-id>*.md`, checkout-relative. Looked up when the
+    node runs, not when the run was submitted: a plan written after a
+    batch was queued still reaches the agent that builds the task."""
+    pattern = os.path.join(WORKSPACE, "docs", "plans", f"{task_id}*.md")
+    return sorted(os.path.relpath(p, WORKSPACE) for p in glob.glob(pattern))
 
 
 async def branch_exists(name: str) -> bool:
