@@ -70,7 +70,9 @@ starting. Everything that matters is specified in `docs/v1/`:
    know its sha — `git log --grep "^T012:"` finds it otherwise). Tasks are
    serial: do not skip ahead and do not have two half-finished.
 2. Read the task's **Do**, **Tests**, and **Done** blocks and every spec
-   section it cites. Do only that task.
+   section it cites, plus `docs/plans/<task-id>*.md` if one exists — that
+   is the implementation plan for the task, and it fences the scope
+   against the tasks either side. Do only that task.
 3. Implement, adding tests at the lowest layer that can express the
    behaviour (`docs/v1/13-testing.md` §Pyramid).
 4. Run the gate until it is green (see Commands).
@@ -236,6 +238,12 @@ gets a description pointing at its heading in the plan — the plan and the
 specs it cites are in the checkout the agent works in, so the run carries
 a pointer, not a copy. Any other title is a free-form feature described
 by the notes you pass. Capacity 1 keeps a loop of them serial.
+
+A `docs/plans/<task-id>*.md` is picked up automatically and named in the
+run description. That is where a task's implementation plan goes when one
+is written ahead of dispatch: the fenced scope, the file-by-file steps and
+the verification a reviewer and QA will ask for. Write the plan, then
+submit.
 
 The seat is `driver/athanore_build/feature.py`, workflow `v1_feature`:
 
