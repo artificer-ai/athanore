@@ -307,7 +307,10 @@ subpackages trivially pass).
 ### T006 — CI workflow (A0.5)
 
 **Do.** `.github/workflows/ci.yml`: job `python` (uv sync, ruff, pyright,
-lint-imports, pytest with `--cov`), job `web` (placeholder until T008:
+lint-imports, pytest with `--cov`) over a `python-version` matrix of
+`3.11`, `3.12`, `3.13` so the supported floor is tested and not just
+declared (D66); ruff, pyright and lint-imports run once, on 3.13. Job
+`web` (placeholder until T008:
 `pnpm install --frozen-lockfile`, `pnpm typecheck`, `pnpm lint`,
 `pnpm test`, `pnpm build`), job `contract` (T008's freshness check).
 `.github/workflows/nightly.yml`: Postgres service container, `uv run

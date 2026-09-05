@@ -151,6 +151,7 @@ for one minor version (14).
 | Retries in clients | httpx transport `retries=` | Connection-level retries only, in the CLI; never in the engine (rule 3 owns retries) |
 | Tests | pytest, pytest-asyncio, hypothesis (graph parsing), respx | See 13 |
 | Lint / types | ruff, pyright (strict on `graph`, `engine`, `store`), import-linter | |
+| Python | 3.11+; 3.13 in the dev stack and the CI default | `StrEnum` (events, error codes) and `asyncio.timeout` (the three nested timeouts of D60) are the floor; every runtime dependency already supports 3.11 (D66) |
 | Packaging | uv, hatchling; `athanore[postgres]` extra | |
 | Frontend | Vite, React 19, TypeScript strict, TanStack Router + Query, Tailwind v4, shadcn/ui, react-hook-form + zod, `@rjsf/core` + `@rjsf/shadcn` (JSON-Schema forms), cmdk, Phosphor icons, `@fontsource-variable/jetbrains-mono`, react-markdown + shiki (lazy), @tanstack/react-virtual, react-resizable-panels, `@hey-api/openapi-ts` (client + TanStack Query options), Vitest + Testing Library + Playwright | See 10; the design mock's single-page dashboard |
 

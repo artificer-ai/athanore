@@ -234,7 +234,10 @@ readable and `[stats]` lines carry real token counts (05 §Stats).
 
 Fixed by `docs/v1/02-architecture.md` §Library choices. Do not substitute.
 
-- Python 3.13, uv, hatchling. FastAPI + uvicorn, pydantic v2,
+- Python 3.11+ (D66; the dev stack and CI's default are 3.13). `StrEnum`
+  and `asyncio.timeout` set the floor — do not reach below them, and do
+  not use a 3.12+ feature (PEP 695 generics, `@override`) without moving
+  the floor first. uv, hatchling. FastAPI + uvicorn, pydantic v2,
   pydantic-settings (`ATHANORE_*` env, `athanore.toml`).
 - SQLAlchemy 2.0 **Core** (async, no ORM) + Alembic; aiosqlite by default,
   asyncpg behind the `postgres` extra. SQLite in WAL mode.

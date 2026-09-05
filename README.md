@@ -131,7 +131,7 @@ per-module breakdown and the layering rule.
 
 ## Development
 
-Python 3.13 with [uv](https://docs.astral.sh/uv/); Node with pnpm once the
+Python 3.11+ with [uv](https://docs.astral.sh/uv/); Node with pnpm once the
 `web/` scaffold lands.
 
 ```sh
