@@ -9,8 +9,9 @@ rest of ``athanore``.
 from __future__ import annotations
 
 import inspect
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 
 class GraphError(Exception):
@@ -81,9 +82,7 @@ def _parse_signature(fn: Callable[..., Any]) -> tuple[list[str], str | None]:
             if payload_param is None:
                 payload_param = param.name
         else:
-            raise GraphError(
-                f"node {fn.__name__!r}: *args/**kwargs are not supported"
-            )
+            raise GraphError(f"node {fn.__name__!r}: *args/**kwargs are not supported")
     return edges, payload_param
 
 
