@@ -2,11 +2,16 @@
 # Drive the v1 plan with athanore v0.
 #
 #   ./scripts/drive.sh up                    # start the orchestrator + TUI
-#   ./scripts/drive.sh submit --dry-run      # list what would be queued
-#   ./scripts/drive.sh submit --only T003
-#   ./scripts/drive.sh submit --from T003 --to T010
+#   ./scripts/drive.sh submit T003           # one task of the plan
+#   ./scripts/drive.sh submit T003 "use the sqlite path, not the pg one"
+#   ./scripts/drive.sh submit "sse replay cap" "see docs/v1/08-api.md"
 #   ./scripts/drive.sh logs                  # follow it
 #   ./scripts/drive.sh down
+#
+# A run is one POST; several tasks are a shell loop, and capacity 1 keeps
+# them serial:
+#
+#   for t in T003 T004 T005; do ./scripts/drive.sh submit $t; done
 #
 # v0 runs in its own container and its own venv — it is the same
 # distribution name as v1 and the two must never meet in one environment
@@ -30,8 +35,31 @@ case "$cmd" in
   down)  compose --profile drive down ;;
   logs)  compose_exec --profile drive logs -f orchestrator ;;
   submit)
-    compose_exec --profile drive exec orchestrator bash -lc \
-      "cd \"\$WORKSPACE/driver\" && uv run python -m athanore_build.submit_plan $*"
+    title="${1:-}"; shift || true
+    [ -n "$title" ] || die "usage: $0 submit <task-id|title> [notes...]"
+    # A plan task is a pointer: the plan section and the specs it cites
+    # are the real text, and they are in the checkout the agent works in.
+    # Anything else is a free-form feature, described by the notes.
+    body="$(TITLE="$title" NOTES="$*" python3 -c '
+import json, os, re
+title, notes = os.environ["TITLE"], os.environ["NOTES"].strip()
+plan = "docs/v1/17-serial-task-plan.md"
+if re.fullmatch(r"T\d{3}[a-z]?", title):
+    text = (
+        f"{title} is specified in `{plan}`, under the heading `### {title}`. "
+        "That section\u2019s **Do**, **Tests** and **Done** blocks are the "
+        "specification; read it and every `docs/v1/` section it cites before "
+        "you write anything."
+    )
+    if notes:
+        text += f"\n\nOperator notes: {notes}"
+else:
+    text = notes
+print(json.dumps({"title": title, "description": text}))')"
+    curl -fsS -X POST \
+      "http://127.0.0.1:${BUILDER_PORT:-4102}/api/workflows/v1_feature/runs" \
+      -H 'content-type: application/json' -d "$body"
+    echo
     ;;
   *) die "usage: $0 <up|down|logs|submit> [args...]" ;;
 esac

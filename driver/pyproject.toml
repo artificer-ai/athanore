@@ -7,7 +7,7 @@ description = "v0 driver workflows that dispatch the v1 serial task plan"
 requires-python = ">=3.13"
 # textual-dev: v0 serves its browser TUI through textual-serve, which
 # is in v0's dev group and so not pulled in by a path dependency.
-dependencies = ["athanore", "httpx", "textual-dev"]
+dependencies = ["athanore", "textual-dev"]
 
 [build-system]
 requires = ["hatchling"]

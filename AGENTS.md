@@ -218,12 +218,20 @@ its browser TUI.
 
 ```sh
 ./scripts/drive.sh up                     # orchestrator + TUI on :2424
-./scripts/drive.sh submit --dry-run       # what would be queued
-./scripts/drive.sh submit --only T003
-./scripts/drive.sh submit --from T003 --to T010
+./scripts/drive.sh submit T003            # one task of the plan
+./scripts/drive.sh submit T003 "notes for the implementer"
+./scripts/drive.sh submit "sse replay cap" "see docs/v1/08-api.md"
+for t in T003 T004 T005; do ./scripts/drive.sh submit $t; done
 ./scripts/drive.sh logs
 ./scripts/drive.sh down
 ```
+
+A run is one `POST /api/workflows/v1_feature/runs` with a `title` and a
+`description`; `submit` is that POST and nothing else. A `Txxx` title
+gets a description pointing at its heading in the plan — the plan and the
+specs it cites are in the checkout the agent works in, so the run carries
+a pointer, not a copy. Any other title is a free-form feature described
+by the notes you pass. Capacity 1 keeps a loop of them serial.
 
 The seat is `driver/athanore_build/feature.py`, workflow `v1_feature`:
 

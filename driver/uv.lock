@@ -197,14 +197,12 @@ version = "0"
 source = { editable = "." }
 dependencies = [
     { name = "athanore" },
-    { name = "httpx" },
     { name = "textual-dev" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "athanore", directory = "../../athanore" },
-    { name = "httpx" },
     { name = "textual-dev" },
 ]
 

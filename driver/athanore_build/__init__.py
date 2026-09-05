@@ -6,6 +6,6 @@ v1 package it is building. The two are both called `athanore`, so they
 live in separate environments and only ever meet over the container
 boundary (D67).
 
-    docker compose --profile drive up -d orchestrator
-    ./scripts/drive.sh submit --only T003
+    ./scripts/drive.sh up
+    ./scripts/drive.sh submit T003
 """
