@@ -80,9 +80,10 @@ marked. Each has a reason; reversing one means editing this table.
    after real usage.
 3. Whether the inbox should support bulk "allow all from this task".
    Leaning yes, as a plugin action on the `requests` builtin.
-4. `docs/design/*` and `docs/bugs/*` are git-ignored. The findings v1
-   cites are now folded into 20 (D59), so this no longer blocks anything;
-   what remains is whether to un-ignore the history for its own sake.
+4. **Closed by D59 (T001).** `docs/design/*` and `docs/bugs/*` are
+   git-ignored in the MVP repository. The findings v1 cites are folded
+   into 20, so `docs/v1/` is self-contained and nothing depends on that
+   history. Un-ignoring it for its own sake is not a v1 question.
 5. Run retention. Runs never expire and `GET /api/runs` returns them
    whole; fine for months of local use, but an `archived` flag or a
    default `?limit=` will be wanted before the list stops being "small".

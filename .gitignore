@@ -20,5 +20,11 @@ athanore.db-shm
 athanore.db-wal
 .athanore/
 
-# node
-node_modules/
+# Frontend (T007 onward). The wheel ships athanore/web/dist via hatch
+# `artifacts`, so the build output is ignored but the directory is not.
+web/node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/
+athanore/web/dist/
+!athanore/web/dist/.gitkeep
