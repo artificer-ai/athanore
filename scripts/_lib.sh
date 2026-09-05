@@ -31,7 +31,9 @@ ensure_env() {
       > "$ROOT/.env"
     note "wrote $ROOT/.env"
   fi
-  docker_gid="$(getent group docker | cut -d: -f3)"
+  # No docker group at all on rootless Docker, Docker Desktop, or inside
+  # a container. `getent` exits 2 there, which pipefail would make fatal.
+  docker_gid="$(getent group docker 2>/dev/null | cut -d: -f3 || true)"
   _env_default WORKSPACE "$ROOT"
   _env_default HOST_HOME "$HOME"
   _env_default UID "$(id -u)"

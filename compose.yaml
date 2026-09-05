@@ -52,6 +52,25 @@ x-environment: &environment
   - ATHANORE_TEST_PG_URL=postgresql+asyncpg://postgres:athanore@127.0.0.1:${POSTGRES_PORT:-5433}/postgres
   - WORKSPACE=${WORKSPACE}
 
+# The agents get everything above plus a fixed identity, so a commit an
+# agent makes is recognisable as one and your own identity can never leak
+# onto it. Kept off `dev` and `app`: those are you, with your ~/.gitconfig.
+x-agent-environment: &agent-environment
+  - OPENROUTER_API_KEY
+  - ANTHROPIC_API_KEY
+  - CLAUDE_CODE_OAUTH_TOKEN
+  - ATHANORE_HOST=${ATHANORE_HOST:-127.0.0.1}
+  - ATHANORE_PORT=${ATHANORE_PORT:-4002}
+  - ATHANORE_TEST_PG_URL=postgresql+asyncpg://postgres:athanore@127.0.0.1:${POSTGRES_PORT:-5433}/postgres
+  - WORKSPACE=${WORKSPACE}
+  - GIT_AUTHOR_NAME=athanore-builder
+  - GIT_AUTHOR_EMAIL=builder@athanore.local
+  - GIT_COMMITTER_NAME=athanore-builder
+  - GIT_COMMITTER_EMAIL=builder@athanore.local
+  # The v0 checkout: the reference the plan calls "the MVP". Goes when
+  # v0 goes (D67).
+  - MVP_CHECKOUT=${MAIN_CHECKOUT}
+
 x-volumes: &volumes
   # Same absolute path inside and out (see the header).
   - ${WORKSPACE}:${WORKSPACE}
@@ -66,6 +85,8 @@ x-volumes: &volumes
   # pi writes its session JSONL here; athanore reads it for the token
   # counts in `[stats]` lines (05 §Stats).
   - ${HOST_HOME}/.pi/agent/sessions:/home/agent/.pi/agent/sessions
+  # The v0 checkout, at its own host path like everything else.
+  - ${MAIN_CHECKOUT}:${MAIN_CHECKOUT}
   # Claude Code's credentials and settings live on a volume, not on a
   # bind mount of the host ~/.claude: the container authenticates once
   # (`./scripts/dev.sh "claude setup-token"`) and keeps its own state.
@@ -84,6 +105,7 @@ services:
       - athanore-pnpm-store:/home/agent/.local/share/pnpm/store
       - athanore-ms-playwright:/home/agent/ms-playwright
       - ${HOST_HOME}/.pi/agent/sessions:/home/agent/.pi/agent/sessions
+      - ${MAIN_CHECKOUT}:${MAIN_CHECKOUT}
       - athanore-claude:/home/agent/.claude
       - ${HOST_HOME}/.gitconfig:/home/agent/.gitconfig:ro
       # Sibling sandboxes for examples/docker_acp.
@@ -105,6 +127,7 @@ services:
       - athanore-pnpm-store:/home/agent/.local/share/pnpm/store
       - athanore-ms-playwright:/home/agent/ms-playwright
       - ${HOST_HOME}/.pi/agent/sessions:/home/agent/.pi/agent/sessions
+      - ${MAIN_CHECKOUT}:${MAIN_CHECKOUT}
       - athanore-claude:/home/agent/.claude
       - ${HOST_HOME}/.gitconfig:/home/agent/.gitconfig:ro
       - /var/run/docker.sock:/var/run/docker.sock
@@ -128,7 +151,7 @@ services:
   #   docker compose run --rm -T agent-pi
   agent-pi:
     <<: [*build, *runtime]
-    environment: *environment
+    environment: *agent-environment
     volumes: *volumes
     stdin_open: true
     tty: false
@@ -136,7 +159,7 @@ services:
 
   agent-claude:
     <<: [*build, *runtime]
-    environment: *environment
+    environment: *agent-environment
     volumes: *volumes
     stdin_open: true
     tty: false

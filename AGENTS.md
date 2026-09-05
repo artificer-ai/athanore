@@ -173,6 +173,12 @@ a sibling container per agent (`docker compose run --rm -T agent-pi`); the
 same workflow running under `./scripts/run.sh` spawns the adapter as an
 in-process subprocess. The container is the guardrail either way, so these
 agents run with `permission_policy="auto_allow"` (05 §User-land adapters).
+It is also exactly how v0 dispatches today (below), so there is one
+definition of the sandbox rather than one per driver.
+
+The agent services carry a fixed `athanore-builder` git identity, so a
+commit an agent makes is recognisable as one; `dev` and `app` do not, and
+mount your `~/.gitconfig` instead.
 
 Authenticating them, once each:
 
@@ -227,12 +233,18 @@ With `BUILDER_ATTENDED=1` (the default) `done` waits for you in the TUI
 before the next task goes out. Capacity 1 plus run order is the whole of
 "serial". Another seat is one module, one `wf`, one `register`.
 
+v0 does not know how to run a container. It dispatches through
+`./scripts/agent.sh` and runs the gate through `./scripts/test.sh` — the
+same two scripts you run, and the same two a v1 workflow will run after
+the port. `compose.yaml` is the one definition of the sandbox, so there
+is nothing to keep in step.
+
 **v0 and v1 are both the `athanore` distribution** and must never share
 an environment (D67). They are separated by environment, not by
 renaming: v0 in the orchestrator's venv (a path source to the sibling
 checkout, `exclude`d from this workspace), v1 in `athanore/dev`. They
-meet only over `docker run -i` speaking ACP. The driver listens on 4102
-so it never collides with the v1 app on 4002.
+meet only through `scripts/agent.sh`, speaking ACP over stdio. The
+driver listens on 4102 so it never collides with the v1 app on 4002.
 
 `driver/` is dev machinery, like the rest of the stack: nothing in
 `athanore/` may import it, and it targets v0's API, not v1's.

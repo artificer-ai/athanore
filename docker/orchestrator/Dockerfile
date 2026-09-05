@@ -24,7 +24,8 @@ RUN apt-get update \
       ca-certificates curl gnupg git \
  && rm -rf /var/lib/apt/lists/*
 
-# The docker CLI: v0 spawns the sandbox through the mounted socket.
+# The docker CLI *and* the compose plugin: v0 dispatches through
+# ./scripts/agent.sh and ./scripts/test.sh, which are compose calls.
 RUN install -m 0755 -d /etc/apt/keyrings \
  && curl -fsSL https://download.docker.com/linux/debian/gpg \
       -o /etc/apt/keyrings/docker.asc \
@@ -32,7 +33,7 @@ RUN install -m 0755 -d /etc/apt/keyrings \
  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bookworm stable" \
       > /etc/apt/sources.list.d/docker.list \
  && apt-get update \
- && apt-get install -y --no-install-recommends docker-ce-cli \
+ && apt-get install -y --no-install-recommends docker-ce-cli docker-compose-plugin \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=uv /uv /uvx /usr/local/bin/

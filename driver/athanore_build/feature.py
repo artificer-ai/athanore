@@ -93,7 +93,7 @@ async def implement(gate, *, payload):
 @wf.node()
 async def gate(review, implement, *, payload):
     """Deterministic: the gate decides, not an agent."""
-    code, tail = await run_gate(GATE_COMMAND)
+    code, tail = await run_gate()
     _log("gate", f"gate {'PASS' if code == 0 else f'FAIL ({code})'}\n{tail}")
     if code == 0:
         return review(payload)
