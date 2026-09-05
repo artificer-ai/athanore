@@ -9,3 +9,16 @@ wheels/
 # Virtual environments
 .venv
 
+# Dev stack (compose.yaml, docker/dev, scripts/). Paths and ids, written
+# on first use by scripts/_lib.sh; .env.example is the committed one.
+.env
+
+# Local server state. `operator_token` lives in .athanore/token and is
+# refused in athanore.toml (12 §Auth).
+athanore.db
+athanore.db-shm
+athanore.db-wal
+.athanore/
+
+# node
+node_modules/

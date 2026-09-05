@@ -69,6 +69,8 @@ marked. Each has a reason; reversing one means editing this table.
 | D60 | Three timeouts nest (node, agent, wait); node timeout raises `TimeoutError` in the body, agent timeout raises `AgentError` after recording stats, both retryable; failed `AgentResult` is returned, not raised | **new (gap review)** | Which clock fired and what a body sees was implicit across 04 and 05 |
 | D61 | Verbatim prompt blocks (19) are part of the contract and byte-tested; only the `/api/agent/` path and header-only token differ from the MVP | **new (gap review)** | Every example was tuned against that wording; drift would show up as example regressions with no test pointing at the cause |
 
+| D64 | The dev stack (`compose.yaml`, `docker/dev/`, `scripts/`) lives in this repository, not in the separate `athanore-build` repo T000 assumed; one image backs the `dev` shell, the `app` server, the `web` server and both ACP agents, and the `scripts/` wrappers run the same on the host and inside the container | **new (2026-09-05)** | The gate an agent runs has to be the gate a human runs; a second repository holding the toolchain is a second thing to keep in step. T000's driver workflows (v0 dispatching the plan) remain out of scope here |
+
 ## Open questions (not blocking)
 
 1. Should `allow_always` answers be surfaced as a per-run allowlist the

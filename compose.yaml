@@ -1,0 +1,175 @@
+# The v1 dev stack. One image (docker/dev/Dockerfile) behind every
+# service, so the gate a human runs and the gate an agent runs are the
+# same gate.
+#
+#   docker compose build                        # build athanore/dev
+#   ./scripts/run.sh                            # serve the app
+#   ./scripts/test.sh                           # the gate
+#   ./scripts/dev.sh "uv run pytest -q"         # anything else
+#   ./scripts/agent.sh pi                       # ACP over stdin/stdout
+#
+# `.env` is written on first use by scripts/_lib.sh (WORKSPACE, UID/GID,
+# DOCKER_GID, HOST_HOME). It is git-ignored; `.env.example` is committed.
+# Secrets are passed through from the shell, never written to a file.
+#
+# Every service uses host networking and mounts the worktree at its OWN
+# host path: athanore hands agents a task API URL and a `cwd`, and both
+# have to mean the same thing inside and outside the container.
+
+name: athanore
+
+x-build: &build
+  image: athanore/dev:latest
+  build:
+    context: docker/dev
+    args:
+      UID: ${UID:-1000}
+      GID: ${GID:-1000}
+      UV_VERSION: ${UV_VERSION:-0.12.10}
+      PYTHON_VERSION: ${PYTHON_VERSION:-3.13}
+      PI_VERSION: ${PI_VERSION:-0.85.1}
+      PI_ACP_VERSION: ${PI_ACP_VERSION:-0.0.33}
+      CLAUDE_CODE_VERSION: ${CLAUDE_CODE_VERSION:-2.1.261}
+      CLAUDE_ACP_VERSION: ${CLAUDE_ACP_VERSION:-0.75.1}
+      PLAYWRIGHT_VERSION: ${PLAYWRIGHT_VERSION:-1.63.0}
+      WITH_BROWSERS: ${WITH_BROWSERS:-0}
+
+x-runtime: &runtime
+  init: true
+  # Loopback binds need no operator token (12), the LAN model endpoint is
+  # reachable as-is, and the task API URL the agent is handed resolves.
+  network_mode: host
+  working_dir: ${WORKSPACE}
+
+x-environment: &environment
+  # Secrets: pass-through from the host shell only.
+  - OPENROUTER_API_KEY
+  - ANTHROPIC_API_KEY
+  - CLAUDE_CODE_OAUTH_TOKEN
+  - ATHANORE_HOST=${ATHANORE_HOST:-127.0.0.1}
+  - ATHANORE_PORT=${ATHANORE_PORT:-4002}
+  # Postgres variants of the store suite (T014); `--profile pg` first.
+  - ATHANORE_TEST_PG_URL=postgresql+asyncpg://postgres:athanore@127.0.0.1:${POSTGRES_PORT:-5433}/postgres
+  - WORKSPACE=${WORKSPACE}
+
+x-volumes: &volumes
+  # Same absolute path inside and out (see the header).
+  - ${WORKSPACE}:${WORKSPACE}
+  # uv venv + cache outside the worktree so the host .venv is never
+  # rewritten, and the pnpm store so `pnpm install` is not a redownload.
+  # web/node_modules deliberately stays inside the bind mount: a named
+  # volume there would create a root-owned directory on the host.
+  - athanore-venv:/home/agent/venv
+  - athanore-uv-cache:/home/agent/.cache/uv
+  - athanore-pnpm-store:/home/agent/.local/share/pnpm/store
+  - athanore-ms-playwright:/home/agent/ms-playwright
+  # pi writes its session JSONL here; athanore reads it for the token
+  # counts in `[stats]` lines (05 §Stats).
+  - ${HOST_HOME}/.pi/agent/sessions:/home/agent/.pi/agent/sessions
+  # Claude Code's credentials and settings live on a volume, not on a
+  # bind mount of the host ~/.claude: the container authenticates once
+  # (`./scripts/dev.sh "claude setup-token"`) and keeps its own state.
+  - athanore-claude:/home/agent/.claude
+
+services:
+  # A shell on the image. The workhorse:
+  #   docker compose run --rm dev "uv run pytest -q"
+  dev:
+    <<: [*build, *runtime]
+    environment: *environment
+    volumes:
+      - ${WORKSPACE}:${WORKSPACE}
+      - athanore-venv:/home/agent/venv
+      - athanore-uv-cache:/home/agent/.cache/uv
+      - athanore-pnpm-store:/home/agent/.local/share/pnpm/store
+      - athanore-ms-playwright:/home/agent/ms-playwright
+      - ${HOST_HOME}/.pi/agent/sessions:/home/agent/.pi/agent/sessions
+      - athanore-claude:/home/agent/.claude
+      - ${HOST_HOME}/.gitconfig:/home/agent/.gitconfig:ro
+      # Sibling sandboxes for examples/docker_acp.
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - ${DOCKER_GID:-999}
+    entrypoint: ["bash", "-lc"]
+    command: ["./scripts/test.sh"]
+
+  # The server. Loopback on the host, so the SPA, the CLI and agents all
+  # reach it at http://127.0.0.1:4002 with no operator token (12).
+  app:
+    <<: [*build, *runtime]
+    environment: *environment
+    volumes:
+      - ${WORKSPACE}:${WORKSPACE}
+      - athanore-venv:/home/agent/venv
+      - athanore-uv-cache:/home/agent/.cache/uv
+      - athanore-pnpm-store:/home/agent/.local/share/pnpm/store
+      - athanore-ms-playwright:/home/agent/ms-playwright
+      - ${HOST_HOME}/.pi/agent/sessions:/home/agent/.pi/agent/sessions
+      - athanore-claude:/home/agent/.claude
+      - ${HOST_HOME}/.gitconfig:/home/agent/.gitconfig:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+    group_add:
+      - ${DOCKER_GID:-999}
+    entrypoint: ["bash", "-lc"]
+    command: ["./scripts/run.sh"]
+    stop_grace_period: 30s
+
+  # Vite dev server, from T007. `docker compose --profile web up web`.
+  web:
+    <<: [*build, *runtime]
+    profiles: ["web"]
+    environment: *environment
+    volumes: *volumes
+    entrypoint: ["bash", "-lc"]
+    command: ["pnpm --dir web install && pnpm --dir web dev --host ${WEB_HOST:-127.0.0.1} --port ${WEB_PORT:-5173}"]
+
+  # ACP agents. JSON-RPC on stdin/stdout: stdin open, never a TTY, and
+  # nothing else may write to stdout.
+  #   docker compose run --rm -T agent-pi
+  agent-pi:
+    <<: [*build, *runtime]
+    environment: *environment
+    volumes: *volumes
+    stdin_open: true
+    tty: false
+    entrypoint: ["pi-acp"]
+
+  agent-claude:
+    <<: [*build, *runtime]
+    environment: *environment
+    volumes: *volumes
+    stdin_open: true
+    tty: false
+    entrypoint: ["claude-agent-acp"]
+
+  # The nightly Postgres variants of the store suite (T014). Bridge
+  # networking with a published port, so the host-networked services
+  # reach it at 127.0.0.1:5433 and it never collides with a local 5432.
+  postgres:
+    profiles: ["pg"]
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: athanore
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - athanore-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  athanore-venv:
+    name: athanore-venv
+  athanore-uv-cache:
+    name: athanore-uv-cache
+  athanore-pnpm-store:
+    name: athanore-pnpm-store
+  athanore-ms-playwright:
+    name: athanore-ms-playwright
+  athanore-claude:
+    name: athanore-claude
+  athanore-postgres:
+    name: athanore-postgres

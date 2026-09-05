@@ -1,0 +1,5 @@
+{
+  "defaultProvider": "openrouter",
+  "defaultModel": "qwen/qwen3.8-27b",
+  "defaultThinkingLevel": "low"
+}
