@@ -150,6 +150,7 @@ GraphError, Node, Transition`. Create `athanore/workflow.py` with
 `Workflow = AthanoreWorkflow` for now (the real class arrives in T020).
 **Done.** `python -c "import athanore.graph, athanore.engine,
 athanore.store"` works.
+**Status.** Done.
 
 ### T004 — `AthanoreSettings` (A0.2)
 

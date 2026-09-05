@@ -1,0 +1,1 @@
+"""One repository per aggregate."""
