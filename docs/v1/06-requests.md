@@ -41,6 +41,7 @@ async def answer(request_id, *, option_id=None, value=None, author="user") -> An
 async def wait(request_id, timeout=None) -> Answer   # claims (consumed=1); raises TimeoutError
 async def poll(request_id, wait_s) -> Answer | None  # HTTP ask long-poll; idempotent re-delivery
 def register_validator(request_id, fn); def unregister_validator(request_id)
+def register_schema_validator(request_id, schema)   # the same, for a registrant holding a JSON schema (the ACP bridge, 05)
 async def list_for_run(run_id) -> list[RequestView]; async def inbox() -> list[RequestView]
 ```
 
@@ -51,7 +52,9 @@ Validation happens where the answer lands (`answer()`):
 - `form`: must be an object; if a validator is registered it runs and may
   normalise the value → else `InvalidAnswer` with pydantic-style errors
   (422). `human_input` registers `output_model.model_validate`; the ACP
-  bridge and HTTP ask register the light JSON-schema validator.
+  bridge and HTTP ask register the light JSON-schema validator — the
+  bridge through `register_schema_validator`, because `athanore.agents`
+  may not import `athanore.requests` to build one (02 §Layering, D123).
 - A second answer → `AlreadyAnswered` (409).
 - A request whose task is no longer `in_progress`/`waiting` → `Stale` (409).
 

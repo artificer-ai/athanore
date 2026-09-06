@@ -122,6 +122,7 @@ ignore_imports = [
     "athanore.agents.base -> athanore.engine.context",
     "athanore.agents.submissions -> athanore.engine.context",
     "athanore.agents.stats -> athanore.engine.context",
+    "athanore.agents.policies -> athanore.engine.context",
 ]
 
 [[tool.importlinter.contracts]]
