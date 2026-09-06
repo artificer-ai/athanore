@@ -80,6 +80,24 @@ def test_python_job_runs_every_step_of_the_gate(ci: Workflow) -> None:
     assert "lint-imports" in ran
 
 
+def test_python_job_gates_the_coverage_of_graph_and_engine(ci: Workflow) -> None:
+    """13 §CI's 95 % threshold, on the paths T028 put it on.
+
+    The gate reads the data file the `pytest` step wrote, so the suite
+    runs once and the threshold is applied to what all of it covered —
+    which is why it is `coverage report --fail-under` rather than a
+    second, narrower pytest run (D112).
+    """
+    ran = commands(ci["jobs"]["python"])
+    assert "coverage report" in ran
+    assert "--include='athanore/graph/*,athanore/engine/*'" in ran
+    assert "--fail-under=95" in ran
+    # Measured before it is gated: the report has nothing to read
+    # otherwise.
+    steps_run = [step.get("name") for step in steps(ci["jobs"]["python"])]
+    assert steps_run.index("pytest") < steps_run.index("coverage gate (graph, engine)")
+
+
 def test_the_once_only_steps_run_once(ci: Workflow) -> None:
     """ruff, pyright and lint-imports are interpreter-independent."""
     once = {"ruff", "pyright", "lint-imports"}
