@@ -1000,7 +1000,8 @@ frame raises `GraphError`; a join node without a payload slot fails
 `finalize`; the join task's `branch` is the parent's stack.
 **Done.** Tests pass.
 
-**Status.** Done, in T024's run (above, D102). `TaskRepo.enqueue` already
+**Status.** Done, in T024's run (above, D102); dispatched a second time on
+`feat/T024b`, which lands no implementation (D105). `TaskRepo.enqueue` already
 took `branch` (T015), so the propagation is the runner's: a single
 transition copies the parent's stack, and a fan-out — a list of N ≥ 1
 refs, which `routing.is_fan_out` names because `interpret` erases it
