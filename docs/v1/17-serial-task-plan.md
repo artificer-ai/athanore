@@ -671,6 +671,24 @@ task finished 15 days ago are gone, of a running task remain; a
 remains; deleting a run removes all eight child tables' rows (cascade).
 **Done.** Tests pass.
 
+**Status.** Done. Two functions and no SQL: both windows are one call to
+a query T014a and T014b already own, and the two deletes share one
+transaction so a pass cannot enforce the two windows to different
+instants. `now` defaults to the store's clock, which is what lets a
+caller pass the exact instant a `freezegun` test measures from.
+`Retention` is a `Protocol` naming `events_days` and `stream_days`, not
+an import of `athanore.settings`: they are independent siblings of the
+bottom tier, the shape `EventPublisher` already takes for the bus (D93).
+`prune_once` returns real `PruneCounts` from the two statements' row
+counts. `retention_loop` prunes *before* its first sleep, so a machine
+restarted more often than the interval still prunes, and catches
+nothing: `CancelledError` propagates untouched, and a failed pass ends
+the loop rather than leaving a janitor that looks alive while the
+database grows. The cascade is asserted end to end over all eight child
+tables — seven by key, `events` by the sweep of D83 — against a second
+run that keeps its rows. The PostgreSQL leg was not run: that container
+has no docker socket (D90).
+
 ### T018 — v0 importer (A1.6)
 
 **Do.** Fixture: `scripts/make_v0_fixture.py` uses the **MVP**
