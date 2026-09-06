@@ -179,6 +179,7 @@ computed `db_url` and `public_url`, `is_loopback` for `127.0.0.1`,
 `::1`, `localhost`, `0.0.0.0` (false), legacy env warning.
 **Done.** Tests pass; `AthanoreSettings()` with no env or file yields the
 documented defaults.
+**Status.** Done.
 
 ### T005 — structlog and tooling config (A0.3, A0.4)
 
