@@ -202,7 +202,6 @@ needed: there are no MVP flat modules in this repository (D65).
 **Done.** `ruff check .`, `pyright`, `lint-imports` green (empty
 subpackages trivially pass).
 **Status.** Done.
-**Status.** Done.
 
 ### T006 — CI workflow (A0.5)
 
@@ -216,6 +215,11 @@ declared (D66); ruff, pyright and lint-imports run once, on 3.13. Job
 `.github/workflows/nightly.yml`: Postgres service container, `uv run
 pytest -m postgres` (marker registered now, tests arrive in T014).
 **Done.** CI green on the branch.
+**Status.** Done, except its exit condition: this checkout has no git
+remote and no CI to be green on, so both workflows were written and
+verified locally (they parse, and `tests/test_ci_workflows.py` asserts
+that they mirror every step of `./scripts/test.sh`); no run was
+observed. The first push to a remote observes it.
 
 ### T007 — `web/` scaffold and the Nocturne theme (A0.6)
 

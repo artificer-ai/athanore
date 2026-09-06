@@ -37,6 +37,8 @@ dev = [
     "pyright",
     "pytest>=8",
     "pytest-asyncio",
+    "pytest-cov",
+    "pyyaml",
     "respx",
     "ruff",
 ]
@@ -56,6 +58,13 @@ artifacts = ["athanore/web/dist/**"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    # The Postgres variants of the store suite (T014). Selected by the
+    # nightly workflow and by `pytest -m postgres` against
+    # `compose --profile pg`; registered here so the marker is never a
+    # typo that silently selects nothing.
+    "postgres: needs a live Postgres at ATHANORE_TEST_PG_URL",
+]
 
 [tool.ruff]
 line-length = 88
