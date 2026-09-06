@@ -1561,6 +1561,27 @@ T040 (keep both until then).
 honours each scenario key.
 **Done.** Tests pass.
 
+**Status.** Done. `athanore/testing/fake_acp.py` is a stdlib-only script
+— nothing in it imports the package, so it spawns in milliseconds — and
+it validates the whole vocabulary of 13 §Fakes on the way in, keys and
+shapes both, so a typo fails where it was written. A scenario scripts
+one **run**: every content block lands on the first prompt turn and the
+repair turns after it send `repair_submit` (D122). `env_echo` emits an
+`agent_message_chunk` under an `[env]` marker and `mcp_calls` reports as
+tool-call updates, because `notice` and `tool_result` are transcript
+kinds the façade writes and ACP has no wire form for either — 13 is
+corrected to say so. `log` and `submit` read `$ATHANORE_TASK_URL` /
+`$ATHANORE_TASK_TOKEN` rather than the prompt, so the same scenario
+drives all three tooling tiers. `mcp` joins `[project].dependencies`
+(02 §Library choices already fixed it; `mcp_calls` is its first caller),
+and the suite exercises the `mcp` tier against a real streamable-HTTP
+server. `MockAgent(submit=…)` takes the endpoint's own path one layer
+down — `validate_submission`, then `accept` or `reject` plus
+`ctx.last_rejection` — under a `# T045` marker rather than a second
+branch. `tests/testing/test_mock.py` covers the three doubles; the MVP
+`athanore/testing.py` was never in this repository (D65), so there is
+nothing to keep beside them.
+
 ### T038 — Policies: permissions, elicitation, ask gating (A2.5, D10)
 
 **Do.** `athanore/agents/policies.py`: `choose_by_kind(options, kinds:
