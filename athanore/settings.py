@@ -21,6 +21,7 @@ from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
     SettingsConfigDict,
+    SettingsError,
     TomlConfigSettingsSource,
 )
 
@@ -31,6 +32,19 @@ _LEGACY_ENV = {
     "ARTIFICER_PORT": ("port", "ATHANORE_PORT"),
     "ARTIFICER_DB": ("db_url", "ATHANORE_DB_URL"),
 }
+
+
+def _translate_legacy_db_url(value: str) -> str:
+    """Translate a legacy ``ARTIFICER_DB`` value to a SQLAlchemy URL.
+
+    v0 treated ``ARTIFICER_DB`` as a filesystem path
+    (``athanore/server.py:139``), so a bare path must become
+    ``sqlite+aiosqlite:///{path}``. A value that already carries a URL
+    scheme is left untouched (D71).
+    """
+    if "://" in value:
+        return value
+    return f"sqlite+aiosqlite:///{value}"
 
 
 class Retention(BaseModel):
@@ -65,7 +79,10 @@ class _LegacyEnvSource(PydanticBaseSettingsSource):
                 DeprecationWarning,
                 stacklevel=3,
             )
-            values[field_name] = value
+            if field_name == "db_url":
+                values[field_name] = _translate_legacy_db_url(value)
+            else:
+                values[field_name] = value
         return values
 
 
@@ -87,6 +104,12 @@ class _TomlSource(TomlConfigSettingsSource):
         else:
             self.toml_file_name = Path("athanore.toml")
 
+    # Read by ``athanore serve``, not settings (02 §athanore.toml layout).
+    _IGNORED_TABLES = frozenset({"pools", "workflows"})
+    # Never settable in TOML: the token is a secret (12), the command is a
+    # test hook (05) (02 §athanore.toml layout).
+    _REFUSED_KEYS = frozenset({"operator_token", "agent_command"})
+
     def __call__(self) -> dict[str, Any]:
         root = self.current_state.get("root_path")
         root_path = Path(root) if root is not None else Path.cwd()
@@ -94,7 +117,25 @@ class _TomlSource(TomlConfigSettingsSource):
         if not toml_path.is_file():
             return {}
         with toml_path.open("rb") as fh:
-            return tomllib.load(fh)
+            data = tomllib.load(fh)
+
+        known = frozenset(self.settings_cls.model_fields)
+        for key in data:
+            if key in self._IGNORED_TABLES:
+                continue
+            if key in self._REFUSED_KEYS:
+                raise SettingsError(
+                    f"`{key}` is refused in {toml_path}; set it via the "
+                    "environment or the CLI, never TOML."
+                )
+            if key not in known:
+                raise SettingsError(
+                    f"unknown top-level key `{key}` in {toml_path} "
+                    "(a typo must not silently fall back to a default)."
+                )
+        return {
+            key: value for key, value in data.items() if key not in self._IGNORED_TABLES
+        }
 
 
 class AthanoreSettings(BaseSettings):
@@ -119,6 +160,7 @@ class AthanoreSettings(BaseSettings):
     max_retries: int = 3
     agent_timeout: float = 10800
     permission_policy: Literal["ask", "auto_allow", "auto_deny"] | None = None
+    agent_command: str | list[str] | None = None
     cors_origins: list[str] = Field(default_factory=list)
     log_format: Literal["pretty", "json"] | None = None
     stream_flush_interval: float = 0.4

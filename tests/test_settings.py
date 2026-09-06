@@ -7,6 +7,8 @@ import warnings
 from pathlib import Path
 
 import pytest
+from pydantic import SecretStr
+from pydantic_settings import SettingsError
 
 from athanore.settings import AthanoreSettings, Retention
 
@@ -39,6 +41,7 @@ def test_defaults() -> None:
     assert settings.max_retries == 3
     assert settings.agent_timeout == 10800
     assert settings.permission_policy is None
+    assert settings.agent_command is None
     assert settings.cors_origins == []
     assert settings.log_format is None
     assert settings.stream_flush_interval == 0.4
@@ -81,6 +84,57 @@ def test_toml_path_resolved_against_root_path(tmp_path: Path) -> None:
     assert settings.workers == 7
 
 
+def test_toml_refuses_operator_token(tmp_path: Path) -> None:
+    toml_path = tmp_path / "athanore.toml"
+    toml_path.write_text('operator_token = "committed-secret"\n', encoding="utf-8")
+    with pytest.raises(SettingsError, match="operator_token.*refused"):
+        AthanoreSettings(root_path=tmp_path)
+
+
+def test_toml_refuses_agent_command(tmp_path: Path) -> None:
+    toml_path = tmp_path / "athanore.toml"
+    toml_path.write_text('agent_command = ["fake-agent"]\n', encoding="utf-8")
+    with pytest.raises(SettingsError, match="agent_command.*refused"):
+        AthanoreSettings(root_path=tmp_path)
+
+
+def test_toml_unknown_top_level_key_is_an_error(tmp_path: Path) -> None:
+    toml_path = tmp_path / "athanore.toml"
+    toml_path.write_text("unknown_typo_key = 3\n", encoding="utf-8")
+    with pytest.raises(SettingsError, match="unknown top-level key `unknown_typo_key`"):
+        AthanoreSettings(root_path=tmp_path)
+
+
+def test_toml_uppercase_key_is_an_error(tmp_path: Path) -> None:
+    toml_path = tmp_path / "athanore.toml"
+    toml_path.write_text('HOST = "upper"\n', encoding="utf-8")
+    with pytest.raises(SettingsError, match="unknown top-level key `HOST`"):
+        AthanoreSettings(root_path=tmp_path)
+
+
+def test_toml_ignores_pools_and_workflows(tmp_path: Path) -> None:
+    toml_path = tmp_path / "athanore.toml"
+    toml_path.write_text(
+        "workers = 5\n"
+        "[pools]\nlocal = 1\n"
+        '[workflows]\nfeature_build = { pool = "local" }\n',
+        encoding="utf-8",
+    )
+    settings = AthanoreSettings(root_path=tmp_path)
+    assert settings.workers == 5
+
+
+def test_agent_command_from_kwargs() -> None:
+    assert AthanoreSettings(agent_command=["fake-agent"]).agent_command == [
+        "fake-agent"
+    ]
+
+
+def test_agent_command_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ATHANORE_AGENT_COMMAND", '["fake-agent"]')
+    assert AthanoreSettings().agent_command == ["fake-agent"]
+
+
 def test_computed_public_url_and_db_url() -> None:
     settings = AthanoreSettings(host="0.0.0.0", port=8080, root_path=Path("/tmp/root"))
     assert settings.public_url == "http://0.0.0.0:8080"
@@ -115,7 +169,7 @@ def test_is_loopback(host: str, expected: bool) -> None:
 def test_legacy_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ARTIFICER_PORT", "4321")
     monkeypatch.setenv("ARTIFICER_HOST", "0.0.0.0")
-    monkeypatch.setenv("ARTIFICER_DB", "sqlite+aiosqlite:///legacy.db")
+    monkeypatch.setenv("ARTIFICER_DB", "/data/athanore.db")
 
     with pytest.warns(DeprecationWarning) as records:
         settings = AthanoreSettings()
@@ -125,7 +179,14 @@ def test_legacy_env_vars(monkeypatch: pytest.MonkeyPatch) -> None:
     assert any("ARTIFICER_DB" in message for message in messages)
     assert settings.port == 4321
     assert settings.host == "0.0.0.0"
-    assert settings.db_url == "sqlite+aiosqlite:///legacy.db"
+    assert settings.db_url == "sqlite+aiosqlite:////data/athanore.db"
+
+
+def test_legacy_db_url_already_a_url_is_kept(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ARTIFICER_DB", "postgresql+asyncpg://u:p@h/db")
+    with pytest.warns(DeprecationWarning):
+        settings = AthanoreSettings()
+    assert settings.db_url == "postgresql+asyncpg://u:p@h/db"
 
 
 def test_legacy_env_does_not_override_modern(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -146,7 +207,9 @@ def test_legacy_env_unset_emits_no_warning(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 def test_effective_operator_token_from_setting(tmp_path: Path) -> None:
-    settings = AthanoreSettings(root_path=tmp_path, operator_token="secret-value")
+    settings = AthanoreSettings(
+        root_path=tmp_path, operator_token=SecretStr("secret-value")
+    )
     assert settings.effective_operator_token is not None
     assert settings.effective_operator_token.get_secret_value() == "secret-value"
 
@@ -173,6 +236,8 @@ def test_token_file_path(tmp_path: Path) -> None:
 
 
 def test_secret_does_not_leak_in_repr(tmp_path: Path) -> None:
-    settings = AthanoreSettings(root_path=tmp_path, operator_token="do-not-leak")
+    settings = AthanoreSettings(
+        root_path=tmp_path, operator_token=SecretStr("do-not-leak")
+    )
     assert "do-not-leak" not in repr(settings)
     assert "do-not-leak" not in str(settings)
