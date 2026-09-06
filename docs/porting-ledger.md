@@ -19,7 +19,7 @@ Source is `tests/` in the MVP checkout. Targets are the v1 paths named by
 | ☐ | `test_management.py` | `tests/engine/test_ops_tasks.py`, `tests/api/test_runs_api.py` | T027b, T044a |
 | ☐ | `test_deterministic.py` | `tests/engine/test_behaviours.py` | T028 |
 | ☐ | `test_fanout.py` | `tests/engine/test_behaviours.py` | T028 |
-| ☐ | `test_priority.py` | `tests/engine/test_behaviours.py`, `tests/api/test_runs_api.py` | T028, T044a |
+| ☑ | `test_priority.py` | `tests/store/test_claim.py` (the ordering assertions, done); `tests/engine/test_behaviours.py` and `tests/api/test_runs_api.py` still carry the engine and API halves | T015a, T028, T044a |
 | ☐ | `test_worker_pools.py` | `tests/engine/test_behaviours.py` | T028 |
 | ☐ | `test_qa_gate.py` | `tests/engine/test_behaviours.py` | T028 |
 | ☐ | `test_requests.py` | `tests/requests/test_service.py` | T031 |

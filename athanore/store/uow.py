@@ -63,6 +63,7 @@ from athanore.store.repos.log import LogRepo
 from athanore.store.repos.runs import RunRepo
 from athanore.store.repos.stream import StreamRepo
 from athanore.store.repos.submissions import SubmissionRepo
+from athanore.store.repos.tasks import TaskRepo
 
 
 class Repos:
@@ -70,13 +71,14 @@ class Repos:
 
     Constructing the set is free — a repository holds a connection and
     nothing else — so a unit of work and a reader each own one rather than
-    sharing a registry with a lifecycle of its own. T015 and T016 add
-    ``tasks``, ``requests`` and ``joins`` here.
+    sharing a registry with a lifecycle of its own. T016 adds ``requests``
+    and ``joins`` here.
     """
 
     def __init__(self, conn: AsyncConnection) -> None:
         self.conn = conn
         self.runs = RunRepo(conn)
+        self.tasks = TaskRepo(conn)
         self.log = LogRepo(conn)
         self.events = EventRepo(conn)
         self.submissions = SubmissionRepo(conn)
@@ -147,6 +149,11 @@ class UnitOfWork:
     def runs(self) -> RunRepo:
         """The run repository, on this transaction."""
         return self._open_repos().runs
+
+    @property
+    def tasks(self) -> TaskRepo:
+        """The task repository, on this transaction."""
+        return self._open_repos().tasks
 
     @property
     def log(self) -> LogRepo:

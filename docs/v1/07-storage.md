@@ -107,12 +107,17 @@ Core `Row`s; there are no mapped classes, so nothing can lazy-load across
 a closed connection and `expire_on_commit` never bites.
 
 `TaskRepo.claim_ready(limit, workflows)` implements the ordering in 04:
-select the ids in order, `UPDATE … WHERE id IN (…)` setting status,
-`started`, `token_hash`, then re-select and return the rows in the
-selected order together with the clear-text tokens. On Postgres the
-select adds `FOR UPDATE SKIP LOCKED`; on SQLite the single writer makes
-it atomic. `RunSummary` fields that are aggregates (`current_nodes`,
-`pending_requests`) come from one grouped query, never a per-run loop.
+select the ids in order, then one `UPDATE … WHERE id = ? AND status =
+'ready'` per id — a token is minted per attempt, so each row is written a
+different `token_hash`, and the `AND status` is the claim: rowcount 0
+means another claimer won the row and the id is dropped. Then re-select
+and return the rows in the selected order together with the clear-text
+tokens. On Postgres the select adds `FOR UPDATE OF tasks SKIP LOCKED`
+(the tasks alone: locking the joined run would make two claims of
+different tasks in one run exclude each other); on SQLite the single
+writer makes it atomic. `RunSummary` fields that are aggregates
+(`current_nodes`, `pending_requests`) come from one grouped query, never
+a per-run loop.
 
 ## Migrations
 
