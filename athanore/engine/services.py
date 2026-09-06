@@ -13,17 +13,20 @@ that describes it emitted inside it** (03 invariant 7). Nothing here spans
 an await on a body, an agent, or a request wait — a `uow` block in this
 module contains exactly its own writes.
 
-Two members are deliberately not implementations yet, and both fail loudly
-rather than plausibly:
+One member is deliberately not an implementation yet, and it fails
+loudly rather than plausibly: :attr:`TaskServices.requests` is a
+:class:`RequestsPort`. The port is the contract T033's ``human_input`` is
+written against; the implementation is T032's, and until it is wired
+every method raises.
 
-- :attr:`TaskServices.requests` is a :class:`RequestsPort`. The port is
-  the contract T033's ``human_input`` is written against; the
-  implementation is T032's, and until it is wired every method raises.
-- :meth:`LeaseService.released` is T026's. Releasing a slot means moving
-  the task to ``waiting``, handing the lease back and re-acquiring it
-  from the pool's re-admit queue (04 §Waiting); a version of it that
-  merely did nothing would look like it worked, under ``workers=1``,
-  right up to the first deadlock.
+:attr:`TaskServices.lease` is the one member the runner has to wire to
+the attempt itself. :meth:`LeaseService.released` moves the task to
+``waiting``, hands the lease back and re-acquires it from the pool's
+re-admit queue (04 §Waiting), so it needs the context, the lease and the
+scheduler's ``notify()`` — none of which a store gives it. It is
+attached by the runner and refuses to release anything until it is: a
+version that quietly did nothing would look like it worked, under
+``workers=1``, right up to the first deadlock.
 
 :attr:`TaskServices.stream` is the one member with a background task
 behind it: chunks accumulate in memory and land as one insert per
@@ -40,17 +43,20 @@ plugin subscriber that a task it is still running has finished.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Mapping, Sequence
-from contextlib import AbstractAsyncContextManager, suppress
-from typing import Any, Protocol, cast
+from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
+from contextlib import asynccontextmanager, suppress
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
+from athanore.engine.pools import Lease, PoolState
 from athanore.events.model import Event
 from athanore.events.names import PLUGIN_PREFIX, EventName, is_known
 from athanore.events.payloads import (
     LogAppended,
     SubmissionAccepted,
     SubmissionRejected,
+    TaskResumed,
     TaskStream,
+    TaskWaiting,
     ValidationError,
 )
 from athanore.logging import get_logger
@@ -66,8 +72,12 @@ from athanore.store.rows import (
     RequestRow,
     RunRow,
     SubmissionRow,
+    TaskStatus,
 )
 from athanore.store.uow import Store
+
+if TYPE_CHECKING:  # `context` imports this module: the arrow points one way.
+    from athanore.engine.context import TaskContext
 
 #: How much of an entry ``log.appended`` carries (18 §Log and stats). The
 #: rest is fetched by id: an event never carries full log text.
@@ -395,26 +405,287 @@ class LeaseService:
 
     A body that parks on a human gives its lease back so another task can
     run, and takes one again through the pool's re-admit queue when the
-    answer arrives. That pair is :meth:`released`, and it is T026's.
+    answer arrives. That pair is :meth:`released`, and it is the whole of
+    what makes a one-worker install usable: the MVP held the slot through
+    the wait, so under ``workers=1`` one playtest question stalled the
+    whole server.
+
+    The service is constructed with the attempt's ids and wired by the
+    runner through :meth:`attach`, which hands it the three things only
+    the runner has — the :class:`~athanore.engine.context.TaskContext` the
+    body runs under, the :class:`~athanore.engine.pools.Lease` the
+    scheduler took for it, and the engine's ``notify()``. Until then
+    :meth:`released` refuses rather than doing nothing: a body waiting
+    outside a dispatched attempt has no slot to give back and no loop to
+    give it to.
+
+    :attr:`held` is the lease the attempt holds **now** — the one the
+    scheduler handed over, or the one the re-admit queue gave it after a
+    wait. The runner's ``finally`` releases that one through
+    :meth:`release`, and it is the only thing that ever does: the second
+    lease of a resumed body is a different object, and the scheduler's
+    reap only knows the first.
     """
 
-    def __init__(self, *, task_id: int) -> None:
+    def __init__(
+        self,
+        store: Store,
+        *,
+        run_id: str,
+        task_id: int,
+        node: str,
+    ) -> None:
+        self._store = store
+        self._run_id = run_id
         self._task_id = task_id
+        self._node = node
+        self._context: TaskContext | None = None
+        self._lease: Lease | None = None
+        self._notify: Callable[[], None] | None = None
+        self._waiting = False
 
-    def released(
-        self, request_id: int | None = None
-    ) -> AbstractAsyncContextManager[None]:
-        """Give the slot back for the duration of the block.
+    # -- wiring ------------------------------------------------------------
 
-        Not implemented until T026. It raises rather than yielding: a
-        no-op would hold the slot through the wait, which under the
-        default ``workers=1`` is one question stalling the whole server —
-        the exact MVP failure 04 §Waiting exists to fix, and one that
-        would look like nothing at all until a second run was queued.
+    def attach(
+        self, context: TaskContext, lease: Lease, notify: Callable[[], None]
+    ) -> None:
+        """Wire the service to the attempt the runner is about to run.
+
+        Called once, after the context is built and before the body is
+        entered (04 §Running an attempt). Attaching twice is a defect
+        rather than a rebind: two contexts sharing one services bundle
+        would leave ``released()`` writing the other attempt's status.
         """
-        raise NotImplementedError(
-            "TaskServices.lease.released() is implemented in T026 (04 §Waiting)"
+        if self._context is not None:
+            raise RuntimeError(
+                f"the lease service of task {self._task_id} is already attached "
+                "to an attempt"
+            )
+        self._context = context
+        self._lease = lease
+        self._notify = notify
+
+    @property
+    def held(self) -> Lease | None:
+        """The lease this attempt holds now, or ``None`` before it is wired.
+
+        Not the lease it started with: after a wait it is the one the
+        re-admit queue handed over.
+        """
+        return self._lease
+
+    @property
+    def waiting(self) -> bool:
+        """Whether the body is inside :meth:`released` right now."""
+        return self._waiting
+
+    def release(self) -> None:
+        """Give the slot this attempt holds back to its pool. Idempotent.
+
+        The runner's ``finally`` calls it on every path, so a body that
+        resumed and then failed returns the lease it actually holds
+        rather than the one it was dispatched with.
+        """
+        if self._lease is not None:
+            self._lease.release()
+
+    # -- waiting -----------------------------------------------------------
+
+    @asynccontextmanager
+    async def released(self, request_id: int) -> AsyncGenerator[None]:
+        """Give the slot back for the duration of the block (04 §Waiting).
+
+        ``request_id`` is the request the body is about to wait on: it is
+        the payload of both events, and the pair of them is what tells an
+        operator which question a task is parked on.
+
+        On the way in, in this order: one transaction moves the task to
+        ``waiting`` and emits ``task.waiting``; the node timeout is
+        paused; the lease goes back; the scheduler is woken. The status is
+        durable *before* the slot is free, so a task that another attempt
+        starts against cannot find this one still ``in_progress``.
+
+        On the way out the task joins its pool's re-admit queue and waits
+        there for a lease — ahead of every ``ready`` task in the pool, and
+        behind every body answered before it (04 §Waiting). It stays
+        ``waiting`` while it queues and flips to ``in_progress``
+        (``task.resumed``) when the lease is handed over, which is what
+        makes "queued for a slot" visible rather than indistinguishable
+        from "running".
+
+        The node timeout is **paused**, not merely restored: the scope is
+        disarmed on the way in and re-armed on the way out with the time
+        that was left when the body parked. A node with ``timeout=300``
+        that waits an hour for a human would otherwise be cancelled inside
+        the wait, and one that survived it would fail the moment it
+        resumed (D108).
+
+        Cancellation is the one exit that does not re-acquire. An operator
+        cancelling the task, or a shutdown, leaves nothing to run: there
+        is no slot to take back, and no status to write (D52) — recovery
+        turns a ``waiting`` row back into ``ready``.
+        """
+        context, lease, notify = self._attached()
+        if self._waiting:
+            raise RuntimeError(
+                f"task {self._task_id} is already waiting: released() is the "
+                "body's one park, and a second one would release a slot the "
+                "attempt no longer holds"
+            )
+        pool = lease.pool_state
+        loop = asyncio.get_running_loop()
+        deadline = _deadline(context)
+
+        async with self._store.uow() as uow:
+            await uow.tasks.set_status(self._task_id, TaskStatus.waiting)
+            uow.emit(
+                Event(
+                    run_id=self._run_id,
+                    task_id=self._task_id,
+                    name=EventName.task_waiting,
+                    data=TaskWaiting(
+                        node=self._node, request_id=request_id
+                    ).model_dump(),
+                    created=now(),
+                )
+            )
+        released_at = loop.time()
+        context._released_at = released_at  # pyright: ignore[reportPrivateUsage]
+        if deadline is not None:
+            _timeout_of(context).reschedule(None)
+        self._waiting = True
+        lease.release()
+        notify()
+
+        try:
+            try:
+                yield
+            finally:
+                # The park is over however it ended; only what happens next
+                # depends on how.
+                self._waiting = False
+        except asyncio.CancelledError:
+            # An operator op or a shutdown. There is nothing left to run,
+            # so there is no slot to take back and no status to write
+            # (D52): recovery turns the `waiting` row back into `ready`.
+            raise
+        except BaseException:
+            # A wait that timed out, or a body that raised inside the
+            # block. The attempt goes on to record an outcome, and the
+            # runner records that as a running task: it needs its slot.
+            await self._resume(
+                context,
+                request_id,
+                pool=pool,
+                notify=notify,
+                deadline=deadline,
+                released_at=released_at,
+            )
+            raise
+        await self._resume(
+            context,
+            request_id,
+            pool=pool,
+            notify=notify,
+            deadline=deadline,
+            released_at=released_at,
         )
+
+    async def _resume(
+        self,
+        context: TaskContext,
+        request_id: int,
+        *,
+        pool: PoolState,
+        notify: Callable[[], None],
+        deadline: float | None,
+        released_at: float,
+    ) -> None:
+        """Queue for a slot, take it, and put the task back in progress."""
+        lease = await _take_readmit(pool, self._task_id, notify)
+        self._lease = lease
+        loop = asyncio.get_running_loop()
+
+        async with self._store.uow() as uow:
+            await uow.tasks.set_status(self._task_id, TaskStatus.in_progress)
+            uow.emit(
+                Event(
+                    run_id=self._run_id,
+                    task_id=self._task_id,
+                    name=EventName.task_resumed,
+                    data=TaskResumed(
+                        node=self._node,
+                        request_id=request_id,
+                        waited_s=loop.time() - released_at,
+                    ).model_dump(),
+                    created=now(),
+                )
+            )
+        if deadline is not None:
+            # What was left of the node's budget when it parked, from now.
+            _timeout_of(context).reschedule(loop.time() + (deadline - released_at))
+        context._released_at = None  # pyright: ignore[reportPrivateUsage]
+
+    def _attached(self) -> tuple[TaskContext, Lease, Callable[[], None]]:
+        """The runner's three, or a ``RuntimeError`` naming what is missing."""
+        context, lease, notify = self._context, self._lease, self._notify
+        if context is None or lease is None or notify is None:
+            raise RuntimeError(
+                f"task {self._task_id} has no pool lease: released() releases "
+                "the slot of a dispatched attempt, and this services bundle "
+                "was never attached to one"
+            )
+        return context, lease, notify
+
+
+async def _take_readmit(
+    pool: PoolState, task_id: int, notify: Callable[[], None]
+) -> Lease:
+    """Join ``pool``'s re-admit queue and wait for the lease it hands over.
+
+    The place in the queue is taken by the call, not by the await, so two
+    bodies answered in order re-enter in that order. The scheduler serves
+    the queue at the top of a tick, so it is woken here too: with a free
+    slot and nothing else to dispatch, the alternative is a body that
+    waits out a whole tick after its answer has already arrived.
+
+    A lease handed to a waiter that is then cancelled is given back rather
+    than dropped. The queue spent a slot on it and nothing else holds a
+    reference to it — under ``workers=1`` losing it is the engine wedged
+    until a restart.
+    """
+    readmit = pool.request_readmit(task_id)
+    notify()
+    try:
+        return await readmit
+    except BaseException:
+        if readmit.done() and not readmit.cancelled() and not readmit.exception():
+            readmit.result().release()
+        raise
+
+
+def _timeout_of(context: TaskContext) -> asyncio.Timeout:
+    """The runner's timeout scope for this attempt.
+
+    Only called where :func:`_deadline` already answered with a deadline,
+    so the scope is there; the check is what keeps that from being an
+    assumption two call sites down.
+    """
+    scope = context._timeout  # pyright: ignore[reportPrivateUsage]
+    if scope is None:  # pragma: no cover - guarded by `_deadline`
+        raise RuntimeError(f"task {context.task_id} has no timeout scope")
+    return scope
+
+
+def _deadline(context: TaskContext) -> float | None:
+    """When the node timeout fires, or ``None`` if the node has none.
+
+    ``asyncio.timeout(None)`` is a scope with no deadline, which is what a
+    node without a ``timeout`` runs under, so "there is a scope" and
+    "there is a clock to pause" are two questions (04 §Timeouts).
+    """
+    scope = context._timeout  # pyright: ignore[reportPrivateUsage]
+    return None if scope is None else scope.when()
 
 
 class EventPort:
@@ -609,7 +880,7 @@ class TaskServices:
             UnwiredRequests() if requests is None else requests
         )
         self.run = RunService(store, run_id=run_id)
-        self.lease = LeaseService(task_id=task_id)
+        self.lease = LeaseService(store, run_id=run_id, task_id=task_id, node=node)
         self.events = EventPort(
             store, run_id=run_id, task_id=task_id, workflow=workflow
         )

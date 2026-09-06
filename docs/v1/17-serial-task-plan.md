@@ -1098,6 +1098,19 @@ a third ready task; `timeout=0.2` with `released()` lasting 0.5 s does
 not fail.
 **Done.** Tests pass.
 
+**Status.** Done. `released(request_id)` takes the request id, because
+`task.waiting` and `task.resumed` both carry it (18). The node timeout is
+paused by *disarming* the scope on the way in (`reschedule(None)`) and
+re-arming it on the way out with what was left of the budget — reading
+`when()` on the way out only is not enough, because the scope would fire
+inside the wait it is meant to survive (D108). `LeaseService` is attached to
+its attempt by the runner (`attach(context, lease, notify)`) and refuses to
+release anything until it is; the runner's `finally` releases
+`services.lease`, which is the re-acquired lease when the body waited, and a
+lease handed to a waiter that is then cancelled is given back rather than
+lost. Cancellation is the one exit that does not re-acquire: the row is left
+`waiting` for recovery (D52).
+
 ### T027 — `Engine` object and recovery (A1.12, A1.13 part)
 
 **Do.** `athanore/engine/__init__.py`: `class Engine(settings, store, bus)`
