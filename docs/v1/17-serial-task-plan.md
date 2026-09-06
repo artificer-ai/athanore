@@ -1160,13 +1160,15 @@ node.
 **Done.** Tests pass.
 
 **Status.** Done. Built in T027's run, on `feat/T027`, with T027 and
-T027b (D109). `Ops` reads the engine through an `OpsEngine` protocol, the
-precedent of `RunnerEngine` and `SchedulerEngine`. `submit` applies
-`edit`'s non-empty-title precondition; `append_log` refuses empty text
-and files the entry under the single **`in_progress` or `waiting`** node
-(03's `current_nodes`), with no `task_id` — an operator note is about the
-run. `resume` sets `running` even for a run that was `queued` when it was
-paused, which is 04's table read literally.
+T027b (D109); dispatched a second time on `feat/T027a`, which lands no
+implementation (D110). `Ops` reads the engine through an `OpsEngine`
+protocol, the precedent of `RunnerEngine` and `SchedulerEngine`.
+`submit` applies `edit`'s non-empty-title precondition; `append_log`
+refuses empty text and files the entry under the single **`in_progress`
+or `waiting`** node (03's `current_nodes`), with no `task_id` — an
+operator note is about the run. `resume` sets `running` even for a run
+that was `queued` when it was paused, which is 04's table read
+literally.
 
 ### T027b — Operator ops, part 2: cancel, delete, rerun, retry, move, set_status (A1.11)
 
