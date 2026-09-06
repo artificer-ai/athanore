@@ -715,6 +715,17 @@ match expectations; running twice changes nothing; source file bytes
 unchanged (hash before/after).
 **Done.** Tests pass.
 
+**Status.** Done. The fixture is written with the stdlib `sqlite3`
+module against a transcribed copy of the MVP's DDL, not with the MVP's
+`Store`, which is not in this repository (D65, D67; D94). `import_v0`
+opens `src` `mode=ro`, migrates the destination to head itself, and
+writes one run and everything under it per transaction, which is what
+makes skipping an already-present run id idempotent. v0's other event
+kinds are renamed onto 03's vocabulary where 18's required payload is in
+a v0 row, and counted in `ImportReport.dropped_events` where it is not
+(D94). The PostgreSQL leg was not run: that container has no docker
+socket (D90).
+
 ### T019 — Graph package split and node options (A0.1 tail, 04 §Graph DSL)
 
 **Do.** `athanore/graph/model.py`: `@dataclass(frozen=True) class Node`

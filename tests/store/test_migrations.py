@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import shutil
 import sqlite3
 from collections.abc import Callable
 from pathlib import Path
@@ -48,6 +49,15 @@ from athanore.store.tables import metadata
 #: The one revision this task ships.
 REVISION = "0001"
 
+#: The committed MVP database of T018 (`scripts/make_v0_fixture.py`).
+V0_FIXTURE = (
+    Path(__file__).resolve().parents[2]
+    / "tests"
+    / "fixtures"
+    / "v0"
+    / "mvp_small.sqlite3"
+)
+
 T = TypeVar("T")
 
 
@@ -65,9 +75,11 @@ async def _read(db_url: str, read: Callable[[Connection], T]) -> T:
 def _make_v0_database(path: Path) -> None:
     """A database shaped like the MVP's: a ``runs`` table, no Alembic.
 
-    T018 commits the real fixture, built by the MVP's own ``Store``. Three
-    of its tables are enough to exercise the predicate, and an inline stub
-    tests it now where an ``xfail`` would test nothing.
+    Three tables are enough to exercise the predicate, which asks only
+    for ``runs`` and the absence of ``alembic_version``. T018's committed
+    fixture is the whole MVP schema with rows in it, and
+    :func:`test_is_v0_database_for_the_committed_fixture` runs the same
+    predicate against that.
     """
 
     connection = sqlite3.connect(path)
@@ -173,6 +185,21 @@ async def test_is_v0_database_for_a_v0_shaped_file(
     sqlite_url: str, sqlite_path: Path
 ) -> None:
     _make_v0_database(sqlite_path)
+
+    assert await is_v0_database(sqlite_url) is True
+
+
+async def test_is_v0_database_for_the_committed_fixture(
+    sqlite_url: str, sqlite_path: Path
+) -> None:
+    """The real MVP database of T018 answers the same way.
+
+    It is copied first: :func:`~athanore.store.engine.make_engine` puts a
+    connection into WAL, which writes to the file, and the fixture is
+    committed.
+    """
+
+    shutil.copyfile(V0_FIXTURE, sqlite_path)
 
     assert await is_v0_database(sqlite_url) is True
 
