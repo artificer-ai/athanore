@@ -39,7 +39,12 @@ Two decisions are worth stating here rather than leaving to the reader:
   `failed`, and that case arrives on a task which *did* transition: the
   last branch of a fan-out that transitions into a join which cannot
   fire. So quiescence is what opens the question, and the two answers
-  are the invariant's (D102).
+  are the invariant's (D102) — but only for a run that is still
+  `running`. A run another branch already failed by dead-lettering is
+  left alone: 03 §State machines re-opens a terminal run by
+  retry/rerun/move and by nothing else, so settling it again would
+  either swallow the failure or report the stall it caused twice
+  (D103).
 """
 
 from __future__ import annotations
@@ -530,7 +535,19 @@ async def _record_arrival(
 async def _settle_run(uow: UnitOfWork, task: TaskRow, terminal: bool) -> None:
     """End the run if this attempt was the last of it (03 invariant 4).
 
-    Three outcomes, decided in this order:
+    A run that is no longer ``running`` is not settled at all: the
+    question has already been answered, and 03 §State machines has no
+    edge out of a terminal run that is not an operator's
+    (retry/rerun/move re-open it). A dead-letter in one branch fails the
+    run while a slower sibling is still in its body, and that sibling's
+    outcome must not overwrite the verdict — with ``completed``, which
+    would swallow the failure and make the run's status a race on which
+    branch landed last, nor with a second ``failed``, which would emit a
+    second ``run.failed`` and re-stamp ``finished`` for one stall
+    (D103). The read is inside this transaction, so the status it sees
+    is the one this write would replace.
+
+    Then three outcomes, decided in this order:
 
     - something is still pending — nothing to settle;
     - a join is short of its branches and nothing will bring them, which
@@ -544,6 +561,9 @@ async def _settle_run(uow: UnitOfWork, task: TaskRow, terminal: bool) -> None:
     it is the one that has not arrived yet.
     """
 
+    run = await uow.runs.get(task.run_id)
+    if run is None or run.status is not RunStatus.running:
+        return
     if await uow.tasks.has_pending(task.run_id):
         return
     partial = await uow.joins.incomplete(task.run_id)

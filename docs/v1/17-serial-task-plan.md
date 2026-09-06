@@ -1037,7 +1037,10 @@ still requires a terminal last branch, so a late arrival at a fired join
 settles nothing. `output` is the shape rule — one terminal task is its
 value, several are the list in branch order — and the two determinism
 tests run the same fan-out under four shuffles of the branch delays,
-joined and open.
+joined and open. The check settles nothing on a run that is no longer
+`running`, so a dead-letter in one branch is neither overwritten with
+`completed` by a slower terminal sibling nor reported twice as the
+stall it causes at a join (D103, and 04 §Running an attempt step 3).
 
 ### T025 — Scheduler loop (A1.8)
 

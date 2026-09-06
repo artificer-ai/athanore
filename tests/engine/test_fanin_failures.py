@@ -126,6 +126,33 @@ def timed_open(delays: tuple[float, ...]) -> Workflow:
     return wf
 
 
+def stalled() -> Workflow:
+    """Three branches into a join; the first refuses, the others dawdle.
+
+    The dead-letter therefore fails the run while the two survivors are
+    still in their bodies, and the join they arrive at is short for good.
+    """
+
+    wf = Workflow("stalled")
+
+    @wf.node(start=True)
+    async def product(build):
+        return [build(f"d{index}") for index in range(3)]
+
+    @wf.node()
+    async def build(release, *, deliverable):
+        if deliverable == "d0":
+            raise NonRetryable(f"{deliverable} refused")
+        await asyncio.sleep(0.1)
+        return release({"built": deliverable})
+
+    @wf.node(join=True)
+    async def release(*, results):
+        return {"released": [result["value"]["built"] for result in results]}
+
+    return wf
+
+
 # --------------------------------------------------------------------------
 # A branch that dead-letters
 # --------------------------------------------------------------------------
@@ -172,6 +199,46 @@ async def test_a_dead_lettered_branch_fails_the_run_and_a_retry_fires_the_join(
     assert run.status is RunStatus.completed
     assert run.output == {"released": ["d0", "d1", "d2"]}
     assert len(await harness.at(run_id, "release")) == 1
+
+
+async def test_a_stall_behind_a_dead_letter_does_not_fail_the_run_twice(
+    harness,
+) -> None:
+    """One stall, one verdict (D103).
+
+    ``d0`` dead-letters and fails the run; the two survivors then arrive
+    at a join that can never fire. Quiescence with a partial join is the
+    deadlock of 03 invariant 4 — but this run is already failed, and
+    failing it again would emit a second ``run.failed`` and re-stamp
+    ``finished`` with no re-open in between.
+    """
+
+    harness.register(stalled())
+    run_id = await harness.submit("stalled")
+
+    await harness.drain()
+
+    fanout = (await harness.at(run_id, "product"))[0]
+    assert len(await harness.arrivals(run_id, "release", fanout.id)) == 2
+    assert await harness.at(run_id, "release") == []
+
+    run = await harness.run(run_id)
+    assert run.status is RunStatus.failed
+    (failed,) = await harness.events_named(run_id, EventName.run_failed)
+    assert failed.data["error"] == repr(NonRetryable("d0 refused"))
+    assert "code" not in failed.data
+
+    # The stamp is the dead-letter's, not the last branch's: the survivors
+    # sleep before they arrive, so a second settle would be later than both.
+    survivors = [
+        task
+        for task in await harness.at(run_id, "build")
+        if task.status is TaskStatus.done
+    ]
+    assert run.finished is not None
+    assert all(
+        task.finished is not None and run.finished < task.finished for task in survivors
+    )
 
 
 # --------------------------------------------------------------------------

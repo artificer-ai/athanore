@@ -65,6 +65,25 @@ def ambiguous() -> Workflow:
     return wf
 
 
+def racing() -> Workflow:
+    """A fan-out of two with no join: one refuses at once, one dawdles."""
+
+    wf = Workflow("racing")
+
+    @wf.node(start=True)
+    async def product(build):
+        return [build(f"d{index}") for index in range(2)]
+
+    @wf.node()
+    async def build(*, deliverable):
+        if deliverable == "d0":
+            raise NonRetryable(f"{deliverable} refused")
+        await asyncio.sleep(0.1)
+        return {"built": deliverable}
+
+    return wf
+
+
 # --------------------------------------------------------------------------
 # Retry
 # --------------------------------------------------------------------------
@@ -220,6 +239,39 @@ async def test_a_node_the_workflow_no_longer_declares_dead_letters(harness) -> N
     (vanished,) = await harness.at(run_id, "vanished")
     assert vanished.status is TaskStatus.dead_letter
     assert "no node 'vanished'" in (vanished.error or "")
+
+
+async def test_a_dead_letter_is_not_overwritten_by_a_slower_terminal_branch(
+    harness,
+) -> None:
+    """A failed run stays failed however its siblings land (D103).
+
+    ``d0`` refuses at once and fails the run; ``d1`` is still in its body
+    and comes back terminal, with nothing else pending. Settling it as
+    ``completed`` would swallow the dead-letter, take an edge 03's run
+    machine does not have, and make the run's status a race on which
+    branch landed last.
+    """
+
+    harness.register(racing())
+    run_id = await harness.submit("racing")
+
+    await harness.drain()
+
+    statuses = {task.node: task.status for task in await harness.tasks(run_id)}
+    assert statuses["product"] is TaskStatus.done
+    builds = await harness.at(run_id, "build")
+    assert {task.status for task in builds} == {
+        TaskStatus.dead_letter,
+        TaskStatus.done,
+    }
+
+    run = await harness.run(run_id)
+    assert run.status is RunStatus.failed
+    assert run.output is None
+    assert await harness.events_named(run_id, EventName.run_completed) == []
+    (failed,) = await harness.events_named(run_id, EventName.run_failed)
+    assert failed.data["error"] == repr(NonRetryable("d0 refused"))
 
 
 # --------------------------------------------------------------------------
