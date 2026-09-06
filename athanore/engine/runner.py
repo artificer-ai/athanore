@@ -647,6 +647,16 @@ async def _record_failure(
     which is never retried — so the budget is the server default and
     never consulted.
 
+    A dead-letter fails the run — but only a run that is still
+    ``running``, read in the same transaction as the write it guards, on
+    the same rule as :func:`_settle_run` (D103). Two branches of one
+    fan-out can be in flight together and dead-letter together; the
+    first verdict is the run's, and the second must not emit a second
+    ``run.failed`` or re-stamp ``finished`` on a run 03 §State machines
+    re-opens only by retry, rerun or move. The second dead-letter loses
+    nothing: its ``task.failed`` and ``task.dead_lettered`` still record
+    it, and the log line below is still appended.
+
     The work-log line is appended after the transaction and in its own,
     which is where :class:`~athanore.engine.services.LogService` puts
     every entry: it is the human-readable record of a failure the store
@@ -713,17 +723,19 @@ async def _record_failure(
                     TaskDeadLettered(node=task.node, attempt=task.attempt, error=error),
                 )
             )
-            await uow.runs.set_status(
-                task.run_id, RunStatus.failed.value, finished=now()
-            )
-            uow.emit(
-                _event(
-                    task.run_id,
-                    None,
-                    EventName.run_failed,
-                    RunFailed(node=task.node, task_id=task.id, error=error),
+            run = await uow.runs.get(task.run_id)
+            if run is not None and run.status is RunStatus.running:
+                await uow.runs.set_status(
+                    task.run_id, RunStatus.failed.value, finished=now()
                 )
-            )
+                uow.emit(
+                    _event(
+                        task.run_id,
+                        None,
+                        EventName.run_failed,
+                        RunFailed(node=task.node, task_id=task.id, error=error),
+                    )
+                )
     await services.log.append(
         f"attempt {task.attempt} failed: {exc}",
         author=LogAuthor.engine,

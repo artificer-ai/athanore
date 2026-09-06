@@ -84,6 +84,29 @@ def racing() -> Workflow:
     return wf
 
 
+def refusing() -> Workflow:
+    """A fan-out of two with no join, both branches refusing.
+
+    ``d0`` refuses at once and ``d1`` after a sleep, so the second
+    dead-letter is committed against a run the first has already failed
+    — which is what the concurrency of a fan-out makes ordinary.
+    """
+
+    wf = Workflow("refusing")
+
+    @wf.node(start=True)
+    async def product(build):
+        return [build(f"d{index}") for index in range(2)]
+
+    @wf.node()
+    async def build(*, deliverable):
+        if deliverable == "d1":
+            await asyncio.sleep(0.1)
+        raise NonRetryable(f"{deliverable} refused")
+
+    return wf
+
+
 # --------------------------------------------------------------------------
 # Retry
 # --------------------------------------------------------------------------
@@ -272,6 +295,37 @@ async def test_a_dead_letter_is_not_overwritten_by_a_slower_terminal_branch(
     assert await harness.events_named(run_id, EventName.run_completed) == []
     (failed,) = await harness.events_named(run_id, EventName.run_failed)
     assert failed.data["error"] == repr(NonRetryable("d0 refused"))
+
+
+async def test_two_concurrent_dead_letters_fail_the_run_once(harness) -> None:
+    """One run, one ``run.failed``, whatever dead-letters after it (D103).
+
+    Both branches of the fan-out are claimed in the same round and both
+    are in flight when the first verdict commits. The second dead-letter
+    is still recorded in full — ``task.failed``, ``task.dead_lettered``
+    and its log line — but the run was failed by the first, and 03
+    §State machines re-opens a failed run only by retry, rerun or move.
+    """
+
+    harness.register(refusing())
+    run_id = await harness.submit("refusing")
+
+    await harness.drain()
+
+    builds = await harness.at(run_id, "build")
+    assert [task.status for task in builds] == [TaskStatus.dead_letter] * 2
+    assert len(await harness.events_named(run_id, EventName.task_dead_lettered)) == 2
+
+    run = await harness.run(run_id)
+    assert run.status is RunStatus.failed
+    (failed,) = await harness.events_named(run_id, EventName.run_failed)
+    assert failed.data["error"] == repr(NonRetryable("d0 refused"))
+
+    # The stamp is the first dead-letter's: ``d1`` sleeps before it
+    # refuses, so a second failure would have moved ``finished`` past it.
+    late = next(task for task in builds if task.payload == "d1")
+    assert run.finished is not None and late.finished is not None
+    assert run.finished < late.finished
 
 
 # --------------------------------------------------------------------------

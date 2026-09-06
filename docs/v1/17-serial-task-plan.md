@@ -968,7 +968,11 @@ not merely that nothing escaped. `retries=0` means no retry rather than
 the server default, which is the only reading under which writing it
 does anything (D102). The work-log line is appended through
 `services.log` after the failure transaction, where every other entry in
-the system is written.
+the system is written. The dead-letter arm fails the run only when the
+run is still `running`, read in the same transaction: two branches of one
+fan-out that dead-letter together each record `task.failed` and
+`task.dead_lettered`, and the first one to commit is the run's verdict
+(D103, and 04 §Running an attempt step 4).
 
 ### T024b — Fan-in: branch frames, `JoinRepo`, arrival and dispatch (A1.9b, D62)
 
@@ -1040,7 +1044,8 @@ tests run the same fan-out under four shuffles of the branch delays,
 joined and open. The check settles nothing on a run that is no longer
 `running`, so a dead-letter in one branch is neither overwritten with
 `completed` by a slower terminal sibling nor reported twice as the
-stall it causes at a join (D103, and 04 §Running an attempt step 3).
+stall it causes at a join (D103, and 04 §Running an attempt step 3 —
+step 4's dead-letter arm carries the same guard).
 
 ### T025 — Scheduler loop (A1.8)
 

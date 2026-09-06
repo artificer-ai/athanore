@@ -199,7 +199,9 @@ order, not arrival order. A join node MUST declare a payload slot;
 ### Failure and operator semantics
 
 - A branch that dead-letters never arrives; the run is `failed` by the
-  dead-letter as usual. Retrying or rerunning that branch later makes it
+  dead-letter as usual — by the *first* one, if several branches
+  dead-letter, since a failed run is re-opened only by retry, rerun or
+  move (D103). Retrying or rerunning that branch later makes it
   arrive, the join fires, and the run re-opens to `running`: fan-in
   composes with the existing re-open semantics without new states.
 - A run with no ready/in-progress/waiting tasks and a join with partial
@@ -318,7 +320,12 @@ The re-admit queue is an in-memory FIFO per pool of tasks whose
    entry `attempt N failed: …`; if the exception is retryable (§Failure
    classes) and `attempt < retries` enqueue a retry (same payload, same
    `created`, `attempt+1`, `task.failed will_retry=true`); else mark
-   `dead_letter`, set run `failed`, publish `run.failed`.
+   `dead_letter`, and — if the run is **still `running`**, read in that
+   same transaction — set run `failed` and publish `run.failed`. Two
+   branches of one fan-out can dead-letter together; the first verdict
+   is the run's, and the second records itself with `task.failed` and
+   `task.dead_lettered` rather than emitting a second `run.failed` and
+   re-stamping `finished` on a run nothing has re-opened (D103).
 5. `finally`: release the lease, unbind the context, `notify()`.
 
 `asyncio.CancelledError` is not a failure: an attempt cancelled by an
