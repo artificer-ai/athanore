@@ -466,7 +466,7 @@ async def test_reaching_a_repository_outside_the_block_raises(
     async with store.uow() as uow:
         pass
 
-    for name in ("runs", "log", "events", "submissions", "stream"):
+    for name in ("runs", "log", "events", "submissions", "stream", "requests"):
         with pytest.raises(RuntimeError, match="not open"):
             getattr(uow, name)
 

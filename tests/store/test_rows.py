@@ -28,6 +28,7 @@ from athanore.store.rows import (
     RequestMode,
     RequestRow,
     RequestSource,
+    RequestView,
     RunRow,
     RunStats,
     RunStatus,
@@ -51,6 +52,7 @@ ROW_MODELS = [
     StreamChunkRow,
     RequestRow,
     AnswerRow,
+    RequestView,
     EventRow,
 ]
 
