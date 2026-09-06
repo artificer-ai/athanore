@@ -33,6 +33,8 @@ Monorepo with one Python distribution and one npm workspace.
 athanore/                      Python package (distribution "athanore")
   __init__.py                  public API surface (see below)
   settings.py                  pydantic-settings: AthanoreSettings
+  logging.py                   structlog config: configure_logging, bind_attempt,
+                               get_logger; routes stdlib logging through structlog
   workflow.py                  Workflow: the user-facing object. Owns a graph
                                builder and the plugin declarations (09); the
                                only module that imports both.
@@ -99,10 +101,13 @@ api, cli, plugins.builtin
         ↓
 engine, requests, agents, plugins.registry
         ↓
-store, events, graph, settings
+store, events, graph, settings, logging
 ```
 
-`graph` imports nothing from the package. `store` never imports `engine`.
+Peers within a tier may not import each other: each module in a tier is
+an independent sibling, and the only cross-module imports allowed are
+arrows down a tier. `graph` imports nothing from the package. `store`
+never imports `engine`.
 `agents` reaches the store only through `TaskContext` (which exposes
 narrow services, not the store object — see 04). `workflow.py` is the
 one module that imports both `graph` and `plugins.decl`; `graph` itself
