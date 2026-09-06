@@ -31,5 +31,14 @@
     "noFallthroughCasesInSwitch": true
   },
   "include": ["src"],
-  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/test-setup.ts"]
+  /* The generated API client is its own project (tsconfig.gen.json); the
+     reference below is what redirects an import of `@/api/gen` to that
+     project's declarations. */
+  "exclude": [
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/test-setup.ts",
+    "src/api/gen"
+  ],
+  "references": [{ "path": "./tsconfig.gen.json" }]
 }

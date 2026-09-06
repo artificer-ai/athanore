@@ -1,0 +1,45 @@
+{
+  /* `src/api/gen` is generated and committed as-is (02 §One wire
+     contract), so it is checked under the generator's contract rather
+     than ours: @hey-api/openapi-ts bundles its fetch runtime into the
+     output, and that runtime is not `exactOptionalPropertyTypes`-clean.
+     Relaxing the flag for the whole SPA to accommodate it would give up
+     a check T007 chose deliberately, so the generated tree is its own
+     project instead. It is `composite`, so the app and test projects
+     consume its declarations and see the same types they would from a
+     published package. */
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.gen.tsbuildinfo",
+    "target": "es2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "esnext",
+    "types": [],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+
+    /* Declarations only: tsc bundles nothing here, but the app and test
+       projects reference this one, so it must publish types. */
+    "composite": true,
+    "emitDeclarationOnly": true,
+    "declarationMap": true,
+    "rootDir": "src/api/gen",
+    "outDir": "./node_modules/.tmp/gen",
+
+    /* Type checking (see tsconfig.app.json), less the one flag the
+       generated runtime does not satisfy. */
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": false,
+
+    /* Linting */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src/api/gen"]
+}

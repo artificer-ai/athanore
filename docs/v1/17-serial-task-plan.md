@@ -267,6 +267,16 @@ json.load(snapshot)` with a message telling the reader to run the script.
 CI `contract` job: `uv run scripts/dump_openapi.py && pnpm gen && git
 diff --exit-code tests/snapshots web/src/api/gen`.
 **Done.** Snapshot and generated client committed; CI contract job green.
+**Status.** Done, with the same caveat as T006: there is no remote to
+watch the `contract` job on, so it was run step by step locally
+(`uv run scripts/dump_openapi.py && pnpm -C web gen` leaves
+`git diff --exit-code tests/snapshots web/src/api/gen` clean, twice in a
+row), and `tests/test_openapi_snapshot.py` carries the Python half of
+the check into the gate. The job lost T006's probe: both generators are
+in the tree for good, and a freshness check that can decide not to run
+is not one. `web/src/api/gen` is its own TypeScript project because the
+generator bundles a fetch runtime that is not
+`exactOptionalPropertyTypes`-clean (D80).
 
 ---
 

@@ -112,42 +112,31 @@ jobs:
 
   # One wire contract: OpenAPI is generated from the code and the
   # TypeScript client from OpenAPI, both committed. This job regenerates
-  # them and fails if the tree is stale. The generators arrive in T008;
-  # until then the probe finds neither and the job passes having run
-  # nothing.
+  # them and fails if the tree is stale. Both generators exist as of
+  # T008, so unlike `web` above there is no probe: a contract check that
+  # can silently skip itself is not a contract check.
   contract:
     name: contract
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: is the contract generated yet?
-        id: probe
-        run: |
-          if [ -f scripts/dump_openapi.py ] && [ -f web/package.json ]; then
-            echo "present=yes" >>"$GITHUB_OUTPUT"
-          else
-            echo "present=no" >>"$GITHUB_OUTPUT"
-            echo "::notice::no scripts/dump_openapi.py yet (T008); nothing to run"
-          fi
-
       - uses: astral-sh/setup-uv@v6
-        if: steps.probe.outputs.present == 'yes'
         with:
           python-version: "3.13"
           enable-cache: true
 
       - uses: actions/setup-node@v4
-        if: steps.probe.outputs.present == 'yes'
         with:
           node-version: 22
 
       - name: pnpm
-        if: steps.probe.outputs.present == 'yes'
         run: npm install --global --no-fund --no-audit pnpm@10
 
+      # `pnpm gen` dumps the document and then runs the codegen, so the
+      # explicit dump is only there to do it in an environment `uv sync`
+      # has just prepared.
       - name: regenerate
-        if: steps.probe.outputs.present == 'yes'
         run: |
           uv sync --all-groups --all-extras
           uv run --no-sync scripts/dump_openapi.py
@@ -155,5 +144,4 @@ jobs:
           pnpm -C web gen
 
       - name: snapshot and client are fresh
-        if: steps.probe.outputs.present == 'yes'
         run: git diff --exit-code tests/snapshots web/src/api/gen
