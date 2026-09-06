@@ -751,6 +751,15 @@ shortest-path depth from start, every unreachable node is reported.
 **Done.** `tests/test_graph.py` deleted; hypothesis suite passes with
 `max_examples=200`.
 
+**Status.** Done. `GraphBuilder.node` also takes `join`, which 17's
+signature omits and 04 §Node options lists: `finalize`'s rejection of a
+join with no payload slot — which 17 does require — is unreachable
+otherwise (D95). `build()` owns the exactly-one-start check, because a
+`Graph` cannot be constructed without a `start`, and `finalize` calls it
+rather than repeating it. The MVP's `test_graph.py` is not deleted:
+D65 put the MVP in a separate checkout this repository never writes to,
+so its row in `docs/porting-ledger.md` is ticked instead.
+
 ### T020 — `Workflow` object (D48, 04 §Programmatic host)
 
 **Do.** `athanore/workflow.py`: `class Workflow` owning a `GraphBuilder`

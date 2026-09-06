@@ -12,7 +12,7 @@ Source is `tests/` in the MVP checkout. Targets are the v1 paths named by
 
 | ✓ | MVP test | v1 target | Task |
 |---|---|---|---|
-| ☐ | `test_graph.py` | `tests/graph/test_builder.py` | T019 |
+| ☑ | `test_graph.py` | `tests/graph/test_builder.py` | T019 |
 | ☐ | `test_edit_run.py` | `tests/engine/test_ops_basic.py`, `tests/api/test_runs_api.py` | T027a, T044a |
 | ☐ | `test_pause.py` | `tests/engine/test_ops_basic.py`, `tests/api/test_runs_api.py` | T027a, T044a |
 | ☐ | `test_run_log.py` | `tests/engine/test_ops_basic.py`, `tests/api/test_runs_api.py` | T027a, T044a |
