@@ -1,0 +1,32 @@
+/* The SPA's one stylesheet entry point.
+ *
+ * Everything token-shaped lives in ./styles/theme.css, which is
+ * generated from docs/v1/design/nocturne.css by `pnpm gen:theme`. This
+ * file holds only what shadcn/ui's `init` puts here: the Tailwind and
+ * shadcn imports, the `dark` variant its components branch on, and the
+ * base layer. Theme values do not belong here — edit nocturne.css and
+ * regenerate.
+ */
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/jetbrains-mono";
+@import "./styles/theme.css";
+
+/* Nocturne is a dark theme and the app has no light one, so the tokens
+ * in theme.css are unconditional and <html> carries `dark` permanently
+ * — that is what makes shadcn's `dark:` branches take the dark side.
+ */
+@custom-variant dark (&:is(.dark *));
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-mono;
+  }
+}
