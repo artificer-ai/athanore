@@ -22,6 +22,15 @@ operator operations (T027). It is a factory rather than one engine
 because those tests start a second engine against the same store, which
 is what a restart is; every engine it hands out is stopped on the way
 out, so no dispatch loop outlives its test.
+
+``start_engine`` and ``run_to_completion`` are what the behaviour suite
+(T028) adds on top: register some workflows on a started engine, submit,
+and wait for the run to end on the bus. 17 §T028 puts them in
+``tests/conftest.py``; they are here because ``engine`` at the root of
+``tests/`` is shadowed in both ``tests/engine`` and ``tests/store``,
+where it is the SQLAlchemy ``AsyncEngine`` these fixtures are built out
+of — a root fixture of that name would be invisible to every test that
+wanted it (D112).
 """
 
 from __future__ import annotations
@@ -29,7 +38,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -39,6 +48,7 @@ from athanore.engine.live import LiveRegistry
 from athanore.engine.pools import Lease, Pool, PoolState
 from athanore.engine.runner import run_attempt
 from athanore.events.bus import EventBus
+from athanore.events.names import EventName
 from athanore.graph import Graph
 from athanore.settings import AthanoreSettings
 from athanore.store.engine import make_engine
@@ -48,6 +58,7 @@ from athanore.store.rows import (
     EventRow,
     LogEntryRow,
     RunRow,
+    RunStatus,
     TaskRow,
 )
 from athanore.store.tables import metadata
@@ -93,15 +104,18 @@ def store(engine: AsyncEngine, bus: EventBus) -> Store:
 def settings(tmp_path: Path, db_url: str) -> AthanoreSettings:
     """Settings pinned to this test's database and defaults.
 
-    Constructed with every field the runner reads passed explicitly, so
+    Constructed with every field the engine reads passed explicitly, so
     an ``ATHANORE_*`` variable in the shell that started the container
-    cannot change what a test asserts.
+    cannot change what a test asserts. ``workers`` is one of them from
+    T028: it sizes the default pool, and a behaviour test that asserts
+    what one slot does would otherwise be at the mercy of the shell.
     """
 
     return AthanoreSettings(
         root_path=tmp_path,
         db_url=db_url,
         public_url="http://127.0.0.1:4002",
+        workers=1,
         max_retries=3,
         stream_flush_interval=0.05,
     )
@@ -314,6 +328,80 @@ async def engines(
     yield make
     for one in made:
         await one.stop()
+
+
+#: A run has ended when its row says so. The bus carries the two events
+#: that say it (``run.completed``, ``run.failed``); the row is what
+#: :func:`_run_to_completion` returns, because an event carries a
+#: preview of the outcome and the row carries the outcome.
+_RUN_ENDED: Final = (RunStatus.completed, RunStatus.failed)
+
+
+@pytest.fixture
+def start_engine(
+    engines: Callable[..., Engine],
+) -> Callable[..., Awaitable[Engine]]:
+    """Register workflows on a real engine and start it (17 §T028).
+
+    ``await start_engine(wf)`` is ``server.register(wf); await
+    engine.start()`` — the whole of what a behaviour test needs before it
+    can submit a run. A workflow may name its pool by arriving as a
+    ``(workflow, pool)`` pair; one that does not runs on the default
+    pool, sized by ``settings.workers`` as it is in production.
+
+    Built on :func:`engines`, so every engine it starts is stopped on the
+    way out of the test whatever the test did to it.
+    """
+
+    async def start(
+        *workflows: Workflow | tuple[Workflow, Pool],
+        tick: float = TICK,
+    ) -> Engine:
+        engine = engines(tick=tick)
+        for entry in workflows:
+            workflow, pool = entry if isinstance(entry, tuple) else (entry, None)
+            engine.register(workflow.finalize(), pool)
+        await engine.start()
+        return engine
+
+    return start
+
+
+@pytest.fixture
+def run_to_completion(
+    store: Store, bus: EventBus
+) -> Callable[[str], Awaitable[RunRow]]:
+    """Wait for ``run_id`` to end, and return the run row it ended as.
+
+    The bus rather than a poll: a suite that drives whole runs waits far
+    more often than it reads, and a poll interval is either a slow suite
+    or a flaky one. ``run.completed`` and ``run.failed`` are the two
+    events that end a run (03 invariant 4), and the subscription is taken
+    **before** the first read of the row, so a run that finished between
+    the submission and this call is seen in the store rather than waited
+    for forever. Any run's ending wakes the wait and the row is re-read;
+    the store is what answers, never the event.
+
+    Raises :exc:`TimeoutError` under :data:`DEADLINE`, which is a
+    deadlocked run rather than a slow one.
+    """
+
+    async def wait(run_id: str) -> RunRow:
+        subscription = bus.subscribe(
+            [EventName.run_completed.value, EventName.run_failed.value]
+        )
+        try:
+            async with asyncio.timeout(DEADLINE):
+                while True:
+                    async with store.reader() as reader:
+                        row = await reader.runs.get(run_id)
+                    if row is not None and row.status in _RUN_ENDED:
+                        return row
+                    await subscription.queue.get()
+        finally:
+            subscription.close()
+
+    return wait
 
 
 async def _wait_until(check: Callable[[], Awaitable[bool]]) -> None:

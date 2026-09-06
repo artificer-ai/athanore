@@ -543,7 +543,13 @@ async def test_cancel_attempts_ends_the_named_attempts_only(fleet) -> None:
     assert second.cancelled
     assert not first.cancelled
     assert one.scheduler.in_flight == ((await one.only_task(kept)).id,)
-    assert one.pools.get("test").free() == 1
+    # The cancelled attempt's slot comes back. Polled rather than read
+    # once, unlike the stopped-scheduler case above: a live loop takes
+    # the free slots *before* it asks the store for work and gives back
+    # the ones it did not use (D107), so a single read of `free()` can
+    # land inside a reservation that is about to be released — which is
+    # a scheduler tick away, and was a flake under a slow interpreter.
+    await wait_until(lambda: leased(one, 1))
     # Cancelling a task nothing is running is not an error, and the
     # attempt already reaped cannot be cancelled twice.
     assert one.scheduler.cancel_attempts([doomed]) == []

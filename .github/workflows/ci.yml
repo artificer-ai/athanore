@@ -38,11 +38,22 @@ jobs:
       - name: uv sync
         run: uv sync --all-groups --all-extras
 
-      # `--cov` measures; it does not yet gate. The thresholds of
-      # 13 §CI (graph/engine/requests >= 95 %, overall >= 85 %) land
-      # with the code they measure, not on an empty package (D76).
+      # `--cov` measures the whole package; the step below gates the part
+      # of it 13 §CI puts a threshold on. The rest of those thresholds
+      # (`requests` >= 95 %, overall >= 85 %) land with the code they
+      # measure, not on an empty package (D76).
       - name: pytest
         run: uv run --no-sync pytest -q --cov=athanore --cov-report=term-missing
+
+      # The engine's coverage gate (13 §CI, T028): `graph` and `engine`
+      # together must stay at 95 %. It reports out of the data file the
+      # step above wrote, so the suite runs once and the gate is on the
+      # numbers the whole suite produced — `coverage report --fail-under`
+      # is the flag `pytest --cov-fail-under` forwards to (D112).
+      - name: coverage gate (graph, engine)
+        run: >
+          uv run --no-sync coverage report
+          --include='athanore/graph/*,athanore/engine/*' --fail-under=95
 
       - name: ruff
         if: matrix.python-version == '3.13'

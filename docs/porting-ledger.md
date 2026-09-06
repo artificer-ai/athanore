@@ -17,11 +17,11 @@ Source is `tests/` in the MVP checkout. Targets are the v1 paths named by
 | ☑ | `test_pause.py` | `tests/engine/test_ops_basic.py` (pause blocks the next claim, resume dispatches, the invalid transitions as `Conflict`, done); `tests/api/test_runs_api.py` still carries the 404/409 half | T027a, T044a |
 | ☑ | `test_run_log.py` | `tests/engine/test_ops_basic.py` (author, node and the empty-text refusal, done); `tests/api/test_runs_api.py` still carries the request-body half | T027a, T044a |
 | ☑ | `test_management.py` | `tests/engine/test_ops_tasks.py` (rerun, retry, move, cancel and delete, done); `tests/api/test_runs_api.py` still carries the HTTP half, and v0's `swap-priority` is `reorder` there | T027b, T044a |
-| ☐ | `test_deterministic.py` | `tests/engine/test_behaviours.py` | T028 |
-| ☐ | `test_fanout.py` | `tests/engine/test_behaviours.py` | T028 |
-| ☑ | `test_priority.py` | `tests/store/test_claim.py` (the ordering assertions, done); `tests/engine/test_behaviours.py` and `tests/api/test_runs_api.py` still carry the engine and API halves | T015a, T028, T044a |
-| ☐ | `test_worker_pools.py` | `tests/engine/test_behaviours.py` | T028 |
-| ☐ | `test_qa_gate.py` | `tests/engine/test_behaviours.py` | T028 |
+| ☑ | `test_deterministic.py` | `tests/engine/test_behaviours.py` | T028 |
+| ☑ | `test_fanout.py` | `tests/engine/test_behaviours.py` | T028 |
+| ☑ | `test_priority.py` | `tests/store/test_claim.py` (the ordering assertions) and `tests/engine/test_behaviours.py` (the same order through `task.started`, done); `tests/api/test_runs_api.py` still carries the API half | T015a, T028, T044a |
+| ☑ | `test_worker_pools.py` | `tests/engine/test_behaviours.py` (dedicated, shared, default and zero-capacity pools, and what `Engine.register` refuses; the two registrations v0 refused and v1 allows are pinned there and recorded in D112) | T028 |
+| ☑ | `test_qa_gate.py` | `tests/engine/test_behaviours.py` (the loop-backs, with the MVP's `MockAgent` stages as plain bodies — agents are Phase 2) | T028 |
 | ☐ | `test_requests.py` | `tests/requests/test_service.py` | T031 |
 | ☐ | `test_permissions.py` | `tests/agents/test_policies.py`, `tests/agents/test_acp_outcomes.py` | T038, T039a |
 | ☐ | `test_elicitation.py` | `tests/agents/test_policies.py`, `tests/agents/test_acp_outcomes.py` | T038, T039a |
@@ -42,6 +42,6 @@ Support files, ported or deleted alongside the tests they serve:
 
 | ✓ | MVP file | v1 target | Task |
 |---|---|---|---|
-| ☐ | `tests/conftest.py` | `tests/conftest.py` (engine fixture), `tests/store/conftest.py` | T028 |
+| ☑ | `tests/conftest.py` | `tests/engine/conftest.py` (`start_engine`, `run_to_completion`; **not** `tests/conftest.py`, where `engine` is shadowed — D112), `tests/store/conftest.py` | T028 |
 | ☐ | `tests/fake_acp.py` | `athanore/testing/` `FakeACPAgent` (`tests/testing/test_fake_acp.py`) | T039a |
 | ☐ | `tests/smoke_acp.py` | `ATHANORE_SMOKE`-gated smoke test | T077 |

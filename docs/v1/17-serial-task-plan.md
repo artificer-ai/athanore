@@ -1220,6 +1220,19 @@ mechanism, this covers the example's shape).
 **Done.** Those five MVP files deleted; coverage of `graph` and `engine`
 ≥ 95 % (`--cov-fail-under` on those paths in CI).
 
+**Status.** Done. The fixtures are `start_engine` and `run_to_completion`
+in `tests/engine/conftest.py`, not an `engine` fixture in
+`tests/conftest.py`: `engine` at the root of `tests/` is shadowed in both
+`tests/engine` and `tests/store`, where it is the SQLAlchemy
+`AsyncEngine` these are built out of (D112). The five MVP files are
+**not** deleted — the MVP checkout is read-only to this repository (D65)
+— so their ledger rows are ticked instead. Coverage of `graph` and
+`engine` is 99 %, gated in CI by `coverage report --include` on the data
+the one full run wrote rather than by a second, narrower pytest. Two v0
+registration errors are v1 non-behaviour and are recorded rather than
+built: a redeclared pool name keeps the capacity it was registered with,
+and `Pool("default", …)` is not reserved (D112).
+
 ### T029 — Phase 1 checkpoint
 
 **Do.** Run the full suite; confirm `lint-imports` passes; update 04 with the two
