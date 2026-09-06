@@ -1460,6 +1460,27 @@ restoring the previous values on exit (nested agents).
 in the header form; no `?token=` or `_token` anywhere.
 **Done.** Tests pass.
 
+**Status.** Done. `athanore/agents/base.py` holds `AgentError`, the
+`AgentResult` dataclass of 05 with its `ok` property, `Agent` with the
+three class attributes and a `run()` that raises, and the four blocks of
+19 as module constants. `render_prompt(prompt="", ctx=None)` is a
+coroutine — 19's `{title}` is the run's, read through
+`ctx.services.run.get()` — and joins the sections with a blank line,
+omitting each with its separator: the system prompt, `---`, `## Your
+assignment`, `---`, the tool-agnostic kickoff, the `http` tier block,
+the ask block under `ask_policy="http"` and the submission block with
+an `output_model`. Placeholders are filled in a single regex pass, so a
+schema's braces are text and not a template. `declare(ctx)` is an async
+context manager publishing `output_model` and `ask_policy` on the
+context, clearing `last_rejection`, restoring all three on every exit
+and a no-op without a context. The tiers of 05 are T039b's: the base
+class emits `http`. `tests/agents/test_prompt.py` reads 19's fenced
+blocks out of the document and asserts the whole rendered prompt against
+them, and that the token appears only after `X-Athanore-Token: ` (five
+times, and nowhere else in the text).
+`athanore.agents.base -> athanore.engine.context` is the second named
+arrow in the layers contract, which 02 §Layering already sanctions (D119).
+
 ### T035 — Submissions helpers (A2.3)
 
 **Do.** `athanore/agents/submissions.py`: `validate_submission(model,
