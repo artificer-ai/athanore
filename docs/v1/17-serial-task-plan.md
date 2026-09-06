@@ -323,6 +323,15 @@ bool`), `RunStats` (`input_tokens, output_tokens, total_tokens, cost,
 tool_calls, duration_s`, all optional).
 **Done.** Importable; pyright strict clean.
 
+**Status.** Done. The models share a frozen `ReadModel` base and
+`RunSummary` extends `RunRow`; `TaskRow.branch` is a list of a typed
+`BranchFrame` while the other JSON columns stay untyped, and
+`RequestRow` spells 08's `schema` as `schema_` with that alias (D82).
+`ChunkKind`'s `thought` was missing from 03 §StreamChunk, which now
+lists it. `tests/store/test_rows.py` pins the two properties that are
+not typing: `token_hash` never serializes, and `RunStats` omits what
+was not measured.
+
 ### T011 — SQLAlchemy Core tables and the engine factory (A1.1)
 
 **Do.** `athanore/store/tables.py`: `metadata = MetaData(naming_convention=…)`;
