@@ -10,8 +10,7 @@ place. And the glob must select whole segments: ``run.*`` is
 translation agrees with it, case by case, so a filtered replay and a
 filtered live stream cannot disagree.
 
-Every test runs on SQLite; T014b parametrises the suite over
-PostgreSQL too (``tests/store/conftest.py``).
+Every test runs on both backends; see ``tests/store/conftest.py``.
 """
 
 from __future__ import annotations

@@ -13,8 +13,7 @@ is that deleting a run really does take everything with it, events
 included — those have no foreign key, so the cascade cannot be trusted to
 do it (D83).
 
-Every test runs on SQLite; T014b parametrises the suite over
-PostgreSQL too (``tests/store/conftest.py``).
+Every test runs on both backends; see ``tests/store/conftest.py``.
 """
 
 from __future__ import annotations
@@ -44,8 +43,6 @@ from athanore.store.tables import (
     log_entries,
     requests,
     runs,
-    stream_chunks,
-    submissions,
     tasks,
 )
 from athanore.store.uow import Store, now
@@ -120,54 +117,6 @@ async def answer_request(store: Store, request_id: int) -> None:
                 option_id="allow",
                 consumed=False,
                 created=NOW,
-            )
-        )
-
-
-async def add_children(store: Store, run_id: str, task_id: int) -> None:
-    """A log entry, a submission and a transcript chunk under one task.
-
-    T014a and T014b give these tables repositories; the cascade is T014's
-    to prove, so the rows go in through the connection.
-    """
-
-    async with store.uow() as uow:
-        await uow.conn.execute(
-            log_entries.insert().values(
-                run_id=run_id,
-                task_id=task_id,
-                node="build",
-                author=LogAuthor.engine.value,
-                kind=None,
-                text="started",
-                created=NOW,
-            )
-        )
-        await uow.conn.execute(
-            submissions.insert().values(
-                task_id=task_id, payload={"value": 1}, created=NOW
-            )
-        )
-        await uow.conn.execute(
-            stream_chunks.insert().values(
-                task_id=task_id, seq=1, kind="text", text="hello", created=NOW
-            )
-        )
-
-
-async def add_event(
-    store: Store, name: str, run_id: str | None, task_id: int | None
-) -> None:
-    """One row in the table with no foreign key (D83)."""
-
-    async with store.uow() as uow:
-        await uow.conn.execute(
-            events.insert().values(
-                run_id=run_id,
-                task_id=task_id,
-                name=name,
-                data={},
-                created=NOW + timedelta(seconds=1),
             )
         )
 
@@ -767,8 +716,11 @@ async def test_delete_takes_the_whole_run_with_it(store: Store) -> None:
     task_id = await add_task(store, run_id, "build", TaskStatus.in_progress)
     request_id = await add_request(store, run_id, task_id)
     await answer_request(store, request_id)
-    await add_children(store, run_id, task_id)
-    await add_event(store, "task.started", run_id, task_id)
+    async with store.uow() as uow:
+        await uow.log.append(run_id, "build", LogAuthor.engine, "started")
+        await uow.submissions.insert(task_id, {"value": 1})
+        await uow.stream.append_batch(task_id, [(1, "text", "hello")])
+        await uow.events.insert_many([_Event("task.started", run_id, task_id)])
     keeper = await make_run(store, title="keeper")
     keeper_task = await add_task(store, keeper, "build", TaskStatus.in_progress)
 
@@ -794,8 +746,10 @@ async def test_delete_of_an_unknown_run_is_false(store: Store) -> None:
 async def test_delete_leaves_another_runs_events_alone(store: Store) -> None:
     doomed = await make_run(store, title="doomed")
     keeper = await make_run(store, title="keeper")
-    await add_event(store, "run.created", doomed, None)
-    await add_event(store, "run.created", keeper, None)
+    async with store.uow() as uow:
+        await uow.events.insert_many(
+            [_Event("run.created", doomed, None), _Event("run.created", keeper, None)]
+        )
 
     async with store.uow() as uow:
         await uow.runs.delete(doomed)
@@ -858,3 +812,15 @@ def test_an_unknown_backend_is_refused_not_guessed(
 ) -> None:
     with pytest.raises(NotImplementedError, match="mysql"):
         build("mysql")
+
+
+class _Event:
+    """The shape :meth:`EventRepo.insert_many` needs, without the bus."""
+
+    def __init__(self, name: str, run_id: str | None, task_id: int | None) -> None:
+        self.id: int | None = None
+        self.run_id = run_id
+        self.task_id = task_id
+        self.name = name
+        self.data: dict[str, Any] = {}
+        self.created = NOW + timedelta(seconds=1)

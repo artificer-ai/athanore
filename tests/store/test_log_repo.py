@@ -7,8 +7,7 @@ attempt (08 §Agent-facing), and it must not take the *unkinded* entries
 with it — ``kind NOT IN ('stats')`` is NULL for a NULL kind, and SQL
 treats NULL as false, which would drop every plain note in the run.
 
-Every test runs on SQLite; T014b parametrises the suite over
-PostgreSQL too (``tests/store/conftest.py``).
+Every test runs on both backends; see ``tests/store/conftest.py``.
 """
 
 from __future__ import annotations

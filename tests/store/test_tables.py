@@ -7,20 +7,24 @@ cascade that is never enforced looks exactly like one that is until a run
 is deleted, which is why the enforcement is tested with a violation
 rather than by reading the DDL.
 
-The database is a temporary **file**. WAL is not available to
-``:memory:``, so an in-memory database would report a journal mode that
-production never runs with.
+The schema tests read the metadata and need no database at all. The ones
+that need a live one take the ``engine`` fixture of
+``tests/store/conftest.py``, so the cascades and the partial index are
+asserted on both backends; the pragmas and the ``sqlite_master`` read are
+SQLite's own and take ``sqlite_url`` instead, which skips on the Postgres
+parameter. The SQLite database is a temporary **file**: WAL is not
+available to ``:memory:``, so an in-memory database would report a
+journal mode that production never runs with.
 """
 
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
 import pytest
-from sqlalchemy import String, Table, UniqueConstraint, select
+from sqlalchemy import String, Table, UniqueConstraint, inspect, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -42,19 +46,10 @@ NOW = datetime(2026, 9, 6, 12, 0, tzinfo=UTC)
 
 
 @pytest.fixture
-def db_url(tmp_path: Path) -> str:
-    return f"sqlite+aiosqlite:///{tmp_path / 'athanore.db'}"
+async def sqlite_engine(sqlite_url: str) -> AsyncIterator[AsyncEngine]:
+    """A SQLite database on a temporary file, for the SQLite-only tests."""
 
-
-@pytest.fixture
-async def engine(db_url: str) -> AsyncIterator[AsyncEngine]:
-    """A migrated-by-``create_all`` database on a temporary file.
-
-    T012 owns the migration; a test does not need one to exercise the
-    metadata it is generated from.
-    """
-
-    eng = make_engine(db_url)
+    eng = make_engine(sqlite_url)
     async with eng.begin() as conn:
         await conn.run_sync(metadata.create_all)
     try:
@@ -234,14 +229,9 @@ def test_the_token_hash_column_is_nullable_and_sized() -> None:
 async def test_create_all_builds_every_table(engine: AsyncEngine) -> None:
     async with engine.connect() as conn:
         names = await conn.run_sync(
-            lambda sync_conn: sorted(
-                row[0]
-                for row in sync_conn.exec_driver_sql(
-                    "SELECT name FROM sqlite_master WHERE type='table'"
-                )
-            )
+            lambda sync_conn: set(inspect(sync_conn).get_table_names())
         )
-    assert set(metadata.tables) <= set(names)
+    assert set(metadata.tables) <= names
 
 
 @pytest.mark.parametrize(
@@ -254,9 +244,9 @@ async def test_create_all_builds_every_table(engine: AsyncEngine) -> None:
     ],
 )
 async def test_each_pragma_reads_back(
-    engine: AsyncEngine, pragma: str, expected: object
+    sqlite_engine: AsyncEngine, pragma: str, expected: object
 ) -> None:
-    async with engine.connect() as conn:
+    async with sqlite_engine.connect() as conn:
         result = await conn.exec_driver_sql(f"PRAGMA {pragma}")
         assert result.scalar_one() == expected
 
@@ -270,8 +260,8 @@ def test_the_pragmas_are_the_four_07_names() -> None:
     }
 
 
-def test_is_sqlite(db_url: str) -> None:
-    assert is_sqlite(make_engine(db_url))
+def test_is_sqlite(sqlite_url: str) -> None:
+    assert is_sqlite(make_engine(sqlite_url))
     assert not is_sqlite(make_engine("postgresql+asyncpg://u:p@localhost/db"))
 
 

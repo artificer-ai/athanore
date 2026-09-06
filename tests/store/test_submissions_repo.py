@@ -7,8 +7,7 @@ matters is that :meth:`SubmissionRepo.latest` returns the newest row and
 not the first, ordered by id rather than by a timestamp two submissions
 of one repair turn can share.
 
-Every test runs on SQLite; T014b parametrises the suite over
-PostgreSQL too (``tests/store/conftest.py``).
+Every test runs on both backends; see ``tests/store/conftest.py``.
 """
 
 from __future__ import annotations

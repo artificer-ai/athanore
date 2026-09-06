@@ -524,6 +524,20 @@ service's `ATHANORE_TEST_PG_URL` (T000) run the Postgres variants locally.
 **Done.** Tests pass on SQLite; Postgres variants skip without the `pg`
 profile and pass with it.
 
+**Status.** Done. The `postgres` parameter skips when
+`ATHANORE_TEST_PG_URL` is unset **and** when it is set but nothing
+answers — the dev container always sets it, so a reachability probe
+(once per session, cached) is what keeps the gate green with the profile
+down. Each PostgreSQL test starts from `DROP SCHEMA public CASCADE`, so a
+migration test finds no `alembic_version` either. `test_uow.py`,
+`test_tables.py` and `test_migrations.py` were retrofitted onto the
+fixture; the tests whose subject *is* SQLite — the pragmas, the file a
+question must not create — take `sqlite_url` and skip on the other
+parameter. `append_batch` is one multi-row `VALUES`, split only above
+`MAX_ROWS_PER_INSERT` so an implausible burst cannot exceed a backend's
+bind-parameter limit. Built in T014's run, as the commit `T014b:`
+on `feat/T014` (D88); do not submit it again.
+
 ### T015 — `TaskRepo` (A1.3)
 
 **Do.** `athanore/store/repos/tasks.py`: `enqueue(run_id, node, payload,
