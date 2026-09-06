@@ -651,6 +651,31 @@ async def test_poll_returns_none_when_the_wait_expires(
     assert await service.poll(request.id, 0.05) is None
 
 
+async def test_a_poll_of_zero_is_the_answer_as_the_store_has_it_now(
+    service: RequestService, store: Store, task: int
+) -> None:
+    """ "How long may I wait" of nothing is "is there an answer" (D117).
+
+    ``human_input`` asks exactly this of a request it re-attached to after
+    a restart — an answered one replays and a pending one is parked on,
+    and the two are told apart without waiting or claiming — and 08's
+    agent long-poll spells it ``?wait=0``. Left to ``asyncio.timeout(0)``
+    the read itself would be cancelled, and the caller would be told "not
+    answered yet" about an answer already in the store.
+    """
+
+    request = await ask_text(service, store, task)
+    assert await service.poll(request.id, 0) is None
+
+    await service.answer(request.id, value="blue")
+    answer = await service.poll(request.id, 0)
+    assert answer is not None and answer.value == "blue"
+    assert answer.consumed is False
+
+    with pytest.raises(RequestNotFound):
+        await service.poll(request.id + 1000, 0)
+
+
 async def test_a_waiter_is_not_woken_by_an_unrelated_event(
     service: RequestService, store: Store, bus: EventBus, task: int
 ) -> None:

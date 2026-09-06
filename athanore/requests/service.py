@@ -372,7 +372,8 @@ class RequestService:
     async def poll(self, request_id: int, wait_s: float) -> AnswerRow | None:
         """The answer to ``request_id``, waiting up to ``wait_s`` for one.
 
-        ``None`` when the wait expires. The agent long-poll of 08
+        ``None`` when the wait expires, and ``wait_s=0`` is the answer
+        as the store has it now. The agent long-poll of 08
         (``GET /api/agent/tasks/{id}/requests/{rid}?wait=N``): the caller
         is not the waiter that opened the request, so nothing is claimed
         and re-delivery is idempotent — a reconnecting agent asking twice
@@ -408,6 +409,18 @@ class RequestService:
         wait that ends in ``TimeoutError`` says "no one answered yet",
         which is a different and misleading thing to tell the caller.
         """
+
+        if timeout is not None and timeout <= 0:
+            # "How long may I wait" of nothing is "is there an answer
+            # right now": one read, no subscription. It cannot be left to
+            # `asyncio.timeout(0)` below, whose deadline has passed before
+            # the loop runs — the read itself would be cancelled, and the
+            # caller would be told "not answered yet" about an answer that
+            # is in the store. `human_input` asks exactly this question of
+            # a request it re-attached to after a restart, and the agent
+            # long-poll asks it as `?wait=0`.
+            await self.view(request_id)
+            return await self._stored_answer(request_id)
 
         subscription = self._bus.subscribe([EventName.request_answered])
         try:

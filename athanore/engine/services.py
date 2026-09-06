@@ -754,6 +754,16 @@ class EventPort:
             )
 
 
+#: What a ``form`` request's waiter registers to have its answer checked
+#: where it lands: a callable that takes the answer as it arrived and
+#: returns the value to store, or raises (06 §Service). Spelled
+#: structurally rather than imported —
+#: ``athanore.requests.validators.Validator`` is the same type, and
+#: ``athanore.requests`` is this package's independent sibling (02
+#: §Layering).
+AnswerValidator = Callable[[Any], Any]
+
+
 class RequestsPort(Protocol):
     """What ``human_input`` and the agent bridge need of the request layer.
 
@@ -794,6 +804,27 @@ class RequestsPort(Protocol):
     async def answer_as_engine(
         self, request_id: int, option_id: str | None = None
     ) -> AnswerRow: ...
+
+    def register_validator(self, request_id: int, fn: AnswerValidator) -> None:
+        """Validate this request's ``form`` answer with ``fn`` when it lands.
+
+        Registered by whoever opened the request, because only they know
+        what the answer is for (06 §Service): ``human_input(output_model=M)``
+        registers a validator built from ``M``, and the ACP bridge one
+        built from the schema the agent sent. Validation happens where the
+        answer lands, so a misfit is refused to the face that gave it
+        rather than in a node body several seconds later.
+        """
+        ...
+
+    def unregister_validator(self, request_id: int) -> None:
+        """Forget this request's validator. Not having one is not an error.
+
+        Called by the waiter on its way out, answered or not: a validator
+        left behind would validate the next answer to a request nobody is
+        waiting on any more.
+        """
+        ...
 
     # ASYNC109: `timeout` is 06 §Service's signature, and the seconds are
     # what the implementation hands to `asyncio.timeout` (T031) rather than a
@@ -857,6 +888,12 @@ class UnwiredRequests:
     ) -> AnswerRow:
         raise NotImplementedError(self._MESSAGE)
 
+    def register_validator(self, request_id: int, fn: AnswerValidator) -> None:
+        raise NotImplementedError(self._MESSAGE)
+
+    def unregister_validator(self, request_id: int) -> None:
+        raise NotImplementedError(self._MESSAGE)
+
     async def wait(
         self,
         request_id: int,
@@ -900,6 +937,10 @@ class RequestBackend(Protocol):
     ) -> RequestRow: ...
 
     async def reopen(self, task_id: int, ordinal: int) -> RequestRow | None: ...
+
+    def register_validator(self, request_id: int, fn: AnswerValidator) -> None: ...
+
+    def unregister_validator(self, request_id: int) -> None: ...
 
     async def answer(
         self,
@@ -1068,6 +1109,21 @@ class TaskRequests:
         return await self._service.answer(
             request_id, option_id=option_id, author=AnswerAuthor.engine
         )
+
+    def register_validator(self, request_id: int, fn: AnswerValidator) -> None:
+        """Register ``fn`` as this request's answer validator (06 §Service).
+
+        Straight to the service, which is where the answer lands and so
+        where the validator has to be. The pair is the body's to manage —
+        ``human_input`` registers before it parks and unregisters in a
+        ``finally`` — because the body is the waiter, and the validator is
+        the shape *it* asked for.
+        """
+        self._service.register_validator(request_id, fn)
+
+    def unregister_validator(self, request_id: int) -> None:
+        """Forget this request's validator. Idempotent, like the service's."""
+        self._service.unregister_validator(request_id)
 
     async def wait(
         self,
