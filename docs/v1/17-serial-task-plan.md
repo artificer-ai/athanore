@@ -679,9 +679,11 @@ records nothing; the failure log line is present with `kind=failure`.
 
 ### T024b — Fan-in: branch frames, `JoinRepo`, arrival and dispatch (A1.9b, D62)
 
-**Do.** Fan-out in T024's success path pushes `{fanout: task.id, index:
-i, count: N, key: jsonable(payload)}` onto each child's `branch` for a
-list of N ≥ 1 transitions. `store/repos/joins.py`: `JoinRepo.arrive(run_id,
+**Do.** `TaskRepo.enqueue` propagates `branch`: copied from the parent
+for single transitions, retries, reruns and moves; a pushed frame for
+fan-outs. Fan-out in T024's success path pushes `{fanout: task.id,
+index: i, count: N, key: jsonable(payload)}` onto each child's `branch`
+for a list of N ≥ 1 transitions. `store/repos/joins.py`: `JoinRepo.arrive(run_id,
 join_node, fanout_task, index, key, value, from_task) -> (arrived, count,
 late)` (upsert on the unique key; `late=True` when a join task for that
 fan-out already exists), `arrivals(run_id, join_node, fanout_task) ->
@@ -720,41 +722,6 @@ after restart and the join fires; `output` is scalar with a join and a
 list without one; the same fan-out with shuffled body delays yields an
 identical `output`.
 **Done.** Tests pass; no `output` assertion depends on finish order.
-
-### T024a — Fan-in: branch frames, join arrivals, join dispatch (A1.9b, D62)
-
-**Do.** `TaskRepo.enqueue` gains `branch` (copied from the parent for
-single transitions, retries, reruns, moves; pushed frame for fan-outs).
-`store/repos/joins.py`: `JoinRepo.arrive(run_id, join_node, fanout_task,
-index, key, value, from_task) -> (arrived, count, late)` (upsert on the
-unique key; `late=True` when a join task for that fan-out already exists),
-`arrivals(run_id, join_node, fanout_task) -> list[ArrivalRow]`,
-`incomplete(run_id) -> list[(join_node, fanout_task, arrived, count)]`.
-Runner step 3 (T024): when interpreting transitions, a list of N ≥ 1
-transitions pushes `{fanout: task.id, index: i, count: N, key:
-jsonable(payload)}` on each child; a transition whose target node has
-`join=True` pops the top frame (`GraphError` on an empty stack), calls
-`arrive`, emits `join.arrived`, and when `arrived == count` enqueues the
-join task with `payload = [{index, key, value, from_task}]` in index
-order, `branch = frames[:-1]`, lineage `{from: fanout, reason: "join",
-arrivals: [...]}`. Completion check: no pending tasks and
-`JoinRepo.incomplete(run)` empty → `completed` with `output` per the
-shape rule (single terminal task → its value; several → list in branch
-order); non-empty → `failed` with `join_incomplete: <join> has k of n
-arrivals` and `run.failed code=join_incomplete`. `Ops.move` rejects a
-join target with `Conflict`; `Ops.rerun` of a join node uses the stored
-payload. Graph builder: `node(join=True)`; finalize rejects a join with
-no payload slot. Event payloads per 18.
-**Tests.** `tests/engine/test_fanin.py`: three branches → join receives
-three dicts in index order with the fan-out keys; nested fan-out/join;
-`count == 1`; one branch dead-letters → run `failed`, `retry` on it →
-join fires → run `completed`; a branch that terminates instead of joining
-→ `failed` with `code=join_incomplete`; late arrival after the join fired
-→ `late: true`, no second join task; recovery with two of three arrived →
-third arrives after restart and the join fires; `output` is scalar with a
-join and a list without one; `move` into a join → `Conflict`.
-**Done.** Tests pass; `run.output` never depends on finish order (a test
-runs the same fan-out with shuffled body delays and asserts equality).
 
 ### T025 — Scheduler loop (A1.8)
 
