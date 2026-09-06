@@ -1880,8 +1880,8 @@ SPA and runs `msgtest` on `FakeACPAgent`.
 | A6.1–A6.4 | T074–T079 |
 
 Sequencing changes relative to 16, all recorded in 15 when executed:
-the TUI is deleted at T055 (end of phase 3) rather than in phase 6,
-because the MVP wire API it depends on is removed there; the `payload_
+the TUI is not deleted at all in this repository — it never lived here
+(D65) and retires with v0 (D13, D67); the `payload_
 too_large` error code is added; the graph package split (A0.1's
 "unchanged" move) is completed in T019 rather than T003 so the MVP
 modules keep running through phase 1.
