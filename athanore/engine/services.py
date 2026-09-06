@@ -41,6 +41,13 @@ behind it: chunks accumulate in memory and land as one insert per
 ``stream_flush_interval`` (07 §Transcript writes). The runner closes it in
 the ``finally`` of every attempt, which is also its last flush.
 
+:attr:`TaskServices.stats` is the one member that writes three things at
+once. An agent run's stats entry is a work-log line, a column and an
+event (05 §Stats entry, D46), and they are one fact: a reader that saw
+the line without the column would total a run wrongly. The text of the
+line arrives as a parameter because formatting it belongs to
+``athanore.agents``, this module's independent sibling.
+
 :attr:`TaskServices.events` is the one member with a rule of its own. A
 plugin or a body may publish, but only into the ``plugin.`` namespace:
 the rest of the vocabulary describes state the engine owns, and a body
@@ -59,6 +66,7 @@ from athanore.engine.pools import Lease, PoolState
 from athanore.events.model import Event
 from athanore.events.names import PLUGIN_PREFIX, EventName, is_known
 from athanore.events.payloads import (
+    AgentStats,
     LogAppended,
     SubmissionAccepted,
     SubmissionRejected,
@@ -84,7 +92,7 @@ from athanore.store.rows import (
     SubmissionRow,
     TaskStatus,
 )
-from athanore.store.uow import Store
+from athanore.store.uow import Store, UnitOfWork
 
 if TYPE_CHECKING:  # `context` imports this module: the arrow points one way.
     from athanore.engine.context import TaskContext
@@ -131,26 +139,119 @@ class LogService:
         entry_author = LogAuthor(author)
         entry_kind = None if kind is None else LogKind(kind)
         async with self._store.uow() as uow:
-            row = await uow.log.append(
+            row = await _log_entry(
+                uow,
                 run_id=self._run_id,
+                task_id=self._task_id,
                 node=self._node,
                 author=entry_author,
                 text=text,
-                task_id=self._task_id,
                 kind=entry_kind,
             )
+        return row
+
+
+async def _log_entry(
+    uow: UnitOfWork,
+    *,
+    run_id: str,
+    task_id: int,
+    node: str,
+    author: LogAuthor,
+    text: str,
+    kind: LogKind | None,
+) -> LogEntryRow:
+    """Write one work-log row and its ``log.appended``, in ``uow``.
+
+    Shared by :meth:`LogService.append`, whose transaction is the entry
+    alone, and by :meth:`StatsService.record`, whose transaction carries
+    two more writes beside it (05 §Stats entry). The event is not
+    optional for either: ``log.appended`` is what invalidates the log
+    query in the SPA (10 §Realtime), so an entry written without one is
+    an entry nothing shows until the next unrelated refresh.
+    """
+    row = await uow.log.append(
+        run_id=run_id,
+        node=node,
+        author=author,
+        text=text,
+        task_id=task_id,
+        kind=kind,
+    )
+    uow.emit(
+        Event(
+            run_id=run_id,
+            task_id=task_id,
+            name=EventName.log_appended,
+            data=LogAppended(
+                log_id=row.id,
+                author=str(author),
+                node=node,
+                kind=None if kind is None else str(kind),
+                preview=text[:PREVIEW_CHARS],
+            ).model_dump(),
+            created=now(),
+        )
+    )
+    return row
+
+
+class StatsService:
+    """The one stats entry of one agent run (05 §Stats entry, D46).
+
+    The façade builds the entry and formats its line
+    (:mod:`athanore.agents.stats`); this is where it lands. Three writes,
+    one transaction:
+
+    - the ``[stats]`` work-log line, author ``engine``, kind ``stats`` —
+      what an operator reads in the run's log, and the reason ``text`` is
+      a parameter rather than something this service formats:
+      ``athanore.agents`` is this module's independent sibling and the
+      arrow between them may not be drawn in either direction (02
+      §Layering);
+    - ``tasks.stats``, so a run's totals are a ``SUM`` over a column
+      rather than a scan of every event it ever emitted (D46, 07);
+    - ``agent.stats``, validated against 18's payload on the way out, so
+      an entry that has drifted from the vocabulary fails here rather
+      than reaching a consumer.
+
+    One entry per agent run, and the column holds the last one written:
+    an attempt that runs two agents in sequence logs two lines and emits
+    two events, and its column carries the run that finished last.
+    """
+
+    def __init__(self, store: Store, *, run_id: str, task_id: int, node: str) -> None:
+        self._store = store
+        self._run_id = run_id
+        self._task_id = task_id
+        self._node = node
+
+    async def record(self, entry: Mapping[str, Any], *, text: str) -> LogEntryRow:
+        """Write the line, the column and the event, or raise.
+
+        It raises like any other write — the transaction rolls back and
+        nothing partial survives. Not failing the agent run over it is
+        the caller's rule, and ``agents.stats.record_entry`` is where it
+        is applied (05 §Stats entry: "Never raises").
+        """
+        payload = AgentStats.model_validate(dict(entry))
+        async with self._store.uow() as uow:
+            row = await _log_entry(
+                uow,
+                run_id=self._run_id,
+                task_id=self._task_id,
+                node=self._node,
+                author=LogAuthor.engine,
+                text=text,
+                kind=LogKind.stats,
+            )
+            await uow.tasks.set_stats(self._task_id, dict(entry))
             uow.emit(
                 Event(
                     run_id=self._run_id,
                     task_id=self._task_id,
-                    name=EventName.log_appended,
-                    data=LogAppended(
-                        log_id=row.id,
-                        author=str(entry_author),
-                        node=self._node,
-                        kind=None if entry_kind is None else str(entry_kind),
-                        preview=text[:PREVIEW_CHARS],
-                    ).model_dump(),
+                    name=EventName.agent_stats,
+                    data=payload.model_dump(),
                     created=now(),
                 )
             )
@@ -1196,6 +1297,7 @@ class TaskServices:
         self.submissions = SubmissionService(
             store, run_id=run_id, task_id=task_id, node=node
         )
+        self.stats = StatsService(store, run_id=run_id, task_id=task_id, node=node)
         self.requests: RequestsPort = (
             UnwiredRequests() if requests is None else requests
         )
@@ -1251,6 +1353,7 @@ __all__ = [
     "RequestBackend",
     "RequestsPort",
     "RunService",
+    "StatsService",
     "StreamService",
     "SubmissionService",
     "TaskRequests",

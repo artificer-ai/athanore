@@ -360,8 +360,10 @@ against the declared `output_model` and checks `ask_policy` for `/ask`
 
 `TaskServices` is the narrow surface bodies and façades use instead of the
 raw store: `log.append(text, author=…)`, `stream.append(kind, text)`,
-`submissions.latest()`, `requests.*` (06), `run.get()`. This is what lets
-`agents` avoid importing `store`.
+`submissions.latest()`, `requests.*` (06), `run.get()`,
+`stats.record(entry, text=…)` (the one transaction behind 05 §Stats
+entry: the `[stats]` line, `tasks.stats` and `agent.stats`). This is what
+lets `agents` avoid importing `store`.
 
 `last_rejection` is `{errors, schema, payload}`: what
 `submissions.reject()` returned, plus the payload it was about. The 422
