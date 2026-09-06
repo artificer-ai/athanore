@@ -104,18 +104,22 @@ layers = [
     "athanore.engine | athanore.requests | athanore.agents | (athanore.plugins.registry) | (athanore.plugins.decl) | (athanore.plugins.mount)",
     "athanore.store | athanore.events | athanore.graph | athanore.settings | athanore.logging",
 ]
-# The one arrow across the middle tier, and the only one there will be
-# (D117). `TaskContext` is where a body's identity and its narrow
-# services live, and 02 §Layering already has the tier reaching it —
+# The arrows across the middle tier, and they all point at the same
+# module (D117, D119). `TaskContext` is where a body's identity and its
+# narrow services live, and 02 §Layering has both siblings reaching it —
 # "`agents` reaches the store only through `TaskContext`" — so a helper a
-# node body calls needs `current_task()` and there is nowhere lower to
-# get it from. It stays one named arrow rather than a `:` between the
-# siblings: `engine.context` is a contextvar and a dataclass, the engine
-# still may not import back (`RequestsPort` is a protocol for that
-# reason), and `athanore.requests.human` is the only module in the tier
-# allowed to reach even this far. An entry that stops matching an import
-# is an error, so the exemption cannot outlive the import it names.
-ignore_imports = ["athanore.requests.human -> athanore.engine.context"]
+# node body calls needs `current_task()`, an agent façade needs the
+# context it declares its `output_model` on, and there is nowhere lower
+# to get either from. They stay named arrows rather than a `:` between
+# the siblings: `engine.context` is a contextvar and a dataclass, the
+# engine still may not import back (`RequestsPort` is a protocol for that
+# reason), and no module in the tier reaches any further into a peer than
+# this. An entry that stops matching an import is an error, so an
+# exemption cannot outlive the import it names.
+ignore_imports = [
+    "athanore.requests.human -> athanore.engine.context",
+    "athanore.agents.base -> athanore.engine.context",
+]
 
 [[tool.importlinter.contracts]]
 name = "graph imports nothing from athanore"
@@ -134,6 +138,18 @@ name = "agents may not import store"
 type = "forbidden"
 source_modules = ["athanore.agents"]
 forbidden_modules = ["athanore.store"]
+# Direct imports only (D119). 02 §Layering does not say `agents` may not
+# reach the store; it says it "reaches the store only through
+# `TaskContext` (which exposes narrow services, not the store object)" —
+# and `TaskContext` is a dataclass whose `services` are typed with store
+# rows, so the sanctioned path is itself an indirect `agents ->
+# engine.context -> engine.services -> store.rows`. Forbidding that chain
+# would forbid the one arrow the architecture grants. What must stay
+# impossible is the direct import — a façade opening a `uow`, writing a
+# row, or naming a table — and that is what this contract now says. The
+# layers contract above is what keeps the indirection to one module:
+# `engine.context` is the only peer any of these siblings may name.
+allow_indirect_imports = true
 
 [[tool.importlinter.contracts]]
 name = "store may not import engine"
