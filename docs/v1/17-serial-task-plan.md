@@ -1422,16 +1422,23 @@ answer that no longer validates re-asks with errors at ordinal 4; a
 retry (new task row) starts its ordinals at 1 and asks afresh.
 **Done.** Tests pass.
 
-**Status.** Done. A request `reopen_or_create` returned with an answer
-already on it is decoded and returned without parking — `poll(id, 0)` is
-what tells the two cases apart — and a form answer that no longer fits is
-logged to the work log (`author=engine`), appended to the prompt, and
-re-asked at the next ordinal. `tests/requests/test_human_input_replay.py`
-kills the attempt with `scheduler.cancel_attempts` and recovers the row
-with `reset_for_recovery`: three questions and one `task.waiting` per
-question plus one for the re-attach, an answer given in the gap re-asked
-at ordinal 4 with its errors in the prompt, and a retry asking afresh at
-ordinal 1.
+**Status.** Done. Built in T033's run, on `feat/T033` (D117);
+dispatched a second time on `feat/T033a`, which lands no implementation
+and two tests (D118). A request `reopen_or_create` returned with an
+answer already on it is decoded and returned without parking —
+`poll(id, 0)` is what tells the two cases apart — and a form answer that
+no longer fits is logged to the work log (`author=engine`), appended to
+the prompt, and re-asked at the next ordinal.
+`tests/requests/test_human_input_replay.py` kills the attempt with
+`scheduler.cancel_attempts` and recovers the row with
+`reset_for_recovery`: three questions and one `task.waiting` per question
+plus one for the re-attach, an answer given in the gap re-asked at
+ordinal 4 with its errors in the prompt, and a retry asking afresh at
+ordinal 1. The re-dispatch added the two modes whose replay decode the
+three original tests did not reach — an `options` answer replays as the
+`option_id` it chose, and a `form` answer given in the gap that still
+fits replays as a validated `output_model` instance rather than the raw
+value the row holds.
 
 ### T034 — Agent base: `Agent`, `AgentResult`, prompt assembly (A2.3)
 

@@ -15,6 +15,14 @@ Three behaviours, one per test:
   nothing it already asked is *waited on* twice, which is the assertion
   that would fail if replay were implemented as "wait, and hope the
   answer is already there".
+- **Each mode replays as its own shape.** ``options`` hands the body the
+  ``option_id`` it chose and ``form`` hands it a validated
+  ``output_model`` instance, on the replay path as on the live one. The
+  two are worth their own tests because the replay reads the answer with
+  ``poll`` where a live wait reads it with ``wait``, and because a
+  ``form`` answer given while nothing was validating is stored exactly as
+  it arrived (D115) — so the validator that turns it into the model runs
+  here, on the way out, or nowhere.
 - **A replayed answer that no longer fits is re-asked, not dropped.**
   Nothing validated the answer given in the gap between the crash and the
   re-attach (no validator survives a restart, 06 §Restart durability), so
@@ -143,6 +151,124 @@ async def test_the_re_executed_body_asks_only_what_it_had_not_asked(
         third.id,
         third.id,
     ]
+
+
+async def test_a_replayed_options_answer_gives_the_body_the_id_it_chose(
+    fleet, service: RequestService, wait_until
+) -> None:
+    """An ``options`` question answered in the gap replays as its ``option_id``.
+
+    The answer to an ``options`` request lives in ``answers.option_id``
+    and not in ``answers.value``, and the replay reads it through
+    ``poll`` — a plain select — where a live wait reads it through the
+    update that claims it. Nothing but this asserts that the two agree,
+    and a replay that handed the body ``None`` would look exactly like an
+    operator who chose nothing.
+    """
+
+    passes: list[list[Any]] = []
+
+    async def body() -> str:
+        got: list[Any] = []
+        passes.append(got)
+        got.append(await human_input("what shall I build?"))
+        got.append(await human_input("ship it?", options=["approve", "reject"]))
+        return "asked"
+
+    one = fleet({"test": 1})
+    one.register_body("asks", body)
+    run_id = await one.submit("asks")
+    await one.scheduler.start()
+
+    first = await one.only_asked(run_id)
+    await service.answer(first.id, value="a bridge")
+    (_, second) = await one.asked(run_id, 2)
+    await wait_until(lambda: one.parked(run_id))
+    task_id = (await one.only_task(run_id)).id
+    await kill(one, task_id, wait_until)
+
+    # Chosen in the gap, and never claimed by a waiter: the attempt that
+    # asked died before the answer arrived.
+    answer = await service.answer(second.id, option_id="reject")
+    assert answer.option_id == "reject"
+    assert answer.consumed is False
+
+    await restart(one, task_id)
+
+    assert await one.finished(run_id) == "asked"
+    assert len(passes) == 2
+    assert passes[0] == ["a bridge"]
+    assert passes[1] == ["a bridge", "reject"]
+
+    # Two questions, asked once each, and neither re-asked: the second
+    # attempt parked on nothing, because both of its answers were already
+    # there.
+    rows = await one.requests_of(run_id)
+    assert [row.ordinal for row in rows] == [1, 2]
+    waiting = await one.events_named(run_id, EventName.task_waiting)
+    assert [event.data["request_id"] for event in waiting] == [first.id, second.id]
+
+
+async def test_a_replayed_form_answer_that_still_fits_is_returned_at_once(
+    fleet, service: RequestService, wait_until
+) -> None:
+    """The other half of the gap: the answer given there still fits.
+
+    ``form`` is the one mode whose stored value is not what the body
+    asked for — an answer given while no validator was registered is
+    stored raw (06 §Restart durability, D115), so the body gets an
+    ``Approval`` only if ``pydantic_validator`` runs on the replay. The
+    raw value here is ``{"approved": "true"}``, which is not the model and
+    coerces to it: a body handed the stored dict back would fail this
+    test where a body handed the validated instance passes it.
+
+    And the question is *not* asked again. Re-asking a form answer that
+    fits would cost the operator the question a second time, which is the
+    whole thing D44 exists to prevent.
+    """
+
+    passes: list[list[Any]] = []
+
+    async def body() -> str:
+        got: list[Any] = []
+        passes.append(got)
+        got.append(await human_input("what shall I build?"))
+        got.append(await human_input("sign off?", output_model=Approval))
+        return "asked"
+
+    one = fleet({"test": 1})
+    one.register_body("asks", body)
+    run_id = await one.submit("asks")
+    await one.scheduler.start()
+
+    first = await one.only_asked(run_id)
+    await service.answer(first.id, value="a bridge")
+    (_, second) = await one.asked(run_id, 2)
+    await wait_until(lambda: one.parked(run_id))
+    task_id = (await one.only_task(run_id)).id
+    await kill(one, task_id, wait_until)
+
+    # Stored as it arrived: `Approval` never saw it, because the waiter
+    # that registered it died with its process.
+    answer = await service.answer(second.id, value={"approved": "true"})
+    assert answer.value == {"approved": "true"}
+
+    await restart(one, task_id)
+
+    assert await one.finished(run_id) == "asked"
+    assert len(passes) == 2
+    assert passes[0] == ["a bridge"]
+    assert passes[1] == ["a bridge", Approval(approved=True, note="")]
+    assert isinstance(passes[1][1], Approval)
+
+    # No third request and no second park: the answer replayed, and the
+    # re-ask path of the test below is the one that did not happen.
+    rows = await one.requests_of(run_id)
+    assert [row.ordinal for row in rows] == [1, 2]
+    waiting = await one.events_named(run_id, EventName.task_waiting)
+    assert [event.data["request_id"] for event in waiting] == [first.id, second.id]
+    notes = await one.log_texts(run_id)
+    assert [text for text in notes if "no longer fits" in text] == []
 
 
 async def test_a_replayed_answer_that_no_longer_fits_is_asked_again(
