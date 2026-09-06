@@ -23,9 +23,12 @@ Every event, stored or ephemeral, is:
 
 ## Typing
 
-`athanore/api/schemas/events.py` declares one pydantic model per event
-name (`RunCreated`, `TaskEnqueued`, …) and an `EventEnvelope` whose
-`data` is a discriminated union on `name`. `GET /api/runs/{id}/events` and
+`athanore/events/payloads.py` declares one pydantic model per event
+name (`RunCreated`, `TaskEnqueued`, …) and an `EventEnvelope`
+discriminated on `name`: one envelope class per name (`RunCreatedEvent`,
+…), each fixing the type of its `data`, so the union is tagged by a field
+the payloads themselves do not carry. `athanore/api/schemas/events.py`
+re-exports them rather than restating them (D81). `GET /api/runs/{id}/events` and
 the SSE `data:` line serialise that envelope, so `openapi.json` carries a
 `oneOf` per event and `@hey-api/openapi-ts` emits a discriminated union.
 `plugin.*` events fall through to `PluginEvent` with `data: dict`. A test
@@ -81,7 +84,7 @@ against it (13 §Contract tests).
 | Event | data |
 |---|---|
 | `log.appended` | `{log_id: int, author: LogAuthor, node: str, kind?: LogKind, preview: str}` — `preview` is the first 200 characters |
-| `agent.stats` | the stats entry of 05 §Stats entry verbatim: `{node, attempt, status, reason?, model?, input_tokens?, output_tokens?, total_tokens?, tool_calls?, cost?, duration_s, session_id?, repair_turns?}` |
+| `agent.stats` | the stats entry of 05 §Stats entry verbatim: `{node, attempt, status, reason?, model?, input_tokens?, output_tokens?, total_tokens?, tool_calls?, cost?, duration_s, session_id?, repair_turns?, denied_permissions?}` |
 
 ### Engine
 

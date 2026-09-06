@@ -300,6 +300,11 @@ patterns (`fnmatch` on dotted names, `run.*` matches one segment only).
 false; `is_known("plugin.gamedev.word")` true.
 **Done.** Tests pass.
 
+**Status.** Done. The payload models type 18's domain-enum fields as
+`str`: those enums arrive with the store in T010, and `events` may not
+import `store` (D81). `agent.stats` carries `denied_permissions`, which
+05 §Stats entry names and 18's field list omits.
+
 ### T010 — Domain enums and read models (A1.3 part)
 
 **Do.** `athanore/store/rows.py`: `RunStatus` (`queued running paused
