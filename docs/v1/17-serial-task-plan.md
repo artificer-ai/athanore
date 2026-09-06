@@ -432,6 +432,14 @@ a subscriber sees the event only after commit; `publish_ephemeral`
 never touches the table; two concurrent `uow()` calls serialise.
 **Done.** Tests pass.
 
+**Status.** Done. `store` and `events` are independent siblings of the
+bottom tier, so `uow.py` names the two shapes it needs from the event
+layer structurally — `OutboxEvent` and `EventPublisher` — instead of
+importing `athanore.events` (D86). `UnitOfWork` is itself the async
+context manager and `Store.uow()` is a one-line wrapper around it, so
+insert / commit / unlock / publish is stated in one place; the outbox is
+one `INSERT ... RETURNING id` per event in emission order.
+
 ### T014 — `RunRepo` (A1.3)
 
 **Do.** `athanore/store/repos/base.py`: `Repo(conn)` with `_row(model,
