@@ -1,0 +1,159 @@
+# The gate, on a runner. `./scripts/test.sh` is the definition of green
+# (D74) and this file follows it: every check below is a check the gate
+# runs, in the gate's order. The one departure is `--cov` on pytest,
+# which measures rather than checks. If the two ever disagree about what
+# green means, the gate is right and this file is wrong;
+# `tests/test_ci_workflows.py` is what notices.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # uv sync, pytest on every supported interpreter; ruff, pyright and
+  # lint-imports once, on 3.13. The floor (3.11) is tested, not just
+  # declared in `requires-python` (D66).
+  python:
+    name: python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+
+      - name: uv sync
+        run: uv sync --all-groups --all-extras
+
+      # `--cov` measures; it does not yet gate. The thresholds of
+      # 13 §CI (graph/engine/requests >= 95 %, overall >= 85 %) land
+      # with the code they measure, not on an empty package (D76).
+      - name: pytest
+        run: uv run --no-sync pytest -q --cov=athanore --cov-report=term-missing
+
+      - name: ruff
+        if: matrix.python-version == '3.13'
+        run: |
+          uv run --no-sync ruff check .
+          uv run --no-sync ruff format --check .
+
+      - name: pyright
+        if: matrix.python-version == '3.13'
+        run: uv run --no-sync pyright
+
+      - name: lint-imports
+        if: matrix.python-version == '3.13'
+        run: uv run --no-sync lint-imports
+
+  # The SPA half of the gate. `web/` arrives in T007; until it does this
+  # job checks out, finds no `web/package.json`, and passes having run
+  # nothing — the same thing `./scripts/test.sh` reports as
+  # "skipped: web (no web/ yet — T007)".
+  web:
+    name: web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: is there a web/ yet?
+        id: probe
+        run: |
+          if [ -f web/package.json ]; then
+            echo "present=yes" >>"$GITHUB_OUTPUT"
+          else
+            echo "present=no" >>"$GITHUB_OUTPUT"
+            echo "::notice::no web/package.json yet (T007); nothing to run"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.probe.outputs.present == 'yes'
+        with:
+          node-version: 22
+
+      # Node 22 and `npm install -g pnpm@10`: the same two lines
+      # `docker/dev/Dockerfile` runs, so the runner and the dev image
+      # are the same toolchain.
+      - name: pnpm
+        if: steps.probe.outputs.present == 'yes'
+        run: npm install --global --no-fund --no-audit pnpm@10
+
+      - name: pnpm install
+        if: steps.probe.outputs.present == 'yes'
+        run: pnpm -C web install --frozen-lockfile
+
+      - name: pnpm typecheck
+        if: steps.probe.outputs.present == 'yes'
+        run: pnpm -C web typecheck
+
+      - name: pnpm lint
+        if: steps.probe.outputs.present == 'yes'
+        run: pnpm -C web lint
+
+      - name: pnpm test
+        if: steps.probe.outputs.present == 'yes'
+        run: pnpm -C web test
+
+      - name: pnpm build
+        if: steps.probe.outputs.present == 'yes'
+        run: pnpm -C web build
+
+  # One wire contract: OpenAPI is generated from the code and the
+  # TypeScript client from OpenAPI, both committed. This job regenerates
+  # them and fails if the tree is stale. The generators arrive in T008;
+  # until then the probe finds neither and the job passes having run
+  # nothing.
+  contract:
+    name: contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: is the contract generated yet?
+        id: probe
+        run: |
+          if [ -f scripts/dump_openapi.py ] && [ -f web/package.json ]; then
+            echo "present=yes" >>"$GITHUB_OUTPUT"
+          else
+            echo "present=no" >>"$GITHUB_OUTPUT"
+            echo "::notice::no scripts/dump_openapi.py yet (T008); nothing to run"
+          fi
+
+      - uses: astral-sh/setup-uv@v6
+        if: steps.probe.outputs.present == 'yes'
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - uses: actions/setup-node@v4
+        if: steps.probe.outputs.present == 'yes'
+        with:
+          node-version: 22
+
+      - name: pnpm
+        if: steps.probe.outputs.present == 'yes'
+        run: npm install --global --no-fund --no-audit pnpm@10
+
+      - name: regenerate
+        if: steps.probe.outputs.present == 'yes'
+        run: |
+          uv sync --all-groups --all-extras
+          uv run --no-sync scripts/dump_openapi.py
+          pnpm -C web install --frozen-lockfile
+          pnpm -C web gen
+
+      - name: snapshot and client are fresh
+        if: steps.probe.outputs.present == 'yes'
+        run: git diff --exit-code tests/snapshots web/src/api/gen

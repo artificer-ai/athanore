@@ -1,0 +1,56 @@
+# The Postgres half of the store suite. It is nightly rather than
+# per-push because it needs a database: `compose --profile pg` provides
+# it locally, a service container provides it here, and both hand the
+# tests the same `ATHANORE_TEST_PG_URL`.
+name: nightly
+
+on:
+  schedule:
+    # 03:00 UTC.
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  postgres:
+    name: pytest -m postgres
+    runs-on: ubuntu-latest
+
+    services:
+      # Same image and credentials as the `postgres` service of
+      # compose.yaml, so a failure here reproduces with
+      # `docker compose --profile pg up -d postgres`.
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: athanore
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+
+    env:
+      ATHANORE_TEST_PG_URL: postgresql+asyncpg://postgres:athanore@127.0.0.1:5432/postgres
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      # `--all-extras` is what brings in asyncpg (the `postgres` extra).
+      - name: uv sync
+        run: uv sync --all-groups --all-extras
+
+      # The marker is registered in pyproject.toml; the tests it selects
+      # arrive in T014. An empty selection is a pass, not exit 5 (D76).
+      - name: pytest -m postgres
+        run: uv run --no-sync pytest -m postgres -q
