@@ -824,6 +824,17 @@ release then acquire; readmit served before `try_acquire` in
 `drain_readmits`; FIFO among readmits.
 **Done.** Tests pass.
 
+**Status.** Done. `Lease` owns the idempotency of `release()` — a second
+call returns without a second decrement, so a pool never gains capacity
+it never had — and `PoolState.release(lease)` refuses a lease of another
+pool, which is strict reservation in the one place it could be broken.
+`request_readmit` is not a coroutine: the waiter takes its place in the
+FIFO when it is called, and a waiter whose future is already cancelled is
+dropped by `drain_readmits` without spending a slot. `try_acquire` takes
+an optional `task_id` so the lease can name its holder (D98), and
+`live.py` names the context it registers structurally, `TaskContext`
+being T023's.
+
 ### T023 — `TaskContext`, `current_task()`, `TaskServices` (A1.10)
 
 **Do.** `athanore/engine/context.py`: `@dataclass class TaskContext` with
