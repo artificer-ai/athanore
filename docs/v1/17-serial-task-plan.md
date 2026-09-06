@@ -540,7 +540,16 @@ question must not create — take `sqlite_url` and skip on the other
 parameter. `append_batch` is one multi-row `VALUES`, split only above
 `MAX_ROWS_PER_INSERT` so an implausible burst cannot exceed a backend's
 bind-parameter limit. Built in T014's run, as the commit `T014b:`
-on `feat/T014` (D88); do not submit it again.
+on `feat/T014` (D88); do not submit it again. A later re-dispatch
+audited the merged deliverable against the **Verification** block of
+`docs/plans/T014b-stream-repo-and-pg-matrix.md` and found nothing to fix
+(D90): the store suite is green on SQLite with the Postgres parameter
+skipping with its reason rather than erroring, every store test that
+opens a database takes `db_url` — the ones off the matrix read metadata
+or call pure functions — and all four statements compile unchanged for
+both dialects. The PostgreSQL half was not re-run: that container has no
+docker socket and nothing answers on 5433, so `feat/T014b` carries the
+audit and no code.
 
 ### T015 — `TaskRepo` (A1.3)
 
