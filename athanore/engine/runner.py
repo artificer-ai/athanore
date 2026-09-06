@@ -83,6 +83,7 @@ from athanore.store.clock import now
 from athanore.store.repos.joins import JOIN_REASON, LINEAGE_FROM, LINEAGE_REASON
 from athanore.store.repos.tasks import ClaimedTask
 from athanore.store.rows import (
+    ArrivalRow,
     BranchFrame,
     LogAuthor,
     LogKind,
@@ -421,7 +422,7 @@ async def _enqueue_transition(
 ) -> None:
     """Enqueue one ordinary transition and announce it."""
 
-    priority, explicit = _dispatch_key(target)
+    priority, explicit = dispatch_key(target)
     child = await uow.tasks.enqueue(
         task.run_id,
         target.name,
@@ -442,7 +443,7 @@ async def _enqueue_transition(
                 reason=TRANSITION_REASON,
                 from_task=task.id,
                 payload_present=transition.payload is not None,
-                branch=_frame_summaries(frames),
+                branch=frame_summaries(frames),
             ),
         )
     )
@@ -499,18 +500,10 @@ async def _record_arrival(
         return
 
     arrivals = await uow.joins.arrivals(task.run_id, target.name, frame.fanout)
-    payload = [
-        {
-            "index": row.index,
-            "key": row.key,
-            "value": row.value,
-            "from_task": row.from_task,
-        }
-        for row in arrivals
-    ]
-    senders = [row.from_task for row in arrivals if row.from_task is not None]
+    payload = arrivals_payload(arrivals)
+    senders = arrival_senders(arrivals)
     outer = list(frames[:-1])
-    priority, explicit = _dispatch_key(target)
+    priority, explicit = dispatch_key(target)
     child = await uow.tasks.enqueue(
         task.run_id,
         target.name,
@@ -535,7 +528,7 @@ async def _record_arrival(
                 reason=JOIN_REASON,
                 from_task=frame.fanout,
                 payload_present=True,
-                branch=_frame_summaries(outer),
+                branch=frame_summaries(outer),
                 arrivals=senders,
             ),
         )
@@ -704,7 +697,7 @@ async def _record_failure(
                         reason=RETRY_REASON,
                         from_task=task.id,
                         payload_present=task.payload is not None,
-                        branch=_frame_summaries(task.branch),
+                        branch=frame_summaries(task.branch),
                     ),
                 )
             )
@@ -772,7 +765,7 @@ def _retry_budget(node: Node | None, settings: AthanoreSettings) -> int:
 # --------------------------------------------------------------------------
 
 
-def _dispatch_key(target: Node) -> tuple[int, bool]:
+def dispatch_key(target: Node) -> tuple[int, bool]:
     """The priority a task at ``target`` is enqueued with (04 §Dispatch order).
 
     An explicit ``priority`` on the node is used as given and flagged, so
@@ -785,7 +778,38 @@ def _dispatch_key(target: Node) -> tuple[int, bool]:
     return -target.generation, False
 
 
-def _frame_summaries(frames: Sequence[BranchFrame]) -> list[FrameSummary]:
+def arrivals_payload(arrivals: Sequence[ArrivalRow]) -> list[dict[str, Any]]:
+    """A join task's payload: one entry per branch, in fan-out order.
+
+    The shape a join body is called with (04 §Arrival and dispatch), in
+    one place because two callers build it — the arrival that fires the
+    join, and the ``rerun`` of a join node, which replays the arrivals
+    the store still holds (T027b).
+    """
+
+    return [
+        {
+            "index": row.index,
+            "key": row.key,
+            "value": row.value,
+            "from_task": row.from_task,
+        }
+        for row in arrivals
+    ]
+
+
+def arrival_senders(arrivals: Sequence[ArrivalRow]) -> list[int]:
+    """The tasks that arrived, for the join task's lineage and its event.
+
+    An arrival whose sender was deleted carries no task id and is
+    skipped: the branch is still in the payload, but there is no row left
+    to name.
+    """
+
+    return [row.from_task for row in arrivals if row.from_task is not None]
+
+
+def frame_summaries(frames: Sequence[BranchFrame]) -> list[FrameSummary]:
     """A branch stack as 18 puts it on the wire: without the keys.
 
     A frame's ``key`` is the payload that branch was given and may be as
@@ -818,5 +842,9 @@ __all__ = [
     "RETRY_REASON",
     "TRANSITION_REASON",
     "RunnerEngine",
+    "arrival_senders",
+    "arrivals_payload",
+    "dispatch_key",
+    "frame_summaries",
     "run_attempt",
 ]

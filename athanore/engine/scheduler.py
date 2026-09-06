@@ -143,6 +143,24 @@ class Scheduler:
         self._loop_task = asyncio.create_task(self._loop(), name="athanore-scheduler")
         await asyncio.sleep(0)
 
+    async def stop_claiming(self) -> None:
+        """End the dispatch loop, leaving the attempts it spawned running.
+
+        Step 1 of 04 §Shutdown on its own, because the engine has one
+        thing to do between it and step 3: ``engine.stopping`` names the
+        attempts that were interrupted, and a loop still ticking could
+        add to that set after it had been read (T027). Awaiting the loop
+        task is what makes "no new attempts from here" true rather than
+        merely likely.
+
+        Idempotent, and safe on a scheduler that was never started.
+        """
+        loop_task, self._loop_task = self._loop_task, None
+        if loop_task is not None:
+            loop_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await loop_task
+
     async def stop(self) -> None:
         """Stop claiming, then cancel every attempt and wait for it.
 
@@ -155,11 +173,7 @@ class Scheduler:
 
         Idempotent, and safe on a scheduler that was never started.
         """
-        loop_task, self._loop_task = self._loop_task, None
-        if loop_task is not None:
-            loop_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await loop_task
+        await self.stop_claiming()
         await self._cancel_all()
         for pool in self._engine.pools:
             # The queue is in memory and its waiters have just been
