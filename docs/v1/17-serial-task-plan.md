@@ -1239,6 +1239,23 @@ and `Pool("default", …)` is not reserved (D112).
 implicit details decided here (empty-list return, `None` payload not
 passed). Tag `v1.0.0a1` locally (no push needed).
 
+**Status.** Done. The gate is green end to end: 805 passed, 279 skipped
+(266 of the Postgres matrix, which needs a `postgres` service this
+environment has no docker socket to start, and 13 assertions that are
+SQLite's own), ruff clean, pyright 0 errors, the web typecheck/lint/test/build,
+and `lint-imports` **4 contracts kept, 0 broken** over 57 files and 140
+dependencies — the first checkpoint at which the layering contracts have
+a populated `engine` and `store` to constrain. 04 needed no edit: it
+already carries both details and both match the code, `routing._explicit`
+for the empty-list return and `runner._call_body` for the payload slot
+that is bound even when the payload is `None` (D113). One finding,
+reported rather than fixed here because fixing it would hide which task
+shipped it: 04 §Routing edge cases still says `return [ref]` is
+"identical to `return ref`", which stopped being true when T024b made a
+fan-out of one push a branch frame — the difference is what makes
+§Fan-in's `count == 1` join fire, and `tests/engine/test_fanin.py`
+asserts it. `v1.0.0a1` is tagged locally; there is no remote (T006).
+
 ---
 
 ## Phase 2 — Requests and agents
