@@ -610,7 +610,20 @@ The PostgreSQL lock is `FOR UPDATE OF tasks SKIP LOCKED`, and the
 `UPDATE` is one statement per id — a token per attempt means a different
 hash per row — with `AND status = 'ready'` as the claim. 07 §Repositories
 is updated to match. The PostgreSQL leg was not run: that container has
-no docker socket (D90).
+no docker socket (D90). A later re-dispatch audited the merged
+deliverable against the **Verification** block of
+`docs/plans/T015a-claim-ready.md` and found nothing to fix (D90): the
+select is 04 §Dispatch order clause for clause, each `CASE` is non-`NULL`
+in exactly the group `explicit DESC` put it in, the claim is one
+`UPDATE … AND status = 'ready'` per id with a token minted per id, the
+run flip is `AND status = 'queued'` on `runs`, and the re-select returns
+the rows in claimed order. `tests/store/test_claim.py` carries every
+assertion the block names — the four ordering rules, the retry that keeps
+its `created`, `limit`, unique tokens whose clear text is absent from the
+row, the second claim that returns nothing, `run_started` flagged once,
+and the paused run — and the whole gate is green on SQLite (401 passed,
+211 skipped). The PostgreSQL leg was again unreachable, for the reason
+D90 records, so `feat/T015a` carries the audit and no code.
 
 ### T016 — Repositories part 3: requests and answers (A1.3)
 
