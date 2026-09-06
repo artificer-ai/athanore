@@ -57,7 +57,7 @@ DEADLINE = 5.0
 class Fleet:
     """A stub engine with real pools, and the scheduler under test.
 
-    The five members :func:`~athanore.engine.runner.run_attempt` reads,
+    The six members :func:`~athanore.engine.runner.run_attempt` reads,
     plus the ``pools`` the loop iterates —
     ``athanore.engine.scheduler.SchedulerEngine`` and nothing more. The
     real ``Engine`` is T027's; wiring one here would test the wiring
@@ -81,6 +81,11 @@ class Fleet:
         for name, capacity in pools.items():
             self.pools.add(Pool(name, capacity=capacity))
         self.notifications = 0
+        # No request service: nothing here parks on a human through the
+        # port, so an attempt that tried would raise rather than ask
+        # (T032). `tests/engine/test_requests_port.py` is where one is
+        # wired.
+        self.requests = None
         self.scheduler = Scheduler(self, tick=tick)
 
     def notify(self) -> None:

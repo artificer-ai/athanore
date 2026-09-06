@@ -58,7 +58,7 @@ from athanore.engine.errors import is_retryable
 from athanore.engine.live import LiveRegistry
 from athanore.engine.pools import Lease
 from athanore.engine.routing import interpret, is_fan_out
-from athanore.engine.services import TaskServices
+from athanore.engine.services import RequestBackend, TaskRequests, TaskServices
 from athanore.events.model import Event
 from athanore.events.names import EventName
 from athanore.events.payloads import (
@@ -126,6 +126,17 @@ class RunnerEngine(Protocol):
     @property
     def graphs(self) -> Mapping[str, Graph]: ...
 
+    @property
+    def requests(self) -> RequestBackend | None:
+        """The one request service, or ``None`` on an engine without one.
+
+        ``athanore.requests`` is the engine's sibling and neither imports
+        the other (02 §Layering), so the service arrives from the
+        composition root and an engine assembled without it hands bodies
+        an :class:`~athanore.engine.services.UnwiredRequests` that raises.
+        """
+        ...
+
     def notify(self) -> None:
         """Wake the scheduler: this attempt may have made work ready."""
         ...
@@ -152,6 +163,7 @@ async def run_attempt(engine: RunnerEngine, claimed: ClaimedTask, lease: Lease) 
     try:
         run = await _load_run(engine.store, task.run_id)
         graph = _load_graph(engine, run)
+        requests = _requests_port(engine, task)
         services = TaskServices(
             engine.store,
             run_id=task.run_id,
@@ -159,6 +171,7 @@ async def run_attempt(engine: RunnerEngine, claimed: ClaimedTask, lease: Lease) 
             node=task.node,
             workflow=run.workflow,
             flush_interval=engine.settings.stream_flush_interval,
+            requests=requests,
         )
         context = TaskContext(
             run_id=task.run_id,
@@ -174,6 +187,12 @@ async def run_attempt(engine: RunnerEngine, claimed: ClaimedTask, lease: Lease) 
         # context whose status it moves, the slot it gives back inside
         # `released()`, and the wake that gets the freed slot dispatched.
         services.lease.attach(context, lease, engine.notify)
+        if requests is not None:
+            # The ordinal counter is the context's, so the port is wired
+            # to the attempt here rather than built with it: a body
+            # re-executed after a crash numbers its questions from this
+            # row's counter (06 §Restart durability).
+            requests.attach(context)
         engine.live.register(context)
         with (
             bind_attempt(
@@ -212,6 +231,22 @@ async def run_attempt(engine: RunnerEngine, claimed: ClaimedTask, lease: Lease) 
 # --------------------------------------------------------------------------
 # Loading what the attempt runs against
 # --------------------------------------------------------------------------
+
+
+def _requests_port(engine: RunnerEngine, task: TaskRow) -> TaskRequests | None:
+    """This attempt's view of the request channel, if the engine has one.
+
+    ``None`` when the engine was composed without a request service, and
+    :class:`~athanore.engine.services.TaskServices` turns that into the
+    port that raises. The port carries the attempt's run and task ids, so
+    a body cannot open a request against another task and cannot claim
+    that an agent raised one it raised itself.
+    """
+
+    backend = engine.requests
+    if backend is None:
+        return None
+    return TaskRequests(backend, run_id=task.run_id, task_id=task.id)
 
 
 async def _load_run(store: Store, run_id: str) -> RunRow:
