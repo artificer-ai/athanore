@@ -895,12 +895,23 @@ class RequestsPort(Protocol):
         self,
         prompt: str,
         *,
-        mode: RequestMode,
-        kind: RequestKind,
+        mode: RequestMode | str,
+        kind: RequestKind | str,
         options: list[dict[str, Any]] | None = None,
         schema: dict[str, Any] | None = None,
         tool_call: dict[str, Any] | None = None,
-    ) -> RequestRow: ...
+    ) -> RequestRow:
+        """Open a request the agent raised mid-turn (06 §The model).
+
+        ``mode`` and ``kind`` are the domain enums **or their values**, and
+        the implementation coerces, for the reason ``LogService.append``
+        takes ``LogAuthor | str``: the caller on the other end of this port
+        is ``athanore.agents.policies``, which may not import
+        ``athanore.store`` to name the enum it means (02 §Layering, D123).
+        A value that is not one of them is a ``ValueError`` at the door
+        rather than a row nothing will ever filter on.
+        """
+        ...
 
     async def answer_as_engine(
         self, request_id: int, option_id: str | None = None
@@ -915,6 +926,22 @@ class RequestsPort(Protocol):
         built from the schema the agent sent. Validation happens where the
         answer lands, so a misfit is refused to the face that gave it
         rather than in a node body several seconds later.
+        """
+        ...
+
+    def register_schema_validator(
+        self, request_id: int, schema: dict[str, Any]
+    ) -> None:
+        """Validate this request's ``form`` answer against ``schema``.
+
+        The same registration, for the registrant that has a JSON schema
+        rather than a callable: the ACP elicitation bridge (05 §Policies).
+        The validator itself is
+        ``athanore.requests.validators.json_schema_validator``, and it is
+        built on the far side of this port because ``athanore.agents`` may
+        not import ``athanore.requests`` — they are independent siblings
+        (02 §Layering, D123) — while the engine names only the method (as
+        it names ``AnswerValidator`` structurally, D117).
         """
         ...
 
@@ -976,8 +1003,8 @@ class UnwiredRequests:
         self,
         prompt: str,
         *,
-        mode: RequestMode,
-        kind: RequestKind,
+        mode: RequestMode | str,
+        kind: RequestKind | str,
         options: list[dict[str, Any]] | None = None,
         schema: dict[str, Any] | None = None,
         tool_call: dict[str, Any] | None = None,
@@ -990,6 +1017,11 @@ class UnwiredRequests:
         raise NotImplementedError(self._MESSAGE)
 
     def register_validator(self, request_id: int, fn: AnswerValidator) -> None:
+        raise NotImplementedError(self._MESSAGE)
+
+    def register_schema_validator(
+        self, request_id: int, schema: dict[str, Any]
+    ) -> None:
         raise NotImplementedError(self._MESSAGE)
 
     def unregister_validator(self, request_id: int) -> None:
@@ -1040,6 +1072,10 @@ class RequestBackend(Protocol):
     async def reopen(self, task_id: int, ordinal: int) -> RequestRow | None: ...
 
     def register_validator(self, request_id: int, fn: AnswerValidator) -> None: ...
+
+    def register_schema_validator(
+        self, request_id: int, schema: dict[str, Any]
+    ) -> None: ...
 
     def unregister_validator(self, request_id: int) -> None: ...
 
@@ -1164,8 +1200,8 @@ class TaskRequests:
         self,
         prompt: str,
         *,
-        mode: RequestMode,
-        kind: RequestKind,
+        mode: RequestMode | str,
+        kind: RequestKind | str,
         options: list[dict[str, Any]] | None = None,
         schema: dict[str, Any] | None = None,
         tool_call: dict[str, Any] | None = None,
@@ -1178,15 +1214,21 @@ class TaskRequests:
         about, carried so the SPA can show what is being asked for (06
         §The model).
 
+        ``mode`` and ``kind`` are coerced through the domain enums, as
+        ``LogService.append`` coerces its ``author`` and ``kind``: the
+        caller is the ACP bridge, which may not import ``athanore.store``
+        to name them (02 §Layering, D123), and a misspelling is a
+        ``ValueError`` here rather than a row nothing will ever filter on.
+
         No context is needed: this is the one opening that does not count.
         """
         return await self._service.create(
             self._run_id,
             self._task_id,
             prompt,
-            mode=mode,
+            mode=RequestMode(mode),
             source=RequestSource.agent,
-            kind=kind,
+            kind=RequestKind(kind),
             options=options,
             schema=schema,
             tool_call=tool_call,
@@ -1221,6 +1263,20 @@ class TaskRequests:
         the shape *it* asked for.
         """
         self._service.register_validator(request_id, fn)
+
+    def register_schema_validator(
+        self, request_id: int, schema: dict[str, Any]
+    ) -> None:
+        """Validate this request's ``form`` answer against ``schema``.
+
+        Straight to the service, like :meth:`register_validator`, and for
+        the registrant that has the agent's ``requestedSchema`` rather
+        than a callable built from a model (05 §Policies). The validator
+        is built where the validators live, because
+        ``athanore.requests`` is neither this package's nor the ACP
+        bridge's to import (02 §Layering, D123).
+        """
+        self._service.register_schema_validator(request_id, schema)
 
     def unregister_validator(self, request_id: int) -> None:
         """Forget this request's validator. Idempotent, like the service's."""

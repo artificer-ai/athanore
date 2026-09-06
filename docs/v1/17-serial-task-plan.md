@@ -1603,6 +1603,23 @@ and `test_elicitation.py` assertions that do not need a subprocess):
 reject-first ordering still picks `allow_once`; engine-authored timeout
 answer recorded; decline on URL mode.
 **Done.** Tests pass.
+**Status.** Done. The policies are module-level functions over two
+structural protocols (`PermissionAgent`, `ElicitationAgent`) rather than
+methods, so the ACP client of T039 calls them with the façade and the
+context it already holds and this module names no class. What the
+resolvers needed and `athanore.agents` may not import — the request
+`mode`/`kind` enums, and `json_schema_validator` — crosses the port
+instead: `create_agent_request` takes `RequestMode | str` and coerces
+(as `LogService.append` coerces its author), and
+`register_schema_validator(request_id, schema)` is a new port method
+whose validator is built in `athanore.requests` (D123). `ask_allowed` is
+a `TypeGuard`, the bounded tool-call summary caps the **JSON rendering**
+of the raw input at 500 characters, and a permission answered by the
+operator as the clock ran out is not overwritten by the timeout action.
+`settings.permission_policy` (05 §Policies) is **not** applied here: the
+façade is where settings are read (`agent_command`, `agent_timeout`,
+T039), and a policy function that constructed its own settings object
+would read the environment once per tool call.
 
 ### T039 — `ACPClient` and the session lifecycle up to the prompt (A2.4)
 

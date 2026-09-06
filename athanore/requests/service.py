@@ -56,7 +56,7 @@ from athanore.requests.errors import (
     RequestNotFound,
     StaleRequest,
 )
-from athanore.requests.validators import Validator
+from athanore.requests.validators import Validator, json_schema_validator
 from athanore.store.clock import now
 from athanore.store.rows import (
     AnswerAuthor,
@@ -189,13 +189,30 @@ class RequestService:
         :func:`~athanore.requests.validators.pydantic_validator`, and the
         ACP bridge and the HTTP ask register
         :func:`~athanore.requests.validators.json_schema_validator` over
-        the schema they were handed (06 §Service).
+        the schema they were handed (06 §Service) —
+        :meth:`register_schema_validator` is the second of those two, said
+        in one call.
 
         Only ``form`` answers are passed through it. The other two modes
         have their shape fixed by the mode itself.
         """
 
         self._validators[request_id] = fn
+
+    def register_schema_validator(
+        self, request_id: int, schema: dict[str, Any]
+    ) -> None:
+        """Validate this request's answer against the JSON schema ``schema``.
+
+        :meth:`register_validator` for the registrant that has a schema
+        and no way to build a callable from it: the ACP elicitation bridge
+        (``athanore.agents.policies``, 05 §Policies) and the HTTP ask both
+        carry a document an agent wrote, and ``athanore.agents`` may not
+        import this package to turn one into a validator (02 §Layering,
+        D123). Building it here costs a line and keeps the arrow undrawn.
+        """
+
+        self.register_validator(request_id, json_schema_validator(schema))
 
     def unregister_validator(self, request_id: int) -> None:
         """Forget this request's validator. Not registering one is fine.
