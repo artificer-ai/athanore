@@ -1526,6 +1526,20 @@ guarded so a second call in the same `run()` is a no-op; never raises
 parsing tests move in T039).
 **Done.** Tests pass.
 
+**Status.** Done. The one uow needed somewhere to be: `TaskServices`
+gains `stats.record(entry, text=…)`, which writes the `[stats]` line,
+`tasks.stats` and `agent.stats` in one transaction and validates the
+entry against 18's `AgentStats` on the way out — `athanore.agents` may
+not reach the store, and the log line's text crosses the other way
+because `agents` and `engine` are siblings (D121). `build_entry` requires
+`node`, `attempt`, `status` and `duration_s` (18 makes all four
+required) and omits every other field it was not given; `reason` and
+`denied_permissions` are parameters too, because 05 §Stats entry names
+them and T039a passes both. `record_entry` is guarded on the identity of
+the entry rather than on the context, so a body running two agents in
+sequence records two entries and a `finally` that already recorded
+records none.
+
 ### T037 — `FakeACPAgent`, `MockAgent`, `StatsMockAgent`, `FakeStatsProvider` (A2.7)
 
 **Do.** `athanore/testing/fake_acp.py`: port `tests/fake_acp.py` to the

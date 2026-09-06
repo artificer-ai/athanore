@@ -28,7 +28,7 @@ Source is `tests/` in the MVP checkout. Targets are the v1 paths named by
 | ☐ | `test_acp_stats.py` | `tests/agents/test_acp_outcomes.py` | T039a |
 | ☐ | `test_submissions.py` | `tests/agents/test_acp_outcomes.py`, `tests/api/test_agent_api.py` | T039a, T045 |
 | ☐ | `test_agents.py` | `tests/agents/test_prompt.py` carries the prompt assertions (the inlined `system_prompt`, the assignment section and its separator, and the blocks of 19 present or absent by config — v0's `template=` cases go with the feature, 05, and its `model` assertions belong to `ACPAgent`; done); `tests/agents/test_acp_outcomes.py` and `tests/agents/` (remainder) carry the rest | T034, T039a, T040 |
-| ☐ | `test_stats.py` | `tests/agents/test_stats_unit.py`, `examples/tests/test_pi_stats.py` | T036, T040 |
+| ☐ | `test_stats.py` | `tests/agents/test_stats_unit.py` carries the pure parts — the ACP usage read, the merge precedence, the entry's omissions and 18's payload, the formatted line, and recording the entry to its three destinations (done); `examples/tests/test_pi_stats.py` still carries the session-file half, which is pi's knowledge and stays out of the package (D27) | T036, T040 |
 | ☐ | `test_stats_workflow.py` | `tests/agents/` | T040 |
 | ☐ | `test_ask.py` | `tests/api/test_agent_api.py` | T045 |
 | ☐ | `test_web_serve.py` | `tests/api/test_static.py` | T047 |
