@@ -31,10 +31,16 @@ or a request wait.
 Nothing here retries. A failed transaction rolls back and raises; what
 happens next is the engine's decision, not the store's (rule 3).
 
+Reads take :class:`Reader` instead, through :meth:`Store.reader`: the
+same repositories on a pooled connection with no transaction and no lock,
+so nothing a report query does is committed and nothing it does queues
+behind a commit.
+
 ``store`` and ``events`` are independent siblings of the bottom tier
-(02 §Layering), so this module names the two shapes it needs from the
-event layer structurally — :class:`OutboxEvent` and
-:class:`EventPublisher` — rather than importing ``athanore.events``. It is
+(02 §Layering), so the store names the two shapes it needs from the event
+layer structurally — :class:`EventPublisher` here, and
+:class:`~athanore.store.repos.events.OutboxEvent` beside the insert that
+takes it — rather than importing ``athanore.events``. It is
 the same constraint that made :class:`~athanore.store.rows.EventRow`
 restate the envelope in T010 (D81). The concrete types are
 ``athanore.events.model.Event`` and ``athanore.events.bus.EventBus``, and
@@ -46,40 +52,46 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
 from types import TracebackType
 from typing import Any, Protocol
 
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncTransaction
 
-from athanore.store.tables import events
+from athanore.store.clock import now
+from athanore.store.repos.events import EventRepo, OutboxEvent
+from athanore.store.repos.log import LogRepo
+from athanore.store.repos.runs import RunRepo
+from athanore.store.repos.stream import StreamRepo
+from athanore.store.repos.submissions import SubmissionRepo
 
 
-def now() -> datetime:
-    """The current time, timezone-aware and in UTC.
+class Repos:
+    """Every repository, bound to one connection.
 
-    Every timestamp column is ``DateTime(timezone=True)``. A naive value
-    written into one is stored differently by SQLite and by PostgreSQL and
-    read back differently again, so the store never produces one.
+    Constructing the set is free — a repository holds a connection and
+    nothing else — so a unit of work and a reader each own one rather than
+    sharing a registry with a lifecycle of its own. T015 and T016 add
+    ``tasks``, ``requests`` and ``joins`` here.
     """
 
-    return datetime.now(UTC)
+    def __init__(self, conn: AsyncConnection) -> None:
+        self.conn = conn
+        self.runs = RunRepo(conn)
+        self.log = LogRepo(conn)
+        self.events = EventRepo(conn)
+        self.submissions = SubmissionRepo(conn)
+        self.stream = StreamRepo(conn)
 
 
-class OutboxEvent(Protocol):
-    """The shape the outbox needs of an event.
+class Reader(Repos):
+    """The repositories on a pooled read connection.
 
-    ``athanore.events.model.Event`` satisfies it. ``id`` is writable
-    because assigning it is how the insert hands the SSE cursor back to
-    the caller that emitted the event.
+    Read-only by construction rather than by convention: :meth:`Store.read`
+    hands out a connection with no transaction open on it, so a write
+    method called here is rolled back when the block ends. Readers take no
+    writer lock, because a report query must never queue behind a commit
+    (07 §Concurrency).
     """
-
-    id: int | None
-    run_id: str | None
-    task_id: int | None
-    name: str
-    data: dict[str, Any]
-    created: datetime
 
 
 class EventPublisher(Protocol):
@@ -102,9 +114,10 @@ class EventPublisher(Protocol):
 class UnitOfWork:
     """One write transaction and the events it will publish when it commits.
 
-    Repositories attach here as plain attributes — ``uow.runs``,
-    ``uow.tasks``, ``uow.log``, … — and are wired on by T014–T016; this
-    class owns the connection they share, the outbox, and the lifecycle.
+    Repositories are reached as attributes — ``uow.runs``, ``uow.log``,
+    ``uow.events``, … — and share this transaction's connection, so
+    everything done through them commits or rolls back together. Reaching
+    one outside the block raises, for the same reason :meth:`emit` does.
 
     Instances come from :meth:`Store.uow`. A unit of work is entered once
     and is not reusable: the connection is released on the way out and
@@ -123,11 +136,37 @@ class UnitOfWork:
         self._outbox: list[OutboxEvent] = []
         self._conn: AsyncConnection | None = None
         self._tx: AsyncTransaction | None = None
+        self._repos: Repos | None = None
 
     @property
     def conn(self) -> AsyncConnection:
         """The connection this transaction runs on."""
         return self._open()
+
+    @property
+    def runs(self) -> RunRepo:
+        """The run repository, on this transaction."""
+        return self._open_repos().runs
+
+    @property
+    def log(self) -> LogRepo:
+        """The work-log repository, on this transaction."""
+        return self._open_repos().log
+
+    @property
+    def events(self) -> EventRepo:
+        """The event repository, on this transaction."""
+        return self._open_repos().events
+
+    @property
+    def submissions(self) -> SubmissionRepo:
+        """The submission repository, on this transaction."""
+        return self._open_repos().submissions
+
+    @property
+    def stream(self) -> StreamRepo:
+        """The transcript repository, on this transaction."""
+        return self._open_repos().stream
 
     def emit(self, event: OutboxEvent) -> None:
         """Queue ``event`` for insertion and publication when this commits.
@@ -157,6 +196,7 @@ class UnitOfWork:
             self._writer_lock.release()
             raise
         self._conn = conn
+        self._repos = Repos(conn)
         return self
 
     async def __aexit__(
@@ -166,13 +206,13 @@ class UnitOfWork:
         tb: TracebackType | None,
     ) -> None:
         conn, tx = self._conn, self._tx
-        self._conn, self._tx = None, None
+        self._conn, self._tx, self._repos = None, None, None
         outbox, self._outbox = self._outbox, []
         if conn is None or tx is None:
             raise RuntimeError("the unit of work was never opened")
         try:
             if exc_type is None:
-                await self._write_outbox(conn, outbox)
+                await self._write_outbox(EventRepo(conn), outbox)
                 await tx.commit()
             else:
                 await tx.rollback()
@@ -203,30 +243,29 @@ class UnitOfWork:
             )
         return self._conn
 
+    def _open_repos(self) -> Repos:
+        """The repositories, or a :exc:`RuntimeError` naming the misuse."""
+        if self._repos is None:
+            raise RuntimeError(
+                "the unit of work is not open; use `async with store.uow()`"
+            )
+        return self._repos
+
     async def _write_outbox(
-        self, conn: AsyncConnection, outbox: Sequence[OutboxEvent]
+        self, repo: EventRepo, outbox: Sequence[OutboxEvent]
     ) -> None:
         """Insert the outbox and stamp each event with the id it was given.
 
-        One statement per event, in emission order, so that the ids the
-        caller gets back ascend in that order — ``events.id`` is the SSE
-        cursor and a subscriber replays by it. A multi-row insert would
-        need ``sort_by_parameter_order`` to promise the same thing, which
-        is subtlety a handful of rows per transaction does not pay for.
+        One statement, in emission order, so that the ids the caller gets
+        back ascend in that order — ``events.id`` is the SSE cursor and a
+        subscriber replays by it. That ordering is
+        :meth:`EventRepo.insert_many`'s promise, which is why the outbox
+        flushes through the repository rather than writing its own insert:
+        there is one way an event becomes a row (D87).
         """
-        for event in outbox:
-            result = await conn.execute(
-                events.insert()
-                .values(
-                    run_id=event.run_id,
-                    task_id=event.task_id,
-                    name=event.name,
-                    data=event.data,
-                    created=event.created,
-                )
-                .returning(events.c.id)
-            )
-            event.id = result.scalar_one()
+        ids = await repo.insert_many(outbox)
+        for event, event_id in zip(outbox, ids, strict=True):
+            event.id = event_id
 
 
 class Store:
@@ -264,6 +303,18 @@ class Store:
         async with self.engine.connect() as conn:
             yield conn
 
+    @asynccontextmanager
+    async def reader(self) -> AsyncGenerator[Reader, None]:
+        """The repositories on a pooled read connection.
+
+        The read-only half of :meth:`uow`: same queries, no transaction,
+        no writer lock. It is what the API's ``GET`` handlers and the
+        report queries of 08 use, so a long history read cannot hold up a
+        commit (07 §Concurrency).
+        """
+        async with self.read() as conn:
+            yield Reader(conn)
+
     async def publish_ephemeral(self, event: OutboxEvent) -> None:
         """Publish ``event`` to the bus without storing it.
 
@@ -278,4 +329,12 @@ class Store:
         self.bus.publish(event)
 
 
-__all__ = ["EventPublisher", "OutboxEvent", "Store", "UnitOfWork", "now"]
+__all__ = [
+    "EventPublisher",
+    "OutboxEvent",
+    "Reader",
+    "Repos",
+    "Store",
+    "UnitOfWork",
+    "now",
+]

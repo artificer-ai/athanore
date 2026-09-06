@@ -465,6 +465,25 @@ with two in-flight nodes and one open request; `detail()` sums stats
 across attempts including failed ones; `delete` cascades.
 **Done.** Tests pass.
 
+**Status.** Done. `Repo._row` takes a row *mapping* rather than a `Row`
+(pyright strict refuses `Row._mapping` as private) and stamps UTC onto
+the naive datetimes SQLite hands back, so a read model is the same value
+on both backends. `list()` and `detail()`'s statements are built by
+module-level `list_statement(dialect, …)` / `stats_statement(dialect, …)`,
+so the PostgreSQL spelling is compiled by the gate and not only by the
+nightly job; `list()` is asserted to be one statement with a cursor
+counter. `update()` refuses a column it does not own rather than dropping
+it, position changes do not touch `updated`, and `delete()` is the
+`DELETE` plus the events sweep D83 called for. `Reader` and `UnitOfWork`
+share a `Repos` bundle, so a repository is reached the same way on either
+(D87). `compact_positions()` renumbers in Python and writes
+`move_position()`'s single `UPDATE … CASE`: a correlated rank subquery
+inside the `UPDATE` reads the rows the same statement has already
+rewritten on SQLite but not on PostgreSQL, so duplicated positions —
+which T018's import can produce — compacted differently on the two
+backends (D88). T014a and T014b were built in this task's run, as the
+two commits after this one on `feat/T014` (D88).
+
 ### T014a — `LogRepo`, `EventRepo`, `SubmissionRepo` (A1.3)
 
 **Do.** `repos/log.py`: `append(run_id, node, author, text, task_id=None,
@@ -478,6 +497,16 @@ exclude_kinds=())`. `repos/events.py`: `insert_many(events) -> list[int]`,
 lines; `list_after` honours cursor, limit, run filter and glob patterns;
 `prune` keeps `run.*`; `latest` returns the highest id.
 **Done.** Tests pass.
+
+**Status.** Done. `EventRepo.insert_many` is the outbox's write path:
+`UnitOfWork._write_outbox` flushes through it with
+`sort_by_parameter_order`, superseding T013a's insert-per-event (D87).
+The glob of `list_after` is translated to `LIKE` plus an equal-dot-count
+check, which is exactly `athanore.events.names.matches` for `*` and `?`
+and is asserted against it case by case; a `fnmatch` character class is
+refused rather than silently mismatched. `OutboxEvent` moved to
+`repos/events.py` and is re-exported from `uow.py`. Built in T014's run, as
+the commit `T014a:` on `feat/T014` (D88); do not submit it again.
 
 ### T014b — `StreamRepo` and the Postgres test matrix (A1.3)
 
@@ -494,6 +523,20 @@ fixture parametrised over SQLite (always) and `ATHANORE_TEST_PG_URL`
 service's `ATHANORE_TEST_PG_URL` (T000) run the Postgres variants locally.
 **Done.** Tests pass on SQLite; Postgres variants skip without the `pg`
 profile and pass with it.
+
+**Status.** Done. The `postgres` parameter skips when
+`ATHANORE_TEST_PG_URL` is unset **and** when it is set but nothing
+answers — the dev container always sets it, so a reachability probe
+(once per session, cached) is what keeps the gate green with the profile
+down. Each PostgreSQL test starts from `DROP SCHEMA public CASCADE`, so a
+migration test finds no `alembic_version` either. `test_uow.py`,
+`test_tables.py` and `test_migrations.py` were retrofitted onto the
+fixture; the tests whose subject *is* SQLite — the pragmas, the file a
+question must not create — take `sqlite_url` and skip on the other
+parameter. `append_batch` is one multi-row `VALUES`, split only above
+`MAX_ROWS_PER_INSERT` so an implausible burst cannot exceed a backend's
+bind-parameter limit. Built in T014's run, as the commit `T014b:`
+on `feat/T014` (D88); do not submit it again.
 
 ### T015 — `TaskRepo` (A1.3)
 

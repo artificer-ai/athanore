@@ -10,8 +10,10 @@ rows from *inside* the subscriber rather than after the block — a
 notification that arrives ahead of its data is a race the SSE endpoint
 would only hit under load.
 
-The database is a temporary **file** throughout. ``:memory:`` gives
-SQLAlchemy a pool holding a single connection, and half of what is
+The ``store`` fixture comes from ``tests/store/conftest.py``, so every
+test here runs against SQLite and, with the ``pg`` profile up, against
+PostgreSQL too. The SQLite database is a temporary **file**: ``:memory:``
+gives SQLAlchemy a pool holding a single connection, and half of what is
 asserted here is that :meth:`Store.read` takes a different one from the
 writer's.
 """
@@ -19,9 +21,7 @@ writer's.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -32,43 +32,10 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from athanore.events.bus import EventBus
 from athanore.events.model import Event
 from athanore.events.names import EventName
-from athanore.store.engine import make_engine
-from athanore.store.tables import events, metadata
+from athanore.store.tables import events
 from athanore.store.uow import Store, now
 
 CREATED = datetime(2026, 9, 6, 12, 0, tzinfo=UTC)
-
-
-@pytest.fixture
-def db_url(tmp_path: Path) -> str:
-    return f"sqlite+aiosqlite:///{tmp_path / 'athanore.db'}"
-
-
-@pytest.fixture
-async def engine(db_url: str) -> AsyncIterator[AsyncEngine]:
-    """A database on a temporary file, created from the metadata.
-
-    T012 owns the migration; nothing here needs one to exercise the
-    schema it is generated from.
-    """
-
-    eng = make_engine(db_url)
-    async with eng.begin() as conn:
-        await conn.run_sync(metadata.create_all)
-    try:
-        yield eng
-    finally:
-        await eng.dispose()
-
-
-@pytest.fixture
-def bus() -> EventBus:
-    return EventBus()
-
-
-@pytest.fixture
-def store(engine: AsyncEngine, bus: EventBus) -> Store:
-    return Store(engine, bus)
 
 
 def event(name: str | EventName, **data: object) -> Event:
@@ -238,11 +205,11 @@ async def test_a_failing_uow_stores_nothing_and_publishes_nothing(
 async def test_a_failed_insert_leaves_no_event_carrying_an_id(
     store: Store, bus: EventBus
 ) -> None:
-    """A stamped id names a row; a rolled-back one must not keep it.
+    """A stamped id names a row; a failed flush must leave none behind.
 
-    The second event's ``created`` is not a datetime, so the first row is
-    inserted and stamped and the second statement raises — the case where
-    the outbox is half-written when the transaction dies.
+    The second event's ``created`` is not a datetime, so the insert of the
+    outbox raises. Neither event may come out of the block carrying an id:
+    a cursor into a hole is worse than no cursor.
     """
 
     subscription = bus.subscribe()
@@ -459,3 +426,64 @@ async def test_emitting_outside_the_block_raises(store: Store) -> None:
 
     with pytest.raises(RuntimeError, match="not open"):
         uow.emit(event(EventName.run_created))
+
+
+# --------------------------------------------------------------------------
+# The repositories (T014)
+# --------------------------------------------------------------------------
+
+
+async def test_the_repositories_share_the_transaction(store: Store) -> None:
+    """One block, one transaction: everything in it commits together."""
+
+    async with store.uow() as uow:
+        run = await uow.runs.insert("demo", "a run")
+        await uow.log.append(run.id, "build", "engine", "started")
+        assert uow.runs.conn is uow.conn
+        assert uow.log.conn is uow.conn
+
+    async with store.reader() as reader:
+        assert await reader.runs.get(run.id) is not None
+        assert len(await reader.log.list(run.id)) == 1
+
+
+async def test_a_rolled_back_block_writes_none_of_its_repositories(
+    store: Store,
+) -> None:
+    with pytest.raises(RuntimeError, match="boom"):
+        async with store.uow() as uow:
+            run = await uow.runs.insert("demo", "a run")
+            await uow.log.append(run.id, "build", "engine", "started")
+            raise RuntimeError("boom")
+
+    async with store.reader() as reader:
+        assert await reader.runs.list() == []
+
+
+async def test_reaching_a_repository_outside_the_block_raises(
+    store: Store,
+) -> None:
+    async with store.uow() as uow:
+        pass
+
+    for name in ("runs", "log", "events", "submissions", "stream"):
+        with pytest.raises(RuntimeError, match="not open"):
+            getattr(uow, name)
+
+
+async def test_the_reader_commits_nothing(store: Store) -> None:
+    """Read-only by construction: no transaction, so no write survives."""
+
+    async with store.reader() as reader:
+        await reader.runs.insert("demo", "never happened")
+
+    async with store.reader() as reader:
+        assert await reader.runs.list() == []
+
+
+async def test_the_reader_takes_no_writer_lock(store: Store) -> None:
+    async with asyncio.timeout(5):
+        async with store.uow() as uow:
+            uow.emit(event(EventName.run_created))
+            async with store.reader() as reader:
+                assert await reader.runs.list() == []

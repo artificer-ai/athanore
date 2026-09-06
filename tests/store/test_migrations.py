@@ -10,8 +10,14 @@ metadata carries a naming convention (T011): an unnamed constraint is
 named by the backend, and two backends name it differently, so the
 comparison would be dialect-dependent.
 
-The database is a temporary **file** throughout. A migration on
-``:memory:`` would run against a database that dies with its connection.
+The upgrade itself is backend-neutral and runs under the parametrised
+``db_url`` of ``tests/store/conftest.py``, so the nightly job proves the
+same migration builds the same schema on PostgreSQL. The tests whose
+subject is the *file* — a question that must not create one, an MVP
+database detected by its tables — take ``sqlite_url`` and ``sqlite_path``
+instead and skip on the Postgres parameter. The SQLite database is a
+temporary **file** throughout: a migration on ``:memory:`` would run
+against a database that dies with its connection.
 """
 
 from __future__ import annotations
@@ -23,7 +29,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TypeVar
 
-import pytest
 from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.runtime.migration import MigrationContext
@@ -44,16 +49,6 @@ from athanore.store.tables import metadata
 REVISION = "0001"
 
 T = TypeVar("T")
-
-
-@pytest.fixture
-def db_path(tmp_path: Path) -> Path:
-    return tmp_path / "athanore.db"
-
-
-@pytest.fixture
-def db_url(db_path: Path) -> str:
-    return f"sqlite+aiosqlite:///{db_path}"
 
 
 async def _read(db_url: str, read: Callable[[Connection], T]) -> T:
@@ -135,17 +130,19 @@ async def test_current_is_the_one_revision_after_an_upgrade(db_url: str) -> None
     assert await current(db_url) == REVISION
 
 
-async def test_current_is_none_before_an_upgrade(db_url: str, db_path: Path) -> None:
+async def test_current_is_none_before_an_upgrade(
+    sqlite_url: str, sqlite_path: Path
+) -> None:
     """An empty file, and an absent one, are both unmigrated."""
 
-    assert await current(db_url) is None
+    assert await current(sqlite_url) is None
 
-    await asyncio.to_thread(db_path.touch)
-    assert await current(db_url) is None
+    await asyncio.to_thread(sqlite_path.touch)
+    assert await current(sqlite_url) is None
 
 
 async def test_asking_about_an_absent_database_does_not_create_one(
-    db_url: str, db_path: Path
+    sqlite_url: str, sqlite_path: Path
 ) -> None:
     """The predicates are asked before anything decided to create a file.
 
@@ -154,9 +151,9 @@ async def test_asking_about_an_absent_database_does_not_create_one(
     behind for the next question to find.
     """
 
-    assert await is_v0_database(db_url) is False
-    assert await current(db_url) is None
-    assert not await asyncio.to_thread(db_path.exists)
+    assert await is_v0_database(sqlite_url) is False
+    assert await current(sqlite_url) is None
+    assert not await asyncio.to_thread(sqlite_path.exists)
 
 
 async def test_upgrade_is_idempotent(db_url: str) -> None:
@@ -172,10 +169,12 @@ async def test_upgrade_to_an_explicit_revision(db_url: str) -> None:
     assert await current(db_url) == REVISION
 
 
-async def test_is_v0_database_for_a_v0_shaped_file(db_url: str, db_path: Path) -> None:
-    _make_v0_database(db_path)
+async def test_is_v0_database_for_a_v0_shaped_file(
+    sqlite_url: str, sqlite_path: Path
+) -> None:
+    _make_v0_database(sqlite_path)
 
-    assert await is_v0_database(db_url) is True
+    assert await is_v0_database(sqlite_url) is True
 
 
 async def test_a_migrated_database_is_not_v0(db_url: str) -> None:
@@ -186,10 +185,10 @@ async def test_a_migrated_database_is_not_v0(db_url: str) -> None:
     assert await is_v0_database(db_url) is False
 
 
-async def test_an_empty_database_is_not_v0(db_url: str, db_path: Path) -> None:
-    sqlite3.connect(db_path).close()
+async def test_an_empty_database_is_not_v0(sqlite_url: str, sqlite_path: Path) -> None:
+    sqlite3.connect(sqlite_path).close()
 
-    assert await is_v0_database(db_url) is False
+    assert await is_v0_database(sqlite_url) is False
 
 
 def test_the_scripts_ship_inside_the_package() -> None:
@@ -204,21 +203,21 @@ def test_the_scripts_ship_inside_the_package() -> None:
     assert SCRIPT_LOCATION.is_relative_to(Path(__file__).resolve().parents[2])
 
 
-def test_the_history_has_one_head(db_url: str) -> None:
+def test_the_history_has_one_head(sqlite_url: str) -> None:
     """One linear history: a second head is a merge nobody asked for."""
 
-    scripts = ScriptDirectory.from_config(alembic_config(db_url))
+    scripts = ScriptDirectory.from_config(alembic_config(sqlite_url))
 
     assert scripts.get_heads() == [REVISION]
     assert scripts.get_revision(REVISION).down_revision is None
 
 
 async def test_offline_mode_emits_sql_without_touching_a_database(
-    db_url: str, db_path: Path
+    sqlite_url: str, sqlite_path: Path
 ) -> None:
     """``alembic upgrade head --sql``: the DDL, and no connection made."""
 
-    config = alembic_config(db_url)
+    config = alembic_config(sqlite_url)
     buffer = io.StringIO()
     config.output_buffer = buffer
     await asyncio.to_thread(command.upgrade, config, "head", sql=True)
@@ -226,7 +225,7 @@ async def test_offline_mode_emits_sql_without_touching_a_database(
     sql = buffer.getvalue()
     assert "CREATE TABLE runs" in sql
     assert "CREATE TABLE events" in sql
-    assert not await asyncio.to_thread(db_path.exists)
+    assert not await asyncio.to_thread(sqlite_path.exists)
 
 
 async def test_downgrade_removes_the_schema(db_url: str) -> None:
