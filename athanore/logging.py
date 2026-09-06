@@ -5,7 +5,10 @@ One process, one log format: pretty on a TTY, JSON everywhere else. Stdlib
 structlog pipeline, so a single run has a single shape on stderr.
 
 Nothing here is called until T011 (CLI) and T031 (server); this module
-only defines the configuration and the per-attempt binding seam.
+only defines the configuration and the per-attempt binding seam. The
+server must construct uvicorn with ``log_config=None`` (02
+§Observability): uvicorn's own dictConfig would otherwise re-capture its
+loggers after ``configure_logging`` has run.
 """
 
 from __future__ import annotations
@@ -64,6 +67,18 @@ def configure_logging(fmt: str | None = None) -> None:
     root = logging.getLogger()
     root.handlers[:] = [handler]
     root.setLevel(logging.INFO)
+
+    # uvicorn installs its own handlers and sets `propagate = False` on
+    # these three loggers, so their records would bypass the pipeline
+    # above and stderr would carry two shapes at once. It does this from
+    # `uvicorn.Config.__init__`, not only from `uvicorn.run()`, so a
+    # programmatic server (T051) triggers it too: the server passes
+    # `log_config=None` so uvicorn never reinstalls them, and this loop
+    # undoes any configuration that already happened.
+    for name in ("uvicorn", "uvicorn.error", "uvicorn.access"):
+        foreign = logging.getLogger(name)
+        foreign.handlers.clear()
+        foreign.propagate = True
 
     structlog.configure(
         processors=[

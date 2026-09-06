@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Run the tests. From T005 this is a thin wrapper over the gate; until
-# then it runs whatever of the gate is already configured and says which
-# steps it skipped.
+# Run the gate. This script is the definition of green (D74): it runs
+# each step whose config exists and names the ones it skipped.
 #
 #   ./scripts/test.sh                      # everything
 #   ./scripts/test.sh -k settings          # arguments go to pytest
@@ -14,8 +13,8 @@ fi
 
 cd "$ROOT"
 
-# T005 adds the real gate; once it exists it is the only definition of
-# green, and this script stops having an opinion.
+# A local `scripts/gate.sh` wins if you drop one in; the plan does not
+# create one (D74).
 if [ -x ./scripts/gate.sh ] && [ $# -eq 0 ]; then
   exec ./scripts/gate.sh
 fi

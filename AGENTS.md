@@ -124,13 +124,14 @@ uv run pytest -q                           # Python tests
 uv run ruff check . && uv run ruff format --check .
 uv run pyright                             # strict on graph, engine, store
 uv run lint-imports                        # layering contracts (from T005)
-./scripts/gate.sh                          # the whole gate, once T005 adds it
 ```
 
 `./scripts/test.sh` runs exactly this set, skipping the steps whose
-config does not exist yet and naming what it skipped. From T005 it
-delegates to `./scripts/gate.sh`, which then becomes the only definition
-of green.
+config does not exist yet and naming what it skipped. **It is the
+definition of green** — no task adds a separate `scripts/gate.sh`
+(D74). It does hand over to `./scripts/gate.sh` if one exists, so you
+can drop a local override in beside it, but nothing in the plan
+creates one.
 
 From T007 onward (`web/` scaffold):
 
@@ -318,8 +319,10 @@ driver listens on 4102 so it never collides with the v1 app on 4002.
 - **Layering, arrows point down only:**
   `api, cli, plugins.builtin` over
   `engine, requests, agents, plugins.registry` over
-  `store, events, graph, settings`. `graph` imports nothing from the
-  package. `store` never imports `engine`. `agents` reaches the store only
+  `store, events, graph, settings, logging`. Every name in a tier is an
+  **independent sibling**: peers within a tier may not import each other,
+  and the only imports allowed are arrows down a tier. `graph` imports
+  nothing from the package. `store` never imports `engine`. `agents` reaches the store only
   through `TaskContext`. `workflow.py` is the one module that imports both
   `graph` and `plugins.decl`. Enforced by import-linter.
 - **Small core.** Nothing in `athanore/` depends on pi, Claude, or Docker.

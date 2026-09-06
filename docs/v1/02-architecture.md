@@ -309,6 +309,12 @@ the first belongs in `.athanore/token` (12), the second is a test hook.
 - Every attempt binds `run_id`, `task_id`, `node`, `workflow`, `attempt` into
   structlog context; agent subprocess stderr is captured to the log at
   DEBUG with the same binding.
+- `configure_logging` routes stdlib `logging` through structlog, and the
+  server MUST build uvicorn with `log_config=None`. Uvicorn applies its
+  own dictConfig from `Config.__init__` — not only from `uvicorn.run()` —
+  which installs handlers on `uvicorn`, `uvicorn.error` and
+  `uvicorn.access` and stops them propagating, putting two formats on one
+  stderr.
 - Events (07) are the business-level trail. Metrics are a later seam
   (`/api/health` already reports counts; Prometheus can be added without
   touching the engine).
