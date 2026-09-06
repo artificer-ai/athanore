@@ -886,7 +886,8 @@ remainder; seq continues after a restart (`last_seq`); the ephemeral
 event never appears in `events`.
 **Done.** Tests pass.
 
-**Status.** Done, in T023's run on `feat/T023` (D100). `append` is a
+**Status.** Done, in T023's run on `feat/T023` (D100); re-dispatched on
+`feat/T023a` and left as it stood (D101). `append` is a
 coroutine and starts the flusher itself,
 so the service needs no lifecycle call but `close()`: the first chunk of
 an attempt is what reads `last_seq` and resolves the counter, and a body
