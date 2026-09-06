@@ -773,6 +773,15 @@ lazily; real implementation in T031). `AthanoreWorkflow = Workflow` kept in
 `Graph`; node options round-trip.
 **Done.** MVP suite still green (it constructs `AthanoreWorkflow`).
 
+**Status.** Done. `AthanoreWorkflow` stays bound to `GraphBuilder` in
+`graph/__init__.py`: rebinding it to `Workflow` there is both a cycle and
+the import `graph` may never make, so the deprecated public name is bound
+to `Workflow` in `athanore/__init__.py` at T055 (D96). `Workflow` owns
+its builder rather than subclassing it, caches the graph `finalize()`
+freezes so every reader gets one `Graph` object, and refuses `node()`
+once finalized. `run(**settings)` is 04 §Programmatic host's shorthand
+over T051's `Server`, imported inside the method.
+
 ### T021 — Routing interpretation and failure classes (A1.9 part, D42)
 
 **Do.** `athanore/engine/errors.py`: `class NonRetryable(Exception)`;

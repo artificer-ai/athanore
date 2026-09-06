@@ -17,8 +17,13 @@ from athanore.graph.json import jsonable
 from athanore.graph.model import Graph, Node
 from athanore.graph.validate import finalize
 
-#: Deprecated alias for :class:`GraphBuilder`, kept for the MVP's name.
-#: ``athanore.Workflow`` (T020) is the object authors actually use.
+#: Deprecated alias for :class:`GraphBuilder`, kept for the MVP's name
+#: (14 §Compatibility). It stays bound to the builder here rather than to
+#: :class:`athanore.workflow.Workflow`, which is what the MVP's name
+#: actually meant: ``graph`` may import nothing from ``athanore``, so the
+#: public deprecated name is bound in ``athanore/__init__.py`` when the
+#: public surface is assembled (D96). ``athanore.workflow.Workflow`` is
+#: the object authors use.
 AthanoreWorkflow = GraphBuilder
 
 __all__ = [
