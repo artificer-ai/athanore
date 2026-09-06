@@ -199,7 +199,9 @@ order, not arrival order. A join node MUST declare a payload slot;
 ### Failure and operator semantics
 
 - A branch that dead-letters never arrives; the run is `failed` by the
-  dead-letter as usual. Retrying or rerunning that branch later makes it
+  dead-letter as usual — by the *first* one, if several branches
+  dead-letter, since a failed run is re-opened only by retry, rerun or
+  move (D103). Retrying or rerunning that branch later makes it
   arrive, the join fires, and the run re-opens to `running`: fan-in
   composes with the existing re-open semantics without new states.
 - A run with no ready/in-progress/waiting tasks and a join with partial
@@ -302,15 +304,28 @@ The re-admit queue is an in-memory FIFO per pool of tasks whose
    `result`, enqueue each transition (`task.enqueued` with
    `reason=transition`, `lineage.from=this task`; a fan-out pushes branch
    frames; a transition into a join node records an arrival and enqueues
-   the join only when complete, §Fan-in), and if there were no transitions
-   (`terminal=true`) and the run has no pending tasks: with no partial
-   join, mark the run `completed` with `output` (§Routing edge cases);
-   with a partial join, mark it `failed` (`join_incomplete`).
+   the join only when complete, §Fan-in), and if the run is **still
+   `running`** and is left with no pending task: with a partial join,
+   mark it `failed` (`join_incomplete`) whether or not this task
+   transitioned — the branch that leaves a join short is one that *did*,
+   into a join that could not fire; otherwise, if there were no
+   transitions (`terminal=true`), mark the run `completed` with `output`
+   (§Routing edge cases). The status is read in this same transaction:
+   a run another branch has already `failed` by dead-lettering is left
+   failed, because 03's run state machine re-opens a terminal run only
+   by retry/rerun/move — settling it again would overwrite that verdict
+   with `completed`, or emit a second `run.failed` for the stall the
+   dead-letter caused (D103).
 4. On exception: mark the task `failed` with `error`; append an engine log
    entry `attempt N failed: …`; if the exception is retryable (§Failure
    classes) and `attempt < retries` enqueue a retry (same payload, same
    `created`, `attempt+1`, `task.failed will_retry=true`); else mark
-   `dead_letter`, set run `failed`, publish `run.failed`.
+   `dead_letter`, and — if the run is **still `running`**, read in that
+   same transaction — set run `failed` and publish `run.failed`. Two
+   branches of one fan-out can dead-letter together; the first verdict
+   is the run's, and the second records itself with `task.failed` and
+   `task.dead_lettered` rather than emitting a second `run.failed` and
+   re-stamping `finished` on a run nothing has re-opened (D103).
 5. `finally`: release the lease, unbind the context, `notify()`.
 
 `asyncio.CancelledError` is not a failure: an attempt cancelled by an
