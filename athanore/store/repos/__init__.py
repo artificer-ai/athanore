@@ -9,9 +9,16 @@ caller a tier up.
 """
 
 from athanore.store.repos.base import Repo
+from athanore.store.repos.events import EventRepo, OutboxEvent
+from athanore.store.repos.log import LogRepo
 from athanore.store.repos.runs import RunRepo
+from athanore.store.repos.submissions import SubmissionRepo
 
 __all__ = [
+    "EventRepo",
+    "LogRepo",
+    "OutboxEvent",
     "Repo",
     "RunRepo",
+    "SubmissionRepo",
 ]

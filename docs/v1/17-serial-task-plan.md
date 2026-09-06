@@ -498,6 +498,16 @@ lines; `list_after` honours cursor, limit, run filter and glob patterns;
 `prune` keeps `run.*`; `latest` returns the highest id.
 **Done.** Tests pass.
 
+**Status.** Done. `EventRepo.insert_many` is the outbox's write path:
+`UnitOfWork._write_outbox` flushes through it with
+`sort_by_parameter_order`, superseding T013a's insert-per-event (D87).
+The glob of `list_after` is translated to `LIKE` plus an equal-dot-count
+check, which is exactly `athanore.events.names.matches` for `*` and `?`
+and is asserted against it case by case; a `fnmatch` character class is
+refused rather than silently mismatched. `OutboxEvent` moved to
+`repos/events.py` and is re-exported from `uow.py`. Built in T014's run, as
+the commit `T014a:` on `feat/T014` (D88); do not submit it again.
+
 ### T014b — `StreamRepo` and the Postgres test matrix (A1.3)
 
 **Do.** `repos/stream.py`: `append_batch(task_id, chunks: list[(seq,

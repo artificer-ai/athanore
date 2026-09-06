@@ -37,9 +37,10 @@ so nothing a report query does is committed and nothing it does queues
 behind a commit.
 
 ``store`` and ``events`` are independent siblings of the bottom tier
-(02 §Layering), so this module names the two shapes it needs from the
-event layer structurally — :class:`OutboxEvent` and
-:class:`EventPublisher` — rather than importing ``athanore.events``. It is
+(02 §Layering), so the store names the two shapes it needs from the event
+layer structurally — :class:`EventPublisher` here, and
+:class:`~athanore.store.repos.events.OutboxEvent` beside the insert that
+takes it — rather than importing ``athanore.events``. It is
 the same constraint that made :class:`~athanore.store.rows.EventRow`
 restate the envelope in T010 (D81). The concrete types are
 ``athanore.events.model.Event`` and ``athanore.events.bus.EventBus``, and
@@ -51,15 +52,16 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncGenerator, Sequence
 from contextlib import asynccontextmanager
-from datetime import datetime
 from types import TracebackType
 from typing import Any, Protocol
 
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncTransaction
 
 from athanore.store.clock import now
+from athanore.store.repos.events import EventRepo, OutboxEvent
+from athanore.store.repos.log import LogRepo
 from athanore.store.repos.runs import RunRepo
-from athanore.store.tables import events
+from athanore.store.repos.submissions import SubmissionRepo
 
 
 class Repos:
@@ -67,13 +69,16 @@ class Repos:
 
     Constructing the set is free — a repository holds a connection and
     nothing else — so a unit of work and a reader each own one rather than
-    sharing a registry with a lifecycle of its own. T014a, T014b, T015 and
-    T016 add the rest here.
+    sharing a registry with a lifecycle of its own. T014b, T015 and T016
+    add ``stream``, ``tasks``, ``requests`` and ``joins`` here.
     """
 
     def __init__(self, conn: AsyncConnection) -> None:
         self.conn = conn
         self.runs = RunRepo(conn)
+        self.log = LogRepo(conn)
+        self.events = EventRepo(conn)
+        self.submissions = SubmissionRepo(conn)
 
 
 class Reader(Repos):
@@ -85,22 +90,6 @@ class Reader(Repos):
     writer lock, because a report query must never queue behind a commit
     (07 §Concurrency).
     """
-
-
-class OutboxEvent(Protocol):
-    """The shape the outbox needs of an event.
-
-    ``athanore.events.model.Event`` satisfies it. ``id`` is writable
-    because assigning it is how the insert hands the SSE cursor back to
-    the caller that emitted the event.
-    """
-
-    id: int | None
-    run_id: str | None
-    task_id: int | None
-    name: str
-    data: dict[str, Any]
-    created: datetime
 
 
 class EventPublisher(Protocol):
@@ -123,8 +112,8 @@ class EventPublisher(Protocol):
 class UnitOfWork:
     """One write transaction and the events it will publish when it commits.
 
-    Repositories are reached as attributes — ``uow.runs`` today, the rest
-    as T014a–T016 add them — and share this transaction's connection, so
+    Repositories are reached as attributes — ``uow.runs``, ``uow.log``,
+    ``uow.events``, … — and share this transaction's connection, so
     everything done through them commits or rolls back together. Reaching
     one outside the block raises, for the same reason :meth:`emit` does.
 
@@ -156,6 +145,21 @@ class UnitOfWork:
     def runs(self) -> RunRepo:
         """The run repository, on this transaction."""
         return self._open_repos().runs
+
+    @property
+    def log(self) -> LogRepo:
+        """The work-log repository, on this transaction."""
+        return self._open_repos().log
+
+    @property
+    def events(self) -> EventRepo:
+        """The event repository, on this transaction."""
+        return self._open_repos().events
+
+    @property
+    def submissions(self) -> SubmissionRepo:
+        """The submission repository, on this transaction."""
+        return self._open_repos().submissions
 
     def emit(self, event: OutboxEvent) -> None:
         """Queue ``event`` for insertion and publication when this commits.
@@ -201,7 +205,7 @@ class UnitOfWork:
             raise RuntimeError("the unit of work was never opened")
         try:
             if exc_type is None:
-                await self._write_outbox(conn, outbox)
+                await self._write_outbox(EventRepo(conn), outbox)
                 await tx.commit()
             else:
                 await tx.rollback()
@@ -241,29 +245,20 @@ class UnitOfWork:
         return self._repos
 
     async def _write_outbox(
-        self, conn: AsyncConnection, outbox: Sequence[OutboxEvent]
+        self, repo: EventRepo, outbox: Sequence[OutboxEvent]
     ) -> None:
         """Insert the outbox and stamp each event with the id it was given.
 
-        One statement per event, in emission order, so that the ids the
-        caller gets back ascend in that order — ``events.id`` is the SSE
-        cursor and a subscriber replays by it. A multi-row insert would
-        need ``sort_by_parameter_order`` to promise the same thing, which
-        is subtlety a handful of rows per transaction does not pay for.
+        One statement, in emission order, so that the ids the caller gets
+        back ascend in that order — ``events.id`` is the SSE cursor and a
+        subscriber replays by it. That ordering is
+        :meth:`EventRepo.insert_many`'s promise, which is why the outbox
+        flushes through the repository rather than writing its own insert:
+        there is one way an event becomes a row (D87).
         """
-        for event in outbox:
-            result = await conn.execute(
-                events.insert()
-                .values(
-                    run_id=event.run_id,
-                    task_id=event.task_id,
-                    name=event.name,
-                    data=event.data,
-                    created=event.created,
-                )
-                .returning(events.c.id)
-            )
-            event.id = result.scalar_one()
+        ids = await repo.insert_many(outbox)
+        for event, event_id in zip(outbox, ids, strict=True):
+            event.id = event_id
 
 
 class Store:
