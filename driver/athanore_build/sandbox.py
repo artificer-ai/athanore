@@ -28,17 +28,41 @@ AGENT_SCRIPT = os.path.join(WORKSPACE, "scripts", "agent.sh")
 GATE_SCRIPT = os.path.join(WORKSPACE, "scripts", "test.sh")
 
 # One model writes, a different model reviews and QAs it: a blind spot
-# shared with the implementer cannot wave its own work through. Ids are
-# `<pi provider>/<model id>` and must exist in docker/dev/pi/models.json
-# — v0 logs and falls back to the agent default for an unknown id, so a
-# typo here silently buys you pi's cheapest model.
-IMPLEMENT_MODEL = os.environ.get(
-    "BUILDER_IMPLEMENT_MODEL", "openrouter/deepseek/deepseek-v4-pro-0813"
+# shared with the implementer cannot wave its own work through.
+#
+# A role names an adapter (`kind`) and a model id valid *for that
+# adapter*. pi takes `<provider>/<model id>` from
+# docker/dev/pi/models.json; the Claude adapter takes the values it
+# advertises (`opus[1m]`, `sonnet`, `haiku`, `default`) plus whatever
+# ANTHROPIC_MODEL names in its container — which is why Fable is its own
+# kind (D75). Both adapters log and silently fall back to their own
+# default for an unknown id, so `_role` refuses an obvious mismatch at
+# import rather than letting a whole build run on the wrong model.
+
+
+def _role(
+    name: str, kind: str, model: str, effort: str = ""
+) -> tuple[str, str, str | None]:
+    prefix = f"BUILDER_{name}_"
+    kind = os.environ.get(prefix + "KIND", kind)
+    model = os.environ.get(prefix + "MODEL", model)
+    effort = os.environ.get(prefix + "EFFORT", effort)
+    pi_shaped = "/" in model
+    if pi_shaped != (kind == "pi"):
+        raise ValueError(
+            f"{prefix}KIND={kind!r} does not match {prefix}MODEL={model!r}: "
+            "pi ids are `<provider>/<model>`, the Claude adapter's are not"
+        )
+    return kind, model, effort or None
+
+
+IMPLEMENT_KIND, IMPLEMENT_MODEL, IMPLEMENT_EFFORT = _role(
+    "IMPLEMENT", "claude", "opus[1m]"
 )
-REVIEW_MODEL = os.environ.get(
-    "BUILDER_REVIEW_MODEL", "openrouter/qwen/qwen3.8-max-0902"
+REVIEW_KIND, REVIEW_MODEL, REVIEW_EFFORT = _role(
+    "REVIEW", "claude-fable", "claude-fable-5", "high"
 )
-QA_MODEL = os.environ.get("BUILDER_QA_MODEL", "openrouter/qwen/qwen3.8-max-0902")
+QA_KIND, QA_MODEL, QA_EFFORT = _role("QA", "claude", "opus[1m]")
 
 # Rounds back to `implement` allowed per lane (gate, review, QA), and
 # across all of them, before the run fails.
@@ -64,14 +88,22 @@ GIT_ENV = {
 class SandboxAgent(AthanoreACPAgent):
     """An ACP agent in the dev container. The container is the guardrail,
     so permissions are auto-allowed and elicitations declined: an
-    unattended build must never block on a dialog."""
+    unattended build must never block on a dialog. Claude agents also run
+    with `permissions.defaultMode = bypassPermissions` in the settings on
+    the `athanore-claude` volume, so they do not round-trip a permission
+    request per tool call (D75)."""
 
+    kind = "pi"
     permission_policy = "auto_allow"
     elicitation_policy = "decline"
 
-    def __init__(self, kind: str = "pi", **kwargs) -> None:
+    def __init__(self, kind: str | None = None, **kwargs) -> None:
         kwargs.setdefault("timeout", AGENT_TIMEOUT)
-        super().__init__(command=[AGENT_SCRIPT, kind], cwd=WORKSPACE, **kwargs)
+        super().__init__(
+            command=[AGENT_SCRIPT, kind or type(self).kind],
+            cwd=WORKSPACE,
+            **kwargs,
+        )
 
 
 # -- git ---------------------------------------------------------------------

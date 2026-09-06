@@ -165,6 +165,32 @@ services:
     tty: false
     entrypoint: ["claude-agent-acp"]
 
+  # The same adapter, on Fable. `claude-agent-acp` builds its model menu
+  # from a fixed set plus whatever ANTHROPIC_MODEL names, and rejects any
+  # value outside it — `session/set_config_option` with "fable" or
+  # "claude-fable-5" is refused unless the environment already named it.
+  # So the model is a property of the service, not of the session (D75).
+  agent-claude-fable:
+    <<: [*build, *runtime]
+    environment:
+      - OPENROUTER_API_KEY
+      - ANTHROPIC_API_KEY
+      - CLAUDE_CODE_OAUTH_TOKEN
+      - ANTHROPIC_MODEL=${BUILDER_REVIEW_MODEL:-claude-fable-5}
+      - ATHANORE_HOST=${ATHANORE_HOST:-127.0.0.1}
+      - ATHANORE_PORT=${ATHANORE_PORT:-4002}
+      - ATHANORE_TEST_PG_URL=postgresql+asyncpg://postgres:athanore@127.0.0.1:${POSTGRES_PORT:-5433}/postgres
+      - WORKSPACE=${WORKSPACE}
+      - GIT_AUTHOR_NAME=athanore-builder
+      - GIT_AUTHOR_EMAIL=builder@athanore.local
+      - GIT_COMMITTER_NAME=athanore-builder
+      - GIT_COMMITTER_EMAIL=builder@athanore.local
+      - MVP_CHECKOUT=${MAIN_CHECKOUT}
+    volumes: *volumes
+    stdin_open: true
+    tty: false
+    entrypoint: ["claude-agent-acp"]
+
   # athanore **v0** driving the v1 serial plan. Its own image and its own
   # venv: v0 and v1 are both the `athanore` distribution and must never
   # share an environment (D67). Profile `drive`, port 4102 so it never
@@ -194,9 +220,15 @@ services:
       - MAIN_CHECKOUT=${MAIN_CHECKOUT}
       - HOST_HOME=${HOST_HOME}
       - SANDBOX_IMAGE=athanore/dev:latest
-      - BUILDER_IMPLEMENT_MODEL=${BUILDER_IMPLEMENT_MODEL:-openrouter/deepseek/deepseek-v4-pro-0813}
-      - BUILDER_REVIEW_MODEL=${BUILDER_REVIEW_MODEL:-openrouter/qwen/qwen3.8-max-0902}
-      - BUILDER_QA_MODEL=${BUILDER_QA_MODEL:-openrouter/qwen/qwen3.8-max-0902}
+      - BUILDER_IMPLEMENT_KIND=${BUILDER_IMPLEMENT_KIND:-claude}
+      - BUILDER_IMPLEMENT_MODEL=${BUILDER_IMPLEMENT_MODEL:-opus[1m]}
+      - BUILDER_IMPLEMENT_EFFORT=${BUILDER_IMPLEMENT_EFFORT:-}
+      - BUILDER_REVIEW_KIND=${BUILDER_REVIEW_KIND:-claude-fable}
+      - BUILDER_REVIEW_MODEL=${BUILDER_REVIEW_MODEL:-claude-fable-5}
+      - BUILDER_REVIEW_EFFORT=${BUILDER_REVIEW_EFFORT:-high}
+      - BUILDER_QA_KIND=${BUILDER_QA_KIND:-claude}
+      - BUILDER_QA_MODEL=${BUILDER_QA_MODEL:-opus[1m]}
+      - BUILDER_QA_EFFORT=${BUILDER_QA_EFFORT:-}
       - BUILDER_MAX_LOOPS=${BUILDER_MAX_LOOPS:-3}
       - BUILDER_MAX_ATTEMPTS=${BUILDER_MAX_ATTEMPTS:-6}
       - BUILDER_AGENT_TIMEOUT=${BUILDER_AGENT_TIMEOUT:-10800}

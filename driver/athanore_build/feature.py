@@ -24,8 +24,14 @@ from .sandbox import (
     BUILDER_ATTENDED,
     BUILDER_MAX_ATTEMPTS,
     BUILDER_MAX_LOOPS,
+    IMPLEMENT_EFFORT,
+    IMPLEMENT_KIND,
     IMPLEMENT_MODEL,
+    QA_EFFORT,
+    QA_KIND,
     QA_MODEL,
+    REVIEW_EFFORT,
+    REVIEW_KIND,
     REVIEW_MODEL,
     SandboxAgent,
     branch_name,
@@ -42,7 +48,9 @@ GATE_COMMAND = "./scripts/test.sh"
 
 
 class ImplementerAgent(SandboxAgent):
+    kind = IMPLEMENT_KIND
     model = IMPLEMENT_MODEL
+    thinking = IMPLEMENT_EFFORT
     output_model = TaskReport
     system_prompt = (
         "You implement one feature in the checkout at cwd, on a branch that "
@@ -65,6 +73,13 @@ class ImplementerAgent(SandboxAgent):
         "being done — anything left uncommitted is invisible to the gate and "
         "to the reviewer, and the workflow will bounce the task back to you "
         "for it.\n"
+        '- Before committing, run `./scripts/dev.sh "uv run ruff check '
+        '--fix ."` and then `./scripts/dev.sh "uv run ruff format ."` '
+        "— separately, because an unfixable finding makes the first "
+        "command exit non-zero and `&&` would skip the formatter. "
+        "Lint and formatting are the "
+        "gate's business, not a reviewer's: fix them mechanically rather "
+        "than spending a round on them.\n"
         f"- Run the gate (`{GATE_COMMAND}`) until it is green before you "
         "submit. The workflow runs it again itself; you do not get to decide "
         "whether your own work passed.\n"
@@ -73,7 +88,9 @@ class ImplementerAgent(SandboxAgent):
 
 
 class ReviewerAgent(SandboxAgent):
+    kind = REVIEW_KIND
     model = REVIEW_MODEL
+    thinking = REVIEW_EFFORT
     output_model = ReviewVerdict
     system_prompt = (
         "You are reviewing one branch against one task. Be harsh: you are "
@@ -93,6 +110,14 @@ class ReviewerAgent(SandboxAgent):
         "- anything that contradicts `AGENTS.md` §Architecture rules — the "
         "three rules, the layering, the small core, the one wire contract.\n"
         "\n"
+        "Do not reject for anything the gate already enforces — ruff lint "
+        "or formatting, pyright, import-linter contracts, a failing test. "
+        "The gate runs before you and would have stopped the branch, so a "
+        "rejection on those grounds costs a round and finds nothing. Your "
+        "subject is what a green gate still hides: behaviour, spec "
+        "compliance, scope, security, and tests that assert the wrong "
+        "thing.\n"
+        "\n"
         "A green gate is not a passing review: the gate only proves the "
         "suite ran. Put every defect in `blocking`, one per entry, naming "
         "the file. Give a verdict only — do not fix anything, do not commit, "
@@ -101,7 +126,9 @@ class ReviewerAgent(SandboxAgent):
 
 
 class QAAgent(SandboxAgent):
+    kind = QA_KIND
     model = QA_MODEL
+    thinking = QA_EFFORT
     output_model = QAVerdict
     system_prompt = (
         "You are QA. The suite is green and the review passed; your job is "

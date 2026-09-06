@@ -287,12 +287,26 @@ on. Resume from the TUI once you have dealt with it. Capacity 1 plus run
 order is the rest of "serial". Another seat is one module, one `wf`, one
 `register`.
 
-`implement` runs on `BUILDER_IMPLEMENT_MODEL` (DeepSeek V4 Pro),
-`review` and `qa` on `BUILDER_REVIEW_MODEL` / `BUILDER_QA_MODEL`
-(Qwen3.8 Max). A model id that is not in `docker/dev/pi/models.json` is
-not an error: pi falls back to its own default and the run continues on
-the wrong model, so ids are pinned in `.env.example` and the models are
-declared in that file.
+Each role picks an **adapter** and a **model**:
+`BUILDER_{IMPLEMENT,REVIEW,QA}_KIND` is `pi`, `claude` or `claude-fable`,
+and `_MODEL` must be an id that adapter accepts — pi's are
+`<provider>/<model>` from `docker/dev/pi/models.json`, Claude's are
+`opus[1m]`, `sonnet`, `haiku` and `default`. Fable is reachable only as
+its own kind: the adapter builds its model menu from a fixed set plus
+whatever `ANTHROPIC_MODEL` names in the container, and rejects anything
+else, so `agent-claude-fable` carries the model in its service
+definition (D75). `_EFFORT` sets the thought level (`low`…`max`).
+
+Both adapters answer an unknown model id by logging and continuing on
+their own default, which is how a build silently runs on the wrong
+model. The driver therefore refuses a mismatched KIND/MODEL pair at
+startup, and `./scripts/agent.sh <kind>` is the one way in.
+
+Claude agents authenticate from the `athanore-claude` volume
+(`./scripts/dev.sh`, then `claude`, then `/login` — once), and that
+volume's `settings.json` sets `permissions.defaultMode =
+bypassPermissions`: the container is the guardrail, so an agent does not
+round-trip a permission request per tool call.
 
 v0 does not know how to run a container. It dispatches through
 `./scripts/agent.sh` and runs the gate through `./scripts/test.sh` — the
