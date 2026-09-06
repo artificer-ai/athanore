@@ -465,6 +465,25 @@ with two in-flight nodes and one open request; `detail()` sums stats
 across attempts including failed ones; `delete` cascades.
 **Done.** Tests pass.
 
+**Status.** Done. `Repo._row` takes a row *mapping* rather than a `Row`
+(pyright strict refuses `Row._mapping` as private) and stamps UTC onto
+the naive datetimes SQLite hands back, so a read model is the same value
+on both backends. `list()` and `detail()`'s statements are built by
+module-level `list_statement(dialect, …)` / `stats_statement(dialect, …)`,
+so the PostgreSQL spelling is compiled by the gate and not only by the
+nightly job; `list()` is asserted to be one statement with a cursor
+counter. `update()` refuses a column it does not own rather than dropping
+it, position changes do not touch `updated`, and `delete()` is the
+`DELETE` plus the events sweep D83 called for. `Reader` and `UnitOfWork`
+share a `Repos` bundle, so a repository is reached the same way on either
+(D87). `compact_positions()` renumbers in Python and writes
+`move_position()`'s single `UPDATE … CASE`: a correlated rank subquery
+inside the `UPDATE` reads the rows the same statement has already
+rewritten on SQLite but not on PostgreSQL, so duplicated positions —
+which T018's import can produce — compacted differently on the two
+backends (D88). T014a and T014b were built in this task's run, as the
+two commits after this one on `feat/T014` (D88).
+
 ### T014a — `LogRepo`, `EventRepo`, `SubmissionRepo` (A1.3)
 
 **Do.** `repos/log.py`: `append(run_id, node, author, text, task_id=None,
