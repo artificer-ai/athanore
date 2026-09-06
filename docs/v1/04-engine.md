@@ -372,14 +372,16 @@ The MVP parked the body while still holding its worker slot; under
 async def human_input(prompt, *, options=None, output_model=None, timeout=None):
     ctx = current_task()
     req = await ctx.services.requests.reopen_or_create(...)
-    async with ctx.services.lease.released():        # task → waiting, slot freed
+    async with ctx.services.lease.released(req.id):  # task → waiting, slot freed
         answer = await ctx.services.requests.wait(req.id, timeout)
     # lease re-acquired here (may queue behind other ready tasks) → task in_progress
     return decode(answer)
 ```
 
-- `released()` sets the task `waiting`, publishes `task.waiting`, and
-  returns the lease to the pool.
+- `released(request_id)` sets the task `waiting`, publishes
+  `task.waiting`, and returns the lease to the pool — in that order, so
+  the slot is never free while the store still says the task is running.
+  The request id is the argument because both events carry it (18).
 - Re-acquisition: when the answer arrives the task joins its pool's
   **re-admit queue**; the scheduler loop hands leases to that queue
   (FIFO by answer time) before it claims anything from the store. A
@@ -388,11 +390,18 @@ async def human_input(prompt, *, options=None, output_model=None, timeout=None):
   and holding state, and it already queued once. While queued the task
   stays `waiting`; it flips to `in_progress` (`task.resumed`) when the
   lease is handed over. The queue is in memory; a crash empties it and
-  recovery handles the tasks.
-- The node `timeout` clock is **paused** while the task is `waiting`
-  (`asyncio.Timeout.reschedule()` on resume). A human taking a day must
-  not fail an attempt capped at ten minutes of agent time; bound the wait
-  itself with `human_input(timeout=…)`.
+  recovery handles the tasks. Cancellation — an operator op, a shutdown —
+  is the one exit that re-acquires nothing: there is no outcome to record
+  (§Shutdown) and the `waiting` row is recovery's. Every other exit,
+  including a wait that timed out, takes a slot back before the runner
+  records what the attempt did.
+- The node `timeout` clock is **paused** while the task is `waiting`:
+  the scope is disarmed on the way in (`reschedule(None)`) and re-armed
+  on resume at `now + (deadline - released_at)`, what was left of the
+  budget when the body parked (D108). A human taking a day must not fail
+  an attempt capped at ten minutes of agent time — and an armed scope
+  would not wait for the resume to say so, it would cancel the body
+  inside the wait; bound the wait itself with `human_input(timeout=…)`.
 - `pause` does not affect a waiting task; answering while paused resumes
   the body, and its successors wait for `resume` as before.
 - Recovery: `waiting` → `ready`; the re-executed body finds its request

@@ -136,7 +136,9 @@ async def run_attempt(engine: RunnerEngine, claimed: ClaimedTask, lease: Lease) 
     ``claimed`` comes from :meth:`~athanore.store.repos.tasks.TaskRepo.claim_ready`,
     which already flipped the row to ``in_progress`` and minted the token
     this attempt authenticates with; ``lease`` is the pool slot the
-    scheduler took for it, and this function is what gives it back.
+    scheduler took for it, and this function is what gives it back —
+    that one, and the one a body that waited on a human took in its
+    place (04 §Waiting).
 
     Returns when the attempt has ended, however it ended. The only
     exception that leaves here is ``asyncio.CancelledError`` — an
@@ -167,6 +169,10 @@ async def run_attempt(engine: RunnerEngine, claimed: ClaimedTask, lease: Lease) 
             api_base=_api_base(engine.settings),
             services=services,
         )
+        # The lease service holds what the attempt actually runs on: the
+        # context whose status it moves, the slot it gives back inside
+        # `released()`, and the wake that gets the freed slot dispatched.
+        services.lease.attach(context, lease, engine.notify)
         engine.live.register(context)
         with (
             bind_attempt(
@@ -193,6 +199,10 @@ async def run_attempt(engine: RunnerEngine, claimed: ClaimedTask, lease: Lease) 
     finally:
         if services is not None:
             await services.stream.close()
+            # The slot the attempt holds *now*. A body that parked on a
+            # human released the one below and came back on another (04
+            # §Waiting), and nothing else knows that second lease exists.
+            services.lease.release()
         lease.release()
         engine.live.unregister(task.id)
         engine.notify()

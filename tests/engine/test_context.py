@@ -296,14 +296,28 @@ async def test_run_get_returns_the_run(store: Store) -> None:
     assert run.title == "a run"
 
 
-async def test_lease_released_raises_until_t026(store: Store) -> None:
-    """A no-op would hold the slot through the wait; it must not pretend."""
+async def test_lease_released_refuses_outside_a_dispatched_attempt(
+    store: Store,
+) -> None:
+    """A services bundle the runner never attached has no slot to give back.
+
+    Nothing here was dispatched, so there is no lease, no pool and no
+    scheduler to wake; a ``released()`` that yielded anyway would look
+    like it freed a slot and would hold one under ``workers=1``. The
+    waiting behaviour itself is ``tests/engine/test_waiting.py``.
+    """
 
     run_id, task_id = await make_task(store)
     ctx = make_context(store, run_id, task_id)
 
-    with pytest.raises(NotImplementedError, match="T026"):
-        ctx.services.lease.released()
+    assert ctx.services.lease.held is None
+    assert not ctx.services.lease.waiting
+    # Idempotent and harmless with nothing to release: the runner's
+    # `finally` calls it on the path where the attempt never started.
+    ctx.services.lease.release()
+    with pytest.raises(RuntimeError, match="no pool lease"):
+        async with ctx.services.lease.released(1):  # pragma: no cover - it raises
+            pass
 
 
 async def test_the_requests_port_raises_until_t032(store: Store) -> None:

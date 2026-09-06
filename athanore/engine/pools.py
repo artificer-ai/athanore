@@ -29,7 +29,7 @@ from __future__ import annotations
 import asyncio
 import re
 from collections import deque
-from collections.abc import Awaitable, Iterator
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import TypedDict
 
@@ -182,15 +182,21 @@ class PoolState:
             )
         lease.release()
 
-    def request_readmit(self, task_id: int) -> Awaitable[Lease]:
+    def request_readmit(self, task_id: int) -> asyncio.Future[Lease]:
         """Join the re-admit queue; await the result for the new lease.
 
         Deliberately not a coroutine. The waiter's place in the queue is
-        taken when this is *called*, not when the returned awaitable is
+        taken when this is *called*, not when the returned future is
         first awaited, so a body that has been answered cannot lose its
         position to one answered after it. The scheduler hands the lease
         over in :meth:`drain_readmits`; cancelling the await removes the
         waiter, without ever spending a slot on it.
+
+        The future is the return type rather than a bare ``Awaitable``
+        because a caller cancelled in the window between
+        :meth:`drain_readmits` setting the result and the waiter resuming
+        holds the only reference to a lease the pool has already spent,
+        and has to be able to see it and give it back (T026).
         """
         loop = asyncio.get_running_loop()
         future: asyncio.Future[Lease] = loop.create_future()
