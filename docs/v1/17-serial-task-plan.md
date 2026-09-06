@@ -1317,6 +1317,30 @@ stale after the task finishes; validator normalisation; `wait` sees an
 answer that landed before it subscribed; timeout raises.
 **Done.** `tests/test_requests.py` deleted.
 
+**Status.** Done. `athanore/requests/service.py` is `RequestService(store,
+bus)` and nothing else: it opens a request, refuses every answer but the
+first, and parks a waiter on one. The refusals are ordered
+`RequestNotFound` → `AlreadyAnswered` → `StaleRequest` → the mode's own
+(`InvalidOption` for an id the request did not offer, `InvalidAnswer` for
+a `text` answer that is not a non-empty string or a `form` answer that is
+not an object or that the registered validator refused), and the pre-check
+for a second answer is the *message* only — the primary key on
+`answers.request_id` is the guard, and an `IntegrityError` from the insert
+is mapped onto the same `AlreadyAnswered`, which
+`test_a_second_answer_that_races_the_first_is_refused` reaches by racing
+two `answer()` calls that both read no answer. A form answer is stored as
+the validator returned it, dumped in JSON mode when that return is a
+pydantic model (D115). The wake-up guard is subscribe-then-read, and it is
+asserted twice: once behaviourally, on an answer whose `request.answered`
+was published before the waiter existed, and once on the ordering itself,
+by counting the bus's subscriptions at the moment `wait` first reads the
+store — reversing the two lines fails the second, and dropping the re-read
+fails the first. `reopen` and `RequestRepo.get_answer` are the two reads
+the section's signatures needed and did not have; the five open choices
+are D115. `human_input`, the endpoints and the CLI verb are the surfaces
+above this and stay with T033, T044a and T054a, which is how the
+porting-ledger row for `tests/test_requests.py` is annotated.
+
 ### T032 — Wire `TaskServices.requests` and the ordinal counter (A2.2 part)
 
 **Do.** `RequestsPort` implementation in `services.py`: `reopen_or_create

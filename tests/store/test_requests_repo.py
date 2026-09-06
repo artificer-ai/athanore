@@ -262,7 +262,7 @@ async def test_a_task_may_raise_many_requests_without_an_ordinal(store: Store) -
 
 
 # --------------------------------------------------------------------------
-# answer / mark_consumed
+# answer / get_answer / mark_consumed
 # --------------------------------------------------------------------------
 
 
@@ -309,6 +309,30 @@ async def test_an_answer_to_no_request_raises(store: Store) -> None:
     with pytest.raises(IntegrityError):
         async with store.uow() as uow:
             await uow.requests.answer(404, AnswerAuthor.user, value="hello")
+
+
+async def test_get_answer_reads_the_answer_without_claiming_it(
+    store: Store,
+) -> None:
+    """The read behind a waiter's wake-up guard and the agent long-poll."""
+
+    run_id = await make_run(store)
+    task_id = await make_task(store, run_id)
+    request_id = await ask_permission(store, run_id, task_id)
+
+    async with store.reader() as reader:
+        assert await reader.requests.get_answer(request_id) is None
+
+    async with store.uow() as uow:
+        await uow.requests.answer(request_id, AnswerAuthor.user, option_id="allow_once")
+
+    async with store.reader() as reader:
+        answer = await reader.requests.get_answer(request_id)
+        assert await reader.requests.get_answer(404) is None
+
+    assert answer is not None
+    assert (answer.request_id, answer.option_id) == (request_id, "allow_once")
+    assert answer.consumed is False, "reading an answer does not take it"
 
 
 async def test_mark_consumed_claims_the_answer(store: Store) -> None:
