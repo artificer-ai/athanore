@@ -8,7 +8,10 @@ place. And the glob must select whole segments: ``run.*`` is
 ``run.created`` and not ``run.a.b``. The bus enforces that rule in Python
 (:func:`athanore.events.names.matches`); this module asserts the SQL
 translation agrees with it, case by case, so a filtered replay and a
-filtered live stream cannot disagree.
+filtered live stream cannot disagree. ``matches`` is ``fnmatchcase``, so
+the pairs include mis-cased ones: SQLite's ``LIKE`` folds ASCII case and
+would select ``run.created`` for ``RUN.*``, which is why the wildcard half
+is ``GLOB`` there (D89).
 
 Every test runs on both backends; see ``tests/store/conftest.py``.
 """
@@ -19,9 +22,11 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
+from sqlalchemy.dialects import postgresql, sqlite
 
 from athanore.events.names import EventName, matches
-from athanore.store.repos.events import like_pattern
+from athanore.store.repos.events import glob_condition, like_pattern
+from athanore.store.tables import events as events_table
 from athanore.store.uow import Store
 
 NOW = datetime(2026, 9, 6, 12, 0, tzinfo=UTC)
@@ -212,6 +217,12 @@ async def test_no_patterns_is_no_filter(store: Store) -> None:
         ("task.done", "task.failed"),
         ("*.created", "run.created"),
         ("*.created", "a.b.created"),
+        # Case is part of the rule: `matches` is `fnmatchcase` (D89).
+        ("RUN.*", "run.created"),
+        ("run.*", "RUN.CREATED"),
+        ("task.DONE", "task.done"),
+        ("TASK.don?", "task.done"),
+        ("run.created", "run.created"),
     ],
 )
 async def test_the_sql_glob_agrees_with_the_bus(
@@ -233,6 +244,47 @@ async def test_a_character_class_is_refused_rather_than_mismatched(
     async with store.reader() as reader:
         with pytest.raises(ValueError, match="character class"):
             await reader.events.list_after(0, 10, patterns=["run.[cd]*"])
+
+
+async def test_a_miscased_pattern_selects_nothing(store: Store) -> None:
+    """``RUN.*`` is not ``run.*``, on either backend (D89).
+
+    SQLite's ``LIKE`` folds ASCII case, so the ``LIKE`` spelling of the
+    glob selected this event there and not on PostgreSQL — and the bus,
+    which is ``fnmatchcase``, selected it on neither. A filtered replay
+    would have handed a subscriber an event its live stream never sends.
+    """
+
+    await store_events(store, Emitted("run.created"))
+
+    async with store.reader() as reader:
+        assert await reader.events.list_after(0, 10, patterns=["RUN.*"]) == []
+        assert await reader.events.list_after(0, 10, patterns=["Run.Created"]) == []
+        selected = await reader.events.list_after(0, 10, patterns=["run.*"])
+
+    assert [event.name for event in selected] == ["run.created"]
+
+
+def test_the_glob_is_spelled_per_backend() -> None:
+    """``GLOB`` on SQLite, ``LIKE`` on PostgreSQL; the dot count on both."""
+
+    condition = glob_condition(events_table.c.name, "run.*", "sqlite")
+    sqlite_sql = str(condition.compile(dialect=sqlite.dialect()))
+    assert "GLOB" in sqlite_sql
+    assert "LIKE" not in sqlite_sql
+
+    condition = glob_condition(events_table.c.name, "run.*", "postgresql")
+    postgres_sql = str(condition.compile(dialect=postgresql.dialect()))
+    assert "LIKE" in postgres_sql
+    assert "GLOB" not in postgres_sql
+
+    for sql in (sqlite_sql, postgres_sql):
+        assert "replace(events.name" in sql
+
+
+def test_the_glob_refuses_a_backend_it_has_no_spelling_for() -> None:
+    with pytest.raises(NotImplementedError, match="event-name glob"):
+        glob_condition(events_table.c.name, "run.*", "mysql")
 
 
 async def test_a_pattern_may_not_smuggle_a_like_wildcard(store: Store) -> None:
@@ -340,6 +392,53 @@ async def test_prune_with_no_prefix_keeps_nothing_old(store: Store) -> None:
     async with store.reader() as reader:
         assert [event.name for event in await reader.events.list_after(0, 10)] == [
             EventName.task_done
+        ]
+
+
+async def test_the_kept_prefix_is_case_sensitive(store: Store) -> None:
+    """``run.`` keeps ``run.``, not ``RUN.`` (D89).
+
+    The prefix was a ``LIKE`` until then, so SQLite kept a ``RUN.`` event
+    that PostgreSQL deleted — the two backends disagreeing about what
+    retention leaves behind.
+    """
+
+    old = NOW - timedelta(days=31)
+    await store_events(
+        store,
+        Emitted("RUN.created", created=old),
+        Emitted("run.created", created=old),
+    )
+
+    async with store.uow() as uow:
+        removed = await uow.events.prune(NOW - timedelta(days=30))
+
+    assert removed == 1
+    async with store.reader() as reader:
+        assert [event.name for event in await reader.events.list_after(0, 10)] == [
+            "run.created"
+        ]
+
+
+async def test_a_kept_prefix_containing_a_like_wildcard_is_a_prefix(
+    store: Store,
+) -> None:
+    """``%`` in the prefix is a literal, not "keep everything"."""
+
+    old = NOW - timedelta(days=31)
+    await store_events(
+        store,
+        Emitted("run.created", created=old),
+        Emitted("%keep.me", created=old),
+    )
+
+    async with store.uow() as uow:
+        removed = await uow.events.prune(NOW - timedelta(days=30), keep_prefix="%")
+
+    assert removed == 1
+    async with store.reader() as reader:
+        assert [event.name for event in await reader.events.list_after(0, 10)] == [
+            "%keep.me"
         ]
 
 

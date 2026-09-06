@@ -506,7 +506,11 @@ check, which is exactly `athanore.events.names.matches` for `*` and `?`
 and is asserted against it case by case; a `fnmatch` character class is
 refused rather than silently mismatched. `OutboxEvent` moved to
 `repos/events.py` and is re-exported from `uow.py`. Built in T014's run, as
-the commit `T014a:` on `feat/T014` (D88); do not submit it again.
+the commit `T014a:` on `feat/T014` (D88); do not submit it again. A later
+re-dispatch audited the merged deliverable against the **Verification**
+block above and found the glob and `prune`'s prefix case-insensitive on
+SQLite and case-sensitive on PostgreSQL, where `matches` is `fnmatchcase`
+on both; `feat/T014a` carries that fix (D89).
 
 ### T014b — `StreamRepo` and the Postgres test matrix (A1.3)
 
