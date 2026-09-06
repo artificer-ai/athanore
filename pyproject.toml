@@ -56,3 +56,61 @@ artifacts = ["athanore/web/dist/**"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+# Spec documents hold hand-aligned Python snippets as illustration, not
+# as importable source; the formatter's markdown code-block pass would
+# churn them on every run (D73).
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "ASYNC"]
+
+[tool.pyright]
+typeCheckingMode = "standard"
+strict = ["athanore/graph", "athanore/engine", "athanore/store"]
+# driver/ is athanore **v0** (D67): it imports the sibling v0 distribution
+# whose symbols do not exist in v1 yet, so type-checking it against v1's
+# package can only produce false positives (D73).
+exclude = ["driver"]
+
+[tool.importlinter]
+root_package = "athanore"
+
+[[tool.importlinter.contracts]]
+name = "Layering: arrows point down only"
+type = "layers"
+# One tier per entry, top to bottom. `|` separates independent sibling
+# modules, so peers within a tier may not import each other; the only
+# cross-module imports allowed are arrows down a tier. `(…)` marks a
+# module that does not exist yet (created in T049/T050).
+layers = [
+    "athanore.api | athanore.cli | athanore.plugins.builtin",
+    "athanore.engine | athanore.requests | athanore.agents | (athanore.plugins.registry) | (athanore.plugins.decl) | (athanore.plugins.mount)",
+    "athanore.store | athanore.events | athanore.graph | athanore.settings | athanore.logging",
+]
+
+[[tool.importlinter.contracts]]
+name = "graph imports nothing from athanore"
+type = "forbidden"
+# `athanore.graph` is a subpackage of the root `athanore`, so the default
+# `as_packages` overlap rule skips the root module as an ancestor rather
+# than forbidding it. `as_packages = false` restores the check, at which
+# point the source must enumerate graph's own modules (`athanore.graph` plus
+# its `**` descendants) because the package form no longer expands them.
+source_modules = ["athanore.graph", "athanore.graph.**"]
+forbidden_modules = ["athanore", "athanore.*"]
+as_packages = false
+
+[[tool.importlinter.contracts]]
+name = "agents may not import store"
+type = "forbidden"
+source_modules = ["athanore.agents"]
+forbidden_modules = ["athanore.store"]
+
+[[tool.importlinter.contracts]]
+name = "store may not import engine"
+type = "forbidden"
+source_modules = ["athanore.store"]
+forbidden_modules = ["athanore.engine"]
