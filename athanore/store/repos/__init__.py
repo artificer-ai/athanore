@@ -10,6 +10,7 @@ caller a tier up.
 
 from athanore.store.repos.base import Repo
 from athanore.store.repos.events import EventRepo, OutboxEvent
+from athanore.store.repos.joins import Arrival, IncompleteJoin, JoinRepo
 from athanore.store.repos.log import LogRepo
 from athanore.store.repos.requests import RequestRepo
 from athanore.store.repos.runs import RunRepo
@@ -18,8 +19,11 @@ from athanore.store.repos.submissions import SubmissionRepo
 from athanore.store.repos.tasks import ClaimedTask, TaskRepo
 
 __all__ = [
+    "Arrival",
     "ClaimedTask",
     "EventRepo",
+    "IncompleteJoin",
+    "JoinRepo",
     "LogRepo",
     "OutboxEvent",
     "Repo",

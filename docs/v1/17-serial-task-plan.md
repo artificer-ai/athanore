@@ -926,6 +926,20 @@ the expected rows; terminal completes the run and stores `output`;
 unregistered in `finally` even when the body raises.
 **Done.** Tests pass.
 
+**Status.** Done, with T024a, T024b and T024c, in this task's run on
+`feat/T024`: one commit, because the four write one `run_attempt` and
+the success path of T024 calls the arrival code of T024b (D102, the
+precedent of D88, D91 and D100). None of the four may be dispatched
+again. `run_attempt` is three transactions and a `finally`: one that
+announces the attempt, the body call **outside** every unit of work — a
+`uow` holds the writer lock, and one spanning an agent turn would hold
+it for hours — and one that writes the whole outcome. The engine it
+takes is a `RunnerEngine` protocol (`store`, `settings`, `live`,
+`graphs`, `notify()`), which T027's `Engine` satisfies structurally, so
+nothing here waits for it. A task at a node the workflow no longer
+declares raises `GraphError` and dead-letters, rather than leaving the
+row `in_progress` with nothing recorded (D102).
+
 ### T024a — Runner: failure path, retries, timeouts, cancellation (A1.9, D42, D52, D60)
 
 **Do.** In `run_attempt`, the `except` arm: uow `finish(failed,
@@ -946,6 +960,15 @@ dead-letter on attempt 1 and fail the run; the third failure of a
 + retry; cancelling the asyncio task leaves the row `in_progress` and
 records nothing; the failure log line is present with `kind=failure`.
 **Done.** Tests pass.
+
+**Status.** Done, in T024's run (above, D102). The `except` arm catches
+`Exception` with `CancelledError` re-raised above it, so a cancelled
+attempt writes no status at all — the test asserts the row is untouched,
+not merely that nothing escaped. `retries=0` means no retry rather than
+the server default, which is the only reading under which writing it
+does anything (D102). The work-log line is appended through
+`services.log` after the failure transaction, where every other entry in
+the system is written.
 
 ### T024b — Fan-in: branch frames, `JoinRepo`, arrival and dispatch (A1.9b, D62)
 
@@ -972,6 +995,19 @@ frame raises `GraphError`; a join node without a payload slot fails
 `finalize`; the join task's `branch` is the parent's stack.
 **Done.** Tests pass.
 
+**Status.** Done, in T024's run (above, D102). `TaskRepo.enqueue` already
+took `branch` (T015), so the propagation is the runner's: a single
+transition copies the parent's stack, and a fan-out — a list of N ≥ 1
+refs, which `routing.is_fan_out` names because `interpret` erases it
+(D102) — pushes a frame per child. `JoinRepo.arrive` takes `count` from
+the caller rather than deriving it: `join_arrivals` has no such column
+(07 §Schema) and the caller always holds the frame it popped; `late` is
+read from the join task's lineage, the one durable record that a fan-out
+has been dispatched. The upsert is each dialect's own `insert()`,
+exercised on SQLite and compiled for both in
+`tests/store/test_joins_repo.py` (the PostgreSQL variants skip without a
+server, as the rest of the store suite does).
+
 ### T024c — Fan-in: failure semantics, late arrivals, output shape (A1.9b, D58, D62)
 
 **Do.** Completion check in the runner: no pending tasks and
@@ -992,6 +1028,16 @@ after restart and the join fires; `output` is scalar with a join and a
 list without one; the same fan-out with shuffled body delays yields an
 identical `output`.
 **Done.** Tests pass; no `output` assertion depends on finish order.
+
+**Status.** Done, in T024's run (above, D102). The completion check runs
+on quiescence rather than on "no transitions": the branch that leaves a
+join short is one that *did* transition, so a check gated on terminality
+would miss exactly the deadlock 03 invariant 4 names (D102). `completed`
+still requires a terminal last branch, so a late arrival at a fired join
+settles nothing. `output` is the shape rule — one terminal task is its
+value, several are the list in branch order — and the two determinism
+tests run the same fan-out under four shuffles of the branch delays,
+joined and open.
 
 ### T025 — Scheduler loop (A1.8)
 

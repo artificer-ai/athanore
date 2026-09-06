@@ -59,6 +59,7 @@ from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine, AsyncTransactio
 
 from athanore.store.clock import now
 from athanore.store.repos.events import EventRepo, OutboxEvent
+from athanore.store.repos.joins import JoinRepo
 from athanore.store.repos.log import LogRepo
 from athanore.store.repos.requests import RequestRepo
 from athanore.store.repos.runs import RunRepo
@@ -72,8 +73,7 @@ class Repos:
 
     Constructing the set is free — a repository holds a connection and
     nothing else — so a unit of work and a reader each own one rather than
-    sharing a registry with a lifecycle of its own. T024b adds ``joins``
-    here.
+    sharing a registry with a lifecycle of its own.
     """
 
     def __init__(self, conn: AsyncConnection) -> None:
@@ -85,6 +85,7 @@ class Repos:
         self.submissions = SubmissionRepo(conn)
         self.stream = StreamRepo(conn)
         self.requests = RequestRepo(conn)
+        self.joins = JoinRepo(conn)
 
 
 class Reader(Repos):
@@ -181,6 +182,11 @@ class UnitOfWork:
     def requests(self) -> RequestRepo:
         """The request repository, on this transaction."""
         return self._open_repos().requests
+
+    @property
+    def joins(self) -> JoinRepo:
+        """The join-arrival repository, on this transaction."""
+        return self._open_repos().joins
 
     def emit(self, event: OutboxEvent) -> None:
         """Queue ``event`` for insertion and publication when this commits.

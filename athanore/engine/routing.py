@@ -57,6 +57,30 @@ def interpret(node: Node, value: Any) -> list[Transition]:
     return transitions
 
 
+def is_fan_out(value: Any) -> bool:
+    """Whether ``value`` is the *list* form of a routing decision.
+
+    :func:`interpret` erases the difference: ``return ref`` and
+    ``return [ref]`` both come back as one transition. The engine still
+    needs it, because a fan-out pushes a branch frame onto every child
+    and a single transition copies the parent's stack unchanged (04
+    §Branch frames) — including a fan-out of one, so that a stage which
+    "usually" splits still closes its join when it produces one branch
+    (04 §Fan-in). Naming it here keeps the runner from re-deriving what
+    counts as a fan-out and drifting from the table above.
+
+    ``[]`` is not a fan-out: it is the terminal answer (04 §Routing edge
+    cases), and neither is a list with anything but refs and transitions
+    in it, which is a plain value.
+    """
+    if not isinstance(value, (list, tuple)):
+        return False
+    items = cast("list[Any] | tuple[Any, ...]", value)
+    return bool(items) and all(
+        isinstance(item, (EdgeRef, Transition)) for item in items
+    )
+
+
 def _explicit(value: Any) -> list[Transition] | None:
     """The routing the body asked for, or ``None`` if it asked for none.
 
@@ -72,15 +96,12 @@ def _explicit(value: Any) -> list[Transition] | None:
         items = cast("list[Any] | tuple[Any, ...]", value)
         if not items:
             return []
-        fan_out: list[Transition] = []
-        for item in items:
-            if isinstance(item, Transition):
-                fan_out.append(_coerce(item))
-            elif isinstance(item, EdgeRef):
-                fan_out.append(Transition(item.name))
-            else:
-                return None
-        return fan_out
+        if not is_fan_out(items):
+            return None
+        return [
+            _coerce(item) if isinstance(item, Transition) else Transition(item.name)
+            for item in cast("list[EdgeRef | Transition]", items)
+        ]
     return None
 
 

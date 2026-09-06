@@ -405,6 +405,33 @@ class RequestView(ReadModel):
     age: float
 
 
+class ArrivalRow(ReadModel):
+    """One row of ``join_arrivals``: one branch reaching a join (04 §Fan-in).
+
+    ``fanout_task`` and ``index`` are the frame the arriving task popped,
+    so an arrival names its branch rather than its sender; ``key`` is that
+    branch's identity (the payload the fan-out gave it) and ``value`` is
+    what the branch transitioned into the join with. ``from_task`` is the
+    task that arrived, and is ``None`` only if that task was deleted.
+
+    ``late`` marks an arrival recorded after the join had already fired:
+    it replaces nothing and dispatches nothing, and exists so that a
+    branch retried after the fact is visible rather than dropped (04
+    §Failure and operator semantics).
+    """
+
+    id: int
+    run_id: str
+    join_node: str
+    fanout_task: int
+    index: int
+    key: Any = None
+    value: Any = None
+    from_task: int | None = None
+    late: bool = False
+    created: datetime
+
+
 class EventRow(ReadModel):
     """One row of ``events``: the audit trail and the SSE feed (03).
 

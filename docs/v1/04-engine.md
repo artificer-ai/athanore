@@ -302,10 +302,12 @@ The re-admit queue is an in-memory FIFO per pool of tasks whose
    `result`, enqueue each transition (`task.enqueued` with
    `reason=transition`, `lineage.from=this task`; a fan-out pushes branch
    frames; a transition into a join node records an arrival and enqueues
-   the join only when complete, §Fan-in), and if there were no transitions
-   (`terminal=true`) and the run has no pending tasks: with no partial
-   join, mark the run `completed` with `output` (§Routing edge cases);
-   with a partial join, mark it `failed` (`join_incomplete`).
+   the join only when complete, §Fan-in), and if the run is left with no
+   pending task: with a partial join, mark it `failed`
+   (`join_incomplete`) whether or not this task transitioned — the branch
+   that leaves a join short is one that *did*, into a join that could not
+   fire; otherwise, if there were no transitions (`terminal=true`), mark
+   the run `completed` with `output` (§Routing edge cases).
 4. On exception: mark the task `failed` with `error`; append an engine log
    entry `attempt N failed: …`; if the exception is retryable (§Failure
    classes) and `attempt < retries` enqueue a retry (same payload, same
