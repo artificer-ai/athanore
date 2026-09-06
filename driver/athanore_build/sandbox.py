@@ -144,7 +144,7 @@ async def run_gate() -> tuple[int, str]:
     )
     try:
         out, _ = await asyncio.wait_for(proc.communicate(), timeout=GATE_TIMEOUT)
-    except asyncio.TimeoutError:
+    except TimeoutError:
         proc.kill()
         await proc.wait()
         return 124, f"gate exceeded {GATE_TIMEOUT}s and was killed"

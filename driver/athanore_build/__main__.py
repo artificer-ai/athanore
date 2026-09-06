@@ -16,10 +16,16 @@ from .feature import wf as v1_feature
 def parse_args(argv=None):
     p = argparse.ArgumentParser(prog="python -m athanore_build")
     # 4102, not 4002: the v1 app under ./scripts/run.sh owns 4002.
-    p.add_argument("--port", type=int, default=int(os.environ.get("BUILDER_PORT", "4102")))
+    p.add_argument(
+        "--port", type=int, default=int(os.environ.get("BUILDER_PORT", "4102"))
+    )
     p.add_argument("--web", action="store_true", help="also serve the TUI in a browser")
     p.add_argument("--web-host", default="0.0.0.0")
-    p.add_argument("--web-port", type=int, default=int(os.environ.get("BUILDER_WEB_PORT", "2424")))
+    p.add_argument(
+        "--web-port",
+        type=int,
+        default=int(os.environ.get("BUILDER_WEB_PORT", "2424")),
+    )
     return p.parse_args(argv)
 
 

@@ -201,6 +201,8 @@ not import `athanore.engine`. No `ignore_imports` escape hatch is
 needed: there are no MVP flat modules in this repository (D65).
 **Done.** `ruff check .`, `pyright`, `lint-imports` green (empty
 subpackages trivially pass).
+**Status.** Done.
+**Status.** Done.
 
 ### T006 — CI workflow (A0.5)
 

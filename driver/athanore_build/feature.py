@@ -258,8 +258,7 @@ async def implement(gate, *, payload):
         )
     if feedback:
         prompt += (
-            "\n\nA previous attempt did not pass. Fix this, and only this:\n"
-            f"{feedback}"
+            f"\n\nA previous attempt did not pass. Fix this, and only this:\n{feedback}"
         )
 
     result = await ImplementerAgent().run(prompt)
