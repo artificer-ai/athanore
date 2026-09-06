@@ -1192,13 +1192,15 @@ and `created` rules; `set_status(ready)` re-dispatches; move into a join
 **Done.** `tests/test_management.py`, `test_pause.py`, `test_run_log.py`
 deleted (their API-level assertions are re-added in T044a).
 
-**Status.** Done. Built in T027's run, on `feat/T027` (D109). The three
-v0 files are **not** deleted: they live in the MVP checkout, which this
-repository never writes to (D65), so their ledger rows are ticked as
-engine-half ported instead. A `rerun` of a join replays the *arrivals
-table* rather than the previous join task's payload — which is how a late
-arrival reaches the join body — and carries the fan-out in
-`lineage.from`; a join that never fired is a `Conflict`.
+**Status.** Done. Built in T027's run, on `feat/T027`, with T027 and
+T027a (D109); dispatched a second time on `feat/T027b`, which lands no
+implementation (D111). The three v0 files are **not** deleted: they live
+in the MVP checkout, which this repository never writes to (D65), so
+their ledger rows are ticked as engine-half ported instead. A `rerun` of
+a join replays the *arrivals table* rather than the previous join task's
+payload — which is how a late arrival reaches the join body — and
+carries the fan-out in `lineage.from`; a join that never fired is a
+`Conflict`.
 `set_status(cancelled)` emits `task.cancelled reason=set_status` beside
 `task.status_set`, since 18 has that `reason` member for no other path.
 
