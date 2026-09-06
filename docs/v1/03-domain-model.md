@@ -82,9 +82,10 @@ declared model are stored; the latest wins for the body.
 
 ### StreamChunk
 
-`id`, `task_id`, `seq`, `kind` ∈ {`text`, `tool_call`, `tool_result`,
-`notice`}, `text`, `created`. The agent transcript, persisted in batches
-and subject to retention (07). Replaces the MVP's `agent_progress` events.
+`id`, `task_id`, `seq`, `kind` ∈ {`text`, `thought`, `tool_call`,
+`tool_result`, `notice`}, `text`, `created`. The agent transcript,
+persisted in batches and subject to retention (07). Replaces the MVP's
+`agent_progress` events.
 
 ### Request / Answer
 
