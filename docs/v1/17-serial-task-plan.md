@@ -796,6 +796,14 @@ this in 04).
 mixed `EdgeRef`/`Transition`; pydantic payload becomes dict.
 **Done.** Tests pass.
 
+**Status.** Done. `interpret` is pure: `_explicit` reads the routing the
+body asked for (a `Transition`, an `EdgeRef`, or a list/tuple of them —
+a list only when *every* element is one, per D97), `_implicit` derives
+it from the node's edge count, and one loop rejects any target the node
+did not declare. An empty list is terminal whatever the edge count, and
+04 §Routing interpretation now has a row for it. `errors.py` exports
+`NonRetryable`, `is_retryable` and the `NON_RETRYABLE` pair T024a reads.
+
 ### T022 — Pools, leases, re-admit queue, live registry (A1.8, D43)
 
 **Do.** `athanore/engine/pools.py`: `class Pool(name, capacity)` (public,
