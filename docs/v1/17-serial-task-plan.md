@@ -356,6 +356,16 @@ SQLite file; each PRAGMA reads back; inserting a task with an unknown
 the same `(task_id, ordinal)` raises, two with `ordinal NULL` do not.
 **Done.** Tests pass.
 
+**Status.** Done. The nine tables, their indexes and their cascades are
+07 §Schema transcribed; `metadata` carries the naming convention T012's
+autogenerate needs, so every constraint has the same name on both
+backends. `events` keeps the section's one omission — it carries no
+foreign keys, because the outbox writes `run.deleted` after the
+transaction deleted the run — and gains `sqlite_autoincrement` so the SSE
+cursor is never reused (D83). `make_engine` registers the four pragmas on
+the pool's `connect` event, and skips `pool_size` for an in-memory URL,
+whose pool rejects it.
+
 ### T012 — Alembic environment and the initial migration (A1.1)
 
 **Do.** `athanore/store/migrations/{env.py, script.py.mako, alembic.ini,
