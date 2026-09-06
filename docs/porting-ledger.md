@@ -13,10 +13,10 @@ Source is `tests/` in the MVP checkout. Targets are the v1 paths named by
 | ✓ | MVP test | v1 target | Task |
 |---|---|---|---|
 | ☑ | `test_graph.py` | `tests/graph/test_builder.py` | T019 |
-| ☐ | `test_edit_run.py` | `tests/engine/test_ops_basic.py`, `tests/api/test_runs_api.py` | T027a, T044a |
-| ☐ | `test_pause.py` | `tests/engine/test_ops_basic.py`, `tests/api/test_runs_api.py` | T027a, T044a |
-| ☐ | `test_run_log.py` | `tests/engine/test_ops_basic.py`, `tests/api/test_runs_api.py` | T027a, T044a |
-| ☐ | `test_management.py` | `tests/engine/test_ops_tasks.py`, `tests/api/test_runs_api.py` | T027b, T044a |
+| ☑ | `test_edit_run.py` | `tests/engine/test_ops_basic.py` (the store and edit assertions, done); `tests/api/test_runs_api.py` still carries the `PATCH` half | T027a, T044a |
+| ☑ | `test_pause.py` | `tests/engine/test_ops_basic.py` (pause blocks the next claim, resume dispatches, the invalid transitions as `Conflict`, done); `tests/api/test_runs_api.py` still carries the 404/409 half | T027a, T044a |
+| ☑ | `test_run_log.py` | `tests/engine/test_ops_basic.py` (author, node and the empty-text refusal, done); `tests/api/test_runs_api.py` still carries the request-body half | T027a, T044a |
+| ☑ | `test_management.py` | `tests/engine/test_ops_tasks.py` (rerun, retry, move, cancel and delete, done); `tests/api/test_runs_api.py` still carries the HTTP half, and v0's `swap-priority` is `reorder` there | T027b, T044a |
 | ☐ | `test_deterministic.py` | `tests/engine/test_behaviours.py` | T028 |
 | ☐ | `test_fanout.py` | `tests/engine/test_behaviours.py` | T028 |
 | ☑ | `test_priority.py` | `tests/store/test_claim.py` (the ordering assertions, done); `tests/engine/test_behaviours.py` and `tests/api/test_runs_api.py` still carry the engine and API halves | T015a, T028, T044a |

@@ -9,24 +9,32 @@ services meet in production, and an in-memory database has neither.
 :class:`StubEngine` is the five members
 :func:`~athanore.engine.runner.run_attempt` reads — ``store``,
 ``settings``, ``live``, ``graphs`` and ``notify()`` — and nothing else,
-which is exactly what 17 §T024 asks for: the real ``Engine`` is T027's,
-and a runner test that needed it would be testing the wiring instead of
+which is exactly what 17 §T024 asks for: a runner test built on the real
+:class:`~athanore.engine.Engine` would be testing the wiring instead of
 the attempt. :class:`Harness` adds the two halves of the scheduler this
 suite cannot do without — submitting a run and claiming its ready tasks —
 so that a test reads as "run this workflow, then look at what the store
 says", which is the level the behaviour is specified at.
+
+The ``engines`` fixture is the other half: the real engine, for the
+suites whose subject *is* the wiring — recovery, shutdown and the
+operator operations (T027). It is a factory rather than one engine
+because those tests start a second engine against the same store, which
+is what a restart is; every engine it hands out is stopped on the way
+out, so no dispatch loop outlives its test.
 """
 
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from pathlib import Path
 from typing import Any
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from athanore.engine import Engine
 from athanore.engine.live import LiveRegistry
 from athanore.engine.pools import Lease, Pool, PoolState
 from athanore.engine.runner import run_attempt
@@ -272,3 +280,77 @@ def harness(store: Store, settings: AthanoreSettings) -> Harness:
     """A stub engine, a pool and the store, wired together."""
 
     return Harness(store, settings)
+
+
+#: A tick short enough that a test which waits for one is not waiting
+#: long, and long enough that a loop under load is not spinning. Every
+#: path that makes work ready calls ``notify()``, so this is the safety
+#: net rather than the mechanism.
+TICK = 0.02
+
+#: The fuse on every wait in the engine-lifecycle suites. Reached only
+#: when something is broken, so it is generous: a slow container must
+#: not make these flaky.
+DEADLINE = 5.0
+
+
+@pytest.fixture
+async def engines(
+    store: Store, settings: AthanoreSettings, bus: EventBus
+) -> AsyncIterator[Callable[..., Engine]]:
+    """Make real engines against this test's store, and stop all of them.
+
+    The teardown is the point: an engine left started keeps a dispatch
+    loop claiming against the next test's database.
+    """
+
+    made: list[Engine] = []
+
+    def make(*, tick: float = TICK) -> Engine:
+        one = Engine(settings, store, bus, tick=tick)
+        made.append(one)
+        return one
+
+    yield make
+    for one in made:
+        await one.stop()
+
+
+async def _wait_until(check: Callable[[], Awaitable[bool]]) -> None:
+    """Poll ``check`` until it is true, or fail the test.
+
+    A poll rather than an event: what these suites wait for is a row the
+    engine wrote, not a moment in a body.
+    """
+
+    async with asyncio.timeout(DEADLINE):
+        while True:
+            if await check():
+                return
+            await asyncio.sleep(0.005)
+
+
+async def _wait_for(event: asyncio.Event) -> None:
+    """Wait for ``event``, or fail the test."""
+
+    async with asyncio.timeout(DEADLINE):
+        await event.wait()
+
+
+@pytest.fixture
+def wait_until() -> Callable[[Callable[[], Awaitable[bool]]], Awaitable[None]]:
+    """Poll a condition until it holds, under :data:`DEADLINE`.
+
+    A fixture rather than an import: ``tests/engine`` is not a package,
+    so a helper shared between its modules arrives through pytest or not
+    at all.
+    """
+
+    return _wait_until
+
+
+@pytest.fixture
+def wait_for() -> Callable[[asyncio.Event], Awaitable[None]]:
+    """Wait for an :class:`asyncio.Event`, under :data:`DEADLINE`."""
+
+    return _wait_for

@@ -372,7 +372,9 @@ class TaskRepo(Repo):
         rows = self._rows(TaskRow, result)
         return sorted(rows, key=lambda row: (branch_path(row), row.id))
 
-    async def reset_for_recovery(self) -> list[int]:
+    async def reset_for_recovery(
+        self, workflows: Sequence[str] | None = None
+    ) -> list[int]:
         """Return every interrupted attempt to ``ready``; report which.
 
         Step 1 of 04 §Recovery on startup. A crash and a graceful stop
@@ -386,17 +388,30 @@ class TaskRepo(Repo):
         ``token_hash`` is cleared with the status. The next claim mints a
         fresh token, so a token captured from the attempt that died
         authenticates nothing (D38, 12 §Task tokens).
+
+        ``workflows`` narrows the sweep to the runs of those workflows —
+        step 2 of the same section: a run whose workflow this server does
+        not have registered is left exactly as it is, because nothing can
+        claim it and a row reset to ``ready`` under it would read as work
+        that is about to happen forever. ``None`` is the whole store,
+        which is what a caller with no registry (a migration, a test) is
+        asking for; an **empty sequence** is a registry with nothing in
+        it and resets nothing, so the two cannot be conflated here.
         """
 
+        statement = tasks.update().where(tasks.c.status.in_(INTERRUPTED))
+        if workflows is not None:
+            statement = statement.where(
+                tasks.c.run_id.in_(
+                    select(runs.c.id).where(runs.c.workflow.in_(list(workflows)))
+                )
+            )
         result = await self.conn.execute(
-            tasks.update()
-            .where(tasks.c.status.in_(INTERRUPTED))
-            .values(
+            statement.values(
                 status=TaskStatus.ready.value,
                 started=None,
                 token_hash=None,
-            )
-            .returning(tasks.c.id)
+            ).returning(tasks.c.id)
         )
         return sorted(int(row_id) for row_id in result.scalars())
 

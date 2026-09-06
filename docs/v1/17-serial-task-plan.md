@@ -1131,6 +1131,17 @@ a run of an unregistered workflow is untouched and never claimed.
 `start()` recovers it.
 **Done.** Tests pass.
 
+**Status.** Done. `recover()` passes the registered workflow names to
+`reset_for_recovery`, which gains an optional `workflows` argument, so a
+run of an unregistered workflow is untouched rather than reset to a
+`ready` no pool can ever claim (D109). `Scheduler.stop_claiming()` splits
+step 1 of 04 §Shutdown out of `stop()`, which is what lets
+`engine.stopping` name the attempts between "stop claiming" and "cancel
+them"; the whole sequence is under a 10 s budget and overrunning is
+logged, not raised. `errors.py` grows an `EngineError` base, with
+`UnknownWorkflow` and `UnknownNode` as `NotFound` subclasses — T042 maps
+both to 404.
+
 ### T027a — Operator ops, part 1: submit, edit, reorder, pause, resume, append_log (A1.11)
 
 **Do.** `athanore/engine/ops.py`: `class Ops(engine)`; each op one uow +
@@ -1147,6 +1158,15 @@ next claim but the in-flight body finishes; resume dispatches; `edit`
 rejects an empty title; reorder swaps and clamps; append_log picks the
 node.
 **Done.** Tests pass.
+
+**Status.** Done. Built in T027's run, on `feat/T027`, with T027 and
+T027b (D109). `Ops` reads the engine through an `OpsEngine` protocol, the
+precedent of `RunnerEngine` and `SchedulerEngine`. `submit` applies
+`edit`'s non-empty-title precondition; `append_log` refuses empty text
+and files the entry under the single **`in_progress` or `waiting`** node
+(03's `current_nodes`), with no `task_id` — an operator note is about the
+run. `resume` sets `running` even for a run that was `queued` when it was
+paused, which is 04's table read literally.
 
 ### T027b — Operator ops, part 2: cancel, delete, rerun, retry, move, set_status (A1.11)
 
@@ -1169,6 +1189,16 @@ and `created` rules; `set_status(ready)` re-dispatches; move into a join
 → `Conflict`; a terminal run re-opens on retry.
 **Done.** `tests/test_management.py`, `test_pause.py`, `test_run_log.py`
 deleted (their API-level assertions are re-added in T044a).
+
+**Status.** Done. Built in T027's run, on `feat/T027` (D109). The three
+v0 files are **not** deleted: they live in the MVP checkout, which this
+repository never writes to (D65), so their ledger rows are ticked as
+engine-half ported instead. A `rerun` of a join replays the *arrivals
+table* rather than the previous join task's payload — which is how a late
+arrival reaches the join body — and carries the fan-out in
+`lineage.from`; a join that never fired is a `Conflict`.
+`set_status(cancelled)` emits `task.cancelled reason=set_status` beside
+`task.status_set`, since 18 has that `reason` member for no other path.
 
 ### T028 — Port the engine behaviour tests (A1.14)
 
