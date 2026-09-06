@@ -43,5 +43,5 @@ Support files, ported or deleted alongside the tests they serve:
 | ✓ | MVP file | v1 target | Task |
 |---|---|---|---|
 | ☑ | `tests/conftest.py` | `tests/engine/conftest.py` (`start_engine`, `run_to_completion`; **not** `tests/conftest.py`, where `engine` is shadowed — D112), `tests/store/conftest.py` | T028 |
-| ☐ | `tests/fake_acp.py` | `athanore/testing/` `FakeACPAgent` (`tests/testing/test_fake_acp.py`) | T039a |
+| ☑ | `tests/fake_acp.py` | `athanore/testing/fake_acp.py`, driven by `tests/testing/test_fake_acp.py` against a raw ACP client: v0's argv flags became the JSON scenario vocabulary of 13 §Fakes, and every key of it is exercised. T039a's "`tests/fake_acp.py` deleted" has nothing left to delete — v1 never had one (D65) | T037 |
 | ☐ | `tests/smoke_acp.py` | `ATHANORE_SMOKE`-gated smoke test | T077 |

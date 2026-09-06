@@ -51,13 +51,19 @@ tests of the same behaviours.
   first invalid element exercises the 422 + repair path), `repair_submit:
   json` (what to submit when a repair turn arrives), `request_log` /
   `response_log: path` (JSON lines of received requests / responses the
-  fake initiated), `env_echo: bool` (emits a `notice` chunk listing the
-  environment, for scrub tests), `advertise_mcp: bool` (report
-  `mcpCapabilities.http` on `initialize` and record the `mcpServers`
-  received on `session/new`), `mcp_calls: [{tool, args}]` (connect to the
-  received MCP server with the `mcp` client and call each tool in order,
-  emitting the results as `tool_result` chunks; exercises the `mcp` tier
-  end to end). Unknown keys are an error.
+  fake initiated), `env_echo: bool` (emits an `agent_message_chunk`
+  listing the environment under an `[env]` marker, for scrub tests — ACP
+  has no wire form for a `notice`, which is a kind the façade itself
+  writes, 05), `advertise_mcp: bool` (report `mcpCapabilities.http` on
+  `initialize` and record the `mcpServers` received on `session/new`),
+  `mcp_calls: [{tool, args}]` (connect to the received MCP server with
+  the `mcp` client and call each tool in order, emitting the results as
+  tool-call updates carrying content — the transcript's `tool_result`;
+  exercises the `mcp` tier end to end). Unknown keys are an error.
+- A scenario scripts **one run**: every content block above is emitted on
+  the first prompt turn, and the repair turns that follow it submit
+  `repair_submit` and nothing else. `sleep_s`, `stop_reason` and `usage`
+  belong to a turn and apply to every one (D122).
 
 ### Running examples on the fake
 
