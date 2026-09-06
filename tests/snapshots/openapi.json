@@ -1,0 +1,55 @@
+{
+  "components": {
+    "schemas": {
+      "Health": {
+        "description": "Liveness and version. Unauthenticated, and carries no ids.",
+        "properties": {
+          "ok": {
+            "description": "True whenever the server answers at all.",
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "version": {
+            "description": "The running Athanore version.",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "version"
+        ],
+        "title": "Health",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "Athanore",
+    "version": "1.0.0a0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/health": {
+      "get": {
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Liveness and version",
+        "tags": [
+          "system"
+        ]
+      }
+    }
+  }
+}

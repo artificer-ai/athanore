@@ -7,6 +7,7 @@ of thing nobody notices until a release, so the correspondence is
 asserted rather than remembered.
 """
 
+import json
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -95,21 +96,31 @@ def test_web_job_runs_the_pnpm_half_of_the_gate(ci: Workflow) -> None:
         assert f"pnpm -C web {command}" in ran
 
 
-def test_web_and_contract_work_is_probe_guarded(ci: Workflow) -> None:
-    """Every step of these jobs runs only if the probe found its inputs.
+def test_web_work_is_probe_guarded(ci: Workflow) -> None:
+    """Every step of the `web` job runs only if the probe found `web/`.
 
-    `web/` arrives with T007 and the generators with T008; until then the
-    probe says no and the jobs pass having run nothing. The guard stays
-    correct once they exist — the probe starts saying yes, and no YAML
-    changes — so this asserts the shape, not today's tree.
+    The guard is from T006, when `web/` did not exist and the job had to
+    pass having run nothing. It stays correct now that it does — the
+    probe says yes, and no YAML changed — so this asserts the shape, not
+    today's tree.
     """
-    for name in ("web", "contract"):
-        job = ci["jobs"][name]
-        probe, *rest = steps(job)[1:]
-        assert probe["id"] == "probe"
-        assert "GITHUB_OUTPUT" in probe["run"]
-        for step in rest:
-            assert step["if"] == "steps.probe.outputs.present == 'yes'"
+    job = ci["jobs"]["web"]
+    probe, *rest = steps(job)[1:]
+    assert probe["id"] == "probe"
+    assert "GITHUB_OUTPUT" in probe["run"]
+    for step in rest:
+        assert step["if"] == "steps.probe.outputs.present == 'yes'"
+
+
+def test_contract_work_is_not_conditional(ci: Workflow) -> None:
+    """The contract job runs unconditionally, every time (T008).
+
+    Its inputs — `scripts/dump_openapi.py` and `web/` — are both in the
+    tree for good, and a freshness check that can decide not to run is
+    not a freshness check.
+    """
+    for step in steps(ci["jobs"]["contract"]):
+        assert "if" not in step, step.get("name", step.get("uses"))
 
 
 def test_node_and_pnpm_match_the_dev_image(ci: Workflow) -> None:
@@ -134,6 +145,15 @@ def test_contract_job_checks_the_generated_client_is_fresh(ci: Workflow) -> None
     assert "scripts/dump_openapi.py" in ran
     assert "pnpm -C web gen" in ran
     assert "git diff --exit-code tests/snapshots web/src/api/gen" in ran
+
+
+def test_the_contract_jobs_generators_exist() -> None:
+    """What the job regenerates, and what it then diffs (T008)."""
+    assert (ROOT / "scripts" / "dump_openapi.py").is_file()
+    assert (ROOT / "web" / "openapi-ts.config.ts").is_file()
+    assert "gen" in json.loads((ROOT / "web" / "package.json").read_text())["scripts"]
+    assert (ROOT / "tests" / "snapshots" / "openapi.json").is_file()
+    assert (ROOT / "web" / "src" / "api" / "gen" / "index.ts").is_file()
 
 
 def test_nightly_selects_the_postgres_marker(nightly: Workflow) -> None:
