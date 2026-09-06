@@ -7,6 +7,6 @@ the one place allowed to import both ``athanore.graph`` and
 ``athanore.plugins.decl`` once the latter exists.
 """
 
-from athanore.graph import AthanoreWorkflow
+from athanore.graph import GraphBuilder
 
-Workflow = AthanoreWorkflow
+Workflow = GraphBuilder
