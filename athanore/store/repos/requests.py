@@ -253,6 +253,22 @@ class RequestRepo(Repo):
             raise RuntimeError("the answer insert returned no row")
         return row
 
+    async def get_answer(self, request_id: int) -> AnswerRow | None:
+        """This request's answer, or ``None`` while it has none.
+
+        The read a waiter's wake-up guard makes: ``request.answered``
+        deliberately carries no value (18 §Requests), so an awakened
+        waiter comes back here for it, and so does the one that reads
+        *before* it has been woken at all. It claims nothing — that is
+        :meth:`mark_consumed`, and the long-poll of 08 has to be able to
+        re-deliver the same answer without taking it.
+        """
+
+        result = await self.conn.execute(
+            select(answers).where(answers.c.request_id == request_id)
+        )
+        return self._first(AnswerRow, result)
+
     async def mark_consumed(self, request_id: int) -> AnswerRow | None:
         """Flag this request's answer as taken by its waiter; ``None`` if
         there is none.
