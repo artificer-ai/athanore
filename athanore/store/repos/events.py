@@ -19,13 +19,23 @@ two properties matter more than anything else here:
   envelope (D81); ``tests/store/test_events_repo.py`` asserts the two
   agree.
 
-The translation is exact for the ``*`` and ``?`` wildcards: a ``LIKE``
-pattern plus a check that the name has exactly as many dots as the
-pattern. Each literal dot in the pattern consumes one dot of the name, so
-equal dot counts mean no wildcard swallowed a separator, which is the
-whole of the one-segment rule. ``fnmatch`` character classes (``[abc]``)
-have no ``LIKE`` equivalent and are refused rather than silently
-mismatched (D87).
+The translation is exact for the ``*`` and ``?`` wildcards: a wildcard
+match plus a check that the name has exactly as many dots as the pattern.
+Each literal dot in the pattern consumes one dot of the name, so equal dot
+counts mean no wildcard swallowed a separator, which is the whole of the
+one-segment rule. ``fnmatch`` character classes (``[abc]``) have no
+``LIKE`` equivalent and are refused rather than silently mismatched (D87).
+
+**The wildcard match is the one part that is spelled per backend.**
+:func:`~athanore.events.names.matches` is ``fnmatchcase``, so the rule is
+case-sensitive: ``RUN.*`` selects nothing, because no event is named
+``RUN.created``. PostgreSQL's ``LIKE`` is case-sensitive and says the
+same. SQLite's is *not* — it folds ASCII case — so a ``LIKE`` there
+selects ``run.created`` for the pattern ``RUN.*`` while the bus does not,
+and a filtered replay hands a subscriber events its live stream will
+never deliver. SQLite's ``GLOB`` is case-sensitive and its syntax is
+``fnmatch``'s, so that is what this module emits there (D89). The dot
+count is the same expression on both.
 """
 
 from __future__ import annotations
@@ -34,14 +44,19 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, Protocol
 
-from sqlalchemy import ColumnElement, and_, func, not_, or_, select
+from sqlalchemy import ColumnElement, and_, func, or_, select
 
-from athanore.store.repos.base import Repo
+from athanore.store.repos.base import (
+    POSTGRESQL,
+    SQLITE,
+    Repo,
+    unsupported_dialect,
+)
 from athanore.store.rows import EventRow
 from athanore.store.tables import events
 
-#: The ``LIKE`` escape character. Backslash is not special to SQLite or
-#: PostgreSQL ``LIKE`` unless declared, which is what ``ESCAPE`` does.
+#: The ``LIKE`` escape character. Backslash is not special to PostgreSQL
+#: ``LIKE`` unless declared, which is what ``ESCAPE`` does.
 LIKE_ESCAPE = "\\"
 
 #: Characters ``LIKE`` treats as wildcards, plus the escape itself.
@@ -72,7 +87,10 @@ def like_pattern(pattern: str) -> str:
     """``pattern`` as a ``LIKE`` pattern: ``*`` → ``%``, ``?`` → ``_``.
 
     Everything else is a literal, so the ``LIKE`` wildcards a caller's
-    pattern happens to contain are escaped rather than honoured.
+    pattern happens to contain are escaped rather than honoured. This is
+    the PostgreSQL spelling; SQLite takes the pattern unchanged, because
+    ``GLOB`` reads ``*`` and ``?`` itself and has no other metacharacter
+    once ``[`` is refused.
     """
 
     out: list[str] = []
@@ -88,11 +106,14 @@ def like_pattern(pattern: str) -> str:
     return "".join(out)
 
 
-def glob_condition(column: ColumnElement[str], pattern: str) -> ColumnElement[bool]:
+def glob_condition(
+    column: ColumnElement[str], pattern: str, dialect: str
+) -> ColumnElement[bool]:
     """The SQL for "``column`` matches the dotted glob ``pattern``".
 
-    See the module docstring for why a ``LIKE`` and a dot count are the
-    whole rule.
+    See the module docstring for why a wildcard match and a dot count are
+    the whole rule, and why the wildcard half is ``GLOB`` on SQLite and
+    ``LIKE`` on PostgreSQL.
     """
 
     if "[" in pattern or "]" in pattern:
@@ -100,11 +121,14 @@ def glob_condition(column: ColumnElement[str], pattern: str) -> ColumnElement[bo
             f"event pattern {pattern!r} uses a character class, which the "
             "store's glob does not support; use * and ? only"
         )
+    if dialect == SQLITE:
+        wildcards = column.bool_op("GLOB")(pattern)
+    elif dialect == POSTGRESQL:
+        wildcards = column.like(like_pattern(pattern), escape=LIKE_ESCAPE)
+    else:
+        raise unsupported_dialect(dialect, "the event-name glob")
     dots = func.length(column) - func.length(func.replace(column, ".", ""))
-    return and_(
-        column.like(like_pattern(pattern), escape=LIKE_ESCAPE),
-        dots == pattern.count("."),
-    )
+    return and_(wildcards, dots == pattern.count("."))
 
 
 class EventRepo(Repo):
@@ -157,7 +181,12 @@ class EventRepo(Repo):
             statement = statement.where(events.c.run_id == run_id)
         if patterns:
             statement = statement.where(
-                or_(*(glob_condition(events.c.name, pattern) for pattern in patterns))
+                or_(
+                    *(
+                        glob_condition(events.c.name, pattern, self.dialect)
+                        for pattern in patterns
+                    )
+                )
             )
         statement = statement.order_by(events.c.id).limit(limit)
         return self._rows(EventRow, await self.conn.execute(statement))
@@ -182,12 +211,18 @@ class EventRepo(Repo):
         Returns the number of rows removed. ``keep_prefix=""`` keeps
         nothing. Nothing here decides *when* to prune: the schedule is
         T017's, and the retention window is a setting.
+
+        The prefix is compared with ``substr`` and ``=`` rather than a
+        ``LIKE``: equality is case-sensitive on both backends, where
+        SQLite's ``LIKE`` would fold ASCII case and keep a ``RUN.``
+        event PostgreSQL deleted (D89). It also leaves nothing to escape,
+        so a prefix containing ``%`` or ``_`` is a prefix.
         """
 
         statement = events.delete().where(events.c.created < before)
         if keep_prefix:
             statement = statement.where(
-                not_(events.c.name.startswith(keep_prefix, autoescape=True))
+                func.substr(events.c.name, 1, len(keep_prefix)) != keep_prefix
             )
         result = await self.conn.execute(statement)
         return result.rowcount
