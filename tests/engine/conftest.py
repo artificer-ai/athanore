@@ -6,10 +6,10 @@ this suite runs against SQLite only — the backend matrix belongs to
 reason ``tests/store/conftest.py`` gives: WAL and a real pool are what the
 services meet in production, and an in-memory database has neither.
 
-:class:`StubEngine` is the five members
+:class:`StubEngine` is the six members
 :func:`~athanore.engine.runner.run_attempt` reads — ``store``,
-``settings``, ``live``, ``graphs`` and ``notify()`` — and nothing else,
-which is exactly what 17 §T024 asks for: a runner test built on the real
+``settings``, ``live``, ``graphs``, ``requests`` and ``notify()`` — and
+nothing else, which is exactly what 17 §T024 asks for: a runner test built on the real
 :class:`~athanore.engine.Engine` would be testing the wiring instead of
 the attempt. :class:`Harness` adds the two halves of the scheduler this
 suite cannot do without — submitting a run and claiming its ready tasks —
@@ -47,9 +47,11 @@ from athanore.engine import Engine
 from athanore.engine.live import LiveRegistry
 from athanore.engine.pools import Lease, Pool, PoolState
 from athanore.engine.runner import run_attempt
+from athanore.engine.services import RequestBackend
 from athanore.events.bus import EventBus
 from athanore.events.names import EventName
 from athanore.graph import Graph
+from athanore.requests.service import RequestService
 from athanore.settings import AthanoreSettings
 from athanore.store.engine import make_engine
 from athanore.store.repos.tasks import ClaimedTask
@@ -128,14 +130,25 @@ class StubEngine:
     ``notifications`` counts the wake-ups the runner asked for, because
     "the scheduler was notified" is part of the attempt's contract and
     the only observable half of it here.
+
+    ``requests`` is the one member a real host has to supply from outside
+    the engine (02 §Layering, T032): ``None`` here means every attempt
+    gets the port that raises, which is what the suites that never ask a
+    human want.
     """
 
-    def __init__(self, store: Store, settings: AthanoreSettings) -> None:
+    def __init__(
+        self,
+        store: Store,
+        settings: AthanoreSettings,
+        requests: RequestBackend | None = None,
+    ) -> None:
         self.store = store
         self.settings = settings
         self.live = LiveRegistry()
         self.graphs: dict[str, Graph] = {}
         self.notifications = 0
+        self.requests = requests
 
     def notify(self) -> None:
         self.notifications += 1
@@ -144,9 +157,15 @@ class StubEngine:
 class Harness:
     """A stub engine plus the two scheduler verbs a runner test needs."""
 
-    def __init__(self, store: Store, settings: AthanoreSettings) -> None:
+    def __init__(
+        self,
+        store: Store,
+        settings: AthanoreSettings,
+        requests: RequestBackend | None = None,
+    ) -> None:
         self.store = store
-        self.engine = StubEngine(store, settings)
+        self.requests = requests
+        self.engine = StubEngine(store, settings, requests)
         self.pool = PoolState(Pool("test", capacity=CAPACITY))
 
     # -- registration and submission ---------------------------------------
@@ -290,8 +309,34 @@ class Harness:
 
 
 @pytest.fixture
-def harness(store: Store, settings: AthanoreSettings) -> Harness:
-    """A stub engine, a pool and the store, wired together."""
+def requests_service(store: Store, bus: EventBus) -> RequestService:
+    """The one request service a host builds beside the engine (T031).
+
+    In ``tests/engine`` because the engine cannot build one for itself:
+    ``athanore.requests`` is its sibling and neither imports the other
+    (02 §Layering), so a suite that drives an attempt which asks a human
+    composes the pair the same way a host does.
+    """
+
+    return RequestService(store, bus)
+
+
+@pytest.fixture
+def harness(
+    store: Store, settings: AthanoreSettings, requests_service: RequestService
+) -> Harness:
+    """A stub engine, a pool, a request service and the store, wired together."""
+
+    return Harness(store, settings, requests_service)
+
+
+@pytest.fixture
+def unwired_harness(store: Store, settings: AthanoreSettings) -> Harness:
+    """The same, on an engine composed without a request service (T032).
+
+    What a host that never built one leaves a body with: a request port
+    whose every method raises.
+    """
 
     return Harness(store, settings)
 
@@ -320,8 +365,8 @@ async def engines(
 
     made: list[Engine] = []
 
-    def make(*, tick: float = TICK) -> Engine:
-        one = Engine(settings, store, bus, tick=tick)
+    def make(*, tick: float = TICK, requests: RequestBackend | None = None) -> Engine:
+        one = Engine(settings, store, bus, requests=requests, tick=tick)
         made.append(one)
         return one
 
@@ -356,8 +401,9 @@ def start_engine(
     async def start(
         *workflows: Workflow | tuple[Workflow, Pool],
         tick: float = TICK,
+        requests: RequestBackend | None = None,
     ) -> Engine:
-        engine = engines(tick=tick)
+        engine = engines(tick=tick, requests=requests)
         for entry in workflows:
             workflow, pool = entry if isinstance(entry, tuple) else (entry, None)
             engine.register(workflow.finalize(), pool)

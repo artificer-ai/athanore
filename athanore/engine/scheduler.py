@@ -71,7 +71,7 @@ class _Attempt(NamedTuple):
 class SchedulerEngine(RunnerEngine, Protocol):
     """What the scheduler needs of the engine.
 
-    The runner's five members plus the pool registry, for the same
+    The runner's six members plus the pool registry, for the same
     reason T024 named a protocol rather than importing the engine: the
     real :class:`athanore.engine.Engine` is T027's and satisfies this
     structurally, and a scheduler test that needed it would be testing

@@ -13,11 +13,19 @@ that describes it emitted inside it** (03 invariant 7). Nothing here spans
 an await on a body, an agent, or a request wait — a `uow` block in this
 module contains exactly its own writes.
 
-One member is deliberately not an implementation yet, and it fails
-loudly rather than plausibly: :attr:`TaskServices.requests` is a
-:class:`RequestsPort`. The port is the contract T033's ``human_input`` is
-written against; the implementation is T032's, and until it is wired
-every method raises.
+:attr:`TaskServices.requests` is the one member that reaches a sibling
+package. ``athanore.requests`` may not be imported from here (02
+§Layering), so :class:`RequestsPort` is the contract a body's
+``human_input`` is written against, :class:`RequestBackend` is the
+contract the service on the other side satisfies, and
+:class:`TaskRequests` is the object between them: the attempt's ids, the
+``source`` a caller does not get to choose, and the ordinal that makes a
+re-executed body re-attach to the question it already asked (06 §Restart
+durability). An engine composed without a request service gets
+:class:`UnwiredRequests` instead, whose every method raises — a port that
+returned ``None`` or an empty answer would let ``human_input`` look like
+it asked and silently take a default, which is the one failure mode a
+human-in-the-loop feature cannot have.
 
 :attr:`TaskServices.lease` is the one member the runner has to wire to
 the attempt itself. :meth:`LeaseService.released` moves the task to
@@ -62,6 +70,7 @@ from athanore.events.payloads import (
 from athanore.logging import get_logger
 from athanore.store.clock import now
 from athanore.store.rows import (
+    AnswerAuthor,
     AnswerRow,
     ChunkKind,
     LogAuthor,
@@ -70,6 +79,7 @@ from athanore.store.rows import (
     RequestKind,
     RequestMode,
     RequestRow,
+    RequestSource,
     RunRow,
     SubmissionRow,
     TaskStatus,
@@ -749,8 +759,9 @@ class RequestsPort(Protocol):
 
     Named here as a protocol because ``athanore.requests`` is an
     independent sibling of ``athanore.engine`` in the middle tier (02
-    §Layering): the engine states the shape it hands a body, and T032
-    supplies the object that satisfies it, wired by the runner.
+    §Layering): the engine states the shape it hands a body, and
+    :class:`TaskRequests` is the object that satisfies it, built and
+    wired per attempt by the runner.
 
     ``reopen_or_create`` is the one with a rule attached. It takes the
     next ``ctx.request_ordinal`` and re-attaches to the request already
@@ -798,15 +809,25 @@ class RequestsPort(Protocol):
 
 
 class UnwiredRequests:
-    """A :class:`RequestsPort` that is not there yet (T032).
+    """The :class:`RequestsPort` of an engine with no request service.
 
     Every method raises. The alternative — a port that returned ``None``
     or an empty answer — would let ``human_input`` look like it asked and
     silently take a default, which is the one failure mode a human-in-the-
     loop feature cannot have.
+
+    An engine reaches this only when it was composed without a
+    :class:`RequestBackend`: the engine cannot construct one for itself
+    (02 §Layering), so the composition root passes it in, and one that
+    did not gets a channel that says so on first use rather than a
+    workflow that quietly never asks anybody anything.
     """
 
-    _MESSAGE = "TaskServices.requests is wired in T032 (06 §Service)"
+    _MESSAGE = (
+        "this engine has no request service: TaskServices.requests is "
+        "unwired, so nothing can open or answer a request on it "
+        "(Engine(..., requests=RequestService(store, bus)), 06 §Service)"
+    )
 
     async def reopen_or_create(
         self,
@@ -845,6 +866,249 @@ class UnwiredRequests:
 
     async def poll(self, request_id: int, wait_s: float) -> AnswerRow | None:
         raise NotImplementedError(self._MESSAGE)
+
+
+class RequestBackend(Protocol):
+    """What :class:`TaskRequests` needs of the request service (06 §Service).
+
+    A structural protocol for the reason
+    :class:`~athanore.engine.runner.RunnerEngine` is one:
+    ``athanore.requests`` is an **independent sibling** of
+    ``athanore.engine`` in the middle tier (02 §Layering), so neither
+    package may import the other. The engine states the shape it delegates
+    to, ``athanore.requests.service.RequestService`` satisfies it without
+    knowing that the engine exists, and the composition root — the server
+    host, or a test — is what puts the two together.
+
+    Every method here is 06 §Service's, unchanged: this port adds the
+    ordinal and the task's identity, and no service logic of its own.
+    """
+
+    async def create(
+        self,
+        run_id: str,
+        task_id: int,
+        prompt: str,
+        *,
+        mode: RequestMode,
+        source: RequestSource,
+        kind: RequestKind,
+        options: list[dict[str, Any]] | None = None,
+        schema: dict[str, Any] | None = None,
+        tool_call: dict[str, Any] | None = None,
+        ordinal: int | None = None,
+    ) -> RequestRow: ...
+
+    async def reopen(self, task_id: int, ordinal: int) -> RequestRow | None: ...
+
+    async def answer(
+        self,
+        request_id: int,
+        *,
+        option_id: str | None = None,
+        value: Any = None,
+        author: AnswerAuthor = AnswerAuthor.user,
+    ) -> AnswerRow: ...
+
+    # ASYNC109: the port's signature, for the reason `RequestsPort` gives.
+    async def wait(
+        self,
+        request_id: int,
+        timeout: float | None = None,  # noqa: ASYNC109
+    ) -> AnswerRow: ...
+
+    async def poll(self, request_id: int, wait_s: float) -> AnswerRow | None: ...
+
+
+class TaskRequests:
+    """One task's view of the request channel: the :class:`RequestsPort`.
+
+    Constructed per attempt over the one process-wide
+    :class:`RequestBackend`, and wired to the attempt by :meth:`attach`
+    for the same reason :class:`LeaseService` is: the counter it keeps is
+    the *context's*, and the context does not exist yet when the services
+    bundle is built.
+
+    The whole of the class is the ordinal. ``run_id`` and ``task_id`` come
+    from the attempt rather than from the caller, so a body cannot open a
+    request against another task; ``source`` is decided by which method was
+    called rather than passed, so a body cannot open a request that claims
+    an agent raised it; and :meth:`reopen_or_create` numbers the
+    node-raised ones so that a body re-executed after a crash asks question
+    three rather than questions one through three again (06 §Restart
+    durability).
+
+    :meth:`create_agent_request` deliberately has no ordinal. An agent's
+    permission prompts arrive from inside a turn that a re-execution does
+    not reproduce statement for statement — the model may stop asking, or
+    ask something else — so numbering them by position would replay one
+    answer onto a different question. The whole attempt re-runs and its
+    agent-raised requests stay in history as stale (06 §Restart
+    durability).
+    """
+
+    def __init__(self, service: RequestBackend, *, run_id: str, task_id: int) -> None:
+        self._service = service
+        self._run_id = run_id
+        self._task_id = task_id
+        self._context: TaskContext | None = None
+
+    # -- wiring ------------------------------------------------------------
+
+    def attach(self, context: TaskContext) -> None:
+        """Wire the port to the attempt whose ordinals it counts.
+
+        Called by the runner once, beside :meth:`LeaseService.attach` and
+        for the same reason. Attaching twice is a defect rather than a
+        rebind: two contexts sharing one port would have the second
+        attempt's questions numbered from the first attempt's counter.
+        """
+        if self._context is not None:
+            raise RuntimeError(
+                f"the requests port of task {self._task_id} is already "
+                "attached to an attempt"
+            )
+        self._context = context
+
+    # -- opening -----------------------------------------------------------
+
+    async def reopen_or_create(
+        self,
+        prompt: str,
+        *,
+        mode: RequestMode,
+        kind: RequestKind,
+        options: list[dict[str, Any]] | None = None,
+        schema: dict[str, Any] | None = None,
+    ) -> RequestRow:
+        """The request this body asks at its next ordinal, opening one if new.
+
+        Three lines and a rule (06 §Restart durability). The counter on
+        the context moves first, so this call *owns* position *n* whatever
+        happens next; the store is asked what is at position *n* on this
+        task row; and only a gap there is a question that has not been
+        asked yet.
+
+        An existing request is returned whether or not it has an answer,
+        because both cases are the caller's to decide: answered, the
+        answer replays (T033a re-validates it); pending, the body parks on
+        the question it already asked. A crash mid-wait therefore costs
+        the operator nothing — the same question, with the answer they may
+        already have given still attached to it.
+
+        A retry or a rerun is a *new task row*, so its ordinals start at 1
+        and it asks afresh: the answers of a failed attempt may have been
+        the reason it failed.
+        """
+        context = self._attached()
+        ordinal = context.request_ordinal + 1
+        context.request_ordinal = ordinal
+        existing = await self._service.reopen(self._task_id, ordinal)
+        if existing is not None:
+            return existing
+        return await self._service.create(
+            self._run_id,
+            self._task_id,
+            prompt,
+            mode=mode,
+            source=RequestSource.node,
+            kind=kind,
+            options=options,
+            schema=schema,
+            ordinal=ordinal,
+        )
+
+    async def create_agent_request(
+        self,
+        prompt: str,
+        *,
+        mode: RequestMode,
+        kind: RequestKind,
+        options: list[dict[str, Any]] | None = None,
+        schema: dict[str, Any] | None = None,
+        tool_call: dict[str, Any] | None = None,
+    ) -> RequestRow:
+        """Open a request the agent raised mid-turn: a permission, an
+        elicitation, or an HTTP ask.
+
+        ``source="agent"`` and no ordinal, for the reason in the class
+        docstring. ``tool_call`` is the ACP tool call a permission is
+        about, carried so the SPA can show what is being asked for (06
+        §The model).
+
+        No context is needed: this is the one opening that does not count.
+        """
+        return await self._service.create(
+            self._run_id,
+            self._task_id,
+            prompt,
+            mode=mode,
+            source=RequestSource.agent,
+            kind=kind,
+            options=options,
+            schema=schema,
+            tool_call=tool_call,
+        )
+
+    # -- answering and waiting ---------------------------------------------
+
+    async def answer_as_engine(
+        self, request_id: int, option_id: str | None = None
+    ) -> AnswerRow:
+        """Record the headless fallback's answer (05 §Policies, 06 §Timeouts).
+
+        ``author="engine"``, which is what makes an answer nobody gave
+        legible as one afterwards: a permission that timed out into its
+        ``permission_timeout_action``, or an elicitation declined past the
+        timeout. The refusals are :meth:`RequestBackend.answer`'s — an
+        engine answer to a request a person answered first is
+        :exc:`~athanore.requests.errors.AlreadyAnswered`, and the person's
+        answer stands.
+        """
+        return await self._service.answer(
+            request_id, option_id=option_id, author=AnswerAuthor.engine
+        )
+
+    async def wait(
+        self,
+        request_id: int,
+        timeout: float | None = None,  # noqa: ASYNC109 - the port's signature
+    ) -> AnswerRow:
+        """Block until ``request_id`` is answered, and claim the answer.
+
+        Straight to the service. The slot the body is holding while it
+        waits is not this object's business: ``human_input`` wraps the
+        wait in ``ctx.services.lease.released(request_id)``, and that pair
+        is what 04 §Waiting specifies.
+        """
+        return await self._service.wait(request_id, timeout)
+
+    async def poll(self, request_id: int, wait_s: float) -> AnswerRow | None:
+        """The answer, waiting up to ``wait_s``; ``None`` if none came.
+
+        The agent long-poll (08 §Agent). Claims nothing, so a reconnecting
+        agent that asks twice gets the same answer twice.
+        """
+        return await self._service.poll(request_id, wait_s)
+
+    # -- internals ---------------------------------------------------------
+
+    def _attached(self) -> TaskContext:
+        """The attempt this port counts ordinals in, or a refusal.
+
+        Refuses rather than counting from zero: a port with no context is
+        one nothing wired, and numbering a question from a counter that
+        restarts every call would re-attach a body to its *first* request
+        forever.
+        """
+        if self._context is None:
+            raise RuntimeError(
+                f"the requests port of task {self._task_id} is not attached "
+                "to an attempt: a node-raised request is numbered by "
+                "`ctx.request_ordinal`, and there is no context to number "
+                "it in"
+            )
+        return self._context
 
 
 class TaskServices:
@@ -928,10 +1192,12 @@ __all__ = [
     "EventPort",
     "LeaseService",
     "LogService",
+    "RequestBackend",
     "RequestsPort",
     "RunService",
     "StreamService",
     "SubmissionService",
+    "TaskRequests",
     "TaskServices",
     "UnwiredRequests",
 ]

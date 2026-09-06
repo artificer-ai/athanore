@@ -1352,6 +1352,27 @@ ordinal). `answer_as_engine(request_id, option_id)`. `wait`, `poll`
 delegate.
 **Done.** Unit-tested through T033.
 
+**Status.** Done. The port is `TaskRequests` in `athanore/engine/
+services.py`, and it is wired end to end: `Engine(settings, store, bus,
+requests=…)` takes the one `RequestService` from whoever composes the
+process, `RunnerEngine` reads it, and `run_attempt` builds one
+`TaskRequests` per attempt and attaches it to the context beside the
+lease service — an engine given none still hands bodies the
+`UnwiredRequests` that raises. The engine cannot build the service for
+itself: `athanore.requests` is its sibling and neither may import the
+other (02 §Layering), so the service arrives through a structural
+`RequestBackend` protocol declared here, exactly as `RunnerEngine`
+declares the engine (D116). The class is the ordinal and nothing else:
+`run_id`, `task_id` and `source` come from the attempt rather than from
+the caller, `reopen_or_create` moves `ctx.request_ordinal` **before** it
+reads, so a call owns its position whatever happens next, and
+`create_agent_request` is unnumbered. `tests/engine/test_requests_port.py`
+is twelve tests through `run_attempt`, including the one the task lists
+none of and the recovery path needs: a body opens two questions, the
+attempt dies, `reset_for_recovery` returns the row to `ready`, and the
+re-executed body re-attaches to both — two requests, not four, with the
+answer given in the gap still on question one.
+
 ### T033 — `human_input`: modes, slot release, timeout (A2.2)
 
 **Do.** `athanore/requests/human.py`: `async def human_input(prompt, *,

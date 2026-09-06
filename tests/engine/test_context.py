@@ -320,16 +320,23 @@ async def test_lease_released_refuses_outside_a_dispatched_attempt(
             pass
 
 
-async def test_the_requests_port_raises_until_t032(store: Store) -> None:
+async def test_an_unwired_requests_port_raises(store: Store) -> None:
+    """An engine composed without a request service cannot ask anybody.
+
+    It says so on the first call rather than answering plausibly: the
+    channel is how a body reaches a person, and one that returned
+    nothing would be a workflow that silently never asked.
+    """
+
     run_id, task_id = await make_task(store)
     ctx = make_context(store, run_id, task_id)
 
-    with pytest.raises(NotImplementedError, match="T032"):
+    with pytest.raises(NotImplementedError, match="no request service"):
         await ctx.services.requests.wait(1)
 
 
 async def test_a_wired_requests_port_is_used_as_given(store: Store) -> None:
-    """The port is injected, so T032 replaces the unwired one and nothing else."""
+    """The port is injected: the runner builds it, this bundle only holds it."""
 
     run_id, task_id = await make_task(store)
     port = object()

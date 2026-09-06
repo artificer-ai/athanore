@@ -58,6 +58,7 @@ from athanore.engine.ops import Ops
 from athanore.engine.pools import Pool, PoolRegistry, PoolSnapshot
 from athanore.engine.recovery import recover
 from athanore.engine.scheduler import DEFAULT_TICK, Scheduler
+from athanore.engine.services import RequestBackend
 from athanore.events.bus import EventBus
 from athanore.events.model import Event
 from athanore.events.names import EventName
@@ -91,6 +92,7 @@ class Engine:
         store: Store,
         bus: EventBus,
         *,
+        requests: RequestBackend | None = None,
         tick: float = DEFAULT_TICK,
     ) -> None:
         self.settings = settings
@@ -101,6 +103,16 @@ class Engine:
         #: wants of it is ``subscribe`` (the SSE feed, T046), and the
         #: store's half of it is the half this attribute is not for.
         self.bus = bus
+        #: The one :class:`~athanore.requests.service.RequestService` of
+        #: this process, or ``None``. It arrives from the composition root
+        #: rather than being built here because ``athanore.requests`` is
+        #: this package's sibling and neither may import the other (02
+        #: §Layering) — the engine states the shape it needs
+        #: (:class:`~athanore.engine.services.RequestBackend`) and the
+        #: host that builds both hands it over. Without it every attempt
+        #: gets a request port whose methods raise, which is what an
+        #: engine that cannot ask anybody anything should do.
+        self.requests = requests
         self.pools = PoolRegistry()
         self.graphs: dict[str, Graph] = {}
         self.live = LiveRegistry()

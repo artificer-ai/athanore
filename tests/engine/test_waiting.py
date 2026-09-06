@@ -91,6 +91,9 @@ class Fleet:
         self.pools = PoolRegistry()
         for name, capacity in pools.items():
             self.pools.add(Pool(name, capacity=capacity))
+        # No request service: these tests drive `lease.released()` with a
+        # request id directly rather than through the port (T032).
+        self.requests = None
         self.scheduler = Scheduler(self, tick=tick)
 
     def notify(self) -> None:
