@@ -50,10 +50,15 @@ members = ["examples"]
 # workspace's environment (D67).
 exclude = ["driver"]
 
+# The SPA build output is git-ignored but ships in the wheel (14). It is
+# declared here rather than under `targets.wheel` because `uv build`
+# builds the wheel from the sdist: a file the sdist drops can never reach
+# the wheel, and `.gitignore`'s `athanore/web/dist/*` drops all of them.
+[tool.hatch.build]
+artifacts = ["athanore/web/dist/**"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["athanore"]
-# The SPA build output is git-ignored but ships in the wheel (14).
-artifacts = ["athanore/web/dist/**"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -28,6 +28,13 @@ athanore.db-wal
 
 # Frontend (T007 onward). The wheel ships athanore/web/dist via hatch
 # `artifacts`, so the build output is ignored but the directory is not.
+# pnpm resolves the workspace root from pnpm-workspace.yaml, so it writes
+# a node_modules/ beside it as well as in web/; the checkout is also
+# where pnpm parks its content-addressable store, because the store it is
+# configured with in the dev container is on a different filesystem from
+# the bind-mounted worktree and hardlinks cannot cross it.
+/node_modules/
+/.pnpm-store/
 web/node_modules/
 web/dist/
 web/test-results/

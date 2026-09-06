@@ -1,0 +1,7 @@
+# The SPA is the only JavaScript package in the tree (T007). pnpm resolves
+# the workspace root from this file, so `pnpm-lock.yaml` and the shared
+# `node_modules/` store live beside it and `pnpm -C web <cmd>` means the
+# same thing from the repository root, from `web/`, and inside the dev
+# container.
+packages:
+  - "web"
