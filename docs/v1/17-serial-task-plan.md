@@ -1035,7 +1035,8 @@ list without one; the same fan-out with shuffled body delays yields an
 identical `output`.
 **Done.** Tests pass; no `output` assertion depends on finish order.
 
-**Status.** Done, in T024's run (above, D102). The completion check runs
+**Status.** Done, in T024's run (above, D102); dispatched a second time on
+`feat/T024c`, which lands no implementation (D106). The completion check runs
 on quiescence rather than on "no transitions": the branch that leaves a
 join short is one that *did* transition, so a check gated on terminality
 would miss exactly the deadlock 03 invariant 4 names (D102). `completed`
