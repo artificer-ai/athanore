@@ -570,6 +570,16 @@ two statuses and clears the token hash; `terminal_tasks` ordering by
 branch index path.
 **Done.** Tests pass.
 
+**Status.** Done. `enqueue` takes `created` because the engine owns the
+clock: a retry passes the failed attempt's value, and `created DESC` is
+the dispatch order's last tiebreaker. `set_status` deliberately writes no
+timestamp — `finish` is the one call that ends an attempt — and
+`by_token_hash` is a lookup, not an authorisation: whether the attempt is
+still live is T043's check. `terminal_tasks` sorts on the frame index
+path in Python, because a path through a JSON array has no index either
+backend can use, and `reset_for_recovery` is a startup sweep across every
+run (D91).
+
 ### T015a — `TaskRepo.claim_ready` (A1.4, D38, D41)
 
 **Do.** `claim_ready(limit, workflows) -> list[ClaimedTask]` where
@@ -590,6 +600,17 @@ clear text absent from the row; second `claim_ready` returns nothing;
 `queued → running` flagged once; paused runs are never claimed.
 **Done.** Tests pass; `tests/test_priority.py` still exists (its API
 half is ported in T044a).
+
+**Status.** Done. Built inside T015's run, on `feat/T015`, as one commit
+with it (D91, the precedent of D88); do not submit it again. The select
+is 04 §Dispatch order transcribed, and the two `CASE` expressions are not
+redundant next to `explicit DESC`: that split is what keeps either
+group's order off the backends' disagreement about where `NULL` sorts.
+The PostgreSQL lock is `FOR UPDATE OF tasks SKIP LOCKED`, and the
+`UPDATE` is one statement per id — a token per attempt means a different
+hash per row — with `AND status = 'ready'` as the claim. 07 §Repositories
+is updated to match. The PostgreSQL leg was not run: that container has
+no docker socket (D90).
 
 ### T016 — Repositories part 3: requests and answers (A1.3)
 
