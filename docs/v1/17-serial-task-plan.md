@@ -961,7 +961,8 @@ dead-letter on attempt 1 and fail the run; the third failure of a
 records nothing; the failure log line is present with `kind=failure`.
 **Done.** Tests pass.
 
-**Status.** Done, in T024's run (above, D102). The `except` arm catches
+**Status.** Done, in T024's run (above, D102); dispatched a second time on
+`feat/T024a`, which lands no implementation (D104). The `except` arm catches
 `Exception` with `CancelledError` re-raised above it, so a cancelled
 attempt writes no status at all — the test asserts the row is untouched,
 not merely that nothing escaped. `retries=0` means no retry rather than
