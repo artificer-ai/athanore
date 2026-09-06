@@ -1495,6 +1495,18 @@ and no valid submission); `repair_prompt(ctx, turn) -> str` quoting
 latest; repair prompt contains the last errors.
 **Done.** Tests pass.
 
+**Status.** Done. 19 §Repair turn is rendered line for line — each
+stand-in line becomes its value, which is why the sentence after the
+rejected payload opens on a lone `.` — and the test reads both blocks
+out of the document. `ctx.last_rejection` is `{errors, schema, payload}`:
+`reject()`'s record plus the payload 19 quotes back, which events do not
+carry (D120). `validate_submission` projects pydantic's errors onto 18's
+three fields itself, so the agent and the operator are shown the same
+ones without `agents` reaching `engine.services`. `attach` and
+`needs_repair` re-validate the stored latest rather than trusting it: a
+body that runs two agents in sequence declares a different model for
+each.
+
 ### T036 — Stats: provider protocol and the entry recorder (A2.6, D27, D46)
 
 **Do.** `athanore/agents/stats.py`: `class SessionStats(BaseModel)`
