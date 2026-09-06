@@ -34,13 +34,18 @@ in the package that writes the clear-text token into text at all (12
 §Task tokens). The substitution is a single pass for the same reason: a
 value that lands in the prompt is never re-scanned for placeholders.
 
-**One tier is implemented here, and it is the fallback one.** 05 §Tooling
-tiers gives an agent three ways to reach its task; ``http`` — the curl
-lines — is the one that always works and the one the base class has,
-because ``tooling`` is an :class:`ACPAgent` attribute and the tier is
-chosen from what a session advertises (T039b). The assembly is a list of
-sections joined by a blank line precisely so that the tier block is one
-entry in it.
+**The tiers are text here; the choice between them is not.** 05 §Tooling
+tiers gives an agent three ways to reach its task, and all three blocks
+of 19 live here — ``http``'s curl lines, and the one sentence naming the
+tools that ``mcp`` and ``native`` share. Which one is sent is
+:class:`~athanore.agents.acp.ACPAgent`'s: ``tooling`` is its attribute
+and ``auto`` is answered by what a session advertises, so
+``render_prompt`` takes the tier as an argument and defaults to the one
+that always works. The assembly is a list of sections joined by a blank
+line precisely so that the tier block is one entry in it — and so that
+in the tool tiers, where the token is not in the prompt at all, the ask
+and submission blocks can be a different entry rather than a variant of
+the same one.
 """
 
 from __future__ import annotations
@@ -59,16 +64,26 @@ from athanore.logging import get_logger
 
 _log = get_logger(__name__)
 
+#: The three ways an agent reaches its task (05 §Tooling tiers, D63).
+#: ``http`` is the fallback and the only one this module can pick on its
+#: own; ``mcp`` and ``native`` are chosen by :class:`ACPAgent
+#: <athanore.agents.acp.ACPAgent>` from what a session advertises.
+Tier = Literal["http", "mcp", "native"]
+
 __all__ = [
     "Agent",
     "AgentError",
     "AgentResult",
+    "Tier",
     "ask_instructions",
     "http_tier",
     "kickoff",
     "run_title",
     "submission_instructions",
+    "submission_tool_line",
     "task_base",
+    "tier_block",
+    "tool_tier",
 ]
 
 
@@ -175,13 +190,16 @@ class Agent:
             ctx.output_model, ctx.ask_policy, ctx.last_rejection = previous
 
     async def render_prompt(
-        self, prompt: str = "", ctx: TaskContext | None = None
+        self,
+        prompt: str = "",
+        ctx: TaskContext | None = None,
+        tier: Tier = "http",
     ) -> str:
         """The full text handed to the agent (19 §Assembly).
 
         Sections, joined by a blank line: the system prompt, ``---``, the
         assignment, ``---``, then the task sections — the tool-agnostic
-        kickoff, the ``http`` tier block, the ask block when
+        kickoff, the block for ``tier``, the ask block when
         ``ask_policy == "http"`` and the submission block when an
         ``output_model`` is declared.
 
@@ -189,6 +207,20 @@ class Agent:
         separator**: no assignment heading without an assignment, and no
         leading ``---`` on an agent that carries no system prompt. With
         neither, the assignment is sent alone (19 §Assembly).
+
+        ``tier`` changes three of those sections at once, because it
+        changes what the agent is being told to *use*. In ``http`` the
+        four capabilities are curl lines, so the ask and submission
+        blocks are curl lines too and the token is in their header. In
+        ``mcp`` and ``native`` they are tools: the tier block names them,
+        the ask block is dropped (the tool's own description carries it),
+        the submission block becomes one line pointing at the tool's input
+        schema — and **the token is not in the prompt at all**, because it
+        travels in the MCP header or the child's environment instead (05
+        §Tooling tiers, 12 §Task tokens). The default is ``http``: it is
+        the tier that always works, and the only one a base
+        :class:`Agent` can pick, since the other two are negotiated over a
+        session this class knows nothing about.
 
         It is a coroutine because of one word in 19's kickoff: the run's
         title, which is a row in the store and reaches an agent façade the
@@ -211,14 +243,19 @@ class Agent:
             )
             return "\n\n".join(sections)
 
+        asking = self.ask_policy == "http"
         if sections:
             sections.append("---")
         sections.append(kickoff(ctx, await run_title(ctx)))
-        sections.append(http_tier(ctx))
-        if self.ask_policy == "http":
+        sections.append(tier_block(ctx, tier, ask=asking))
+        if tier == "http" and asking:
             sections.append(ask_instructions(ctx))
         if self.output_model is not None:
-            sections.append(submission_instructions(ctx, self.output_model))
+            sections.append(
+                submission_instructions(ctx, self.output_model)
+                if tier == "http"
+                else submission_tool_line()
+            )
         return "\n\n".join(sections)
 
 
@@ -253,14 +290,56 @@ def kickoff(ctx: TaskContext, title: str) -> str:
     )
 
 
+def tier_block(ctx: TaskContext, tier: Tier, *, ask: bool) -> str:
+    """The one tier-specific section of 19: *how* the four capabilities work.
+
+    ``http`` is the curl lines; ``mcp`` and ``native`` are the same list
+    of tools, because the agent calls them the same way whether the
+    server is ours (``mcp``) or its harness's (``native``) — the tier
+    picks who provides them, not what they are called (05 §Tooling
+    tiers).
+    """
+
+    if tier == "http":
+        return http_tier(ctx)
+    return tool_tier(ask=ask)
+
+
 def http_tier(ctx: TaskContext) -> str:
     """The ``http`` tier block: how to read the task and append to the log.
 
-    The fallback tier, and the only one the base class has — ``mcp`` and
-    ``native`` are chosen from what an ACP session advertises (T039b).
+    The fallback tier, and the only one the base class picks on its own —
+    ``mcp`` and ``native`` are chosen from what an ACP session advertises
+    (05 §Tooling tiers).
     """
 
     return _fill(_HTTP_TIER, base=task_base(ctx), token=ctx.token)
+
+
+def tool_tier(*, ask: bool) -> str:
+    """The ``mcp`` / ``native`` tier block: the tools, named (19).
+
+    No placeholders, and that is the point: an agent in these tiers is
+    told what it has, not where to send a token. ``ask`` is
+    ``ask_policy == "http"`` and drops ``ask_operator`` and ``wait_answer``
+    from the list when it is off — an agent that cannot open a request
+    must not be shown a tool for it, and the endpoint behind it would
+    refuse anyway (19 §Tier block).
+    """
+
+    return _TOOL_TIER if ask else _TOOL_TIER.replace(_TOOL_TIER_ASK, "")
+
+
+def submission_tool_line() -> str:
+    """19's one-line submission instruction for the tool tiers.
+
+    The schema is not repeated here: ``submit_result``'s input schema
+    **is** the node's ``output_model`` schema (05 §Tooling tiers), so the
+    model already has it as a tool definition and a second copy in the
+    prompt would be one more thing to drift.
+    """
+
+    return _SUBMIT_TOOL
 
 
 def ask_instructions(ctx: TaskContext) -> str:
@@ -336,6 +415,30 @@ _HTTP_TIER = (
     "Append your deliverable with:\n"
     "curl -sS -X POST {base}/log -H 'Content-Type: application/json' "
     "-H 'X-Athanore-Token: {token}' -d '{\"text\": \"<text>\"}'"
+)
+
+#: 19 §Tier block: ``mcp`` and ``native``. One sentence naming the four
+#: capabilities as tools, with no ``{base}`` and no ``{token}`` in it —
+#: which is the tier's whole point (12 §Task tokens).
+_TOOL_TIER = (
+    "You have these tools for your task: get_task (read it), append_log "
+    "(your deliverable), submit_result (your structured result, when one "
+    "is required), ask_operator and wait_answer (only if you genuinely "
+    "need something from the human operator — sparingly)."
+)
+
+#: The clause of :data:`_TOOL_TIER` that 19 removes when ``ask_policy``
+#: is off. Stated as the substring rather than as a second copy of the
+#: sentence, so the two variants cannot drift apart.
+_TOOL_TIER_ASK = (
+    ", ask_operator and wait_answer (only if you genuinely need something "
+    "from the human operator — sparingly)"
+)
+
+#: 19 §Tier block: what replaces the submission instructions in the
+#: ``mcp`` and ``native`` tiers.
+_SUBMIT_TOOL = (
+    "When you have finished, call submit_result; its schema is the tool's input schema."
 )
 
 #: 19 §Ask instructions. Only with ``ask_policy="http"``.

@@ -1652,6 +1652,25 @@ subclass's command; permission with reject-first order picks
 `allow_once`.
 **Done.** Tests pass.
 
+**Status.** Done. `ACPClient` transcribes, counts and delegates, and does
+nothing else: the mapping of 05 onto the four chunk kinds, the two
+questions handed to T038's policies, and `fs/*` / `terminal/*` answering
+`method_not_found` — spelled out rather than inherited from the SDK's
+protocol stubs, which would answer `null` and read to an adapter as "it
+worked". A policy failure raised inside a callback is **recorded on the
+client and re-raised by `run()`**: the SDK turns it into a JSON-RPC error
+to the agent, which is exactly how 20 §Finding 1 stayed invisible (D124).
+Config options resolve by category, a rejection *and* a category the
+agent does not advertise are both a WARNING and a `notice` chunk, and the
+timeout scopes the whole conversation rather than one `prompt` call.
+Landing this needed four things the file list did not name: `athanore.
+__version__` (05 requires the real one in `initialize`), a lock in
+`StreamService.append` (the SDK dispatches every `session/update` as its
+own task, so the `seq` counter raced), the fake advertising `{value,
+name}` selectable values (the SDK's own spelling; the old one was
+silently dropped by `skip_invalid_items`), and the sixth `ignore_imports`
+entry. All in D124.
+
 ### T039a — `ACPAgent.run()`: repair loop, outcome mapping, cleanup, stats once (A2.4, A2.6)
 
 **Do.** Continue `run()`: repair loop (`needs_repair` → send
@@ -1673,6 +1692,23 @@ failure, timeout, refusal, and shutdown-cancel.
 **Done.** `tests/test_permissions.py`, `test_elicitation.py`,
 `test_acp_stats.py` deleted; `tests/fake_acp.py` deleted.
 
+**Status.** Done. The rest of `run()`: a repair loop bounded by
+`max_repair_turns` that emits `submission.repair` through a new
+`SubmissionService.repair` (`EventPort.publish` is user land's, restricted
+to the `plugin.` namespace), the outcome mapping — `refusal` /
+`cancelled` / truncated returned as a failed result, timeout / transport /
+`no_submission` raised — and a `finally` that flushes the transcript,
+closes the connection, terminates then kills the child, and records
+exactly one stats entry. It **flushes rather than closes** the
+transcript: the runner owns its lifetime and a body may run two agents in
+sequence (D124). ACP `usage` is summed over the turns of a run, and ACP's
+own `max_tokens` counts as truncation beside the provider's
+`final_stop_reason == "length"`. `tests/agents/test_acp_outcomes.py` runs
+the five exits of 05 — success, refusal, timeout, no-submission,
+shutdown-cancel — and asserts one `[stats]` line each, with
+`returncode is not None` on the two that kill the child. Deleting the MVP
+files has nothing to delete (D65); their ledger rows are ticked.
+
 ### T039b — Tooling tiers in the façade (A2.10, D63)
 
 **Do.** `ACPAgent.tooling` attribute; in `run()` read `initialize`'s
@@ -1692,6 +1728,22 @@ endpoint; no advertisement → `http` tier with the curl block; prompt
 contains no token in `mcp`/`native`; the athanore-server permission
 request is auto-allowed while a filesystem one still asks.
 **Done.** Tests pass.
+
+**Status.** Done. `tooling` is an attribute, `auto` reads
+`initialize`'s `mcpCapabilities`, and the three blocks of 19 live in
+`agents/base.py` beside the other three — `render_prompt` takes the tier
+and the choice belongs to `ACPAgent`, which is the only thing that has
+seen a session. In `mcp` and `native` the submission block collapses to
+19's one line, the ask block is dropped (the tool's description carries
+it), `ask_operator` and `wait_answer` leave the tool list together when
+the policy is off, and **the token is not in the prompt at all** —
+asserted over the whole rendered text, for both tiers. The permission
+exemption matches the tool call's title against three namespace
+spellings of the server's own name (D124), so a filesystem call still
+opens a request and still blocks the turn. `tests/agents/test_tooling.py`
+drives the `mcp` tier end to end: the fake connects to the server it was
+handed with the real `mcp` client, and `append_log` and `submit_result`
+reach the task over the agent HTTP API — one substrate, three adapters.
 
 ### T040 — Pi stats provider in `examples/` and the remaining agent tests (A2.8, A2.9)
 

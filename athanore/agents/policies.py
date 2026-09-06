@@ -31,6 +31,13 @@ task to open a request against — warns and falls back to ``auto_allow``,
 because there is nobody to escalate to and, where that happens, the
 container is the guardrail (05 §User-land adapters).
 
+**One exemption, by name.** A tool call on the ``athanore`` MCP server —
+the agent reading its own task, appending to its own log — is allowed
+under ``ask`` without opening a request (:func:`names_athanore_server`,
+05 §Tooling tiers). It is the agent talking to us, the transcript still
+records the call, and a question per log append is a question nobody
+reads. It is that server by name and nothing else.
+
 **The tool-call summary is bounded.** A permission request carries what
 the operator needs to decide — the title, the tool kind, and the raw
 input the agent is about to run with — and a tool call's raw input can be
@@ -69,6 +76,7 @@ __all__ = [
     "DEFAULT_TOOL_TITLE",
     "Elicited",
     "ElicitationAgent",
+    "MCP_SERVER_NAME",
     "PermissionAgent",
     "PermissionOptionLike",
     "RAW_INPUT_CHARS",
@@ -76,6 +84,7 @@ __all__ = [
     "ToolCallLike",
     "ask_allowed",
     "choose_by_kind",
+    "names_athanore_server",
     "option_dict",
     "resolve_elicitation",
     "resolve_permission",
@@ -93,6 +102,20 @@ REJECT_KINDS = ["reject_once", "reject_always"]
 
 #: How much of a tool call's raw input a permission request carries.
 RAW_INPUT_CHARS = 500
+
+#: The name the ``mcp`` tier registers the task server under on
+#: ``session/new`` (05 §Tooling tiers). One constant, because the
+#: permission exemption below is "that server, by this name".
+MCP_SERVER_NAME = "athanore"
+
+#: How an adapter spells "a tool on the ``athanore`` server" in the title
+#: of a permission request. ``mcp__<server>__<tool>`` is the MCP tool-name
+#: convention; the other two are the separators adapters use instead.
+_MCP_NAMESPACES = (
+    f"mcp__{MCP_SERVER_NAME}__",
+    f"{MCP_SERVER_NAME}__",
+    f"{MCP_SERVER_NAME}:",
+)
 
 #: The prompt of a permission request whose tool call has no title.
 DEFAULT_TOOL_TITLE = "tool call"
@@ -277,6 +300,29 @@ def tool_call_summary(tool_call: ToolCallLike) -> dict[str, Any]:
     return summary
 
 
+def names_athanore_server(tool_call: ToolCallLike) -> bool:
+    """Whether this tool call is the agent talking to **our** MCP server.
+
+    The exemption of 05 §Tooling tiers, and it is deliberately by name:
+    ``new_session`` was handed a server called :data:`MCP_SERVER_NAME`
+    and nothing else is exempt — not another MCP server, not a tool that
+    happens to be called ``append_log``.
+
+    What a permission request carries about a tool call is a
+    human-readable ``title``, so that is what is read, and the
+    namespacing an adapter puts in front of the tool name is what
+    identifies the server. The three spellings in
+    :data:`_MCP_NAMESPACES` are the ones adapters use — ``mcp__athanore__
+    append_log`` (the MCP tool-name convention Claude Code follows),
+    ``athanore__append_log`` and ``athanore:append_log``. A title that
+    merely *mentions* athanore does not match: the name has to be the
+    namespace the tool is called through.
+    """
+
+    title = (tool_call.title or "").strip()
+    return any(title.startswith(prefix) for prefix in _MCP_NAMESPACES)
+
+
 async def resolve_permission(
     agent: PermissionAgent,
     ctx: TaskContext | None,
@@ -298,6 +344,14 @@ async def resolve_permission(
     that nobody answered it and the engine chose — which is the one thing
     a silently defaulted permission never showed in the MVP.
 
+    ``ask`` has one exemption and it is narrow: a tool call on the
+    **athanore MCP server** is answered ``allow_once`` without opening a
+    request (:func:`names_athanore_server`, 05 §Tooling tiers). Asking an
+    operator whether the agent may append to its own work log is noise
+    that arrives once per tool call and trains them to answer without
+    reading; the tool call is still in the transcript. Any other server,
+    and any other tool, still asks.
+
     Raises :exc:`~athanore.agents.base.AgentError` when the policy cannot
     be honoured: no option of the wanted kind, or a policy value that is
     not one of the three. Both are the failure D10 exists to make loud.
@@ -313,6 +367,12 @@ async def resolve_permission(
             f"unknown permission_policy {policy!r}: expected 'ask', "
             "'auto_allow' or 'auto_deny'"
         )
+    if names_athanore_server(tool_call):
+        _log.debug(
+            "permission for the athanore tool server allowed without asking",
+            title=tool_call.title,
+        )
+        return _picked(options, ALLOW_KINDS, "auto_allow")
     if ask_allowed(ctx):
         return await _ask_permission(agent, ctx, tool_call, options)
 

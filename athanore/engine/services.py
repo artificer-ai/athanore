@@ -60,7 +60,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
 from contextlib import asynccontextmanager, suppress
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Literal, Protocol, cast
 
 from athanore.engine.pools import Lease, PoolState
 from athanore.events.model import Event
@@ -70,6 +70,7 @@ from athanore.events.payloads import (
     LogAppended,
     SubmissionAccepted,
     SubmissionRejected,
+    SubmissionRepair,
     TaskResumed,
     TaskStream,
     TaskWaiting,
@@ -309,6 +310,7 @@ class StreamService:
         self._seq: int | None = None
         self._flusher: asyncio.Task[None] | None = None
         self._flushing = asyncio.Lock()
+        self._appending = asyncio.Lock()
         self._closed = False
 
     async def append(self, kind: ChunkKind | str, text: str) -> int:
@@ -316,9 +318,21 @@ class StreamService:
 
         A coroutine rather than a plain call because the first chunk of an
         attempt is what resolves the counter against the store; every
-        chunk after it appends and returns without awaiting anything. The
-        flusher is started here too, so a body that never streams never
-        has a background task.
+        chunk after it appends and returns without awaiting anything but
+        the lock. The flusher is started here too, so a body that never
+        streams never has a background task.
+
+        **The lock is not optional.** The producer is an ACP client
+        callback and the SDK dispatches every ``session/update`` as its
+        own task (05 §The ACP client), so a turn's chunks arrive
+        concurrently: without it the first several appends all find
+        ``_seq`` unresolved, all read the same ``last_seq`` and all claim
+        the same number — a ``UNIQUE`` violation on ``(task_id, seq)``
+        that fails the whole batch — and the buffer ends up in whatever
+        order the reads happened to finish in. Held across the counter
+        *and* the buffer write, it makes ``seq`` the order the chunks
+        arrived in, which is what ``GET /api/tasks/{id}/stream?after=``
+        pages by (07 §Transcript writes).
         """
         if self._closed:
             raise RuntimeError(
@@ -326,14 +340,34 @@ class StreamService:
                 "the attempt has ended"
             )
         chunk_kind = ChunkKind(kind)
-        if self._seq is None:
-            async with self._store.reader() as reader:
-                self._seq = await reader.stream.last_seq(self._task_id)
-        self._seq += 1
-        self.buffer.append((self._seq, str(chunk_kind), text))
+        async with self._appending:
+            if self._seq is None:
+                async with self._store.reader() as reader:
+                    self._seq = await reader.stream.last_seq(self._task_id)
+            self._seq += 1
+            seq = self._seq
+            self.buffer.append((seq, str(chunk_kind), text))
         if self._flusher is None:
             self._flusher = asyncio.get_running_loop().create_task(self._flusher_loop())
-        return self._seq
+        return seq
+
+    async def flush(self) -> None:
+        """Write what has accumulated, now, without ending the transcript.
+
+        What an agent façade does on its way out (05 §Session lifecycle,
+        step 7): the last chunks of a finished turn are the ones a reader
+        most wants, and waiting up to ``stream_flush_interval`` for them
+        is a transcript that lags the result the body already has.
+
+        It is not :meth:`close` because the transcript belongs to the
+        **attempt**, not to the agent: the runner closes it in the
+        ``finally`` of every attempt, and a body may run several agents in
+        sequence (``Agent.declare``, 05 §Agent classes) — a façade that
+        closed it would leave the second agent's turn with nowhere to
+        write. Failures are logged rather than raised, like every other
+        flush: an agent run is never failed by its own transcript.
+        """
+        await self._flush_guarded()
 
     async def close(self) -> None:
         """Stop the flusher and write what is left. Idempotent.
@@ -487,6 +521,40 @@ class SubmissionService:
             "errors": [error.model_dump() for error in reported],
             "schema": dict(schema),
         }
+
+    async def repair(
+        self, turn: int, reason: Literal["nothing_submitted", "rejected"]
+    ) -> Event:
+        """Announce a repair turn: the façade is asking again (05, 19).
+
+        No row and no transition — a repair turn is the agent façade
+        sending one more prompt on the same session because no valid
+        submission is stored (05 §Session lifecycle, step 5), and the
+        event is the whole record of it. It lives here rather than on
+        :class:`EventPort` because ``publish`` is user land's, restricted
+        to ``plugin.<workflow>.<name>``: everything in the rest of the
+        vocabulary is emitted by the code that owns the fact, and the
+        fact here is a submission that is missing.
+
+        ``turn`` is the 1-based repair counter and ``reason`` is which of
+        19's two texts was sent — ``rejected`` when a 422 is being quoted
+        back, ``nothing_submitted`` when the agent submitted nothing at
+        all.
+        """
+        if turn < 1:
+            raise ValueError(f"a repair turn is counted from 1, not {turn}")
+        event = Event(
+            run_id=self._run_id,
+            task_id=self._task_id,
+            name=EventName.submission_repair,
+            data=SubmissionRepair(
+                node=self._node, turn=turn, reason=reason
+            ).model_dump(),
+            created=now(),
+        )
+        async with self._store.uow() as uow:
+            uow.emit(event)
+        return event
 
 
 class RunService:

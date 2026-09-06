@@ -468,7 +468,7 @@ async def test_session_new_advertises_pis_two_config_options_by_default() -> Non
         handshake = await client.handshake()
     options = handshake["session"]["configOptions"]
     assert [option["category"] for option in options] == ["model", "thought_level"]
-    assert options[0]["currentValue"] == options[0]["options"][0]["id"]
+    assert options[0]["currentValue"] == options[0]["options"][0]["value"]
 
 
 async def test_config_options_are_advertised_and_settable() -> None:
@@ -482,7 +482,7 @@ async def test_config_options_are_advertised_and_settable() -> None:
     advertised = handshake["session"]["configOptions"][0]
     assert advertised["id"] == "llm"
     assert advertised["category"] == "model"
-    assert [choice["id"] for choice in advertised["options"]] == ["a", "b"]
+    assert [choice["value"] for choice in advertised["options"]] == ["a", "b"]
     assert result["configOptions"][0]["currentValue"] == "b"
 
 
