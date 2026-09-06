@@ -1275,6 +1275,25 @@ unchanged (move the MVP's light validator from `agents.py`/`human.py`).
 rejected; error `loc` paths for nested objects.
 **Done.** Tests pass.
 
+**Status.** Done. Both modules land as pure functions of their inputs —
+no store, no bus, nothing to await — so T031 has the vocabulary it
+refuses answers with and the two callables a `form` request registers.
+`errors.py` carries the five refusals under a `RequestError` base (v0's
+`AnswerError` role), each documenting the status and code T042 maps it
+onto; `InvalidAnswer.errors` is always a list. `validators.py` keeps
+`loc` a **tuple path** in both validators, pydantic's own for
+`pydantic_validator` (narrowed to `loc`/`msg`/`type`) and built the same
+way by `json_schema_validator`, whose codes are pydantic's where one
+exists (`missing`, `extra_forbidden`, `enum`, `too_short`, `too_long`,
+`greater_than_equal`, `less_than_equal`, `string_pattern_mismatch`) and
+`type` for a type mismatch, single or union. The subset is closed: an
+unsupported keyword, an unknown type name and a non-object subschema all
+constrain nothing rather than refusing the answer (D114), and
+`tests/requests/test_validators.py` asserts each of the three. A wrong
+type is reported once instead of cascading through the keywords that
+could not apply, and a keyword only constrains the type it applies to,
+as in JSON Schema proper.
+
 ### T031 — Requests service (A2.1)
 
 **Do.** `athanore/requests/service.py`: `class RequestService(store, bus)`
