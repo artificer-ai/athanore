@@ -1068,6 +1068,17 @@ tasks run one after the other; `capacity=0` pool never claims; `notify()`
 wakes before the tick; `stop()` cancels a running body.
 **Done.** Tests pass.
 
+**Status.** Done. The loop takes a pool's free slots *before* it claims and
+releases the surplus, so a claimed row can never turn out to have no slot to
+run in; `run.started` stays the runner's, on the task the claim flagged, so
+one is published however many of a run's tasks were claimed together; `tick`
+is a constructor argument, not a setting; and `stop()` stops claiming before
+it cancels, which is 04 §Shutdown step 1 (all four: D107). The attempts are
+held twice — by task id for `cancel_attempts`, by asyncio task for the reap —
+so a row re-dispatched under a live attempt cannot cost the pool a slot
+(D107). A failure in a pool's dispatch is logged and the pools after it still
+get their turn.
+
 ### T026 — Lease release for waiting bodies (A1.8, 04 §Waiting)
 
 **Do.** Implement `LeaseService.released()` in `services.py`: on enter,
