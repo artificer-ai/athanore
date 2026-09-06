@@ -24,8 +24,8 @@ that is the primary way an operator finds anything.
    when active); a `/` filter input; grid rows using the mock's column
    template — RUN (8-char id) · WORKFLOW · TITLE · STATUS pill · NODE
    (with `⚠` when `pending_requests > 0`) · AGE; zebra striping; the
-   selected-row treatment (accent gradient, 2 px left border, inset
-   glow); a footer strip reading `n shown · ↑↓ select · ⏎ focus detail`;
+   selected-row treatment (a flat `color-mix(accent 12%, surface)` tint
+   and a 2 px accent left border — no gradient, no glow); a footer strip reading `n shown · ↑↓ select · ⏎ focus detail`;
    and the collapsed rail `RUNS n`.
 2. Selection writes `?run=` — the URL is the state.
 3. Header: `n runs · ● k active`, pulsing only when `k > 0`.

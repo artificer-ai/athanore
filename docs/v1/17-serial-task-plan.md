@@ -1531,7 +1531,7 @@ reconnect uses `after=lastId`; `resync` clears the cache.
 when on), `/` filter input (client-side over title/id), grid rows with
 the mock's column template (RUN 8-char id · WORKFLOW · TITLE · STATUS
 pill · NODE (+ `⚠` when `pending_requests > 0`) · AGE), zebra, selected
-row treatment (accent gradient, 2 px left border, inset glow), footer
+row treatment (flat accent tint, 2 px accent left border), footer
 strip `n shown · ↑↓ select · ⏎ focus detail`, collapsed rail `RUNS n`.
 Selection writes `?run=`. Header: `n runs · ● k active` with pulse only
 when `k > 0`. `useRuns()` from the generated query options, invalidated

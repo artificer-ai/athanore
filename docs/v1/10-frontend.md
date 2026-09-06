@@ -54,8 +54,8 @@ which is simpler and reads better for pipelines with loop-backs (see
 - **Run list** (left, default 540 px, drag-resizable 260 px to
   `window − 340`, collapsible with `b` to a 30 px vertical rail reading
   `RUNS n`): grid columns RUN · WORKFLOW · TITLE · STATUS · NODE · AGE.
-  Selected row gets the accent gradient, 2 px accent left border, and an
-  inset glow. Footer strip: `n shown · ↑↓ select · ⏎ focus detail`.
+  Selected row gets a flat accent tint (`color-mix(accent 12%, surface)`)
+  and a 2 px accent left border. Footer strip: `n shown · ↑↓ select · ⏎ focus detail`.
 - **Detail** (right): pane bar with the collapse toggle, `◀ PANE (i/n) ▶`,
   one 14×3 px dot per pane (accent = current, accent-800 = plugin pane,
   neutral-800 = builtin), then `run <id>` and a status pill.
