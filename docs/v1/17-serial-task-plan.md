@@ -408,6 +408,10 @@ receives `run.created` but not `task.started`; overflow flag set when
 `maxsize=1` and two events published; `close()` stops delivery;
 `wait_for` returns the first matching event and raises `TimeoutError`.
 **Done.** Tests pass.
+**Status.** Done. `publish` is a plain function and a ticker task
+alongside it asserts it never yields to the loop, which is the property
+the drop-on-full exists for. `wait_for`'s `timeout` carries a `noqa`
+for ASYNC109 — owning the timeout is what the convenience is (D85).
 
 ### T013a — `Store`, `UnitOfWork`, outbox (A1.2)
 
