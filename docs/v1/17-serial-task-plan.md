@@ -857,6 +857,19 @@ row and emits `log.appended` with the task id; `events.publish("task.
 done", …)` is rejected.
 **Done.** Tests pass.
 
+**Status.** Done. Each service owns the transaction for its own verb, so
+a `uow` block in `services.py` contains exactly its own writes and never
+spans the body. `events.publish` refuses three things, not one: a name
+outside `plugin.`, a plugin name that is not `plugin.<workflow>.<name>`
+with identifier segments, and one naming a *different* workflow — the
+last is 18 §Plugins' rule, and the publish path is the only place it is
+enforced at runtime (D99). `submissions.reject(errors, schema)` returns
+the `{errors, schema}` record the endpoint answers 422 with and stores
+as `ctx.last_rejection` (T045), which is what gives its `schema`
+argument a job. `TaskServices.requests` takes an injected port and
+defaults to an `UnwiredRequests` whose every method raises until T032,
+for the reason `lease.released()` raises until T026.
+
 ### T023a — `StreamService` flusher (A1.10, 07 §Transcript writes)
 
 **Do.** `StreamService` in `services.py`: in-memory `buffer: list[(seq,
@@ -872,6 +885,16 @@ the next tick, never raised into the body.
 remainder; seq continues after a restart (`last_seq`); the ephemeral
 event never appears in `events`.
 **Done.** Tests pass.
+
+**Status.** Done, in T023's run on `feat/T023` (D100). `append` is a
+coroutine and starts the flusher itself,
+so the service needs no lifecycle call but `close()`: the first chunk of
+an attempt is what reads `last_seq` and resolves the counter, and a body
+that never streams never has a background task (D100). The buffer is
+trimmed only after the transaction has committed, and `close()` waits out
+an in-flight flush under a lock before it cancels the flusher, because
+`seq` is unique per task and a batch that committed while still buffered
+would be written twice.
 
 ### T024 — Runner: attempt lifecycle and the success path (A1.9)
 

@@ -344,7 +344,7 @@ against the declared `output_model` and checks `ask_policy` for `/ask`
 (the MVP's `scheduler.context_for`).
 
 `TaskServices` is the narrow surface bodies and façades use instead of the
-raw store: `log.append(text, author=…)`, `stream.append(chunks)`,
+raw store: `log.append(text, author=…)`, `stream.append(kind, text)`,
 `submissions.latest()`, `requests.*` (06), `run.get()`. This is what lets
 `agents` avoid importing `store`.
 
