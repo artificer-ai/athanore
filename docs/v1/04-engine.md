@@ -79,6 +79,7 @@ colour nodes without re-deriving anything.
 | `Transition` | that transition |
 | `EdgeRef` | `Transition(ref.name)` |
 | non-empty list/tuple of refs/transitions | fan-out, one branch each |
+| empty list/tuple (`[]`, `()`) | terminal whatever the node's edges, branch value `[]` (§Routing edge cases) |
 | anything else, node has 0 edges | terminal (branch completes, `value` is the run output when last) |
 | anything else, node has 1 edge | auto-transition carrying `value` as payload |
 | anything else, node has ≥2 edges | `GraphError` (fails the attempt) |
@@ -87,11 +88,16 @@ A transition targeting an undeclared edge is a `GraphError`. Payloads are
 coerced with `jsonable()` (pydantic models → dict, dataclasses → dict,
 unknown → `str`).
 
+A list is a fan-out only when *every* element is an `EdgeRef` or a
+`Transition`. A list with anything else in it is a plain value like any
+other, and takes the "anything else" rows: one edge carries it as the
+payload, two or more are a `GraphError`.
+
 ### Routing edge cases
 
 | Case | Behaviour |
 |---|---|
-| `return []` / `return ()` | Terminal for this branch, exactly like a plain value from a node with no edges; the branch value is `[]`. An empty fan-out is not an error: a stage may legitimately decide there is nothing to split |
+| `return []` / `return ()` | Terminal for this branch, exactly like a plain value from a node with no edges; the branch value is `[]`. This holds whatever the node's edge count: an empty fan-out is not an error and is not the single edge's payload either, because a stage may legitimately decide there is nothing to split |
 | `return [ref]` (one element) | A fan-out of one: identical to `return ref` except for the `task.enqueued` event, which is the same either way. No special case in code |
 | Payload `None` arriving at a node with a payload slot | The slot is bound to `None`; bodies wanting a default write `*, payload=None`. The engine never omits a declared parameter |
 | Payload given to a node with no payload slot | Dropped silently and recorded on the task row (`payload` column) so the timeline shows what was passed. Loop-backs rely on this (`return engineering` after `engineering(deliverable)` earlier) |
