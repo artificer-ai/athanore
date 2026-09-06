@@ -643,6 +643,22 @@ view flags pending vs stale by task status; inbox excludes answered and
 stale; ordinal lookup.
 **Done.** Tests pass.
 
+**Status.** Done. `view` and `list_views` are one statement,
+`view_statement(run_id, pending_only)`: `pending` and `stale` are SQL
+predicates over the outer-joined answer and the inner-joined task, so
+`pending_only` narrows the query rather than the rows already fetched,
+and the run list's `pending_requests` counts by the same rule. `age` is
+finished in Python — the row already carries `created`, and date
+arithmetic in SQL would be a dialect switch buying nothing — with one
+timestamp per call, so every view in a listing is measured against the
+same instant. `RequestView` carries `stale` beside 08's field list and
+folds the answer's two columns into one `answer` (D92). Nothing here
+decides: `answer` lets the double-answer `IntegrityError` out for the
+service to map, and `mark_consumed` records the claim without judging a
+replay. `RequestRepo` joins the `Repos` bundle, so it is reachable as
+`uow.requests` and `reader.requests`. The PostgreSQL leg was not run:
+that container has no docker socket (D90).
+
 ### T017 — Retention job (A1.5)
 
 **Do.** `athanore/store/retention.py`: `async def prune_once(store,

@@ -6,10 +6,12 @@ build, so a repository turns a Core ``Row`` into one of these and hands it
 out: every model is ``frozen=True``, which makes a row a value that cannot
 drift after the connection it came from is closed.
 
-Two of them are not tables. :class:`RunSummary` is a run plus the
+Three of them are not tables. :class:`RunSummary` is a run plus the
 aggregates 08 §Runs lists on the list endpoint, computed by one grouped
 query rather than a per-run loop (07 §Repositories); :class:`RunStats` is
-the total of the per-attempt ``tasks.stats`` entries.
+the total of the per-attempt ``tasks.stats`` entries; and
+:class:`RequestView` is a request joined to its answer and its task, which
+is what the inbox of 08 §Requests reads.
 
 The module imports nothing from ``athanore``: ``store`` is a bottom-tier
 module whose siblings — ``events`` in particular — are independent of it
@@ -347,6 +349,60 @@ class AnswerRow(ReadModel):
     value: Any = None
     consumed: bool = False
     created: datetime
+
+
+class RequestView(ReadModel):
+    """A request, its answer and its task's node, as 08 §Requests shows it.
+
+    Not a table: it is what one join of ``requests ⟕ answers ⟗ tasks``
+    produces, and the read model behind the inbox, a run's request list
+    and the response to answering one.
+
+    The three derived fields are the point of the join:
+
+    - ``pending`` — unanswered, and its task is still ``in_progress`` or
+      ``waiting``, so somebody is actually waiting for the answer.
+    - ``stale`` — unanswered, and its task is not. The attempt that asked
+      is gone (it failed, it was cancelled, or it was recovered into a new
+      row), so nothing will consume an answer to this one. It stays in
+      history and leaves the inbox, which is the distinction 06 §Restart
+      durability draws: agent-raised requests "remain in history as
+      stale".
+    - ``age`` — seconds since ``created``, at the moment the view was
+      read.
+
+    An answered request is neither pending nor stale. ``answer`` is the
+    ``option_id`` of an ``options`` request and the ``value`` of a ``text``
+    or ``form`` one — the shape 08 gives the agent long-poll,
+    ``{answered: true, answer, answered_by}`` — and ``answered_by`` is the
+    field to test for "has an answer at all", because a value of ``None``
+    is one an author could have given.
+
+    ``schema_`` is spelled as it is in :class:`RequestRow`, and for the
+    same reason.
+    """
+
+    model_config = ConfigDict(frozen=True, populate_by_name=True)
+
+    id: int
+    run_id: str
+    task_id: int
+    node: str
+    prompt: str
+    mode: RequestMode
+    source: RequestSource
+    kind: RequestKind
+    options: list[dict[str, Any]] | None = None
+    schema_: dict[str, Any] | None = Field(
+        default=None, validation_alias="schema", serialization_alias="schema"
+    )
+    tool_call: dict[str, Any] | None = None
+    pending: bool
+    stale: bool
+    answer: Any = None
+    answered_by: AnswerAuthor | None = None
+    created: datetime
+    age: float
 
 
 class EventRow(ReadModel):
