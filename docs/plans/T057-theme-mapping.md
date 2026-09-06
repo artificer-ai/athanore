@@ -30,10 +30,15 @@ Extend `gen-theme.mjs`'s output with:
 3. Surfaces: `bg-chrome` =
    `color-mix(in srgb, var(--color-surface) 45%, var(--color-bg))`,
    `bg-zebra` at 60 %.
-4. The `glow-accent` text-shadow utility.
-5. `ath-pulse` keyframes **guarded by `prefers-reduced-motion`** — the
-   guard is part of the deliverable, not a later accessibility pass.
-6. `--radius: 2px`.
+4. `ath-pulse` and `ath-caret` keyframes **guarded by
+   `prefers-reduced-motion`** — the guard is part of the deliverable,
+   not a later accessibility pass.
+
+The mock carries no `text-shadow` glow, no scan or flicker, and no
+`--radius` override (D71): Nocturne's 8 px radius stands. If you find
+yourself adding a glow utility because the mock "looks flat", check
+`docs/v1/design/Athanore.dc.html` — it is the reference, and it does not
+have one.
 
 Then `web/src/dev/Tokens.tsx`, rendering every token and component
 primitive at `/__tokens` in dev only.

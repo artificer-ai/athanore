@@ -47,7 +47,7 @@ which is simpler and reads better for pipelines with loop-backs (see
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-- **Header**: brand mark with accent glow and the version; run count and
+- **Header**: brand mark and the version; run count and
   a pulsing active-count dot; workflow filter chips (accent-tinted when
   selected); a `/` filter input; `＋ new run` (outlined primary);
   `workflows` (neutral outline) opening the library.
@@ -59,11 +59,8 @@ which is simpler and reads better for pipelines with loop-backs (see
 - **Detail** (right): pane bar with the collapse toggle, `◀ PANE (i/n) ▶`,
   one 14×3 px dot per pane (accent = current, accent-800 = plugin pane,
   neutral-800 = builtin), then `run <id>` and a status pill.
-- **Footer**: key-hint chips (accent-tinted keycaps with glow) and the
+- **Footer**: key-hint chips (accent-tinted keycaps) and the
   `^p palette` button.
-- **CRT chrome** (toggle in settings, default on as in the mock): a
-  scanline overlay, a slow scan band, a vignette, and a flicker; all
-  `pointer-events: none`, all disabled under `prefers-reduced-motion`.
 
 ## Panes (cycle order)
 
@@ -149,7 +146,7 @@ task here (move is disabled for join nodes).
 ## Overlays
 
 All overlays are full-screen backdrops (`rgba(10,11,18,.72)`) with a
-surface panel, 1 px neutral-800 border, 2 px radius, `--shadow-lg`.
+surface panel, 1 px neutral-800 border, 8 px radius, `--shadow-lg`.
 `esc` closes any of them.
 
 - **Command palette** (`^p` / `⌘p`): `›` input, then rows of
@@ -243,7 +240,7 @@ attributes.
 - `:focus-visible` is the Nocturne 2 px accent ring everywhere.
 - Colour is never the only status signal: pills carry text, graph rows
   carry glyphs.
-- `prefers-reduced-motion` disables the pulse, caret, scan, and flicker.
+- `prefers-reduced-motion` disables the pulse and the caret.
 - Lighthouse a11y ≥ 95 on the dashboard.
 
 ## Auth in the browser
@@ -276,7 +273,7 @@ Source: `design/nocturne.css` (tokens) and `design/Athanore.dc.html`
 | `--accent` | `color-mix(accent 16%, transparent)` (selected chips, rows) |
 | `--destructive` | `--ath-status-fail` #d9868f |
 | `--ring` | `--color-accent` |
-| `--radius` | 2 px (the app overrides Nocturne's 8 px) |
+| `--radius` | 8 px (Nocturne's default; the app does not override it, D71) |
 | `--chart-1…3` | `--color-accent`, `--color-accent-700`, `--color-accent-2-400` |
 
 ### Status colours
@@ -284,7 +281,7 @@ Source: `design/nocturne.css` (tokens) and `design/Athanore.dc.html`
 | State | Token | Treatment |
 |---|---|---|
 | completed / done | `--ath-status-ok` #8fbfa4 | plain |
-| running / in_progress | `--color-accent-400` | text-shadow glow, `ath-pulse` 1.8 s |
+| running / in_progress | `--color-accent-400` | `ath-pulse` 1.8 s |
 | waiting (gate) | `--ath-status-gate` #d9c184 | plain; `⚠` glyph beside the node |
 | queued / ready | `--color-neutral-400` | plain |
 | failed / dead_letter | `--ath-status-fail` #d9868f | plain, `✗` in the graph |

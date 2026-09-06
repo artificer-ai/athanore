@@ -18,20 +18,18 @@
   a:hover { color: var(--color-accent-200); }
   *::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
   ::-webkit-scrollbar { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-thumb { background: var(--color-neutral-800); border-radius: 2px; }
+  ::-webkit-scrollbar-thumb { background: var(--color-neutral-800); border-radius: 8px; }
   ::-webkit-scrollbar-track { background: transparent; }
   @keyframes ath-pulse { 0%,100% { opacity: 1 } 50% { opacity: .25 } }
   @keyframes ath-caret { 0%,49% { opacity: 1 } 50%,100% { opacity: 0 } }
-  @keyframes ath-scan { 0% { transform: translateY(-12%) } 100% { transform: translateY(112%) } }
-  @keyframes ath-flicker { 0%,96%,100% { opacity: .10 } 97% { opacity: .16 } 98% { opacity: .07 } }
 </style>
 </helmet>
 
 <div style="height: 100dvh; overflow: hidden; display: flex; flex-direction: column; background: var(--color-bg); color: var(--color-text); font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; line-height: 1.5;">
 
-  <header style="position: relative; display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; padding: 8px 14px; border-bottom: 1px solid var(--color-neutral-800); background: linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 55%, var(--color-bg)), var(--color-bg));" style-after="content: ''; position: absolute; left: 48px; right: 48px; bottom: -1px; height: 1px; background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-accent) 75%, transparent), transparent);">
+  <header style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; padding: 8px 14px; border-bottom: 1px solid var(--color-neutral-800); background: linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 55%, var(--color-bg)), var(--color-bg));">
     <div style="display: flex; align-items: baseline; gap: 8px;">
-      <span style="color: var(--color-accent-200); font-weight: 700; letter-spacing: .26em; font-size: 12px; text-shadow: 0 0 12px color-mix(in srgb, var(--color-accent) 70%, transparent);">▚ ATHANORE</span>
+      <span style="color: var(--color-accent-300); font-weight: 700; letter-spacing: .12em; font-size: 12px;">ATHANORE</span>
       <span style="color: var(--color-neutral-500); font-size: 11px;">v0.0.11</span>
     </div>
     <div style="display: flex; align-items: center; gap: 10px; color: var(--color-neutral-500); font-size: 11px; white-space: nowrap;">
@@ -45,12 +43,12 @@
         <button type="button" onClick="{{ f.onClick }}" style="{{ f.style }}" style-hover="border-color: var(--color-accent-600); color: var(--color-accent-200);">{{ f.label }}</button>
       </sc-for>
     </div>
-    <div style="display: flex; align-items: center; gap: 8px; border: 1px solid var(--color-neutral-800); border-radius: 2px; padding: 4px 8px; background: var(--color-surface); min-width: 190px;">
+    <div style="display: flex; align-items: center; gap: 8px; border: 1px solid var(--color-neutral-800); border-radius: 8px; padding: 4px 8px; background: var(--color-surface); min-width: 190px;">
       <span style="color: var(--color-neutral-500);">/</span>
       <input value="{{ query }}" onChange="{{ onQuery }}" placeholder="filter runs" style="background: transparent; border: 0; outline: none; color: var(--color-text); font-family: inherit; font-size: 11px; width: 100%;">
     </div>
     <button type="button" onClick="{{ openNewRun }}" class="btn btn-primary" style="font-family: inherit; font-size: 11px; padding: 4px 10px;" style-hover="background: color-mix(in srgb, var(--color-accent) 14%, transparent);">＋ new run</button>
-    <button type="button" onClick="{{ openLibrary }}" style="font-family: inherit; font-size: 11px; padding: 4px 10px; background: transparent; color: var(--color-neutral-400); border: 1px solid var(--color-neutral-800); border-radius: 2px; cursor: pointer;" style-hover="border-color: var(--color-accent-600); color: var(--color-accent-200);">workflows</button>
+    <button type="button" onClick="{{ openLibrary }}" style="font-family: inherit; font-size: 11px; padding: 4px 10px; background: transparent; color: var(--color-neutral-400); border: 1px solid var(--color-neutral-800); border-radius: 8px; cursor: pointer;" style-hover="border-color: var(--color-accent-600); color: var(--color-accent-200);">workflows</button>
   </header>
 
   <div style="flex: 1; display: flex; align-items: stretch; min-height: 0;">
@@ -93,9 +91,11 @@
 
     <section style="flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0;">
       <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 6px 12px; border-bottom: 1px solid var(--color-neutral-800); background: color-mix(in srgb, var(--color-surface) 45%, var(--color-bg));">
-        <button type="button" onClick="{{ toggleList }}" title="toggle run list (b)" style="background: transparent; border: 1px solid var(--color-neutral-800); border-radius: 2px; color: var(--color-neutral-500); cursor: pointer; font-family: inherit; font-size: 10px; padding: 1px 6px; margin-right: 2px;" style-hover="border-color: var(--color-accent-600); color: var(--color-accent-200);">{{ collapseGlyph }}</button>
+        <sc-if value="{{ listVisible }}" hint-placeholder-val="{{ true }}">
+          <button type="button" onClick="{{ toggleList }}" title="hide run list (b)" style="background: transparent; border: 1px solid var(--color-neutral-800); border-radius: 8px; color: var(--color-neutral-500); cursor: pointer; font-family: inherit; font-size: 10px; padding: 1px 6px; margin-right: 2px;" style-hover="border-color: var(--color-accent-600); color: var(--color-accent-200);">❮</button>
+        </sc-if>
         <button type="button" onClick="{{ prevPane }}" style="background: transparent; border: 0; color: var(--color-accent-400); cursor: pointer; font-family: inherit; font-size: 12px; padding: 0 4px;" style-hover="color: var(--color-accent-200);">◀</button>
-        <span style="color: var(--color-accent-200); font-weight: 500; letter-spacing: .16em; font-size: 11px; white-space: nowrap; text-transform: uppercase; text-shadow: 0 0 10px color-mix(in srgb, var(--color-accent) 60%, transparent);">{{ paneLabel }}</span>
+        <span style="color: var(--color-accent-300); font-weight: 500; letter-spacing: .08em; font-size: 11px; white-space: nowrap;">{{ paneLabel }}</span>
         <button type="button" onClick="{{ nextPane }}" style="background: transparent; border: 0; color: var(--color-accent-400); cursor: pointer; font-family: inherit; font-size: 12px; padding: 0 4px;" style-hover="color: var(--color-accent-200);">▶</button>
         <div style="display: flex; gap: 4px; margin-left: 4px;">
           <sc-for list="{{ paneDots }}" as="d" hint-placeholder-count="5">
@@ -114,7 +114,7 @@
           <div style="display: flex; flex-direction: column;">
             <div style="padding: 12px 14px; border-bottom: 1px solid var(--color-neutral-900);">
               <div style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .14em; margin-bottom: 8px;">STATS</div>
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1px; background: var(--color-neutral-900); border: 1px solid var(--color-neutral-900); border-radius: 2px; overflow: hidden;">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1px; background: var(--color-neutral-900); border: 1px solid var(--color-neutral-900); border-radius: 8px; overflow: hidden;">
                 <sc-for list="{{ sel.metrics }}" as="m" hint-placeholder-count="4">
                   <div style="background: var(--color-surface); padding: 8px 10px;">
                     <div style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .1em;">{{ m.label }}</div>
@@ -126,7 +126,7 @@
                 <sc-for list="{{ sel.tokenBars }}" as="b" hint-placeholder-count="6">
                   <div style="display: grid; grid-template-columns: minmax(0, 84px) minmax(60px, 1fr) minmax(0, 70px); align-items: center; gap: 8px;">
                     <span style="color: var(--color-neutral-500); text-align: right; font-size: 11px;">{{ b.node }}</span>
-                    <span style="height: 8px; background: var(--color-neutral-900); border-radius: 2px; overflow: hidden; display: block;"><span style="{{ b.fill }}"></span></span>
+                    <span style="height: 8px; background: var(--color-neutral-900); border-radius: 8px; overflow: hidden; display: block;"><span style="{{ b.fill }}"></span></span>
                     <span style="color: var(--color-neutral-500); font-size: 11px; text-align: right;">{{ b.count }}</span>
                   </div>
                 </sc-for>
@@ -147,7 +147,7 @@
               <div style="display: grid; grid-template-columns: minmax(60px, 1fr) 34px minmax(0, 80px) minmax(0, 76px) minmax(0, 58px); gap: 6px; color: var(--color-neutral-500); font-size: 10px; letter-spacing: .06em; padding: 0 8px 5px; overflow: hidden;">
                 <span>NODE</span><span>ATT</span><span>STATUS</span><span style="text-align: right;">TOKENS</span><span style="text-align: right;">DUR</span>
               </div>
-              <div style="border: 1px solid var(--color-neutral-900); border-radius: 2px; overflow: hidden;">
+              <div style="border: 1px solid var(--color-neutral-900); border-radius: 8px; overflow: hidden;">
                 <sc-for list="{{ sel.nodeRows }}" as="n" hint-placeholder-count="7">
                   <div style="{{ n.style }}" style-hover="background: var(--color-neutral-900);">
                     <span style="color: var(--color-neutral-300); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ n.node }}</span>
@@ -272,7 +272,7 @@
                 </div>
                 <div style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .14em; margin: 16px 0 8px;">SOURCE</div>
                 <div style="color: var(--color-neutral-500); font-size: 11px; overflow-wrap: anywhere;">workflows/feature_build.py</div>
-                <button type="button" onClick="{{ openLibrary }}" style="margin-top: 10px; background: transparent; border: 1px solid var(--color-neutral-800); border-radius: 2px; color: var(--color-neutral-400); font-family: inherit; font-size: 11px; padding: 4px 8px; cursor: pointer;" style-hover="border-color: var(--color-accent-600); color: var(--color-accent-200);">open definition</button>
+                <button type="button" onClick="{{ openLibrary }}" style="margin-top: 10px; background: transparent; border: 1px solid var(--color-neutral-800); border-radius: 8px; color: var(--color-neutral-400); font-family: inherit; font-size: 11px; padding: 4px 8px; cursor: pointer;" style-hover="border-color: var(--color-accent-600); color: var(--color-accent-200);">open definition</button>
               </div>
             </div>
           </div>
@@ -289,7 +289,7 @@
             </div>
             <div style="padding: 12px 14px 24px; display: flex; flex-direction: column; gap: 14px;">
               <div style="color: var(--color-neutral-500); font-size: 11.5px; max-width: 620px;">{{ plugin.note }}</div>
-              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 1px; background: var(--color-neutral-900); border: 1px solid var(--color-neutral-900); border-radius: 2px; overflow: hidden;">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 1px; background: var(--color-neutral-900); border: 1px solid var(--color-neutral-900); border-radius: 8px; overflow: hidden;">
                 <sc-for list="{{ plugin.metrics }}" as="m" hint-placeholder-count="3">
                   <div style="background: var(--color-surface); padding: 8px 10px;">
                     <div style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .1em;">{{ m.label }}</div>
@@ -301,7 +301,7 @@
                 <div style="display: grid; grid-template-columns: minmax(80px, 1fr) minmax(0, 92px) minmax(0, 68px); gap: 8px; color: var(--color-neutral-500); font-size: 10px; letter-spacing: .06em; padding: 0 8px 5px;">
                   <span>{{ plugin.colA }}</span><span>{{ plugin.colB }}</span><span style="text-align: right;">{{ plugin.colC }}</span>
                 </div>
-                <div style="border: 1px solid var(--color-neutral-900); border-radius: 2px; overflow: hidden;">
+                <div style="border: 1px solid var(--color-neutral-900); border-radius: 8px; overflow: hidden;">
                   <sc-for list="{{ plugin.rows }}" as="r" hint-placeholder-count="5">
                     <div style="{{ r.style }}">
                       <span style="color: var(--color-neutral-300); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ r.a }}</span>
@@ -325,7 +325,7 @@
             </div>
             <div style="padding: 12px 14px 24px; display: flex; flex-direction: column; gap: 8px;">
               <sc-for list="{{ messages }}" as="m" hint-placeholder-count="5">
-                <div style="border: 1px solid var(--color-neutral-900); border-radius: 2px; background: var(--color-surface); padding: 8px 10px;">
+                <div style="border: 1px solid var(--color-neutral-900); border-radius: 8px; background: var(--color-surface); padding: 8px 10px;">
                   <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
                     <span style="color: var(--color-accent-2-400); font-size: 11px;">{{ m.from }}</span>
                     <span style="color: var(--color-neutral-500);">→</span>
@@ -347,28 +347,20 @@
   <footer style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 5px 12px; border-top: 1px solid var(--color-neutral-800); background: color-mix(in srgb, var(--color-surface) 45%, var(--color-bg));">
     <sc-for list="{{ keyHints }}" as="k" hint-placeholder-count="12">
       <span style="display: inline-flex; align-items: center; gap: 5px;">
-        <span style="background: color-mix(in srgb, var(--color-accent) 12%, var(--color-bg)); border: 1px solid var(--color-accent-800); border-radius: 1px; color: var(--color-accent-200); font-size: 10px; padding: 0 4px; text-shadow: 0 0 8px color-mix(in srgb, var(--color-accent) 50%, transparent);">{{ k.key }}</span>
+        <span style="background: var(--color-neutral-900); border: 1px solid var(--color-neutral-800); border-radius: 8px; color: var(--color-accent-300); font-size: 10px; padding: 0 4px;">{{ k.key }}</span>
         <span style="color: var(--color-neutral-500); font-size: 10px;">{{ k.label }}</span>
       </span>
     </sc-for>
     <div style="flex: 1;"></div>
-    <button type="button" onClick="{{ openPalette }}" style="display: inline-flex; align-items: center; gap: 6px; background: transparent; border: 1px solid var(--color-neutral-800); border-radius: 2px; padding: 2px 8px; cursor: pointer; font-family: inherit;" style-hover="border-color: var(--color-accent-600);">
+    <button type="button" onClick="{{ openPalette }}" style="display: inline-flex; align-items: center; gap: 6px; background: transparent; border: 1px solid var(--color-neutral-800); border-radius: 8px; padding: 2px 8px; cursor: pointer; font-family: inherit;" style-hover="border-color: var(--color-accent-600);">
       <span style="color: var(--color-accent-300); font-size: 10px;">^p</span>
       <span style="color: var(--color-neutral-500); font-size: 10px;">palette</span>
     </button>
   </footer>
 
-  <sc-if value="{{ crt }}" hint-placeholder-val="{{ true }}">
-    <div style="position: fixed; inset: 0; pointer-events: none; z-index: 60; background: repeating-linear-gradient(180deg, rgba(145,132,217,.055) 0px, rgba(145,132,217,.055) 1px, transparent 1px, transparent 3px); animation: ath-flicker 7s linear infinite;"></div>
-    <div style="position: fixed; inset: 0; pointer-events: none; z-index: 61; overflow: hidden;">
-      <div style="position: absolute; left: 0; right: 0; height: 22%; background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--color-accent) 7%, transparent), transparent); animation: ath-scan 9s linear infinite;"></div>
-    </div>
-    <div style="position: fixed; inset: 0; pointer-events: none; z-index: 62; box-shadow: inset 0 0 120px 0 rgba(8,9,16,.25);"></div>
-  </sc-if>
-
   <sc-if value="{{ showPalette }}" hint-placeholder-val="{{ false }}">
     <div onClick="{{ closeOverlay }}" style="position: fixed; inset: 0; background: rgba(10,11,18,.72); display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; z-index: 40;">
-      <div onClick="{{ stop }}" style="width: min(560px, 92vw); background: var(--color-surface); border: 1px solid var(--color-neutral-800); border-radius: 2px; box-shadow: var(--shadow-lg); overflow: hidden;">
+      <div onClick="{{ stop }}" style="width: min(560px, 92vw); background: var(--color-surface); border: 1px solid var(--color-neutral-800); border-radius: 8px; box-shadow: var(--shadow-lg); overflow: hidden;">
         <div style="display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--color-neutral-900);">
           <span style="color: var(--color-accent-400);">›</span>
           <input value="{{ paletteQuery }}" onChange="{{ onPaletteQuery }}" placeholder="run a command" autoFocus="{{ true }}" style="flex: 1; background: transparent; border: 0; outline: none; color: var(--color-text); font-family: inherit; font-size: 12px;">
@@ -389,7 +381,7 @@
 
   <sc-if value="{{ showNewRun }}" hint-placeholder-val="{{ false }}">
     <div onClick="{{ closeOverlay }}" style="position: fixed; inset: 0; background: rgba(10,11,18,.72); display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 40;">
-      <div onClick="{{ stop }}" style="width: min(600px, 94vw); background: var(--color-surface); border: 1px solid var(--color-neutral-800); border-radius: 2px; box-shadow: var(--shadow-lg);">
+      <div onClick="{{ stop }}" style="width: min(600px, 94vw); background: var(--color-surface); border: 1px solid var(--color-neutral-800); border-radius: 8px; box-shadow: var(--shadow-lg);">
         <div style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--color-neutral-900);">
           <span style="color: var(--color-accent-300); letter-spacing: .12em; font-size: 11px;">NEW RUN</span>
           <div style="flex: 1;"></div>
@@ -406,11 +398,11 @@
           </div>
           <div>
             <div style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .1em; margin-bottom: 5px;">TITLE</div>
-            <input value="{{ newTitle }}" onChange="{{ onNewTitle }}" placeholder="short summary" style="width: 100%; box-sizing: border-box; background: var(--color-bg); border: 1px solid var(--color-neutral-800); border-radius: 2px; padding: 7px 9px; color: var(--color-text); font-family: inherit; font-size: 12px; outline: none;">
+            <input value="{{ newTitle }}" onChange="{{ onNewTitle }}" placeholder="short summary" style="width: 100%; box-sizing: border-box; background: var(--color-bg); border: 1px solid var(--color-neutral-800); border-radius: 8px; padding: 7px 9px; color: var(--color-text); font-family: inherit; font-size: 12px; outline: none;">
           </div>
           <div>
             <div style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .1em; margin-bottom: 5px;">DESCRIPTION</div>
-            <textarea value="{{ newDesc }}" onChange="{{ onNewDesc }}" rows="5" placeholder="what should the agents do" style="width: 100%; box-sizing: border-box; background: var(--color-bg); border: 1px solid var(--color-neutral-800); border-radius: 2px; padding: 7px 9px; color: var(--color-text); font-family: inherit; font-size: 12px; outline: none; resize: vertical;"></textarea>
+            <textarea value="{{ newDesc }}" onChange="{{ onNewDesc }}" rows="5" placeholder="what should the agents do" style="width: 100%; box-sizing: border-box; background: var(--color-bg); border: 1px solid var(--color-neutral-800); border-radius: 8px; padding: 7px 9px; color: var(--color-text); font-family: inherit; font-size: 12px; outline: none; resize: vertical;"></textarea>
           </div>
           <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
             <div>
@@ -419,12 +411,12 @@
             </div>
             <div>
               <div style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .1em; margin-bottom: 5px;">ENTRY NODE</div>
-              <div style="color: var(--color-neutral-300); border: 1px solid var(--color-neutral-800); border-radius: 2px; padding: 7px 9px; background: var(--color-bg);">prompt</div>
+              <div style="color: var(--color-neutral-300); border: 1px solid var(--color-neutral-800); border-radius: 8px; padding: 7px 9px; background: var(--color-bg);">prompt</div>
             </div>
           </div>
         </div>
         <div style="display: flex; gap: 8px; justify-content: flex-end; padding: 12px 14px; border-top: 1px solid var(--color-neutral-900);">
-          <button type="button" onClick="{{ closeOverlay }}" style="background: transparent; border: 1px solid var(--color-neutral-800); border-radius: 2px; color: var(--color-neutral-400); font-family: inherit; font-size: 11px; padding: 5px 12px; cursor: pointer;" style-hover="border-color: var(--color-neutral-800);">cancel</button>
+          <button type="button" onClick="{{ closeOverlay }}" style="background: transparent; border: 1px solid var(--color-neutral-800); border-radius: 8px; color: var(--color-neutral-400); font-family: inherit; font-size: 11px; padding: 5px 12px; cursor: pointer;" style-hover="border-color: var(--color-neutral-800);">cancel</button>
           <button type="button" onClick="{{ submitNewRun }}" class="btn btn-primary" style="font-family: inherit; font-size: 11px; padding: 5px 14px;" style-hover="background: color-mix(in srgb, var(--color-accent) 14%, transparent);">submit run</button>
         </div>
       </div>
@@ -433,7 +425,7 @@
 
   <sc-if value="{{ showLibrary }}" hint-placeholder-val="{{ false }}">
     <div onClick="{{ closeOverlay }}" style="position: fixed; inset: 0; background: rgba(10,11,18,.72); display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 40;">
-      <div onClick="{{ stop }}" style="width: min(880px, 96vw); height: min(640px, 88vh); background: var(--color-surface); border: 1px solid var(--color-neutral-800); border-radius: 2px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column;">
+      <div onClick="{{ stop }}" style="width: min(880px, 96vw); height: min(640px, 88vh); background: var(--color-surface); border: 1px solid var(--color-neutral-800); border-radius: 8px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column;">
         <div style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--color-neutral-900);">
           <span style="color: var(--color-accent-300); letter-spacing: .12em; font-size: 11px;">WORKFLOW LIBRARY</span>
           <span style="color: var(--color-neutral-500); font-size: 10px;">defined in python · hot-reloaded from workflows/</span>
@@ -463,7 +455,7 @@
 
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;crt&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Chrome&quot;},&quot;streamLive&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Behavior&quot;},&quot;showKeyHints&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Chrome&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;streamLive&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Behavior&quot;},&quot;showKeyHints&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Chrome&quot;}}">
 const S = {
   completed: 'color: #8fbfa4;',
   running: 'color: var(--color-accent-400);',
@@ -750,9 +742,7 @@ class Component extends DCLogic {
 
   statusStyle(st, size) {
     const base = (S[st] || S.queued) + ' font-size: ' + (size || 11) + 'px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: .06em;';
-    return st === 'running'
-      ? base + ' text-shadow: 0 0 10px color-mix(in srgb, var(--color-accent) 65%, transparent); animation: ath-pulse 1.8s ease-in-out infinite;'
-      : base;
+    return st === 'running' ? base + ' animation: ath-pulse 1.8s ease-in-out infinite;' : base;
   }
 
   renderVals() {
@@ -787,7 +777,7 @@ class Component extends DCLogic {
       workflowFilters: ['all', 'feature_build', 'gamedev', 'claude_acp', 'docker_acp', 'projects'].map(w => ({
         label: w,
         onClick: () => this.setState({ wf: w }),
-        style: 'font-family: inherit; font-size: 10.5px; padding: 3px 8px; border-radius: 2px; cursor: pointer; background: ' +
+        style: 'font-family: inherit; font-size: 10.5px; padding: 3px 8px; border-radius: 8px; cursor: pointer; background: ' +
           (st.wf === w ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent') +
           '; color: ' + (st.wf === w ? 'var(--color-accent-200)' : 'var(--color-neutral-500)') +
           '; border: 1px solid ' + (st.wf === w ? 'var(--color-accent-600)' : 'var(--color-neutral-800)') + ';'
@@ -798,7 +788,7 @@ class Component extends DCLogic {
         onClick: () => this.setState({ selected: r.id }),
         statusStyle: this.statusStyle(r.status),
         style: rowBase + (r.id === st.selected
-          ? ' background: linear-gradient(90deg, color-mix(in srgb, var(--color-accent) 20%, var(--color-surface)), color-mix(in srgb, var(--color-accent) 6%, var(--color-surface))); border-left-color: var(--color-accent); box-shadow: inset 0 0 24px color-mix(in srgb, var(--color-accent) 12%, transparent);'
+          ? ' background: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface)); border-left-color: var(--color-accent);'
           : ' background: transparent;')
       })),
 
@@ -808,7 +798,7 @@ class Component extends DCLogic {
       paneDots: panes.map((p, i) => ({
         name: p,
         onClick: () => this.setState({ pane: i }),
-        style: 'width: 14px; height: 3px; border-radius: 2px; border: 0; padding: 0; cursor: pointer; background: ' +
+        style: 'width: 14px; height: 3px; border-radius: 8px; border: 0; padding: 0; cursor: pointer; background: ' +
           (i === paneIdx ? 'var(--color-accent)' : i >= PANES.length ? 'var(--color-accent-800)' : 'var(--color-neutral-800)') + ';'
       })),
       isOverview: paneIdx === 0, isLog: paneIdx === 1, isAgent: paneIdx === 2, isGraph: paneIdx === 3, isMessages: paneIdx === 4,
@@ -823,7 +813,6 @@ class Component extends DCLogic {
         }))
       } : null,
 
-      crt: this.props.crt !== false,
       listVisible: !st.listCollapsed,
       listCollapsed: st.listCollapsed,
       toggleList: () => this.setState(s => ({ listCollapsed: !s.listCollapsed })),
@@ -834,7 +823,7 @@ class Component extends DCLogic {
 
       sel: {
         id: sel.id, status: sel.status, workflow: sel.workflow,
-        statusPill: this.statusStyle(sel.status, 10.5) + ' border: 1px solid var(--color-neutral-800); border-radius: 2px; padding: 1px 7px;',
+        statusPill: this.statusStyle(sel.status, 10.5) + ' border: 1px solid var(--color-neutral-800); border-radius: 8px; padding: 1px 7px;',
         agentTask: 'task 402 · engineering · ' + (sel.status === 'running' ? 'streaming' : 'finished'),
         agentModel: 'engineering → claude (acp)',
         metrics: [
@@ -874,7 +863,7 @@ class Component extends DCLogic {
       agentTyping: sel.status === 'running',
       agentBlocks: AGENT.map(b => ({
         kind: b.kind, meta: b.meta,
-        wrap: 'border: 1px solid var(--color-neutral-900); border-radius: 2px; background: ' + (b.kind === 'tool' ? 'color-mix(in srgb, var(--color-surface) 60%, var(--color-bg))' : 'var(--color-surface)') + '; padding: 9px 11px;',
+        wrap: 'border: 1px solid var(--color-neutral-900); border-radius: 8px; background: ' + (b.kind === 'tool' ? 'color-mix(in srgb, var(--color-surface) 60%, var(--color-bg))' : 'var(--color-surface)') + '; padding: 9px 11px;',
         kindStyle: 'font-size: 10px; letter-spacing: .12em; color: ' + (b.kind === 'tool' ? 'var(--color-accent-2-400)' : b.kind === 'system' ? 'var(--color-neutral-600)' : 'var(--color-accent-300)') + ';',
         bodyStyle: 'white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11.5px; line-height: 1.65; color: ' + (b.kind === 'tool' ? 'var(--color-neutral-400)' : 'var(--color-neutral-300)') + ';',
         body: b.body
@@ -890,7 +879,7 @@ class Component extends DCLogic {
         mark: g.state === 'done' ? '✓' : g.state === 'active' ? '●' : g.state === 'failed' ? '✗' : '·',
         markStyle: 'width: 14px; color: ' + (g.state === 'done' ? '#8fbfa4' : g.state === 'active' ? 'var(--color-accent)' : g.state === 'failed' ? '#d9868f' : 'var(--color-neutral-700)') + ';' + (g.state === 'active' ? ' animation: ath-pulse 1.8s ease-in-out infinite;' : ''),
         onClick: () => this.setState({ pane: 1 }),
-        style: 'display: flex; align-items: center; gap: 8px; min-width: 0; width: 100%; max-width: 420px; box-sizing: border-box; padding: 6px 10px; border-radius: 2px; cursor: pointer; font-size: 11.5px; color: var(--color-neutral-300); border: 1px solid ' +
+        style: 'display: flex; align-items: center; gap: 8px; min-width: 0; width: 100%; max-width: 420px; box-sizing: border-box; padding: 6px 10px; border-radius: 8px; cursor: pointer; font-size: 11.5px; color: var(--color-neutral-300); border: 1px solid ' +
           (g.state === 'active' ? 'var(--color-accent-600)' : 'var(--color-neutral-800)') + '; background: ' +
           (g.state === 'active' ? 'color-mix(in srgb, var(--color-accent) 12%, var(--color-surface))' : 'var(--color-surface)') + ';' +
           (g.state === 'active' ? ' box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 30%, transparent);' : '')
@@ -919,7 +908,7 @@ class Component extends DCLogic {
       workflowChoices: Object.keys(LIBRARY).map(name => ({
         name,
         onClick: () => this.setState({ newWf: name }),
-        style: 'font-family: inherit; font-size: 11px; padding: 4px 9px; border-radius: 2px; cursor: pointer; background: ' +
+        style: 'font-family: inherit; font-size: 11px; padding: 4px 9px; border-radius: 8px; cursor: pointer; background: ' +
           (st.newWf === name ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent') +
           '; color: ' + (st.newWf === name ? 'var(--color-accent-200)' : 'var(--color-neutral-500)') +
           '; border: 1px solid ' + (st.newWf === name ? 'var(--color-accent-600)' : 'var(--color-neutral-800)') + ';'

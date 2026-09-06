@@ -225,8 +225,9 @@ web --template react-ts`; React 19, TS strict (`noUncheckedIndexedAccess`,
 copies every `--color-*`, `--space-*`, `--shadow-*`, `--ath-*` token into
 `web/src/styles/theme.css` under `:root`, then appends the shadcn
 mapping block from 10 §Tokens → shadcn (`--background: var(--color-bg)`
-…), the `@theme inline` block exposing them to Tailwind, `--radius: 2px`,
-and the app type scale (12 px base, JetBrains Mono). `pnpm gen:theme`
+…), the `@theme inline` block exposing them to Tailwind (no `--radius`
+override: Nocturne's 8 px stands, D71), and the app type scale (12 px
+base, JetBrains Mono). `pnpm gen:theme`
 script; CI fails if the generated file is stale.
 `vite.config.ts`: `build.outDir = "../athanore/web/dist"`,
 `emptyOutDir: true`, `server.proxy["/api"] → http://127.0.0.1:4002`.
@@ -1458,8 +1459,9 @@ workflow, `payload_too_large`).
 15/500, `text-body` 12, `text-row` 11.5, `text-secondary` 11,
 `text-kicker` 10.5 uppercase tracking `.12em`), surfaces (`bg-chrome` =
 `color-mix(in srgb, var(--color-surface) 45%, var(--color-bg))`,
-`bg-zebra` 60 %), `glow-accent` text-shadow utility, `ath-pulse`
-keyframes with `prefers-reduced-motion` guard, `--radius: 2px`.
+`bg-zebra` 60 %), `ath-pulse` and `ath-caret` keyframes with a
+`prefers-reduced-motion` guard. No glow utility, no scan or flicker, and
+no `--radius` override (D71).
 Storybook is not used; instead `web/src/dev/Tokens.tsx` renders every
 token and component primitive at `/__tokens` in dev only.
 **Done.** `pnpm gen:theme` idempotent; `/__tokens` matches the mock's
@@ -1471,9 +1473,9 @@ palette by eye against `Athanore.dc.html`.
 `{run?: string, pane?: number, overlay?: "palette"|"new"|"library"|
 "edit"|"keys"|"task"|"pick-retry"|"pick-move"|"pick-cancel"|"pick-rerun",
 task?: number}`. zustand store `usePrefs` (persisted: `listWidth`,
-`listCollapsed`, `crt`, `autoSwitchOnRequest`, `notifications`, `token`)
+`listCollapsed`, `autoSwitchOnRequest`, `notifications`, `token`)
 and `useUi` (transient: focus region). Layout components: `Header`
-(brand mark with glow, `__APP_VERSION__` injected from `pyproject.toml` at
+(brand mark, `__APP_VERSION__` injected from `pyproject.toml` at
 build, count placeholders), `RunList` (empty), `Detail` (empty pane bar),
 `Footer` (key chips).
 **Tests.** Vitest: search param round-trip; prefs persist to
@@ -1484,16 +1486,14 @@ reload on `:5173`, proxying `/api` to the v1 server started with
 `docker compose run --rm dev "uv run athanore serve ..."`.
 **Done.** `pnpm build` output served by `athanore serve` shows the shell.
 
-### T058a — Splitter, list collapse, CRT chrome (A4.1, D36)
+### T058a — Splitter and list collapse (A4.1, D71)
 
 **Do.** `Splitter` (`react-resizable-panels`, min 260, max `window − 340`,
 5 px handle, width persisted); list collapse to the 30 px `RUNS n` rail
-(`listCollapsed`); `CrtChrome` (scanlines, scan band, vignette, flicker;
-`pointer-events: none`; disabled under `prefers-reduced-motion` or
-`crt=false`; toggle in settings).
+(`listCollapsed`). The CRT chrome is gone from the mock (D71): no
+`CrtChrome`, no `crt` preference, no settings toggle.
 **Tests.** Vitest: collapse toggles the store and the rail renders the
-count; the chrome is absent when `matchMedia` reports reduced motion;
-width clamps.
+count; width clamps.
 **Done.** Tests pass.
 
 ### T059 — API client bootstrap, `/api/me`, query provider (A4.1, A4.9 prelude)

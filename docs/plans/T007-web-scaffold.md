@@ -37,8 +37,9 @@ exists — so all four have to pass, not just `build`.
    every `--color-*`, `--space-*`, `--shadow-*` and `--ath-*` token into
    `web/src/styles/theme.css` under `:root`; append the shadcn mapping
    block from 10 §Tokens → shadcn, the `@theme inline` block that
-   exposes them to Tailwind, `--radius: 2px`, and the app type scale
-   (12 px base, JetBrains Mono). Wire it as `pnpm gen:theme`.
+   exposes them to Tailwind, and the app type scale (12 px base,
+   JetBrains Mono). No `--radius` override — Nocturne's 8 px stands
+   (D71). Wire it as `pnpm gen:theme`.
 5. Staleness check: regenerating must produce no diff, and CI must fail
    when it does. Same shape as T008's contract check.
 6. `vite.config.ts`: `build.outDir = "../athanore/web/dist"`,

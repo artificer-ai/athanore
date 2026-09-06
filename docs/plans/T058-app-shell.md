@@ -17,7 +17,7 @@ regions.
   that is what makes every view linkable.
 - No preference that belongs in the URL, and no URL state that belongs
   in preferences. `run`, `pane`, `overlay`, `task` are shareable; widths
-  and the CRT toggle are personal.
+  are personal.
 
 ## Steps
 
@@ -26,10 +26,10 @@ regions.
    "edit"|"keys"|"task"|"pick-retry"|"pick-move"|"pick-cancel"|
    "pick-rerun", task?: number}`. An invalid `?overlay=` is **dropped,
    not thrown** — a stale bookmark must not white-screen the app.
-2. zustand `usePrefs` (persisted: `listWidth`, `listCollapsed`, `crt`,
+2. zustand `usePrefs` (persisted: `listWidth`, `listCollapsed`,
    `autoSwitchOnRequest`, `notifications`, `token`) and `useUi`
    (transient: focus region).
-3. Layout: `Header` (brand mark with glow, `__APP_VERSION__` injected
+3. Layout: `Header` (brand mark, `__APP_VERSION__` injected
    from `pyproject.toml` at build time, count placeholders), `RunList`
    (empty), `Detail` (empty pane bar), `Footer` (key chips).
 
