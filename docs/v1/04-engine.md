@@ -363,6 +363,11 @@ raw store: `log.append(text, author=…)`, `stream.append(kind, text)`,
 `submissions.latest()`, `requests.*` (06), `run.get()`. This is what lets
 `agents` avoid importing `store`.
 
+`last_rejection` is `{errors, schema, payload}`: what
+`submissions.reject()` returned, plus the payload it was about. The 422
+body is the `{errors, schema}` half; the payload is there because 19's
+repair turn quotes it back to the agent and no event carries it (D120).
+
 ## Waiting on a human (new)
 
 The MVP parked the body while still holding its worker slot; under
