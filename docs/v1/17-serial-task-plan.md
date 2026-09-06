@@ -1392,6 +1392,21 @@ starts while the first is parked) and the body resumes ahead of new
 ready tasks.
 **Done.** Tests pass.
 
+**Status.** Done. `athanore/requests/human.py` is `human_input(prompt, *,
+options=None, output_model=None, timeout=None)`: the mode comes from the
+arguments (both, or an empty `options`, is a `ValueError`), the options
+are normalised to `[{option_id, name, kind}]`, and the answer is decoded
+into the id, the string or the model instance. The wait is
+`async with ctx.services.lease.released(req.id)` around
+`requests.wait(req.id, timeout)`, with the validator registered before
+the park and unregistered in a `finally`. `RequestsPort` grew
+`register_validator`/`unregister_validator` — nothing else could have
+registered one — and `poll(id, 0)` became a single read (D117).
+`tests/requests/test_human_input.py` is nine tests on a one-worker pool,
+including the ordering one: parked body, a second run completing inside
+the window, and the answered body taking the freed slot ahead of a task
+made ready while it waited.
+
 ### T033a — `human_input`: ordinal replay after a crash (D44)
 
 **Do.** In `human_input`, when `reopen_or_create` returns a request that
@@ -1406,6 +1421,17 @@ question three and gets answers one and two replayed; a replayed form
 answer that no longer validates re-asks with errors at ordinal 4; a
 retry (new task row) starts its ordinals at 1 and asks afresh.
 **Done.** Tests pass.
+
+**Status.** Done. A request `reopen_or_create` returned with an answer
+already on it is decoded and returned without parking — `poll(id, 0)` is
+what tells the two cases apart — and a form answer that no longer fits is
+logged to the work log (`author=engine`), appended to the prompt, and
+re-asked at the next ordinal. `tests/requests/test_human_input_replay.py`
+kills the attempt with `scheduler.cancel_attempts` and recovers the row
+with `reset_for_recovery`: three questions and one `task.waiting` per
+question plus one for the re-attach, an answer given in the gap re-asked
+at ordinal 4 with its errors in the prompt, and a retry asking afresh at
+ordinal 1.
 
 ### T034 — Agent base: `Agent`, `AgentResult`, prompt assembly (A2.3)
 

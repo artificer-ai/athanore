@@ -104,6 +104,18 @@ layers = [
     "athanore.engine | athanore.requests | athanore.agents | (athanore.plugins.registry) | (athanore.plugins.decl) | (athanore.plugins.mount)",
     "athanore.store | athanore.events | athanore.graph | athanore.settings | athanore.logging",
 ]
+# The one arrow across the middle tier, and the only one there will be
+# (D117). `TaskContext` is where a body's identity and its narrow
+# services live, and 02 §Layering already has the tier reaching it —
+# "`agents` reaches the store only through `TaskContext`" — so a helper a
+# node body calls needs `current_task()` and there is nowhere lower to
+# get it from. It stays one named arrow rather than a `:` between the
+# siblings: `engine.context` is a contextvar and a dataclass, the engine
+# still may not import back (`RequestsPort` is a protocol for that
+# reason), and `athanore.requests.human` is the only module in the tier
+# allowed to reach even this far. An entry that stops matching an import
+# is an error, so the exemption cannot outlive the import it names.
+ignore_imports = ["athanore.requests.human -> athanore.engine.context"]
 
 [[tool.importlinter.contracts]]
 name = "graph imports nothing from athanore"
