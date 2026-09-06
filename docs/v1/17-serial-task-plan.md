@@ -886,6 +886,15 @@ remainder; seq continues after a restart (`last_seq`); the ephemeral
 event never appears in `events`.
 **Done.** Tests pass.
 
+**Status.** Done. `append` is a coroutine and starts the flusher itself,
+so the service needs no lifecycle call but `close()`: the first chunk of
+an attempt is what reads `last_seq` and resolves the counter, and a body
+that never streams never has a background task (D100). The buffer is
+trimmed only after the transaction has committed, and `close()` waits out
+an in-flight flush under a lock before it cancels the flusher, because
+`seq` is unique per task and a batch that committed while still buffered
+would be written twice.
+
 ### T024 — Runner: attempt lifecycle and the success path (A1.9)
 
 **Do.** `athanore/engine/runner.py`: `async def run_attempt(engine, claimed:

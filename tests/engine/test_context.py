@@ -31,6 +31,7 @@ from athanore.store.rows import LogAuthor, LogKind
 from athanore.store.uow import Store
 
 WORKFLOW = "demo"
+FLUSH_INTERVAL = 0.05
 
 
 async def make_task(store: Store, node: str = "build") -> tuple[str, int]:
@@ -46,7 +47,12 @@ def make_context(
     store: Store, run_id: str, task_id: int, node: str = "build"
 ) -> TaskContext:
     services = TaskServices(
-        store, run_id=run_id, task_id=task_id, node=node, workflow=WORKFLOW
+        store,
+        run_id=run_id,
+        task_id=task_id,
+        node=node,
+        workflow=WORKFLOW,
+        flush_interval=FLUSH_INTERVAL,
     )
     return TaskContext(
         run_id=run_id,
@@ -319,6 +325,7 @@ async def test_a_wired_requests_port_is_used_as_given(store: Store) -> None:
         task_id=task_id,
         node="build",
         workflow=WORKFLOW,
+        flush_interval=FLUSH_INTERVAL,
         requests=port,  # type: ignore[arg-type]
     )
     assert services.requests is port

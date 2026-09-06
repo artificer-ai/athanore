@@ -25,6 +25,11 @@ rather than plausibly:
   merely did nothing would look like it worked, under ``workers=1``,
   right up to the first deadlock.
 
+:attr:`TaskServices.stream` is the one member with a background task
+behind it: chunks accumulate in memory and land as one insert per
+``stream_flush_interval`` (07 §Transcript writes). The runner closes it in
+the ``finally`` of every attempt, which is also its last flush.
+
 :attr:`TaskServices.events` is the one member with a rule of its own. A
 plugin or a body may publish, but only into the ``plugin.`` namespace:
 the rest of the vocabulary describes state the engine owns, and a body
@@ -34,8 +39,9 @@ plugin subscriber that a task it is still running has finished.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping, Sequence
-from contextlib import AbstractAsyncContextManager
+from contextlib import AbstractAsyncContextManager, suppress
 from typing import Any, Protocol, cast
 
 from athanore.events.model import Event
@@ -44,11 +50,14 @@ from athanore.events.payloads import (
     LogAppended,
     SubmissionAccepted,
     SubmissionRejected,
+    TaskStream,
     ValidationError,
 )
+from athanore.logging import get_logger
 from athanore.store.clock import now
 from athanore.store.rows import (
     AnswerRow,
+    ChunkKind,
     LogAuthor,
     LogEntryRow,
     LogKind,
@@ -63,6 +72,8 @@ from athanore.store.uow import Store
 #: How much of an entry ``log.appended`` carries (18 §Log and stats). The
 #: rest is fetched by id: an event never carries full log text.
 PREVIEW_CHARS = 200
+
+_log = get_logger(__name__)
 
 
 class LogService:
@@ -124,6 +135,156 @@ class LogService:
                 )
             )
         return row
+
+
+class StreamService:
+    """The agent transcript of one attempt, written in batches.
+
+    07 §Transcript writes. An agent turn produces chunks faster than a
+    database wants statements — a token at a time, a tool call at a time —
+    so the façade appends into memory here and a background flusher writes
+    what has accumulated every ``stream_flush_interval`` as **one**
+    multi-row insert, followed by one ephemeral ``task.stream`` naming the
+    range it wrote. Two to three flushes a second per streaming task is
+    also why that event is never stored: it would be most of the ``events``
+    table, and a late joiner rebuilds the transcript from
+    ``GET /api/tasks/{id}/stream?after=`` instead (03, ``EPHEMERAL``).
+
+    ``seq`` is the cursor that endpoint pages by, and it is unique per
+    task, so the counter is initialised from
+    :meth:`~athanore.store.repos.stream.StreamRepo.last_seq` rather than
+    from zero: an attempt that is re-executed after a crash (04
+    §Durability) writes chunk ``n+1``, not chunk ``1`` again against rows
+    that are already there. The read happens on the first
+    :meth:`append` — the only moment at which it is both needed and
+    cheap — which is what lets the service be constructed synchronously
+    beside the others and still be correct.
+
+    **Nothing here reaches the body.** A failed flush is logged and the
+    buffer is left alone, so the next tick retries it; the transcript is
+    diagnostic (the work log carries the deliverables), and an agent turn
+    that failed because a batch insert did is a worse outcome than a turn
+    with a gap in its transcript. The one thing that must not happen is
+    writing a batch twice, so the buffer is trimmed only after the
+    transaction has committed, and :meth:`close` waits out an in-flight
+    flush before it cancels the flusher.
+    """
+
+    def __init__(
+        self,
+        store: Store,
+        *,
+        run_id: str,
+        task_id: int,
+        flush_interval: float,
+    ) -> None:
+        self._store = store
+        self._run_id = run_id
+        self._task_id = task_id
+        self._interval = flush_interval
+        #: Chunks written but not yet inserted, oldest first.
+        self.buffer: list[tuple[int, str, str]] = []
+        #: The highest ``seq`` handed out, or ``None`` before the first read.
+        self._seq: int | None = None
+        self._flusher: asyncio.Task[None] | None = None
+        self._flushing = asyncio.Lock()
+        self._closed = False
+
+    async def append(self, kind: ChunkKind | str, text: str) -> int:
+        """Buffer one chunk and return the ``seq`` it was given.
+
+        A coroutine rather than a plain call because the first chunk of an
+        attempt is what resolves the counter against the store; every
+        chunk after it appends and returns without awaiting anything. The
+        flusher is started here too, so a body that never streams never
+        has a background task.
+        """
+        if self._closed:
+            raise RuntimeError(
+                f"the transcript of task {self._task_id} is closed; "
+                "the attempt has ended"
+            )
+        chunk_kind = ChunkKind(kind)
+        if self._seq is None:
+            async with self._store.reader() as reader:
+                self._seq = await reader.stream.last_seq(self._task_id)
+        self._seq += 1
+        self.buffer.append((self._seq, str(chunk_kind), text))
+        if self._flusher is None:
+            self._flusher = asyncio.get_running_loop().create_task(self._flusher_loop())
+        return self._seq
+
+    async def close(self) -> None:
+        """Stop the flusher and write what is left. Idempotent.
+
+        The last chunks of a finished agent turn are the ones a reader
+        most wants, so the flusher is not simply cancelled: an in-flight
+        flush is waited out under :attr:`_flushing` first, which is what
+        makes cancelling it impossible in the window where a cancellation
+        could leave a committed batch still in the buffer — and therefore
+        written twice, against a unique ``seq``.
+        """
+        if self._closed:
+            return
+        self._closed = True
+        flusher, self._flusher = self._flusher, None
+        if flusher is not None:
+            async with self._flushing:
+                # Held across the cancel, and no await between: the flusher
+                # is either sleeping or waiting for this lock, never mid-write.
+                flusher.cancel()
+            with suppress(asyncio.CancelledError):
+                await flusher
+        await self._flush_guarded()
+
+    async def _flusher_loop(self) -> None:
+        """Flush every ``flush_interval`` until cancelled."""
+        while True:
+            await asyncio.sleep(self._interval)
+            await self._flush_guarded()
+
+    async def _flush_guarded(self) -> None:
+        """One flush, with its failures logged rather than raised.
+
+        Retries are the engine's (rule 3) and this is not the engine: a
+        flush that failed is retried on the next tick because the buffer
+        still holds its chunks, and an attempt is never failed by its own
+        transcript.
+        """
+        async with self._flushing:
+            try:
+                await self._flush()
+            except Exception:
+                _log.warning(
+                    "stream flush failed",
+                    task_id=self._task_id,
+                    buffered=len(self.buffer),
+                    exc_info=True,
+                )
+
+    async def _flush(self) -> None:
+        """Write the buffer as one batch and announce the range.
+
+        The buffered prefix that was written is dropped only after the
+        transaction has committed, so a failure leaves the chunks to be
+        retried and a chunk appended while the insert was in flight is
+        kept for the next batch.
+        """
+        batch = list(self.buffer)
+        if not batch:
+            return
+        async with self._store.uow() as uow:
+            await uow.stream.append_batch(self._task_id, batch)
+        del self.buffer[: len(batch)]
+        await self._store.publish_ephemeral(
+            Event(
+                run_id=self._run_id,
+                task_id=self._task_id,
+                name=EventName.task_stream,
+                data=TaskStream(seq_from=batch[0][0], seq_to=batch[-1][0]).model_dump(),
+                created=now(),
+            )
+        )
 
 
 class SubmissionService:
@@ -434,9 +595,13 @@ class TaskServices:
         task_id: int,
         node: str,
         workflow: str,
+        flush_interval: float,
         requests: RequestsPort | None = None,
     ) -> None:
         self.log = LogService(store, run_id=run_id, task_id=task_id, node=node)
+        self.stream = StreamService(
+            store, run_id=run_id, task_id=task_id, flush_interval=flush_interval
+        )
         self.submissions = SubmissionService(
             store, run_id=run_id, task_id=task_id, node=node
         )
@@ -448,8 +613,6 @@ class TaskServices:
         self.events = EventPort(
             store, run_id=run_id, task_id=task_id, workflow=workflow
         )
-        #: The transcript flusher. T023a.
-        self.stream = None
 
 
 def _json_object(name: str, data: object) -> dict[str, Any]:
@@ -496,6 +659,7 @@ __all__ = [
     "LogService",
     "RequestsPort",
     "RunService",
+    "StreamService",
     "SubmissionService",
     "TaskServices",
     "UnwiredRequests",
