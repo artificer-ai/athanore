@@ -80,22 +80,52 @@ def test_python_job_runs_every_step_of_the_gate(ci: Workflow) -> None:
     assert "lint-imports" in ran
 
 
-def test_python_job_gates_the_coverage_of_graph_and_engine(ci: Workflow) -> None:
-    """13 §CI's 95 % threshold, on the paths T028 put it on.
+#: 13 §CI's coverage thresholds: three packages at 95 %, the whole of
+#: `athanore` at 85 %. One gate each, so a red build names the package
+#: that slipped (D149). `None` is the overall gate, which takes no
+#: `--include`.
+COVERAGE_GATES = {
+    "graph": ("athanore/graph/*", 95),
+    "engine": ("athanore/engine/*", 95),
+    "requests": ("athanore/requests/*", 95),
+    "overall": (None, 85),
+}
 
-    The gate reads the data file the `pytest` step wrote, so the suite
+
+def test_python_job_gates_the_coverage_13_asks_for(ci: Workflow) -> None:
+    """Every threshold of 13 §CI is a step, and none of them is missing.
+
+    Each gate reads the data file the `pytest` step wrote, so the suite
     runs once and the threshold is applied to what all of it covered —
     which is why it is `coverage report --fail-under` rather than a
     second, narrower pytest run (D112).
     """
     ran = commands(ci["jobs"]["python"])
-    assert "coverage report" in ran
-    assert "--include='athanore/graph/*,athanore/engine/*'" in ran
-    assert "--fail-under=95" in ran
-    # Measured before it is gated: the report has nothing to read
-    # otherwise.
+    for name, (include, threshold) in COVERAGE_GATES.items():
+        expected = "uv run --no-sync coverage report"
+        if include is not None:
+            expected += f" --include='{include}'"
+        expected += f" --fail-under={threshold}"
+        # The YAML folds `>` blocks onto one line, so the command a
+        # runner executes is what is compared, not how it was written.
+        assert expected in " ".join(ran.split()), name
+
+
+def test_every_coverage_gate_runs_after_the_suite_it_reads(ci: Workflow) -> None:
+    """Measured before it is gated: the report has nothing to read otherwise."""
     steps_run = [step.get("name") for step in steps(ci["jobs"]["python"])]
-    assert steps_run.index("pytest") < steps_run.index("coverage gate (graph, engine)")
+    for name in COVERAGE_GATES:
+        assert steps_run.index("pytest") < steps_run.index(f"coverage gate ({name})")
+
+
+def test_the_coverage_gates_measure_paths_that_exist(ci: Workflow) -> None:
+    """A threshold on a glob that matches nothing passes at 100 %."""
+    for include, _ in COVERAGE_GATES.values():
+        if include is None:
+            continue
+        package = ROOT / include.removesuffix("/*")
+        assert package.is_dir(), include
+        assert list(package.glob("*.py")), include
 
 
 def test_the_once_only_steps_run_once(ci: Workflow) -> None:

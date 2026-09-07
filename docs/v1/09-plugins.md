@@ -186,9 +186,19 @@ background flusher on its first append, and a request-scoped one nobody
 closed would outlive the request.
 
 **The manifest**: `GET /api/plugins`, builtins first and then the
-workflows in registration order. A server with nothing registered
-answers with an empty list rather than a 404, which is a fact the SPA
-can act on.
+workflows in registration order. The builtins are one entry like any
+other, and its `workflow` is the literal `"_builtin"` (§Builtins are
+plugins), so the SPA finds them by name rather than by position. `Server`
+composes the list with that entry in front, and the manifest route
+partitions on the name anyway — a stable partition, so registration order
+survives it — which makes "builtins first" a property of the route rather
+than of how carefully a host assembled its argument. Within an entry,
+`panels` and `actions` are in **declaration order**: the order the
+workflow's declarations ran, which for the builtins is the order
+§Builtins are plugins tables them. A server with nothing registered
+answers with an empty list rather than a 404, which is a fact the SPA can
+act on — and an empty list means an application built with no plugins at
+all, since a served one always carries the builtins.
 
 **One subscription** for the process, feeding the `on` handlers. The bus
 is fed by the store's outbox after the commit, so a handler sees only
@@ -216,6 +226,9 @@ assets are served under `/plugins/{wf}/static/` (§Escape hatch).
 - `GET /api/plugins` → manifest: `[{workflow, panels: [{name, slot,
   placement, kind, scope, node?, source?, element?, refresh_on}],
   actions: [{name, title, scope, confirm, schema}], assets: [url]}]`.
+  `workflow` is `"_builtin"` on the first entry and a registered
+  workflow's name on the rest; entries and the lists inside them are
+  ordered as §Mounting says, so the SPA renders what it is given.
   Fetched at boot and again whenever the SSE stream reconnects and
   `/api/me` reports a new `started_at` (the manifest only changes on
   restart, so no event is needed for it).

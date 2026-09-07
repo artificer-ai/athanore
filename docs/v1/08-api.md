@@ -45,6 +45,14 @@ When a token is required, SSE (which cannot set headers from a browser)
 also accepts it as `?access_token=` on `GET /api/events` only; the server
 does not log that query string.
 
+A task token fails in two distinguishable ways and they are two different
+status codes. `X-Athanore-Token` is a **required** header, so a request
+that omits it is **422** with the validation shape above, naming the
+header that is absent. A token that *was* presented and was refused is
+**403**, and the three ways it can be refused — unknown, another task's,
+an attempt that has ended — share one message: which one it was is not
+information the door hands out.
+
 ## Endpoints
 
 ### Workflows
@@ -64,14 +72,14 @@ does not log that query string.
 | GET | `/api/runs/{id}` | `RunDetail` = summary + description, output, tasks `[TaskRow]` (no tokens), stats totals |
 | PATCH | `/api/runs/{id}` | `{title?, description?}` → `RunDetail` |
 | DELETE | `/api/runs/{id}` | 204 |
-| POST | `/api/runs/{id}/pause` `/resume` `/cancel` | → `{ok, note?}`; 409 on wrong state |
+| POST | `/api/runs/{id}/pause` `/resume` `/cancel` | → `{ok, note?}`; 409 on wrong state. `cancel` is the only one that fills `note`, with the number of attempts it stopped |
 | POST | `/api/runs/{id}/rerun` | `{node}` → `{task_id}` |
 | POST | `/api/runs/{id}/position` | `{direction: -1\|1}` or `{index}` → `{position}` |
 | POST | `/api/runs/{id}/log` | `{text}` → `{log_id}` (author `user`, node = current node or `user`) |
 | GET | `/api/runs/{id}/log` | `[LogEntry]` |
-| GET | `/api/runs/{id}/events` | `?after=&limit=` → `[Event]` |
+| GET | `/api/runs/{id}/events` | `?after=&limit=` → `[Event]`; `limit` defaults to 500 and caps at 5000, the default `sse_replay_cap` |
 | GET | `/api/runs/{id}/requests` | `[RequestView]` |
-| GET | `/api/runs/{id}/graph` | the workflow graph with per-node state for this run (below): `{nodes: [{name, generation, join, state, live, attempts, last_task_id, branches: [{from_task, tasks: [int]}], arrivals?: {arrived, count}}], edges: [{from, to, kind: forward\|back\|join, traversed: n}]}` |
+| GET | `/api/runs/{id}/graph` | the workflow graph with per-node state for this run (below); 404 `unknown_workflow` if the run's workflow is not registered here: `{nodes: [{name, generation, join, state, live, attempts, last_task_id, branches: [{from_task, tasks: [int]}], arrivals?: {arrived, count}}], edges: [{from, to, kind: forward\|back\|join, traversed: n}]}` |
 
 #### Graph semantics
 
@@ -80,7 +88,11 @@ does not log that query string.
   `dead_letter` → `failed` (a failed attempt with a retry still pending
   reports `ready`, because the retry row exists) → `done` → `cancelled` →
   `idle` (no task ever). The SPA colours by `state` alone (10 §Status
-  colours).
+  colours). Every member but `idle` is the name of a task status, and the
+  precedence **is** the member order of the `state` enum in the OpenAPI
+  document: a client reads the rule off the contract rather than
+  restating it, and the server does not keep a second copy of it either
+  (D131).
 - `live` is `state ∈ {in_progress, waiting}` or the node has at least one
   `done` task. It is the liveness flag for `node`-slot plugin panels (09
   §Slots), computed here so the manifest can stay static.
@@ -91,14 +103,40 @@ does not log that query string.
   whose parent returned a list. Nodes reached by a single path have one
   branch with `from_task: null`. The SPA renders one indented sub-list per
   branch (10 §Graph pane).
+- The grouping key is the **whole branch-frame stack**, not `from_task`
+  alone, and `from_task` is the innermost frame's fan-out (D131). Two
+  branches of one fan-out are therefore two entries carrying the same
+  `from_task`, which is what the SPA indents separately; a node's
+  retries *within* one branch are several ids in one entry, because a
+  retry does not open a branch. Nesting works the same way at any depth:
+  an inner fan-out under an outer one produces one entry per leaf, each
+  naming the inner fan-out.
 - `edges` are the finalized graph's edges; `kind` is `back` when the target's
   generation is ≤ the source's (a loop-back, drawn as a rail), `join` when
-  the target is a join node, else `forward`. `traversed` counts
+  the target is a join node, else `forward`. The three tests are applied
+  in that order, so an arrow that goes back *into* a join node is `back`:
+  it is a loop however its target is declared, and the crossing is
+  counted either way, since a transition into a join enqueues nothing and
+  the `join.arrived` arm is what counts it. `traversed` counts
   `task.enqueued reason=transition` events from a task of `from` to a
-  task of `to`, plus `join.arrived` events for `join` edges.
+  task of `to`, plus `join.arrived` events for `join` edges. It is read
+  off the run's stored events **in pages**, accumulating counts rather
+  than rows, so an unbounded history is counted whole rather than
+  silently truncated at one page.
+- `nodes` come out in generation order and, within a generation, in
+  declaration order — the order 10 §Graph pane draws, so the SPA renders
+  the list it is given.
 - Join nodes carry `join: true` and, while a fan-out is open, `arrivals:
   {arrived, count}` for the innermost pending fan-out, so the SPA can show
-  `2 of 3 arrived` (10 §Graph pane).
+  `2 of 3 arrived` (10 §Graph pane). "Innermost" is nesting depth — the
+  length of the fan-out task's own branch stack — with the highest task
+  id as the tiebreak between two fan-outs at the same depth (D131).
+- `GET /api/runs/{id}/graph` is **404 `unknown_workflow`** when the run's
+  workflow is not registered in this process, and it is the only route
+  that refuses for that reason: there is no graph to project a run onto,
+  and inventing a shape for a workflow this process does not have would
+  be the opposite of 01 §Real data only. Every other run route answers
+  normally, and `GET /api/runs` reports the run with `unregistered: true`.
 - `POST /api/runs/{id}/position`: `{direction: -1 | 1}` swaps with the
   neighbour above or below (no-op at the ends, still 200 with the current
   position); `{index: n}` moves to the **zero-based** list index, clamped to
@@ -117,7 +155,7 @@ does not log that query string.
 | Method | Path | Body → Response |
 |---|---|---|
 | GET | `/api/tasks/{id}` | `TaskRow` + `submissions` (operator view; no token in response) |
-| GET | `/api/tasks/{id}/stream` | `?after=<seq>&limit=` → `{chunks: [{seq, kind, text, created}], last_seq, live}` |
+| GET | `/api/tasks/{id}/stream` | `?after=<seq>&limit=` → `{chunks: [{seq, kind, text, created}], last_seq, live}`; `limit` defaults to 500 and caps at 5000, the pair `/api/runs/{id}/events` uses. `live` is the attempt being `in_progress` **or** `waiting` — a waiting attempt is parked on a request and goes on writing once it is answered |
 | POST | `/api/tasks/{id}/retry` | → `{task_id}` |
 | POST | `/api/tasks/{id}/move` | `{node}` → `{task_id}`; 409 `conflict` when `node` is a join node (04 §Fan-in) |
 | POST | `/api/tasks/{id}/status` | `{status: ready\|cancelled\|dead_letter}` → `{ok}` |
@@ -226,8 +264,29 @@ options, schema, tool_call, pending, answer, answered_by, created, age}`.
 
 | Method | Path | Response |
 |---|---|---|
-| GET | `/api/health` | `{ok, version, runs_running, tasks_in_progress, pools: {name: {capacity, in_flight}}}` — unauthenticated, no ids |
+| GET | `/api/health` | `{ok, version, runs_running?, tasks_in_progress?, pools?: {name: {capacity, in_flight}}}` — unauthenticated, no ids |
 | GET | `/api/me` | `{auth: "off"\|"token", authenticated: bool, version, started_at, features}` — unauthenticated so the SPA can decide whether to show the token screen; `started_at` changes on restart, which is the SPA's cue to refetch the plugin manifest (09) |
+
+`runs_running`, `tasks_in_progress` and `pools` are **omitted** when the
+application was built without the collaborator that answers them — the
+counts need a store, the pools need an engine. A served application
+always carries both, so the wire a client meets is the full shape; a bare
+`create_app()` (the OpenAPI dump, a unit test) is the case, and 01 §Real
+data only forbids zero-filling it: "no store to ask" and "nothing
+running" are different facts, and `runs_running: 0` from an application
+with no database is the shape of a monitor reporting a dead server as
+drained.
+
+`tasks_in_progress` counts `in_progress` only, not `waiting`. The name is
+literal, and it is the number 04 §Shutdown's drain waits on: a waiting
+task holds no slot and needs an operator rather than time, so a drain
+that counted it would never finish while one question sat unanswered.
+
+`/api/me` reports `authenticated: true` whenever `auth` is `"off"`. The
+field says whether the caller has operator rights, and on a plain
+loopback bind every caller does (12 §Posture); the SPA branches on the
+pair, so `{"auth": "off", "authenticated": false}` would be a token
+screen nobody could satisfy.
 
 ## OpenAPI
 
@@ -245,9 +304,28 @@ options, schema, tool_call, pending, answer, answered_by, created, age}`.
 ## Sizes
 
 Body limit `body_limit` (1 MiB default) on every JSON endpoint; 413
-beyond. Neither FastAPI nor Starlette ships this: it is a ~30-line ASGI
-middleware that checks `Content-Length` and caps the receive stream.
-Rate limiting is a later seam, not built.
+beyond, with the error shape of §Conventions and the code
+`payload_too_large`. Neither FastAPI nor Starlette ships this: it is a
+~30-line ASGI middleware that checks `Content-Length` and caps the
+receive stream. Rate limiting is a later seam, not built.
+
+There are two cases and the second is the one that matters.
+
+- A declared `Content-Length` past the limit is refused before a single
+  byte of the body is read.
+- A body sent **without** one — `Transfer-Encoding: chunked`, which any
+  streaming client produces — is counted as it arrives and refused the
+  moment the running total passes the limit. A check that only read the
+  header would be decorative: it is exactly the client that declines to
+  declare a size that is worth bounding. The one case it cannot answer is
+  a body that overruns after the application has already sent its
+  response headers; there is no status line left to write, so the
+  response simply ends.
+
+Because the refusal is the middleware's and not a route's, the 413 is not
+a per-route response in the OpenAPI document. `payload_too_large` reaches
+a client through `ErrorCode`, which is the vocabulary of §Conventions
+rather than the list of responses any one path declares (D128).
 
 ## Versioning
 
