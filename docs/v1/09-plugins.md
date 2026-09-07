@@ -83,19 +83,43 @@ semantics). The manifest stays static; the SPA shows a `node`-slot pane
 when the manifest entry's `node` is `live` in the selected run's graph,
 and the pane count changes accordingly (10 §Panes clamps the index).
 
-`PluginContext` by scope: for `run`/`task`/`node` scopes `run` (and
-`task`) are resolved rows and every service is available. For `workflow`
-and `global` scopes `run_id`, `task_id`, `run`, `task` are `None`;
-`services.log`, `stream`, `submissions`, `requests` raise
-`PluginError(400, "no run in scope")` where they are reached for, while
-`services.run.list()`, `services.events.publish`, and `ops` (which take
-explicit run/task ids) work. The four run-scoped services belong to an
-*attempt*, so a run in scope without a task is
-`PluginError(400, "no task in scope")` — the same refusal one level in.
-`services.run.list()` lists the plugin's own workflow's runs and no
-others. Handlers never get a partially-resolved context: a `run_id` that
-exists but belongs to another workflow is a 404 before the handler runs,
-as is a `task_id` of another run and a `node` the workflow does not have.
+### Context and scopes
+
+`PluginContext` carries `run_id`, `task_id`, `node`, `workflow`, the
+`run` and `task` rows those ids resolve to, `services` and `ops`. A
+route reads the three ids from its `run_id` / `task_id` / `node` query
+parameters, an action from the scope it was invoked in, an `on` handler
+from the event.
+
+By scope: for `run`/`task`/`node` scopes `run` (and `task`) are resolved
+rows and every service is available. For `workflow` and `global` scopes
+`run_id`, `task_id`, `run`, `task` are `None`; `services.log`, `stream`,
+`submissions`, `requests` raise `PluginError(400, "no run in scope")`
+where they are reached for, while `services.run.list()`,
+`services.events.publish`, and `ops` (which take explicit run/task ids)
+work. The four run-scoped services belong to an *attempt*, so a run in
+scope without a task is `PluginError(400, "no task in scope")` — the
+same refusal one level in. `services.run.list()` lists the plugin's own
+workflow's runs and no others.
+
+Handlers never get a partially-resolved context. Each of these is a 404
+*before* the handler runs, and never a 403 — whether a run exists is not
+something one workflow's plugin learns about another's:
+
+- a `run_id` that exists but belongs to another workflow;
+- a `run_id` or `task_id` that does not exist;
+- a `task_id` of another run;
+- a `node` the workflow does not have.
+
+An `on` handler is the one caller resolved leniently: the run a
+`run.deleted` names is already gone by the time the handler is called,
+so it is given a context with no run in scope rather than nothing at
+all. Which workflow is called is still decided by ownership (§Mounting),
+not skipped.
+
+The builtin scope (`_builtin`, §Builtins are plugins) is the exception
+to ownership on both counts: its panels apply to every run, so it owns
+every run and its `services.run.list()` is unfiltered.
 
 ### Escape hatch: web components
 
@@ -136,6 +160,49 @@ Routers mount, the manifest entry is built. Errors at startup, never at
 runtime — the same contract the graph has, and the refusal is a
 `PluginValidationError` (`PluginError` carries an HTTP status and belongs
 to a handler, not to registration).
+
+## Mounting
+
+Registration having passed, three things happen and nothing else does.
+
+**One router per workflow**: an `APIRouter(prefix="/api/plugins/{wf}")`
+under `Depends(operator_auth)`. A plugin does not get an auth model of
+its own (12 §Plugins) — its routes are operator routes, they answer 401
+on a bind that requires a token like every other operator route, and
+they carry the operator security scheme in the document. The handler's
+`ctx: PluginContext` parameter is rewritten into a FastAPI dependency,
+which is what makes `run_id` / `task_id` / `node` documented query
+parameters of the route; every other parameter follows normal FastAPI
+rules. That dependency is a generator, so whatever the context opened is
+closed when the response is done — the transcript service starts a
+background flusher on its first append, and a request-scoped one nobody
+closed would outlive the request.
+
+**The manifest**: `GET /api/plugins`, builtins first and then the
+workflows in registration order. A server with nothing registered
+answers with an empty list rather than a 404, which is a fact the SPA
+can act on.
+
+**One subscription** for the process, feeding the `on` handlers. The bus
+is fed by the store's outbox after the commit, so a handler sees only
+state that is durable, and delivery runs in the dispatcher's own task
+rather than in the transaction. Ownership decides who is called: an
+event that names no run is about the server rather than about anyone's
+work and reaches every subscriber; an event about a run reaches the
+workflow that owns it, resolved from the store or — when the row is
+already gone, as a `run.deleted`'s deterministically is — from the
+payload, which names the workflow (18 §Payloads); an owner that cannot
+be established at all reaches only `_builtin`, which owns every run.
+
+**A plugin cannot break the engine.** A handler that raises is logged
+with its traceback and dropped: the transaction that emitted the event
+committed before the bus published it, the handlers after it still run,
+and the run carries on. A handler that is merely slow costs its own
+subscription events rather than stalling a writer, because the bus never
+awaits a subscriber (D29).
+
+Actions are one endpoint rather than a route each (§Wire contract), and
+assets are served under `/plugins/{wf}/static/` (§Escape hatch).
 
 ## Wire contract
 

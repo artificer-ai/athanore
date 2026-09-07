@@ -2383,8 +2383,13 @@ exception carries, so a handler's 404 is a 404 and not a 500, and
 including the two that matter most: a raising handler leaves the run
 `completed` with its output and the other handler still fires, and a
 `global` route gets `run=None` while `services.log` answers 400
-`plugin_error`. The action endpoint is T070's and the assets mount
-T071's.
+`plugin_error`. 09 now carries the two sections this behaviour belongs
+to and the code cites: §Context and scopes — the scope rules, the
+lenient resolution an `on` handler gets, and the four refusals that are a
+404 and never a 403, moved out of §Slots, which is about slots — and
+§Mounting, the router per workflow under the operator dependency, the
+manifest's order, the one subscription, and why a handler cannot break
+the engine. The action endpoint is T070's and the assets mount T071's.
 
 ### T050 — Builtin plugin declarations (A3.9)
 
