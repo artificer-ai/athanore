@@ -2626,6 +2626,27 @@ aliases warn.
 `__init__.py`, `settings.py`, `logging.py`, `workflow.py`, `server.py`;
 ledger rows for `test_e2e.py`, `test_api_surface.py` and `test_tui.py`
 (retired) ticked.
+**Status.** Done. `tests/api/test_e2e.py` is the one suite with every
+layer in it at once, and the only one that reads nothing except through
+the wire: a real `Server` on a real socket, the engine dispatching,
+agents submitting over the agent API with their task tokens, and the
+event stream attached *before* the run is submitted so the completion is
+seen arriving rather than fetched afterwards. The stream's history and
+`GET /api/runs/{id}/events` are asserted to be one history — same names,
+same order, same ids — with `task.stream` the single frame that carries
+no `id:` because it is published and never stored (03). `athanore/__init__.py`
+is 02 §Public API resolved **lazily** through a module `__getattr__`, and
+that is a layering decision: this module runs before `athanore.workflow`
+on any import of it, so an eager `Server` or `Pool` here would pull
+uvicorn, the API and the store into every module that defines a workflow
+— the one thing 02 §Layering says must not happen (D148). The four MVP
+names of 14 §Compatibility resolve through the same hook and warn on
+every access. There was no MVP teardown to do: no flat modules to
+delete, no `textual` / `netext` / `textual-dev` to drop, no
+`ignore_imports` hatch to remove and no TUI, because this repository
+never held them (D65) — the `find` above already listed exactly the five
+modules before the task started, and `tests/test_public_api.py` now pins
+that it goes on doing so.
 
 ### T056 — Phase 3 checkpoint
 
