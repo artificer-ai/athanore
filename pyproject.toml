@@ -63,7 +63,10 @@ packages = ["athanore"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests"]
+# The examples are a workspace package with its own suite, and the gate
+# is one command (D74): `uv run pytest` collects both, and `uv sync
+# --all-packages` is what puts `pi` on the path for the second.
+testpaths = ["tests", "examples/tests"]
 markers = [
     # The Postgres variants of the store suite (T014). Selected by the
     # nightly workflow and by `pytest -m postgres` against
@@ -81,6 +84,12 @@ extend-exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "ASYNC"]
+
+[tool.ruff.lint.isort]
+# `pi` is this workspace's example package, not a dependency: ruff infers
+# `athanore` as first-party from the source tree and would otherwise sort
+# an example's own imports in among pytest's.
+known-first-party = ["athanore", "pi"]
 
 [tool.pyright]
 typeCheckingMode = "standard"

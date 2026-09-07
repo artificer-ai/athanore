@@ -1775,6 +1775,25 @@ repository, D65.)
 **Done.** `uv run pytest examples` and `tests/` green; `tests/test_stats.py`,
 `test_stats_workflow.py`, `test_agents.py` deleted.
 
+**Status.** Done. `examples/pi/stats.py` reads pi's session JSONL — both
+on-disk layouts, the header check that makes a filename match
+insufficient, per-message sums that exclude the re-read `totalTokens`,
+and a cost that is a measurement only when a message reported a numeric
+total — behind `PiSessionStats`, whose two `async` methods run that file
+I/O in a worker thread because the façade calls them from the `finally`
+of a run. Nothing landed in `athanore/`: `pi` is a package of the
+`examples` workspace member, installed by `uv sync --all-packages`, and
+`grep -rn 'import pi\|from pi' athanore/` is empty. The three ledger
+rows are ticked: `examples/tests/test_pi_stats.py` has the session-file
+half of `test_stats.py`, `tests/agents/test_stats_workflow.py` drives a
+real `Engine` through four agent nodes with a retry in the middle (five
+entries, five events, five `tasks.stats` columns, and none at all for a
+body that failed without an agent), and
+`tests/agents/test_agent_classes.py` carries the rest of `test_agents.py`
+— the class-attribute configuration, the four run-time constructor
+arguments, and v0's `template=` cases inverted into the absence
+`AGENTS.md` requires. The MVP modules were never here to delete (D65).
+
 ### T040a — pi extension for the `native` tier (A2.11, D14)
 
 **Do.** `examples/pi/extensions/athanore.ts`: `pi.registerTool()` for

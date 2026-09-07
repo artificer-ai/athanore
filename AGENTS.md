@@ -119,7 +119,7 @@ Python 3.13, node 22, pnpm, git, sqlite3, jq, ripgrep, the docker CLI,
 and both agents on `PATH`. In there, run the tools directly:
 
 ```sh
-uv sync --all-groups --all-extras          # deps (workspace incl. examples/ from T002)
+uv sync --all-packages --all-groups --all-extras   # deps (workspace incl. examples/)
 uv run pytest -q                           # Python tests
 uv run ruff check . && uv run ruff format --check .
 uv run pyright                             # strict on graph, engine, store

@@ -78,5 +78,5 @@ dev_run() {
 # Bring the project environment up to the lockfile. uv logs to stderr, so
 # this is safe ahead of anything that owns stdout.
 sync_python() {
-  uv sync --all-groups --all-extras
+  uv sync --all-packages --all-groups --all-extras
 }
