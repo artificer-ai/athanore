@@ -592,12 +592,8 @@ def stream(
     options = Options.of(ctx)
     with options.client() as client:
         detail = _mapping(client.get(f"/api/tasks/{task}"))
-        page = _mapping(client.get(f"/api/tasks/{task}/stream", params={"limit": PAGE}))
-        chunks = _mappings(page.get("chunks"))
-        if options.json:
-            emit(page, json_flag=True)
-        else:
-            _print_chunks(chunks)
+        chunks, page = _all_chunks(client, task)
+        _emit_chunks(options, chunks, page)
         if not follow_ or not page.get("live"):
             return
         seq = _last_seq(chunks)
@@ -613,6 +609,61 @@ def stream(
                 seq, live = _drain(options, client, task, seq)
                 if not live:
                     return
+
+
+def _chunks_page(client: Client, task: int, after: int) -> Mapping[str, Any]:
+    """One page of ``GET /api/tasks/{id}/stream`` after ``after``."""
+
+    return _mapping(
+        client.get(f"/api/tasks/{task}/stream", params={"after": after, "limit": PAGE})
+    )
+
+
+def _all_chunks(
+    client: Client, task: int, after: int = 0
+) -> tuple[list[Mapping[str, Any]], Mapping[str, Any]]:
+    """Every chunk of ``task`` after ``after``, and the last page read.
+
+    The API pages a transcript exactly as it pages a history, so `stream`
+    pages exactly as `logs` does: a verb that printed one page and stopped
+    would print the first 500 chunks of a long attempt and exit 0 as if
+    that were the whole of it. The page comes back with the chunks because
+    ``last_seq`` and ``live`` belong to the *end* of the read, not to
+    where it started.
+    """
+
+    chunks: list[Mapping[str, Any]] = []
+    while True:
+        page = _chunks_page(client, task, after)
+        got = _mappings(page.get("chunks"))
+        chunks.extend(got)
+        if len(got) < PAGE:
+            return chunks, page
+        last = _last_seq(got)
+        if last <= after:
+            # Sequence numbers ascend (`StreamRepo`); a full page that did
+            # not advance the cursor would loop for ever, and stopping is
+            # the only honest thing left to do with it.
+            return chunks, page
+        after = last
+
+
+def _emit_chunks(
+    options: Options,
+    chunks: Sequence[Mapping[str, Any]],
+    page: Mapping[str, Any],
+) -> None:
+    """The chunks read, as the API's own object or as the text they are.
+
+    ``--json`` is one ``StreamOut`` however many pages it took to read,
+    the way ``logs --json`` is one list: the shape a script parses is the
+    wire contract's, not the CLI's paging.
+    """
+
+    if options.json:
+        emit({**page, "chunks": list(chunks)}, json_flag=True)
+        return
+    _print_chunks(chunks)
 
 
 def _print_chunks(chunks: Sequence[Mapping[str, Any]]) -> None:
@@ -641,17 +692,17 @@ def _last_seq(chunks: Sequence[Mapping[str, Any]]) -> int:
 
 
 def _drain(options: Options, client: Client, task: int, seq: int) -> tuple[int, bool]:
-    """Print everything after ``seq``; report the new cursor and liveness."""
+    """Print everything after ``seq``; report the new cursor and liveness.
 
-    page = _mapping(
-        client.get(f"/api/tasks/{task}/stream", params={"after": seq, "limit": PAGE})
-    )
-    chunks = _mappings(page.get("chunks"))
-    if options.json:
-        if chunks:
-            emit(page, json_flag=True)
-    else:
-        _print_chunks(chunks)
+    Everything, not one page of it: a flush larger than :data:`PAGE` is
+    ordinary for an agent that has been quiet for a while, and a follower
+    that read one page per event would print a transcript with holes in
+    it and then decide, from a stale ``live``, that it was done.
+    """
+
+    chunks, page = _all_chunks(client, task, seq)
+    if chunks:
+        _emit_chunks(options, chunks, page)
     return max(seq, _last_seq(chunks)), bool(page.get("live"))
 
 

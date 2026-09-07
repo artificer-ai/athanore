@@ -76,6 +76,14 @@ PERMISSION_OPTIONS = [
 ]
 
 
+#: What the `chatty` workflow streams after its request is answered, in
+#: one flush. Several chunks rather than one, because a single
+#: `task.stream` event announces the whole flush: a follower that read
+#: one page of transcript per event it saw would print the first of these
+#: and drop the rest, and only a flush bigger than a page can say so.
+AFTER_ANSWER = ["second thing", "third thing", "fourth thing", "fifth thing"]
+
+
 #: An `options` request whose choices carry no kind, which is what most
 #: `human_input(options=[...])` questions look like. `permit` and `deny`
 #: cannot pick from these, and that refusal is theirs to word.
@@ -156,6 +164,10 @@ def chatty_workflow(name: str = "chatty") -> Workflow:
     `waiting` — which is live, because a waiting attempt goes on writing
     once its request is answered — so a follower attaches to a transcript
     that is genuinely still growing.
+
+    The second flush writes every chunk of :data:`AFTER_ANSWER` at once,
+    because one ``task.stream`` event announces a whole flush however
+    many chunks are in it.
     """
 
     wf = Workflow(name)
@@ -166,7 +178,8 @@ def chatty_workflow(name: str = "chatty") -> Workflow:
         await services.stream.append(ChunkKind.text, "first thing")
         await services.stream.flush()
         answer = await human_input(PROMPT)
-        await services.stream.append(ChunkKind.text, "second thing")
+        for text in AFTER_ANSWER:
+            await services.stream.append(ChunkKind.text, text)
         await services.stream.flush()
         return answer
 

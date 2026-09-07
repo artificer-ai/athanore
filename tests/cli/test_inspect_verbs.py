@@ -31,7 +31,15 @@ import pytest
 from athanore.cli import inspect, main
 from athanore.cli.output import EXIT_API_ERROR, EXIT_OK, EXIT_UNREACHABLE, EXIT_USAGE
 from athanore.server import Server
-from tests.cli.conftest import PROMPT, Api, Cli, flat, listening, until
+from tests.cli.conftest import (
+    AFTER_ANSWER,
+    PROMPT,
+    Api,
+    Cli,
+    flat,
+    listening,
+    until,
+)
 
 #: A ULID-shaped id of no run, for the 404s.
 ABSENT_RUN = "01NOTAREALRUNID0000000000"
@@ -274,6 +282,52 @@ async def test_stream_prints_an_attempts_transcript(cli: Cli, api: Api) -> None:
     assert [chunk["kind"] for chunk in page["chunks"]] == ["text", "thought"]
     assert page["last_seq"] == 2
     assert page["live"] is False
+
+
+async def test_stream_pages_through_a_transcript_longer_than_one_page(
+    cli: Cli, api: Api, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A verb that printed one page would quietly truncate a transcript."""
+
+    run = await api.completed("demo", "Build the thing")
+    task = (await api.run(run))["tasks"][0]["id"]
+    whole = await api.get(f"/api/tasks/{task}/stream", limit=5000)
+    assert len(whole["chunks"]) > 1
+
+    monkeypatch.setattr(inspect, "PAGE", 1)
+    paged = await cli.json("stream", str(task))
+    # One `StreamOut`, however many pages it took to read it.
+    assert [chunk["seq"] for chunk in paged["chunks"]] == [
+        chunk["seq"] for chunk in whole["chunks"]
+    ]
+    assert paged["last_seq"] == whole["last_seq"]
+    assert paged["live"] is False
+
+    result = await cli.run("stream", str(task))
+    assert result.code == EXIT_OK
+    assert "reading the task" in result.out
+    assert "[thought] this looks easy" in result.out
+
+
+async def test_stream_follow_prints_a_flush_bigger_than_a_page(
+    cli: Cli, api: Api, server: Server, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One `task.stream` event can announce more chunks than a page holds."""
+
+    monkeypatch.setattr(inspect, "PAGE", 1)
+    request = await api.one_request("chatty")
+    task = int(request["task_id"])
+
+    before = len(server.bus.subscriptions)
+    follower = cli.follower("stream", str(task), "-f")
+    await listening(server, before)
+
+    await api.post(f"/api/requests/{request['id']}/answer", {"value": "carry on"})
+    assert await follower == EXIT_OK
+
+    printed = cli.capsys.readouterr().out
+    # Every chunk of the one flush, not the first page of it.
+    assert [text for text in AFTER_ANSWER if text in printed] == AFTER_ANSWER
 
 
 async def test_stream_follow_ends_when_the_attempt_does(
