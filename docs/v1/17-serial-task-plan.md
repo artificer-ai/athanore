@@ -2162,6 +2162,24 @@ success and misfit; `append_log` writes with author `agent`; a wrong
 token is refused; `ask_operator` absent when the policy is off.
 **Done.** Tests pass; snapshot updated.
 
+**Status.** Done. `athanore/api/mcp.py` is 08 §MCP's five tools on an
+`mcp` SDK server (stateless streamable HTTP), on a Starlette route at
+`/mcp/agent` behind `TaskTokenGuard` — the token resolved once, by
+`deps.live_task`, the predicate `task_auth` was refactored onto, so a
+missing or dead token is the API's own 403 before any JSON-RPC is
+parsed. Every tool calls the very function `routers/agent.py` registers
+as a route, so nothing here is reachable that `/api/agent/` does not
+reach. The listing is per request: `submit_result`'s input schema is the
+live context's `output_model` schema, a free object when none is
+declared, and `ask_operator`/`wait_answer` are listed only with
+`ask_policy == "http"` — a call anyway still gets `/ask`'s 403, as an
+`isError` result. Refusals carry 08 §Conventions' error body; a rejected
+submission carries 08 §MCP's `{ok: false, errors, schema}`, which is what
+lets a model fix the shape inside the same turn. Descriptions are 19's
+wording, checked against the document. `create_app`'s lifespan runs the
+session manager, and the route is in the snapshot under `agent` as an
+opaque path item (D134).
+
 ### T046 — SSE endpoint (A3.5)
 
 **Do.** `athanore/api/sse.py`: `GET /api/events` → `EventSourceResponse

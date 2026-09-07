@@ -9,9 +9,12 @@ What it assembles is the API's spine — the error shape of 08
 refuses a configuration whose auth could never succeed (12 §Operator
 token), and the application state every router reads its collaborators
 from. The routers arrive one task at a time; the system router of 08
-§System is the first of them. The lifespan is empty on purpose: starting
-the engine belongs to the host that owns it (T031), not to the
-application it serves.
+§System is the first of them.
+
+The lifespan starts one thing and one thing only: the MCP endpoint's
+session manager, which the application owns because the application
+mounted it (08 §MCP). Starting the engine belongs to the host that owns
+it (T031), not to the application it serves.
 
 The OpenAPI document generated from this app is committed as
 `tests/snapshots/openapi.json`, and the SPA's TypeScript client is
@@ -30,6 +33,7 @@ from fastapi import FastAPI
 from athanore.api import VERSION
 from athanore.api.deps import check_operator_token
 from athanore.api.errors import install_error_handlers
+from athanore.api.mcp import mount as mount_mcp
 from athanore.api.middleware import BodyLimitMiddleware
 from athanore.api.routers import agent, requests, runs, system, tasks, workflows
 from athanore.engine import Engine
@@ -42,17 +46,19 @@ __all__ = ["VERSION", "create_app"]
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """The application's startup and shutdown, which do nothing yet.
+    """The application's startup and shutdown.
 
-    It exists now so that the hook is part of the published factory
-    rather than something a later task retrofits. Nothing the API owns
-    has a lifecycle: the engine, the store and the event bus are started
-    and stopped by whoever built them and handed them here (04
-    §Shutdown), because an application that started an engine it did not
-    own would stop one out from under a host still using it.
+    One collaborator has a lifecycle the application owns: the MCP
+    server's session manager, which holds the task group each request's
+    server instance runs in and therefore serves nothing until it is
+    entered (08 §MCP). Everything else — the engine, the store, the event
+    bus — is started and stopped by whoever built it and handed it here
+    (04 §Shutdown), because an application that started an engine it did
+    not own would stop one out from under a host still using it.
     """
 
-    yield
+    async with app.state.mcp.run():
+        yield
 
 
 def create_app(
@@ -102,5 +108,9 @@ def create_app(
     app.include_router(tasks.router)
     app.include_router(requests.router)
     app.include_router(agent.router)
+    # Last, and not a router: the same five capabilities as MCP tools,
+    # on a mounted ASGI application with its own auth at the door (08
+    # §MCP). The manager it returns is what `lifespan` runs.
+    app.state.mcp = mount_mcp(app, settings)
 
     return app

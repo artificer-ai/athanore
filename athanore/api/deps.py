@@ -62,6 +62,7 @@ __all__ = [
     "auth_mode",
     "authenticated",
     "check_operator_token",
+    "live_task",
     "operator_auth",
     "task_auth",
 ]
@@ -211,6 +212,35 @@ async def operator_auth(request: Request) -> None:
         raise ApiError(401, ErrorCode.unauthorized, _UNAUTHORIZED)
 
 
+async def live_task(request: Request, token: str | None) -> TaskRow:
+    """The attempt ``token`` is the live token of, or 403.
+
+    Two conditions, and both are the same refusal: the hash is known, and
+    the attempt it names is still ``in_progress`` or ``waiting`` (12
+    §Task tokens). A token from a finished, failed, recovered or
+    cancelled attempt is dead, so an agent that keeps working after its
+    task ended can no longer write to it.
+
+    The predicate rather than the dependency, because there are two
+    surfaces to say it on: :func:`task_auth` for the REST routes, which
+    additionally checks the token against the id in the path, and
+    :class:`athanore.api.mcp.TaskTokenGuard` for the MCP endpoint, whose
+    tools take no id at all. Both mean "this token, and it is live", and
+    this is that sentence.
+    """
+
+    store = request.app.state.store
+    if store is None or token is None:
+        # No store, no attempts, no valid token — the honest answer is
+        # the same refusal rather than a 500 about the server's wiring.
+        raise ApiError(403, ErrorCode.forbidden, _FORBIDDEN)
+    async with store.reader() as reader:
+        row = await reader.tasks.by_token_hash(token_hash(token))
+    if row is None or row.status not in LIVE_STATUSES:
+        raise ApiError(403, ErrorCode.forbidden, _FORBIDDEN)
+    return row
+
+
 async def task_auth(
     request: Request,
     task_id: Annotated[int, Path(description="The task the token was minted for.")],
@@ -220,25 +250,16 @@ async def task_auth(
 ) -> TaskRow:
     """The attempt ``x_athanore_token`` is the live token of, or 403.
 
-    Three conditions, and all three are the same refusal: the hash is
-    known, the attempt it names is *this* ``task_id``, and that attempt
-    is still ``in_progress`` or ``waiting`` (12 §Task tokens). A token
-    from a finished, failed, recovered or cancelled attempt is dead, so
-    an agent that keeps working after its task ended can no longer write
-    to it.
+    Three conditions, and all three are the same refusal: the two of
+    :func:`live_task`, and that the attempt the token names is *this*
+    ``task_id`` — a token cannot name another task.
 
     The header is required, so a request without one is FastAPI's 422
     with the shape of 08 §Conventions rather than a 403: nothing was
     presented to refuse, and the body names the header that is missing.
     """
 
-    store = request.app.state.store
-    if store is None:
-        # No store, no attempts, no valid token — the honest answer is
-        # the same refusal rather than a 500 about the server's wiring.
-        raise ApiError(403, ErrorCode.forbidden, _FORBIDDEN)
-    async with store.reader() as reader:
-        row = await reader.tasks.by_token_hash(token_hash(x_athanore_token))
-    if row is None or row.id != task_id or row.status not in LIVE_STATUSES:
+    row = await live_task(request, x_athanore_token)
+    if row.id != task_id:
         raise ApiError(403, ErrorCode.forbidden, _FORBIDDEN)
     return row
