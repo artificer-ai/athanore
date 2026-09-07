@@ -1844,6 +1844,57 @@ the model `PiSessionStats` read out of the session file.
 **Do.** Full suite; `pyright` strict paths clean; 05 and 06 updated with
 implementation notes (stderr cap, kill grace period, empty-list return).
 
+**Status.** Done. The gate is green end to end: 1246 passed, 280 skipped
+(the Postgres matrix, which needs a `postgres` service this environment
+has no docker socket to start, plus the assertions that are SQLite's
+own), ruff clean, pyright **0 errors** including the strict paths, the
+web typecheck/lint/test/build, and `lint-imports` 4 contracts kept, 0
+broken over 69 files and 181 dependencies. The phase gate ran: a
+two-node workflow of `PiAgent` seats, driven by a real `Engine`, with
+`ATHANORE_AGENT_COMMAND` pointing every one of them at `FakeACPAgent`
+and `ATHANORE_FAKE_SCENARIOS` selecting `gate.build.json` /
+`gate.review.json` by the workflow and node in the kickoff prompt —
+each scenario logging a deliverable and submitting a value that
+satisfies the node's `output_model` — completes with no model in the
+loop, two `[stats]` lines and the run output the second submission
+carried. (There are no example *workflows* to run yet: `examples/` is
+the pi seat, its stats provider and its extension until T074, so the
+gate was exercised as a throwaway module and not committed — T041 lands
+no code.)
+
+05 and 06 were read line by line against `athanore/agents/acp.py`,
+`policies.py`, `stats.py` and `athanore/requests/`; what the read
+changed is D127. Three findings, reported rather than fixed, because
+fixing any of them here would hide which task shipped it:
+
+1. `ACPAgent._cleanup` cancels the stderr pump **before** it stops the
+   child, so the last thing a crashing adapter writes — the part that
+   explains the crash — is not logged, and a child that writes more than
+   one pipe buffer on shutdown blocks on stderr instead of handling
+   `SIGTERM` and is killed five seconds later. Stopping the child first
+   and then awaiting the pump to EOF would fix both.
+2. `STDERR_CAP` and `KILL_AFTER` have no test. The reaping is asserted
+   (`tests/agents/test_acp_outcomes.py` checks `returncode is not None`
+   on the timeout and cancellation paths), but nothing exercises a child
+   that ignores `SIGTERM` or one that floods stderr, so both constants
+   could be changed to anything and the suite would stay green.
+3. `MockAgent`'s class docstring says "Each argument is one thing a real
+   run does, and may be a value or a zero-argument callable", which is
+   true of `output`, `submit` and `log` — the three that go through
+   `_value()` — and false of the other two. A callable `stream=` raises
+   `TypeError` in `__init__` (`list(stream)`), and a callable `fail=` is
+   never called: `run()` raises `AgentError(self._fail)` with the
+   function object as the message, so the double fails in a way the test
+   reading the message cannot recognise. §Testing doubles above now
+   states the contract the code implements; making the docstring's wider
+   contract true — put `stream` and `fail` through `_value()`, or reject
+   a callable at construction — is a change to `athanore/testing/mock.py`
+   and belongs to a task of its own.
+
+Also still open from T029, re-reported so it is not lost: 04 §Routing
+edge cases says `return [ref]` is "identical to `return ref`", which
+stopped being true when T024b made a fan-out of one push a branch frame.
+
 ---
 
 ## Phase 3 — API, CLI, plugin manifest

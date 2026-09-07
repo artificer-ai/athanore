@@ -106,17 +106,23 @@ system_prompt
 ## Your assignment
 <prompt argument>
 ---
-## Your task
+## Your task                       omitted outside a task context
 Work on task N "title" — stage "node" of workflow "wf" (run R).
-  curl GET  {api_base}/api/agent/tasks/N        (read title, description, FULL work log)
-  curl POST {api_base}/api/agent/tasks/N/log    (append your deliverable before finishing)
-[## Asking the operator]           only when ask_policy == "http"
-[## Submitting your result]        only when output_model is set: exact curl + JSON schema
+[tier block, mcp/native]           the tool list: get_task, append_log, submit_result, …
+[tier block, http]                 curl GET  {api_base}/api/agent/tasks/N     (read title, description, FULL work log)
+                                   curl POST {api_base}/api/agent/tasks/N/log (append your deliverable before finishing)
+[## Asking the operator]           http tier only, when ask_policy == "http"
+[## Submitting your result]        http tier only, when output_model is set: exact curl + JSON schema
 ```
 
 The exact wording of every block, including the repair-turn text, is
 fixed in 19 and asserted by tests; the MVP's text is carried verbatim
-with only the path and header changes below.
+with only the path and header changes below. A section with nothing to
+say is omitted **with its separator**, so an agent carrying no
+`system_prompt` opens on its assignment rather than on a `---` (19
+§Assembly). In the `mcp` and `native` tiers the ask block is dropped —
+the tool's own description carries it — and the submission block becomes
+the one line pointing at `submit_result`'s input schema.
 
 The task token is passed in the `X-Athanore-Token` header of the injected
 curl lines, and is also exported to the subprocess as `ATHANORE_TASK_TOKEN`
@@ -148,6 +154,19 @@ callbacks:
    `CLAUDE_PID` removed, or only `env_allowlist` kept; then
    `ATHANORE_TASK_TOKEN` / `ATHANORE_TASK_URL` and the explicit `env`
    merged), stdin/stdout piped, stderr captured to the structured log.
+   Two bounds on that pipe pair, both of them the difference between a
+   diagnosis and a hang:
+   - **stderr is capped at 64 KiB** (`STDERR_CAP`). The first 64 KiB is
+     logged line by line at DEBUG; past the cap the pump keeps *reading*
+     and stops logging. A crashing adapter can produce megabytes and the
+     structured log is not the place for them (12 §Agents), but
+     abandoning the pipe is worse than logging it: a full pipe blocks the
+     child on its next write, and a child blocked on stderr looks exactly
+     like a slow model.
+   - **stdout is buffered at 8 MiB** (`STDOUT_LIMIT`). One ACP frame is
+     one line, and a tool call's `rawInput` — a file the agent just read
+     — routinely exceeds asyncio's 64 KiB default, which fails the read
+     rather than the tool call (D124).
 2. `initialize` (client info carries the real `athanore.__version__`),
    `new_session(cwd)`, set `model` / `thinking` by category.
 3. Declare `output_model` and `ask_policy` on the `TaskContext` for the
@@ -160,9 +179,24 @@ callbacks:
 6. Outcome: `refusal`/`cancelled` → failed result; final-turn truncation
    (below) → failed result; else attach the latest submission (validated
    against `output_model`; missing → `AgentError`).
-7. `finally`: flush the transcript, close the connection, terminate then
-   kill the subprocess, record the stats entry exactly once (work-log
-   line, `agent.stats` event, and `tasks.stats` column, 07).
+7. `finally`: flush the transcript, close the connection, stop the
+   subprocess, record the stats entry exactly once (work-log line,
+   `agent.stats` event, and `tasks.stats` column, 07). Each step is
+   guarded on its own — a connection that will not close must not leave
+   a child running, and neither may stop the stats entry being written —
+   and the transcript is flushed, not closed: it belongs to the attempt,
+   so a body running two agents in sequence still has somewhere to write
+   (D124).
+
+   Stopping the child is three steps and **a five-second grace period**
+   (`KILL_AFTER`): close its stdin, which is how a well-behaved adapter
+   is asked to exit on its own; `terminate()`; and `kill()` if it has not
+   exited within `KILL_AFTER`. The child is always waited on, so
+   `returncode` is set by the time `run()` returns and a long-lived
+   server collects no zombies — on the timeout and cancellation paths as
+   much as on the clean one. Five seconds is a shutdown budget, not a
+   turn's: the agent has already been told to stop, and an adapter that
+   is still writing after it is one this process cannot wait for.
 
 ### Truncation detection is a provider concern
 
@@ -233,7 +267,8 @@ Recorded once per `run()` on every exit path, as a `[stats]` work-log line
 (provider-reported, else the class's `model`), `input_tokens`,
 `output_tokens`, `total_tokens` (input + output; ACP usage wins over the
 provider when present), `tool_calls` (ACP `ToolCallStart` count), `cost`
-(provider only), `duration_s`, `session_id`, `repair_turns`,
+(provider only), `duration_s` (whole seconds, the resolution the work-log
+line quotes), `session_id`, `repair_turns` (when > 0),
 `denied_permissions` (count of `reject_*` answers, when > 0), `reason`
 (with `status=failed`: `refusal`, `cancelled`, `truncated`, `timeout`,
 `shutdown`, `transport`, `no_submission`). Fields that cannot be
@@ -244,9 +279,16 @@ determined are omitted. Never raises. The text form is
 
 ## Testing doubles (`athanore.testing`)
 
-- `MockAgent(output=… | submit=… | log=… | stream=…)` — no subprocess;
-  `submit=` exercises the real endpoint with the real token.
-- `StatsMockAgent(stats=…, fail=…)` — records a stats entry like the façade.
+- `MockAgent(output=… | submit=… | log=… | stream=… | fail=…)` — no
+  subprocess; `submit=` exercises the real endpoint with the real token,
+  and `fail=` raises the `AgentError` a body has to route around.
+  `output=`, `submit=` and `log=` each take either a value or a
+  zero-argument callable, so a body that runs the same agent on several
+  attempts scripts them by closing over a counter; `stream=` and `fail=`
+  take a value.
+- `StatsMockAgent(stats=…, fail=…)` — records a stats entry like the
+  façade; `stats=` takes a value or a zero-argument callable, and `fail=`
+  is `True` for a transport failure or one of §Stats entry's reasons.
 - `FakeACPAgent` — a real subprocess speaking ACP over stdio, scriptable
   (text chunks, tool calls, permission requests, elicitations, usage), so
   the façade is tested end to end without pi or Claude.

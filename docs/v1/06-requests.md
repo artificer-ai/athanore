@@ -42,21 +42,43 @@ async def wait(request_id, timeout=None) -> Answer   # claims (consumed=1); rais
 async def poll(request_id, wait_s) -> Answer | None  # HTTP ask long-poll; idempotent re-delivery
 def register_validator(request_id, fn); def unregister_validator(request_id)
 def register_schema_validator(request_id, schema)   # the same, for a registrant holding a JSON schema (the ACP bridge, 05)
+async def view(request_id) -> RequestView       # the read every method above makes first
 async def list_for_run(run_id) -> list[RequestView]; async def inbox() -> list[RequestView]
 ```
 
-Validation happens where the answer lands (`answer()`):
+`create` refuses an `options` request that offers nothing, with
+`ValueError`: `answer()` accepts only an `option_id` the request listed,
+so such a row is a question no answer could ever satisfy, and the honest
+place to say so is the call that would write it (D115).
 
+Validation happens where the answer lands (`answer()`), in this order:
+
+- an id that names no request → `RequestNotFound` (404). It is `view()`'s
+  refusal, and `answer`, `wait` and `poll` all inherit it from that one
+  read rather than each deciding what a missing row means (D115).
+- A second answer → `AlreadyAnswered` (409). The unique constraint on
+  `answers.request_id` is the guard; the read is the sentence, and an
+  answer that lands between the two collides and gets the same refusal.
+- A request whose task is no longer `in_progress`/`waiting` →
+  `StaleRequest` (409).
 - `options`: `option_id` must be offered → else `InvalidOption` (400).
-- `text`: non-empty string → else `InvalidAnswer` (422).
+- `text`: non-empty string, whitespace alone is not one → else
+  `InvalidAnswer` (422). Stored exactly as it was given: the answer is
+  the operator's, not the service's.
 - `form`: must be an object; if a validator is registered it runs and may
   normalise the value → else `InvalidAnswer` with pydantic-style errors
   (422). `human_input` registers `output_model.model_validate`; the ACP
   bridge and HTTP ask register the light JSON-schema validator — the
   bridge through `register_schema_validator`, because `athanore.agents`
   may not import `athanore.requests` to build one (02 §Layering, D123).
-- A second answer → `AlreadyAnswered` (409).
-- A request whose task is no longer `in_progress`/`waiting` → `Stale` (409).
+
+What a validator returns is what is stored, so an answer is normalised
+once, at the door. `answers.value` is a JSON column and a pydantic
+instance is not JSON, so a `pydantic_validator`'s return is stored as its
+`model_dump(mode="json")` and `human_input` re-validates it on the way
+out to hand the body the instance it promised (D115). That is one decode
+path rather than two: it is the same one a replay after a restart already
+takes (§Restart durability).
 
 ### Wake-ups
 
@@ -85,7 +107,11 @@ polling loops, no shared `asyncio.Event` in the store.
   fits, the failure is logged and the question is re-asked with the
   errors appended (a new request at the next ordinal).
 - Agent-raised requests die with their agent session (the whole attempt
-  re-runs); they remain in history as stale.
+  re-runs); they remain in history as stale. They carry **no ordinal**:
+  an ordinal is a promise that the *n*th question of a re-executed
+  attempt is the same question, and a turn is not reproduced statement
+  for statement, so numbering a permission by position would replay one
+  answer onto a different tool call.
 
 ### Timeouts and headless fallbacks
 
