@@ -1921,6 +1921,22 @@ later tasks; `state.settings/engine/store/started_at`.
 with and without `Content-Length`.
 **Done.** Tests pass.
 
+**Status.** Done. `athanore/api/errors.py` carries `ErrorCode` (08
+§Conventions in full, `payload_too_large` and `plugin_error` included),
+`ApiError`, the `ErrorResponse` that renders with `default=str`, the
+`DOMAIN_ERRORS` table looked up along the raised exception's MRO — so
+`UnknownWorkflow` answers 404 `unknown_workflow` rather than its
+`NotFound` base's code — and `install_error_handlers`.
+`athanore/api/middleware.py` is the pure-ASGI `BodyLimitMiddleware`:
+`Content-Length` refused before a byte is read, and otherwise the
+running total counted on a wrapped `receive`, which is the only guard a
+chunked upload meets. `create_app` adds the middleware, installs the
+handlers, declares an empty lifespan and puts `settings`, `engine`,
+`store`, `plugins` and `started_at` on `app.state`. The five choices the
+task left open are D128 in 15 — including the number, since the `D53`
+it names was taken before Phase 3 was reached. The OpenAPI snapshot is
+unchanged: handlers and middleware are not in the document.
+
 ### T043 — Auth dependencies, `/api/health`, `/api/me` (A3.2, D47)
 
 **Do.** `athanore/api/deps.py`: `auth_mode(settings) -> "off" | "token"`
