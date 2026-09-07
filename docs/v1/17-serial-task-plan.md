@@ -2309,6 +2309,33 @@ errors; the manifest shape for a workflow with one of every declaration;
 `panel()` is a plain call and returns the `Panel`.
 **Done.** Tests pass.
 
+**Status.** Done. `athanore/plugins/decl.py` is the declaration
+vocabulary and nothing else — `Route`, `Action`, `Panel`, `Handler`, the
+`Slot` and `PanelKind` enums, `Placement` as the two-value literal 09
+names, and `PluginError(status, message)` — so it imports pydantic and
+nothing from this package, and sits at the bottom of the layering beside
+`graph` (D138). `Workflow` gained `route()`, `action()`, `panel()`,
+`on()` and `assets=`: `panel` is a plain call that returns its `Panel`
+(D50), an action reads its model off the handler's `input` annotation
+because "the model **is** the form", a panel's `scope` defaults to its
+`slot`, and a declaration made after `finalize()` is refused exactly as a
+node is. `athanore/plugins/registry.py` freezes a workflow's
+declarations into a `PluginSpec`, checks it, and renders its manifest
+entry. `validate` runs **six** checks in order — duplicate names, a node
+the graph lacks, a `custom` panel with no `element`, a `source` that
+names none of this workflow's routes (or, for a `form`, its actions), a
+missing `assets` directory, and an `on` outside the vocabulary or in
+another workflow's `plugin.` namespace — and refuses with a
+`PluginValidationError`, because a declaration refused at registration
+has no request to answer (D138). 09 §Registration now lists all six.
+`manifest_entry` renders `{workflow, panels, actions, assets}` with the
+action's `model_json_schema()` as its form, the route's mounted URL as a
+panel's `source` (the action's name for a `form`), every `.js` under the
+assets directory as a URL, and fields that do not apply **absent** rather
+than null. `tests/plugins/test_registry.py` is 33 tests: one per
+validation error, the manifest of a workflow declaring one of everything,
+and `panel()` returning the `Panel` it declared.
+
 ### T049a — Plugin mount, `PluginContext` dependency, `on` dispatch (A3.8)
 
 **Do.** `athanore/plugins/context.py`: `PluginContext` dataclass (`run_id,
@@ -2327,6 +2354,37 @@ a foreign `run_id` is 404; a `global` route gets `run=None` and
 `run.completed`; a raising handler does not affect the engine; manifest
 endpoint shape.
 **Done.** Tests pass; snapshot updated.
+
+**Status.** Done. `athanore/plugins/context.py` is `PluginContext`
+(`run_id`, `task_id`, `node`, `workflow`, `run`, `task`, `services`,
+`ops`) and the `PluginHost` that resolves one. Nothing is partially
+resolved: a run of another workflow, a run or task that does not exist, a
+task of another run and a node the workflow does not have are each a 404
+before the handler runs, and never a 403. A service the scope cannot have
+raises where it is reached for — `no run in scope` in a `workflow` or
+`global` context, `no task in scope` when a run is in scope but no
+attempt is — while `services.run.list()` (this workflow's runs only),
+`services.events.publish` and `ops` work in every scope (D139).
+`athanore/plugins/mount.py` builds one `APIRouter` per workflow at
+`/api/plugins/{wf}` under `Depends(operator_auth)`, rewriting the
+handler's `ctx: PluginContext` parameter into a generator dependency —
+which is what makes `run_id`/`task_id`/`node` documented query
+parameters and what closes the transcript flusher a route may have
+started. `GET /api/plugins` is the manifest, builtins first under
+`_builtin`. `dispatch_handlers(bus, specs, host)` takes one subscription
+and one consumer task, resolves each event's owning workflow once, skips
+the specs that do not own it, and calls the rest after commit; a handler
+that raises is logged with its traceback and dropped, and it cannot reach
+the engine at all. The application's lifespan starts and closes it.
+`PluginError` is rendered by `api/errors.py` with the status the
+exception carries, so a handler's 404 is a 404 and not a 500, and
+`WorkflowOut.plugin` is populated from the same `manifest_entry`.
+`tests/plugins/test_mount.py` is 25 tests over a real `create_app()`,
+including the two that matter most: a raising handler leaves the run
+`completed` with its output and the other handler still fires, and a
+`global` route gets `run=None` while `services.log` answers 400
+`plugin_error`. The action endpoint is T070's and the assets mount
+T071's.
 
 ### T050 — Builtin plugin declarations (A3.9)
 

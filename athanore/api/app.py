@@ -11,10 +11,11 @@ token), and the application state every router reads its collaborators
 from. The routers arrive one task at a time; the system router of 08
 §System is the first of them.
 
-The lifespan starts one thing and one thing only: the MCP endpoint's
-session manager, which the application owns because the application
-mounted it (08 §MCP). Starting the engine belongs to the host that owns
-it (T031), not to the application it serves.
+The lifespan starts what the application itself owns and nothing else:
+the MCP endpoint's session manager, because the application mounted it
+(08 §MCP), and the plugin event dispatcher, because the subscription it
+holds is one this application took (09). Starting the engine belongs to
+the host that owns it (T031), not to the application it serves.
 
 The OpenAPI document generated from this app is committed as
 `tests/snapshots/openapi.json`, and the SPA's TypeScript client is
@@ -24,9 +25,8 @@ adds a route regenerates both as part of its own definition of done.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
-from typing import Any
+from collections.abc import AsyncIterator, Sequence
+from contextlib import AsyncExitStack, asynccontextmanager
 
 from fastapi import FastAPI
 
@@ -48,6 +48,9 @@ from athanore.api.routers import agent, requests, runs, system, tasks, workflows
 from athanore.api.sse import router as sse_router
 from athanore.api.static import install_cors, mount_spa
 from athanore.engine import Engine
+from athanore.plugins.context import PluginHost
+from athanore.plugins.mount import dispatch_handlers, mount_plugins
+from athanore.plugins.registry import PluginSpec
 from athanore.settings import AthanoreSettings
 from athanore.store.clock import now
 from athanore.store.uow import Store
@@ -59,16 +62,28 @@ __all__ = ["VERSION", "create_app"]
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """The application's startup and shutdown.
 
-    One collaborator has a lifecycle the application owns: the MCP
-    server's session manager, which holds the task group each request's
-    server instance runs in and therefore serves nothing until it is
-    entered (08 §MCP). Everything else — the engine, the store, the event
-    bus — is started and stopped by whoever built it and handed it here
-    (04 §Shutdown), because an application that started an engine it did
-    not own would stop one out from under a host still using it.
+    Two collaborators have a lifecycle the application owns. The MCP
+    server's session manager holds the task group each request's server
+    instance runs in and therefore serves nothing until it is entered (08
+    §MCP). The plugin event dispatcher is one subscription on the engine's
+    bus, and it can only be taken once there is a loop to consume it in
+    (09 §Wire contract) — so it is started here and closed here, and a
+    handler that outlived the application would otherwise be delivering
+    events into a store on its way down.
+
+    Everything else — the engine, the store, the event bus — is started
+    and stopped by whoever built it and handed it here (04 §Shutdown),
+    because an application that started an engine it did not own would
+    stop one out from under a host still using it.
     """
 
-    async with app.state.mcp.run():
+    engine: Engine | None = app.state.engine
+    specs: Sequence[PluginSpec] = app.state.plugins
+    async with AsyncExitStack() as stack:
+        await stack.enter_async_context(app.state.mcp.run())
+        if engine is not None and any(spec.handlers for spec in specs):
+            dispatch = dispatch_handlers(engine.bus, specs, PluginHost.from_app(app))
+            stack.push_async_callback(dispatch.aclose)
         yield
 
 
@@ -76,14 +91,15 @@ def create_app(
     settings: AthanoreSettings | None = None,
     engine: Engine | None = None,
     store: Store | None = None,
-    plugins: Any = None,
+    plugins: Sequence[PluginSpec] | None = None,
 ) -> FastAPI:
     """Build the ASGI application.
 
     `settings` defaults to a freshly loaded :class:`AthanoreSettings`, so
     a bare `create_app()` is the server the environment describes.
-    `plugins` is untyped only because the plugin registry does not exist
-    yet; it becomes the registry in T049.
+    `plugins` are the collected, **validated** specs of the registered
+    workflows (09): the host that registered them is what checked them,
+    and this application mounts what it is given.
 
     Raises :class:`~athanore.api.deps.MissingOperatorToken` when the
     settings turn operator auth on without a token to check against —
@@ -109,7 +125,7 @@ def create_app(
     app.state.settings = settings
     app.state.engine = engine
     app.state.store = store
-    app.state.plugins = plugins
+    app.state.plugins = tuple(plugins) if plugins is not None else ()
     # When this process came up. `/api/me` reports it and the SPA
     # refetches the plugin manifest whenever it changes (09).
     app.state.started_at = now()
@@ -153,6 +169,10 @@ def create_app(
     # item the line above inserts as well as the generated routes (08
     # §OpenAPI).
     install_openapi(app)
+    # The plugin routes, then the manifest that lists them: one router
+    # per workflow at `/api/plugins/{workflow}`, under the same operator
+    # door as everything else (09 §Mounting, 12 §Plugins).
+    mount_plugins(app, app.state.plugins)
     # The SPA at `/`, as the router's fallback rather than as a route:
     # every route is matched first — including the ones a plugin
     # registers after this call — and an unmatched path is the client

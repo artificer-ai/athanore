@@ -332,13 +332,15 @@ driver listens on 4102 so it never collides with the v1 app on 4002.
   declaration on the workflow). Never add a fourth rule.
 - **Layering, arrows point down only:**
   `api, cli, plugins.builtin` over
+  `plugins.mount` over `plugins.context` over
   `engine, requests, agents, plugins.registry` over
-  `store, events, graph, settings, logging`. Every name in a tier is an
+  `store, events, graph, settings, logging, plugins.decl`. Every name in a tier is an
   **independent sibling**: peers within a tier may not import each other,
   and the only imports allowed are arrows down a tier. `graph` imports
   nothing from the package. `store` never imports `engine`. `agents` reaches the store only
-  through `TaskContext`. `workflow.py` is the one module that imports both
-  `graph` and `plugins.decl`. Enforced by import-linter.
+  through `TaskContext`. `workflow.py` and `plugins.registry` are the
+  only modules that import both `graph` and `plugins.decl`. Enforced by
+  import-linter.
 - **Small core.** Nothing in `athanore/` depends on pi, Claude, or Docker.
   Vendor adapters and example workflows live in `examples/`.
 - **One wire contract.** The HTTP + SSE API is the only way in for the SPA,

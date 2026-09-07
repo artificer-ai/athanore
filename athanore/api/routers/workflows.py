@@ -22,6 +22,7 @@ arguments and a row into a 201.
 from __future__ import annotations
 
 import inspect
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Annotated
 
@@ -30,9 +31,17 @@ from fastapi import Path as PathParam
 
 from athanore.api.deps import operator_auth
 from athanore.api.errors import ApiError, ErrorCode
-from athanore.api.schemas import Created, NewRun, SourceNode, SourceOut, WorkflowOut
+from athanore.api.schemas import (
+    Created,
+    NewRun,
+    SourceNode,
+    SourceOut,
+    WorkflowOut,
+    WorkflowPlugin,
+)
 from athanore.engine import Engine, UnknownWorkflow
 from athanore.graph import Graph
+from athanore.plugins.registry import PluginSpec, manifest_entry
 
 __all__ = ["router"]
 
@@ -96,7 +105,24 @@ def _view(request: Request, graph: Graph) -> WorkflowOut:
         pool=pool.name,
         capacity=counts["capacity"],
         in_flight=counts["in_flight"],
+        plugin=_plugin(request, graph.name),
     )
+
+
+def _plugin(request: Request, name: str) -> WorkflowPlugin:
+    """What this workflow contributes to the UI (08 §Workflows, 09).
+
+    The same entries ``GET /api/plugins`` publishes, so the two views of
+    one declaration cannot disagree: a workflow that declares nothing
+    carries two empty lists, which is a fact rather than a placeholder.
+    """
+
+    specs: Sequence[PluginSpec] = getattr(request.app.state, "plugins", None) or ()
+    spec = next((one for one in specs if one.workflow == name), None)
+    if spec is None:
+        return WorkflowPlugin()
+    entry = manifest_entry(spec)
+    return WorkflowPlugin(panels=entry["panels"], actions=entry["actions"])
 
 
 @router.get("", summary="Every workflow this server can run")

@@ -107,12 +107,21 @@ name = "Layering: arrows point down only"
 type = "layers"
 # One tier per entry, top to bottom. `|` separates independent sibling
 # modules, so peers within a tier may not import each other; the only
-# cross-module imports allowed are arrows down a tier. `(…)` marks a
-# module that does not exist yet (created in T049/T050).
+# cross-module imports allowed are arrows down a tier.
+#
+# The plugin host is three tiers of its own between `api` and `engine`
+# (D138): `mount` builds routers out of `context`, `context` resolves a
+# handler's scope out of the engine and the store, and `registry`
+# validates declarations that `decl` — pure data, pydantic and nothing
+# else — sits at the bottom with `graph`. Those two are what
+# `workflow.py` and `registry` join, and why 02 §Layering names
+# `plugins.decl` beside `graph`.
 layers = [
     "athanore.api | athanore.cli | athanore.plugins.builtin",
-    "athanore.engine | athanore.requests | athanore.agents | (athanore.plugins.registry) | (athanore.plugins.decl) | (athanore.plugins.mount)",
-    "athanore.store | athanore.events | athanore.graph | athanore.settings | athanore.logging",
+    "athanore.plugins.mount",
+    "athanore.plugins.context",
+    "athanore.engine | athanore.requests | athanore.agents | athanore.plugins.registry",
+    "athanore.store | athanore.events | athanore.graph | athanore.settings | athanore.logging | athanore.plugins.decl",
 ]
 # The arrows across the middle tier, and they all point at the same
 # module (D117, D119). `TaskContext` is where a body's identity and its
@@ -133,6 +142,14 @@ ignore_imports = [
     "athanore.agents.stats -> athanore.engine.context",
     "athanore.agents.policies -> athanore.engine.context",
     "athanore.agents.acp -> athanore.engine.context",
+    # The two arrows back up into the API, and the only ones (D138). A
+    # plugin route is an operator route: it hangs on the API's own door
+    # (`operator_auth`) and declares the API's own security requirement,
+    # and there is no lower place to put a door that has to be the same
+    # one. Everything else `mount` needs — the specs, the context, the
+    # bus — it takes from below.
+    "athanore.plugins.mount -> athanore.api.deps",
+    "athanore.plugins.mount -> athanore.api.openapi",
 ]
 
 [[tool.importlinter.contracts]]

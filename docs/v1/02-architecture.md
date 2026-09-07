@@ -99,9 +99,13 @@ Arrows point down only:
 ```
 api, cli, plugins.builtin
         ↓
+plugins.mount
+        ↓
+plugins.context
+        ↓
 engine, requests, agents, plugins.registry
         ↓
-store, events, graph, settings, logging
+store, events, graph, settings, logging, plugins.decl
 ```
 
 Peers within a tier may not import each other: each module in a tier is
@@ -109,10 +113,24 @@ an independent sibling, and the only cross-module imports allowed are
 arrows down a tier. `graph` imports nothing from the package. `store`
 never imports `engine`.
 `agents` reaches the store only through `TaskContext` (which exposes
-narrow services, not the store object — see 04). `workflow.py` is the
-one module that imports both `graph` and `plugins.decl`; `graph` itself
-knows nothing about plugins, so the pure layer stays pure. Enforced in CI
-with `import-linter`.
+narrow services, not the store object — see 04). `graph` and
+`plugins.decl` are joined above them, never in each other: `workflow.py`
+imports both, because a declaration hangs on the workflow that carries
+the graph, and `plugins.registry` imports both, because checking a
+declaration means checking it against the graph's nodes. Nothing else
+imports the two, and `graph` itself knows nothing about plugins, so the
+pure layer stays pure. Enforced in CI with `import-linter`.
+
+The plugin host (09) occupies three tiers of its own between `api` and
+`engine`, and each is one direction of the same sentence: `mount` builds
+routers out of contexts, `context` resolves a handler's scope out of the
+engine and the store, `registry` validates declarations against the graph, and `decl` is
+pure data — pydantic and nothing else — so it sits at the bottom beside
+`graph`, which is what lets the two modules above join them. `mount` is the
+one module with named arrows back up into `api`: a plugin route is an
+operator route, so it hangs on `api.deps.operator_auth` and declares
+`api.openapi`'s security requirement, and there is no lower place to put
+a door that has to be the same one (D138).
 
 The `api` layer needs two things from the engine at request time: the
 live `TaskContext` of an in-flight task (to validate a submission against

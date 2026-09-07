@@ -877,10 +877,22 @@ class EventPort:
     one would be a claim about state, made by something that did not
     change any — an SSE client told a task is done while its body is still
     running, a plugin subscriber acting on a run that never completed.
+
+    The two ids are optional because the port has a second caller: an
+    attempt always has both, and a plugin handler in a ``workflow`` or
+    ``global`` scope has neither (09 §Context and scopes). An event
+    without them is what :class:`~athanore.events.model.Event` already
+    describes — "``run_id`` is absent on ``engine.*``" — and the name is
+    what a subscriber filters on either way.
     """
 
     def __init__(
-        self, store: Store, *, run_id: str, task_id: int, workflow: str
+        self,
+        store: Store,
+        *,
+        run_id: str | None,
+        task_id: int | None,
+        workflow: str,
     ) -> None:
         self._store = store
         self._run_id = run_id

@@ -26,6 +26,12 @@ subclass inherits its base's mapping unless it has a row of its own.
 That is what lets :class:`~athanore.engine.errors.UnknownWorkflow` be a
 :class:`~athanore.engine.errors.NotFound` — 404 either way — and still
 answer with its own code.
+
+:class:`~athanore.plugins.decl.PluginError` is the one row whose status
+comes from the exception rather than from the table: a plugin handler
+raises the status it means (09 §Wire contract), and the same refusal is
+what a plugin context raises when a handler reaches for a service its
+scope does not have.
 """
 
 from __future__ import annotations
@@ -41,6 +47,7 @@ from starlette.responses import JSONResponse, Response
 
 from athanore.engine.errors import Conflict, NotFound, UnknownNode, UnknownWorkflow
 from athanore.graph import GraphError
+from athanore.plugins.decl import PluginError
 from athanore.requests.errors import (
     AlreadyAnswered,
     InvalidAnswer,
@@ -170,6 +177,10 @@ DOMAIN_ERRORS: dict[type[Exception], tuple[int, ErrorCode, str]] = {
     InvalidAnswer: (422, ErrorCode.validation, "answer failed validation"),
     AlreadyAnswered: (409, ErrorCode.already_answered, "already answered"),
     StaleRequest: (409, ErrorCode.stale_request, "request is no longer live"),
+    # The one row whose status is not the row's: a plugin handler names
+    # its own (09 §Wire contract), and 400 is what it gets when it did
+    # not — the context's own refusals, which are all client errors.
+    PluginError: (400, ErrorCode.plugin_error, "the plugin refused"),
 }
 
 
@@ -188,6 +199,12 @@ def api_error_for(exc: Exception) -> ApiError | None:
             continue
         status, code, default = row
         extras: dict[str, Any] = {}
+        if isinstance(exc, PluginError):
+            # A plugin says what status it means. Everything else in the
+            # table is refused by a layer that does not know what an HTTP
+            # status is, which is why this is the one exception to the
+            # rule that the row decides.
+            status = exc.status
         if isinstance(exc, InvalidAnswer):
             # The per-field detail the SPA renders next to the offending
             # inputs (06 §Service); always a list, empty when the

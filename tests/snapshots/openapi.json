@@ -1,6 +1,45 @@
 {
   "components": {
     "schemas": {
+      "ActionOut": {
+        "description": "One action of the manifest, and the form the SPA renders for it.",
+        "properties": {
+          "confirm": {
+            "description": "Whether the SPA asks for confirmation before calling it.",
+            "title": "Confirm",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "The action's name, as its URL spells it.",
+            "title": "Name",
+            "type": "string"
+          },
+          "schema": {
+            "additionalProperties": true,
+            "description": "JSON Schema of the input model \u2014 the form itself.",
+            "title": "Schema",
+            "type": "object"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Slot",
+            "description": "What has to be resolved before it can run."
+          },
+          "title": {
+            "description": "What the button and the palette entry say.",
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "title",
+          "scope",
+          "confirm",
+          "schema"
+        ],
+        "title": "ActionOut",
+        "type": "object"
+      },
       "AgentStats": {
         "additionalProperties": false,
         "description": "The stats entry of 05 \u00a7Stats entry verbatim.\n\nEvery measurement is optional because 05 omits what it cannot\ndetermine rather than zero-filling it (01 \u00a7Real data only).",
@@ -1569,6 +1608,105 @@
         "title": "Ok",
         "type": "object"
       },
+      "PanelKind": {
+        "description": "The renderer vocabulary of 09 \u00a7Panel kinds, one member per row.\n\nThe kind fixes the shape ``source`` must return: ``markdown`` a\nstring, ``kv`` an object, ``table`` ``{columns, rows}``, ``log`` a\nlist of entries, ``chart`` ``{series, kind}``, ``dashboard``\n``{note?, metrics, table?}``, ``form`` the name of an action, and\n``custom`` nothing at all \u2014 the plugin's own web component reads what\nit needs through ``window.athanore``.\n\nA kind the SPA does not know renders a placeholder card rather than\ncrashing the pane (09), so this enum is the server's vocabulary and\nnot a promise about the browser's.",
+        "enum": [
+          "markdown",
+          "kv",
+          "table",
+          "log",
+          "chart",
+          "dashboard",
+          "form",
+          "custom"
+        ],
+        "title": "PanelKind",
+        "type": "string"
+      },
+      "PanelOut": {
+        "description": "One panel of the manifest (09 \u00a7Wire contract).\n\n``source`` is the mounted URL of the route the panel's data comes\nfrom, or \u2014 for a ``form`` panel \u2014 the name of the action whose model\nis the form. ``node`` is present only on a panel that follows one;\nwhether that node is *live* travels on the run's graph rather than\nhere, because the manifest changes only on restart (08 \u00a7Graph\nsemantics).",
+        "properties": {
+          "element": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The custom element tag a `custom` panel renders.",
+            "title": "Element"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/PanelKind",
+            "description": "Which renderer draws it, and its data shape."
+          },
+          "name": {
+            "description": "The panel's title, unique within its workflow.",
+            "title": "Name",
+            "type": "string"
+          },
+          "node": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The node this panel follows, when it follows one.",
+            "title": "Node"
+          },
+          "placement": {
+            "description": "A pane of its own, or a card on the run overview.",
+            "enum": [
+              "pane",
+              "card"
+            ],
+            "title": "Placement",
+            "type": "string"
+          },
+          "refresh_on": {
+            "description": "Event-name globs that invalidate this panel's data.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Refresh On",
+            "type": "array"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Slot",
+            "description": "What has to be resolved before it can load."
+          },
+          "slot": {
+            "$ref": "#/components/schemas/Slot",
+            "description": "Where the panel is shown (09 \u00a7Slots)."
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The URL its data comes from, or the action name for a form.",
+            "title": "Source"
+          }
+        },
+        "required": [
+          "name",
+          "slot",
+          "placement",
+          "kind",
+          "scope"
+        ],
+        "title": "PanelOut",
+        "type": "object"
+      },
       "PluginEvent": {
         "additionalProperties": false,
         "description": "``plugin.<workflow>.<name>``: the vocabulary's open end.\n\nThe handler's data is free-form, so the wire carries whatever it passed\nto ``ctx.services.events.publish``; 18 requires a JSON object, and the\nregistry \u2014 not this model \u2014 enforces that ``<workflow>`` is the\npublishing workflow.\n\n``name`` is the only one in the union that is not a\n:class:`~typing.Literal`, and it is declared as the whole vocabulary\n\u2014 ``EventName | str`` \u2014 rather than as a bare ``str``. The two are\nthe same set of strings, so nothing is widened; what the wider\nspelling buys is a *reference* to the enum in the generated document,\nwhich is where 08 \u00a7OpenAPI wants the event-name enum published and\nwhere the SPA's TypeScript union is generated from (13 \u00a7Contract\ntests). The validator below is what actually narrows this field, to\nthe ``plugin.`` namespace.",
@@ -1634,6 +1772,45 @@
           "data"
         ],
         "title": "PluginEvent",
+        "type": "object"
+      },
+      "PluginManifestEntry": {
+        "description": "What one workflow contributes to the UI (09 \u00a7Wire contract).",
+        "properties": {
+          "actions": {
+            "description": "Its actions, in declaration order.",
+            "items": {
+              "$ref": "#/components/schemas/ActionOut"
+            },
+            "title": "Actions",
+            "type": "array"
+          },
+          "assets": {
+            "description": "URLs of the JavaScript modules the SPA injects for it.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Assets",
+            "type": "array"
+          },
+          "panels": {
+            "description": "Its panels, in declaration order.",
+            "items": {
+              "$ref": "#/components/schemas/PanelOut"
+            },
+            "title": "Panels",
+            "type": "array"
+          },
+          "workflow": {
+            "description": "The workflow that declared these, or `_builtin` for the views the core ships.",
+            "title": "Workflow",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow"
+        ],
+        "title": "PluginManifestEntry",
         "type": "object"
       },
       "PoolHealth": {
@@ -3255,6 +3432,18 @@
         ],
         "title": "SetStatus",
         "type": "object"
+      },
+      "Slot": {
+        "description": "Where a panel is shown \u2014 09 \u00a7Slots, one member per row.\n\n``run`` is a pane in the selected run's cycle or a card on its\noverview, ``task`` the task drawer, ``node`` a pane live only while\nthe named node has a task in flight or has produced output,\n``workflow`` the library's detail side, and ``global`` a pane shown\nwhen no run is selected.",
+        "enum": [
+          "run",
+          "task",
+          "node",
+          "workflow",
+          "global"
+        ],
+        "title": "Slot",
+        "type": "string"
       },
       "SourceNode": {
         "description": "Where one node's body starts in the returned source.",
@@ -5708,6 +5897,47 @@
         "summary": "Whether the caller needs a token, and has one",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/api/plugins": {
+      "get": {
+        "description": "The plugin manifest: panels, actions and assets, per workflow.\n\nBuiltins first, then the workflows in registration order. The\nSPA fetches this at boot and again whenever the SSE stream\nreconnects onto a server with a new ``started_at``, because a\nmanifest changes only when the process does (09 \u00a7Wire contract).",
+        "operationId": "manifest_api_plugins_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/PluginManifestEntry"
+                  },
+                  "title": "Response Manifest Api Plugins Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          }
+        },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
+        "summary": "Everything the registered workflows contribute to the UI",
+        "tags": [
+          "plugins"
         ]
       }
     },
