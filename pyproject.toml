@@ -171,6 +171,19 @@ ignore_imports = [
     # — the verbs that repair an installation whose server will not start
     # — never pull in uvicorn, the API and the store to parse a flag.
     "athanore.cli.serve -> athanore.server",
+    # `athanore/__init__.py` is the public surface of 02 §Public API, and
+    # `agents.acp` is the one module inside a tier that imports it: the
+    # ACP handshake sends this implementation's version, so it reads
+    # `__version__` off the package root (05 §Session lifecycle). The
+    # root is *above* every tier — it re-exports `Server`, `Pool` and the
+    # rest — so grimp reads that one line as `agents -> engine`,
+    # `agents -> requests`, `agents -> plugins.context` and
+    # `agents -> server`, four arrows nothing executes. It imports
+    # nothing at runtime: every name is resolved on attribute access
+    # through a module `__getattr__` (D148), and
+    # `tests/test_public_api.py` asserts in a fresh interpreter that
+    # importing `athanore` pulls in no server, no API and no store.
+    "athanore.agents.acp -> athanore",
     # The one arrow back up into the composition root, and the reason it
     # is written inside `Workflow.run` rather than at module scope:
     # `wf.run()` is 04 §Programmatic host's shorthand for "build a
