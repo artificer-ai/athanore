@@ -2655,6 +2655,53 @@ overall ≥ 85 %) enabled in CI; `docs/v1/08` and `09` updated with the
 implicit details (state precedence in `/graph`, `_builtin` manifest
 workflow, `payload_too_large`).
 
+**Status.** Done. The gate is green end to end: **1930 passed, 280
+skipped** (the Postgres matrix, which needs a `postgres` service this
+environment has no docker socket to start, plus the assertions that are
+SQLite's own), ruff clean, pyright **0 errors** including the strict
+paths, the web typecheck/lint/test/build, and `lint-imports` 4 contracts
+kept, 0 broken.
+
+Coverage, measured over the whole suite: `graph` **100 %**, `engine`
+**98 %**, `requests` **99 %**, `athanore` as a whole **93 %** (8896
+statements, 624 missed). Every threshold of 13 §CI therefore holds with
+room, so all four are on in `.github/workflows/ci.yml` — one step per
+package rather than the joint `graph`+`engine` step T028 left, because a
+joint threshold lets one package be carried by another and the numbers
+say none has to be (D149). `tests/test_ci_workflows.py` grows the table
+those steps are read against, so a gate deleted or renamed is a red test
+rather than a silent hole. `pyproject.toml` is untouched: the gates need
+no `[tool.coverage]` key, and the one that would move a number would only
+inflate figures that already pass.
+
+The phase gate ran: a three-node workflow of `ACPAgent` seats on a real
+`Server`, `ATHANORE_AGENT_COMMAND` pointing every seat at `FakeACPAgent`
+and `ATHANORE_FAKE_SCENARIOS` selecting `gate.build.json` /
+`gate.review.json` by the workflow and node in the kickoff prompt, read
+back **only through the API** — the run completes, `output` is the third
+node's return, both agents logged and submitted over HTTP with their own
+task tokens, two `[stats]` lines carry real token counts, `/graph`
+reports three `done` nodes and two `forward` edges each `traversed: 1`,
+and `/api/plugins` answers with `_builtin` first and its six panels.
+(There are still no example *workflows* to run: `examples/` is the pi
+seat until T074, so the gate was a throwaway script and not committed —
+T056 lands no `athanore/` code.)
+
+08 and 09 now say what Phase 3 built. 09 gains the `_builtin` manifest
+entry by name and the ordering rule inside an entry; 08 gains the six
+`/graph` details T044a settled (the branch-frame grouping key, the
+innermost-fan-out rule for `arrivals`, `back` before `join`, node order,
+the paged `traversed` count, and the 404 `unknown_workflow` that only
+`/graph` raises), the two `payload_too_large` cases of T042 and the fact
+that a middleware's 413 is not a per-route response in the document, and
+five corrections where 08 stated the design and the code shipped
+something else: `/api/health`'s three counts are optional,
+`tasks_in_progress` excludes `waiting`, `/api/me` reports `authenticated:
+true` under `auth: off`, an absent `X-Athanore-Token` is 422 rather than
+403, and `?limit=` on `/events` and `/stream` has a documented default
+and cap. D149 records the four choices. No code was changed and no defect
+was found to report.
+
 ---
 
 ## Phase 4 — SPA core

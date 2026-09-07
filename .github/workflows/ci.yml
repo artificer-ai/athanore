@@ -38,22 +38,41 @@ jobs:
       - name: uv sync
         run: uv sync --all-packages --all-groups --all-extras
 
-      # `--cov` measures the whole package; the step below gates the part
-      # of it 13 §CI puts a threshold on. The rest of those thresholds
-      # (`requests` >= 95 %, overall >= 85 %) land with the code they
-      # measure, not on an empty package (D76).
+      # `--cov` measures the whole package; the four steps below gate it.
+      # Every threshold 13 §CI names is on now (T056): the three packages
+      # at 95 % and the package as a whole at 85 %. They were deferred
+      # until the code they measure existed, because a threshold on a
+      # package that is four modules old fails on arithmetic rather than
+      # on quality (D76).
       - name: pytest
         run: uv run --no-sync pytest -q --cov=athanore --cov-report=term-missing
 
-      # The engine's coverage gate (13 §CI, T028): `graph` and `engine`
-      # together must stay at 95 %. It reports out of the data file the
-      # step above wrote, so the suite runs once and the gate is on the
-      # numbers the whole suite produced — `coverage report --fail-under`
-      # is the flag `pytest --cov-fail-under` forwards to (D112).
-      - name: coverage gate (graph, engine)
+      # One gate per package rather than one over all three, so a red
+      # build names the package that slipped and a package cannot be
+      # carried by its neighbours (D149). Each reports out of the data
+      # file the step above wrote, so the suite runs once and the gate is
+      # on the numbers the whole suite produced — `coverage report
+      # --fail-under` is the flag `pytest --cov-fail-under` forwards to
+      # (D112).
+      - name: coverage gate (graph)
         run: >
           uv run --no-sync coverage report
-          --include='athanore/graph/*,athanore/engine/*' --fail-under=95
+          --include='athanore/graph/*' --fail-under=95
+
+      - name: coverage gate (engine)
+        run: >
+          uv run --no-sync coverage report
+          --include='athanore/engine/*' --fail-under=95
+
+      - name: coverage gate (requests)
+        run: >
+          uv run --no-sync coverage report
+          --include='athanore/requests/*' --fail-under=95
+
+      # The whole package, 13 §CI's second threshold. No `--include`, so
+      # it is every file `--cov=athanore` measured.
+      - name: coverage gate (overall)
+        run: uv run --no-sync coverage report --fail-under=85
 
       - name: ruff
         if: matrix.python-version == '3.13'
