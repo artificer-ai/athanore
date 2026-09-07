@@ -2076,6 +2076,31 @@ pagination and `live`; retry/move/status state transitions; every
 answer error code; inbox excludes stale.
 **Done.** Tests pass; snapshot updated.
 
+**Status.** Done. `athanore/api/routers/tasks.py` is the five rows of 08
+§Tasks: the detail with its `submissions` and no field a token could sit
+in, `/stream` paged by the `seq` cursor with `?after=` and `?limit=`
+(500 by default, 5000 at most — the pair `/api/runs/{id}/events` uses),
+and `retry`, `move` and `status`, each one call into `engine.ops` with
+no precondition re-checked. `live` is `in_progress` **or** `waiting`: a
+waiting attempt is parked on a request and goes on writing once it is
+answered, and the docked request panel sits under that very transcript
+(10 §Panes). `athanore/api/routers/requests.py` is the inbox
+(`?pending`, default true, and `?run=`), the single read, and `/answer`
+returning the **updated** `RequestView`; the two reads are the store's
+join, the write is `RequestService.answer` through the engine's
+`RequestBackend` port, and every refusal of 06 §Errors reaches the wire
+through T042's table — 404 `not_found`, 409 `already_answered`, 409
+`stale_request`, 400 `invalid_option`, 422 `validation` with its
+per-field `errors`. `tests/api/test_tasks_api.py` is 36 tests
+(pagination, the six statuses of `live`, the retry that keeps its
+`created`, the move that cancels its source, the 409 on a join target,
+the three settable statuses and the 422 on the other four) and
+`tests/api/test_requests_api.py` is 19 (the inbox excluding the answered
+*and* the stale, `?run=`, the three modes answered, and one test per
+error code). D132 records the choices. The `test_management.py` and
+`test_requests.py` ledger rows note their remaining API halves as
+landed.
+
 ### T045 — Agent router under `/api/agent/` (A3.4, D39)
 
 **Do.** `athanore/api/routers/agent.py` with `Depends(task_auth)`:

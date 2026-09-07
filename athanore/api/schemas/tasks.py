@@ -179,10 +179,15 @@ class StreamOut(BaseModel):
 
     ``last_seq`` is the highest sequence *stored* for the task, not the
     highest in this page, so a client that has caught up can tell. ``live``
-    says the attempt is still running, which is what stops the SPA polling
-    a transcript that will never grow again.
+    says the attempt is still running — ``in_progress`` or ``waiting``,
+    because a waiting attempt goes on writing once its request is
+    answered — which is what stops the SPA polling a transcript that will
+    never grow again.
     """
 
     chunks: list[StreamChunk] = Field(description="The page, in sequence order.")
     last_seq: int = Field(description="The highest sequence stored for this task.")
-    live: bool = Field(description="Whether the attempt is still in progress.")
+    live: bool = Field(
+        description="Whether the attempt is still running (`in_progress` or "
+        "`waiting`), so the transcript may still grow."
+    )
