@@ -11,6 +11,26 @@ import { defineConfig } from '@hey-api/openapi-ts'
  */
 export default defineConfig({
   input: '../tests/snapshots/openapi.json',
+  parser: {
+    filters: {
+      // Naming a filter at all turns on the parser's orphan pruning;
+      // keeping orphans is what the generated tree looked like before,
+      // and the event payload schemas of 18 are reachable only through
+      // the envelope union, which this generator leaves opaque.
+      orphans: true,
+      operations: {
+        // `GET /api/events` is the SSE feed (08 §Events). The SPA reads
+        // it with `EventSource` and never with the fetch client — a
+        // stream that does not end is not a request/response — and the
+        // generator's cursor heuristic reads its `after` parameter as
+        // pagination, emitting infinite-query options that cannot type
+        // an `ServerSentEventsResult`. It stays in the OpenAPI document,
+        // which is the contract; it is simply not something this client
+        // can call.
+        exclude: ['GET /api/events'],
+      },
+    },
+  },
   output: {
     path: 'src/api/gen',
     // No formatter or linter pass over generated output: the freshness

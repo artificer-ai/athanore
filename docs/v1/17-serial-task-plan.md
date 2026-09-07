@@ -2198,6 +2198,27 @@ duplicate across the replay/live boundary; `names=run.*` filters;
 accepted when auth is on.
 **Done.** Tests pass.
 
+**Status.** Done. `athanore/api/sse.py` is `GET /api/events` on
+`EventSourceResponse(..., ping=15)`: subscribe, replay `cap + 1` rows
+filtered by `run` and `names`, then live off the bus with a high-water
+mark that drops what the replay already sent. `resync` is a frame of its
+own — no `id:`, a `{"reason": …}` body a browser will actually dispatch
+— for a replay past `sse_replay_cap` and for a subscription the bus
+overflowed, and it is sent once per hole. `task.stream` goes out without
+an `id:`, so a reconnecting `Last-Event-ID` always names a stored row.
+The replay's read runs shielded in its own task: a tab closed mid-replay
+would otherwise cancel the pooled connection's own `close` and leave
+SQLAlchemy to terminate it (D135). `tests/api/test_sse.py` drives the
+application over ASGI directly — `httpx.ASGITransport` buffers a whole
+response, which a stream that does not end never becomes — and its
+boundary test commits an event *inside* the replay query to make the
+overlap real. `tests/api/test_auth.py` drops the stub route T043 stood in
+for this one, and the accepting half of its `?access_token=` matrix moved
+into the new suite. The route is in the snapshot and excluded from the
+generated TypeScript client: the SPA reads it with `EventSource`, and the
+generator reads `after` as a pagination cursor and emits an infinite query
+that cannot type a stream (D135).
+
 ### T047 — Static SPA, CSP, and CORS (A3.6)
 
 **Do.** `athanore/api/static.py`: mount `athanore/web/dist` at `/` (SPA

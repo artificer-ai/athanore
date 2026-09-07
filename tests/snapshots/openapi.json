@@ -2734,6 +2734,109 @@
         ]
       }
     },
+    "/api/events": {
+      "get": {
+        "description": "Missed history, then live events, on one connection.\n\n`access_token` is accepted here as a query parameter and on no other\nroute, because a browser's `EventSource` cannot set a header (08\n\u00a7Authentication); the query string is never logged.",
+        "operationId": "events_api_events_get",
+        "parameters": [
+          {
+            "description": "Replay stored events after this event id, then go live. Takes precedence over the `Last-Event-ID` header.",
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Replay stored events after this event id, then go live. Takes precedence over the `Last-Event-ID` header.",
+              "title": "After"
+            }
+          },
+          {
+            "description": "Only events of this run.",
+            "in": "query",
+            "name": "run",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only events of this run.",
+              "title": "Run"
+            }
+          },
+          {
+            "description": "Comma-separated event-name globs; a `*` matches one dotted segment, so `run.*` selects `run.created`. Omitted means every event.",
+            "in": "query",
+            "name": "names",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Comma-separated event-name globs; a `*` matches one dotted segment, so `run.*` selects `run.created`. Omitted means every event.",
+              "title": "Names"
+            }
+          },
+          {
+            "description": "A browser's reconnect cursor, set by EventSource.",
+            "in": "header",
+            "name": "last-event-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A browser's reconnect cursor, set by EventSource.",
+              "title": "Last-Event-Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {}
+            },
+            "description": "An SSE stream. Each message is `id: <event id>`, `event: <event name>`, `data: <EventEnvelope as JSON>`. Ephemeral events (`task.stream`) carry no `id:`, and the `resync` control frame \u2014 sent when the replay overran `sse_replay_cap` or the server dropped events for a slow reader \u2014 carries neither an `id:` nor an event envelope."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "The event stream",
+        "tags": [
+          "events"
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "description": "Whether the server is up, which version it is, and what it is doing.\n\nPausing every run and then waiting for `tasks_in_progress` to reach\nzero here is how an operator drains a server before stopping it.",

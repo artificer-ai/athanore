@@ -8,10 +8,15 @@ for exactly as long as that attempt is live.
 
 What has to hold here is that the two dependencies decide correctly, so
 the subject is the door rather than the room behind it. `task_auth` is
-exercised against the real agent route (T045); `operator_auth` is
-exercised against two routes this module hangs off a real `create_app()`
-— one plainly guarded, and one at `/api/events`, the one path with the
-query-parameter exception, whose own router arrives in T046.
+exercised against the real agent route (T045); `operator_auth` against a
+plainly guarded route this module hangs off a real `create_app()`, and
+against the real `/api/events` (T046) for the query-parameter exception.
+
+Only the *refusals* on `/api/events` are asserted here. A stream that
+opens does not end, and `httpx.ASGITransport` runs an application to
+completion before it hands back a response, so the accepting half of
+that route's matrix is in `test_sse.py`, where the harness that can read
+a live stream lives.
 """
 
 from __future__ import annotations
@@ -89,17 +94,17 @@ def build_app(
     store: Store | None = None,
     engine: Engine | None = None,
 ) -> FastAPI:
-    """A real application, plus the two routes T046 has not landed yet."""
+    """A real application, plus one plainly guarded route to knock on.
+
+    Every real operator route needs a store, a run or a workflow to
+    answer at all, and none of that is the subject here: what is being
+    asserted is which callers get past the dependency.
+    """
 
     app = create_app(settings=settings, engine=engine, store=store)
 
     @app.get("/api/guarded", dependencies=[Depends(operator_auth_dep)])
     async def guarded() -> dict[str, bool]:
-        return {"ok": True}
-
-    # The one route that also takes `?access_token=` (08 §Authentication).
-    @app.get("/api/events", dependencies=[Depends(operator_auth_dep)])
-    async def events() -> dict[str, bool]:
         return {"ok": True}
 
     return app
@@ -190,7 +195,6 @@ async def test_a_loopback_bind_needs_no_credential(tmp_path: Path) -> None:
     app = build_app(make_settings(tmp_path))
     async with client(app) as http:
         assert (await http.get("/api/guarded")).status_code == 200
-        assert (await http.get("/api/events")).status_code == 200
 
 
 async def test_a_network_bind_401s_without_the_header(tmp_path: Path) -> None:
@@ -271,14 +275,18 @@ async def test_require_token_turns_auth_on_for_a_loopback_bind(
 # -- the SSE query-parameter exception --------------------------------------
 
 
-async def test_the_events_route_accepts_the_token_as_a_query_parameter(
+async def test_the_events_route_still_refuses_a_wrong_token_in_the_query(
     tmp_path: Path,
 ) -> None:
-    """`EventSource` cannot set a header, so this one route takes a query."""
+    """`EventSource` cannot set a header, so this one route takes a query.
+
+    The credential is checked as it would be in a header: a wrong one is
+    refused. That the right one is *accepted* is asserted in `test_sse.py`
+    against the stream it opens.
+    """
 
     app = build_app(make_settings(tmp_path, host="0.0.0.0", operator_token=TOKEN))
     async with client(app) as http:
-        assert (await http.get(f"/api/events?access_token={TOKEN}")).status_code == 200
         assert (await http.get("/api/events?access_token=wrong")).status_code == 401
 
 
