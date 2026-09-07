@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { appendLogApiRunsRunIdLogPost, cancelRunApiRunsRunIdCancelPost, deleteRunApiRunsRunIdDelete, editRunApiRunsRunIdPatch, getEventsApiRunsRunIdEventsGet, getGraphApiRunsRunIdGraphGet, getLogApiRunsRunIdLogGet, getRequestsApiRunsRunIdRequestsGet, getRunApiRunsRunIdGet, getSourceApiWorkflowsNameSourceGet, getWorkflowApiWorkflowsNameGet, healthApiHealthGet, listRunsApiRunsGet, listWorkflowsApiWorkflowsGet, meApiMeGet, moveRunApiRunsRunIdPositionPost, type Options, pauseRunApiRunsRunIdPausePost, rerunNodeApiRunsRunIdRerunPost, resumeRunApiRunsRunIdResumePost, submitRunApiWorkflowsNameRunsPost } from '../sdk.gen';
-import type { AppendLogApiRunsRunIdLogPostData, AppendLogApiRunsRunIdLogPostError, AppendLogApiRunsRunIdLogPostResponse, CancelRunApiRunsRunIdCancelPostData, CancelRunApiRunsRunIdCancelPostError, CancelRunApiRunsRunIdCancelPostResponse, DeleteRunApiRunsRunIdDeleteData, DeleteRunApiRunsRunIdDeleteError, DeleteRunApiRunsRunIdDeleteResponse, EditRunApiRunsRunIdPatchData, EditRunApiRunsRunIdPatchError, EditRunApiRunsRunIdPatchResponse, GetEventsApiRunsRunIdEventsGetData, GetEventsApiRunsRunIdEventsGetError, GetEventsApiRunsRunIdEventsGetResponse, GetGraphApiRunsRunIdGraphGetData, GetGraphApiRunsRunIdGraphGetError, GetGraphApiRunsRunIdGraphGetResponse, GetLogApiRunsRunIdLogGetData, GetLogApiRunsRunIdLogGetError, GetLogApiRunsRunIdLogGetResponse, GetRequestsApiRunsRunIdRequestsGetData, GetRequestsApiRunsRunIdRequestsGetError, GetRequestsApiRunsRunIdRequestsGetResponse, GetRunApiRunsRunIdGetData, GetRunApiRunsRunIdGetError, GetRunApiRunsRunIdGetResponse, GetSourceApiWorkflowsNameSourceGetData, GetSourceApiWorkflowsNameSourceGetError, GetSourceApiWorkflowsNameSourceGetResponse, GetWorkflowApiWorkflowsNameGetData, GetWorkflowApiWorkflowsNameGetError, GetWorkflowApiWorkflowsNameGetResponse, HealthApiHealthGetData, HealthApiHealthGetResponse, ListRunsApiRunsGetData, ListRunsApiRunsGetError, ListRunsApiRunsGetResponse, ListWorkflowsApiWorkflowsGetData, ListWorkflowsApiWorkflowsGetResponse, MeApiMeGetData, MeApiMeGetResponse, MoveRunApiRunsRunIdPositionPostData, MoveRunApiRunsRunIdPositionPostError, MoveRunApiRunsRunIdPositionPostResponse, PauseRunApiRunsRunIdPausePostData, PauseRunApiRunsRunIdPausePostError, PauseRunApiRunsRunIdPausePostResponse, RerunNodeApiRunsRunIdRerunPostData, RerunNodeApiRunsRunIdRerunPostError, RerunNodeApiRunsRunIdRerunPostResponse, ResumeRunApiRunsRunIdResumePostData, ResumeRunApiRunsRunIdResumePostError, ResumeRunApiRunsRunIdResumePostResponse, SubmitRunApiWorkflowsNameRunsPostData, SubmitRunApiWorkflowsNameRunsPostError, SubmitRunApiWorkflowsNameRunsPostResponse } from '../types.gen';
+import { answerRequestApiRequestsRequestIdAnswerPost, appendLogApiRunsRunIdLogPost, cancelRunApiRunsRunIdCancelPost, deleteRunApiRunsRunIdDelete, editRunApiRunsRunIdPatch, getEventsApiRunsRunIdEventsGet, getGraphApiRunsRunIdGraphGet, getLogApiRunsRunIdLogGet, getRequestApiRequestsRequestIdGet, getRequestsApiRunsRunIdRequestsGet, getRunApiRunsRunIdGet, getSourceApiWorkflowsNameSourceGet, getStreamApiTasksTaskIdStreamGet, getTaskApiTasksTaskIdGet, getWorkflowApiWorkflowsNameGet, healthApiHealthGet, listRequestsApiRequestsGet, listRunsApiRunsGet, listWorkflowsApiWorkflowsGet, meApiMeGet, moveRunApiRunsRunIdPositionPost, moveTaskApiTasksTaskIdMovePost, type Options, pauseRunApiRunsRunIdPausePost, rerunNodeApiRunsRunIdRerunPost, resumeRunApiRunsRunIdResumePost, retryTaskApiTasksTaskIdRetryPost, setStatusApiTasksTaskIdStatusPost, submitRunApiWorkflowsNameRunsPost } from '../sdk.gen';
+import type { AnswerRequestApiRequestsRequestIdAnswerPostData, AnswerRequestApiRequestsRequestIdAnswerPostError, AnswerRequestApiRequestsRequestIdAnswerPostResponse, AppendLogApiRunsRunIdLogPostData, AppendLogApiRunsRunIdLogPostError, AppendLogApiRunsRunIdLogPostResponse, CancelRunApiRunsRunIdCancelPostData, CancelRunApiRunsRunIdCancelPostError, CancelRunApiRunsRunIdCancelPostResponse, DeleteRunApiRunsRunIdDeleteData, DeleteRunApiRunsRunIdDeleteError, DeleteRunApiRunsRunIdDeleteResponse, EditRunApiRunsRunIdPatchData, EditRunApiRunsRunIdPatchError, EditRunApiRunsRunIdPatchResponse, GetEventsApiRunsRunIdEventsGetData, GetEventsApiRunsRunIdEventsGetError, GetEventsApiRunsRunIdEventsGetResponse, GetGraphApiRunsRunIdGraphGetData, GetGraphApiRunsRunIdGraphGetError, GetGraphApiRunsRunIdGraphGetResponse, GetLogApiRunsRunIdLogGetData, GetLogApiRunsRunIdLogGetError, GetLogApiRunsRunIdLogGetResponse, GetRequestApiRequestsRequestIdGetData, GetRequestApiRequestsRequestIdGetError, GetRequestApiRequestsRequestIdGetResponse, GetRequestsApiRunsRunIdRequestsGetData, GetRequestsApiRunsRunIdRequestsGetError, GetRequestsApiRunsRunIdRequestsGetResponse, GetRunApiRunsRunIdGetData, GetRunApiRunsRunIdGetError, GetRunApiRunsRunIdGetResponse, GetSourceApiWorkflowsNameSourceGetData, GetSourceApiWorkflowsNameSourceGetError, GetSourceApiWorkflowsNameSourceGetResponse, GetStreamApiTasksTaskIdStreamGetData, GetStreamApiTasksTaskIdStreamGetError, GetStreamApiTasksTaskIdStreamGetResponse, GetTaskApiTasksTaskIdGetData, GetTaskApiTasksTaskIdGetError, GetTaskApiTasksTaskIdGetResponse, GetWorkflowApiWorkflowsNameGetData, GetWorkflowApiWorkflowsNameGetError, GetWorkflowApiWorkflowsNameGetResponse, HealthApiHealthGetData, HealthApiHealthGetResponse, ListRequestsApiRequestsGetData, ListRequestsApiRequestsGetError, ListRequestsApiRequestsGetResponse, ListRunsApiRunsGetData, ListRunsApiRunsGetError, ListRunsApiRunsGetResponse, ListWorkflowsApiWorkflowsGetData, ListWorkflowsApiWorkflowsGetResponse, MeApiMeGetData, MeApiMeGetResponse, MoveRunApiRunsRunIdPositionPostData, MoveRunApiRunsRunIdPositionPostError, MoveRunApiRunsRunIdPositionPostResponse, MoveTaskApiTasksTaskIdMovePostData, MoveTaskApiTasksTaskIdMovePostError, MoveTaskApiTasksTaskIdMovePostResponse, PauseRunApiRunsRunIdPausePostData, PauseRunApiRunsRunIdPausePostError, PauseRunApiRunsRunIdPausePostResponse, RerunNodeApiRunsRunIdRerunPostData, RerunNodeApiRunsRunIdRerunPostError, RerunNodeApiRunsRunIdRerunPostResponse, ResumeRunApiRunsRunIdResumePostData, ResumeRunApiRunsRunIdResumePostError, ResumeRunApiRunsRunIdResumePostResponse, RetryTaskApiTasksTaskIdRetryPostData, RetryTaskApiTasksTaskIdRetryPostError, RetryTaskApiTasksTaskIdRetryPostResponse, SetStatusApiTasksTaskIdStatusPostData, SetStatusApiTasksTaskIdStatusPostError, SetStatusApiTasksTaskIdStatusPostResponse, SubmitRunApiWorkflowsNameRunsPostData, SubmitRunApiWorkflowsNameRunsPostError, SubmitRunApiWorkflowsNameRunsPostResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -85,6 +85,87 @@ export const meApiMeGetOptions = (options?: Options<MeApiMeGetData>) => queryOpt
     },
     queryKey: meApiMeGetQueryKey(options)
 });
+
+export const listRequestsApiRequestsGetQueryKey = (options?: Options<ListRequestsApiRequestsGetData>) => createQueryKey('listRequestsApiRequestsGet', options);
+
+/**
+ * The inbox: every request still waiting on a person
+ *
+ * The requests of every run, or of one, oldest first.
+ *
+ * "Pending" is narrower than "unanswered": a request whose task has
+ * ended is **stale** and leaves the inbox, because an answer to it
+ * would reach nobody (06 §Restart durability). It stays in the run's
+ * own history, and ``pending=false`` here shows it too, with
+ * ``stale: true`` on it.
+ *
+ * An application with no store holds no requests and answers with an
+ * empty list; a ``run`` that names no run is a filter that matches
+ * nothing rather than a 404.
+ */
+export const listRequestsApiRequestsGetOptions = (options?: Options<ListRequestsApiRequestsGetData>) => queryOptions<ListRequestsApiRequestsGetResponse, ListRequestsApiRequestsGetError, ListRequestsApiRequestsGetResponse, ReturnType<typeof listRequestsApiRequestsGetQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listRequestsApiRequestsGet({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listRequestsApiRequestsGetQueryKey(options)
+});
+
+export const getRequestApiRequestsRequestIdGetQueryKey = (options: Options<GetRequestApiRequestsRequestIdGetData>) => createQueryKey('getRequestApiRequestsRequestIdGet', options);
+
+/**
+ * One request and its answer
+ *
+ * One request, answered or not, with the node that asked.
+ */
+export const getRequestApiRequestsRequestIdGetOptions = (options: Options<GetRequestApiRequestsRequestIdGetData>) => queryOptions<GetRequestApiRequestsRequestIdGetResponse, GetRequestApiRequestsRequestIdGetError, GetRequestApiRequestsRequestIdGetResponse, ReturnType<typeof getRequestApiRequestsRequestIdGetQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getRequestApiRequestsRequestIdGet({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getRequestApiRequestsRequestIdGetQueryKey(options)
+});
+
+/**
+ * Answer a request
+ *
+ * Record the one answer this request may have, and return it.
+ *
+ * ``option_id`` for an ``options`` request and ``value`` for a ``text``
+ * or ``form`` one; the request's own ``mode`` decides which of the two
+ * is read, so a ``value`` sent to an ``options`` request is not an
+ * answer that request could have (06 §Service).
+ *
+ * The response is the **updated** view rather than the answer row (08
+ * §Requests): the SPA re-renders the card it just answered, and
+ * ``pending``, ``answer`` and ``answered_by`` are all part of what
+ * changed. The author is ``user`` — this route is the operator's, and
+ * the other author, ``engine``, belongs to the headless fallbacks that
+ * record an answer without a person (06 §Timeouts).
+ */
+export const answerRequestApiRequestsRequestIdAnswerPostMutation = (options?: Partial<Options<AnswerRequestApiRequestsRequestIdAnswerPostData>>): UseMutationOptions<AnswerRequestApiRequestsRequestIdAnswerPostResponse, AnswerRequestApiRequestsRequestIdAnswerPostError, Options<AnswerRequestApiRequestsRequestIdAnswerPostData>> => {
+    const mutationOptions: UseMutationOptions<AnswerRequestApiRequestsRequestIdAnswerPostResponse, AnswerRequestApiRequestsRequestIdAnswerPostError, Options<AnswerRequestApiRequestsRequestIdAnswerPostData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await answerRequestApiRequestsRequestIdAnswerPost({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
 
 export const listRunsApiRunsGetQueryKey = (options?: Options<ListRunsApiRunsGetData>) => createQueryKey('listRunsApiRunsGet', options);
 
@@ -487,6 +568,171 @@ export const resumeRunApiRunsRunIdResumePostMutation = (options?: Partial<Option
         }
     };
     return mutationOptions;
+};
+
+export const getTaskApiTasksTaskIdGetQueryKey = (options: Options<GetTaskApiTasksTaskIdGetData>) => createQueryKey('getTaskApiTasksTaskIdGet', options);
+
+/**
+ * One attempt and what was submitted for it
+ *
+ * The operator view of a task: 08's ``TaskRow`` plus ``submissions``.
+ *
+ * Every accepted submission, oldest first, because "last valid wins"
+ * (D5) is a rule about which one the body reads and not about which
+ * ones happened: an operator reading a repaired attempt wants the
+ * rejected shape and the accepted one.
+ *
+ * No token, in this response or any other: a task token is
+ * header-only (12 §Task tokens), and ``TaskDetail`` has no field that
+ * could carry one.
+ */
+export const getTaskApiTasksTaskIdGetOptions = (options: Options<GetTaskApiTasksTaskIdGetData>) => queryOptions<GetTaskApiTasksTaskIdGetResponse, GetTaskApiTasksTaskIdGetError, GetTaskApiTasksTaskIdGetResponse, ReturnType<typeof getTaskApiTasksTaskIdGetQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getTaskApiTasksTaskIdGet({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getTaskApiTasksTaskIdGetQueryKey(options)
+});
+
+/**
+ * Move a task's work to another node
+ *
+ * Cancel the attempt and enqueue its payload at ``node``.
+ *
+ * 409 ``conflict`` when ``node`` is a **join** (04 §Fan-in): a join is
+ * dispatched by its arrivals and called with all of them, so a task
+ * moved into one would be a join attempt holding a single branch's
+ * payload, with no arrival recorded and a run left waiting for
+ * branches that already landed.
+ */
+export const moveTaskApiTasksTaskIdMovePostMutation = (options?: Partial<Options<MoveTaskApiTasksTaskIdMovePostData>>): UseMutationOptions<MoveTaskApiTasksTaskIdMovePostResponse, MoveTaskApiTasksTaskIdMovePostError, Options<MoveTaskApiTasksTaskIdMovePostData>> => {
+    const mutationOptions: UseMutationOptions<MoveTaskApiTasksTaskIdMovePostResponse, MoveTaskApiTasksTaskIdMovePostError, Options<MoveTaskApiTasksTaskIdMovePostData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await moveTaskApiTasksTaskIdMovePost({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Queue another attempt of a task
+ *
+ * Enqueue the next attempt of a task that has stopped.
+ *
+ * Same node, same payload, same branch and the same ``created``, so a
+ * retry keeps its place in the dispatch order (``Ops.retry``). Refused
+ * with 409 ``conflict`` while the task is still going: a second attempt
+ * of a task that already has one is two attempts of one task.
+ */
+export const retryTaskApiTasksTaskIdRetryPostMutation = (options?: Partial<Options<RetryTaskApiTasksTaskIdRetryPostData>>): UseMutationOptions<RetryTaskApiTasksTaskIdRetryPostResponse, RetryTaskApiTasksTaskIdRetryPostError, Options<RetryTaskApiTasksTaskIdRetryPostData>> => {
+    const mutationOptions: UseMutationOptions<RetryTaskApiTasksTaskIdRetryPostResponse, RetryTaskApiTasksTaskIdRetryPostError, Options<RetryTaskApiTasksTaskIdRetryPostData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await retryTaskApiTasksTaskIdRetryPost({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Write a task's status
+ *
+ * Put the task in one of the three statuses an operator may write.
+ *
+ * ``ready`` re-dispatches it and re-opens a terminal run, ``cancelled``
+ * stops it and ``dead_letter`` files it as failed for good; the other
+ * four statuses are the engine's record of what happened and are not an
+ * operator's to declare, which is why the body's field is a
+ * ``Literal`` and a fourth value is a 422 before the engine is reached.
+ */
+export const setStatusApiTasksTaskIdStatusPostMutation = (options?: Partial<Options<SetStatusApiTasksTaskIdStatusPostData>>): UseMutationOptions<SetStatusApiTasksTaskIdStatusPostResponse, SetStatusApiTasksTaskIdStatusPostError, Options<SetStatusApiTasksTaskIdStatusPostData>> => {
+    const mutationOptions: UseMutationOptions<SetStatusApiTasksTaskIdStatusPostResponse, SetStatusApiTasksTaskIdStatusPostError, Options<SetStatusApiTasksTaskIdStatusPostData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await setStatusApiTasksTaskIdStatusPost({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getStreamApiTasksTaskIdStreamGetQueryKey = (options: Options<GetStreamApiTasksTaskIdStreamGetData>) => createQueryKey('getStreamApiTasksTaskIdStreamGet', options);
+
+/**
+ * A page of a task's agent transcript
+ *
+ * The chunks after ``after``, in transcript order (08 §Tasks).
+ *
+ * ``after=0`` is the whole transcript from the start, which is what a
+ * tab opening on a finished attempt asks for; a client following a
+ * live one passes the ``seq_to`` of the ephemeral ``task.stream`` event
+ * it just received (18) and appends what comes back.
+ */
+export const getStreamApiTasksTaskIdStreamGetOptions = (options: Options<GetStreamApiTasksTaskIdStreamGetData>) => queryOptions<GetStreamApiTasksTaskIdStreamGetResponse, GetStreamApiTasksTaskIdStreamGetError, GetStreamApiTasksTaskIdStreamGetResponse, ReturnType<typeof getStreamApiTasksTaskIdStreamGetQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getStreamApiTasksTaskIdStreamGet({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getStreamApiTasksTaskIdStreamGetQueryKey(options)
+});
+
+export const getStreamApiTasksTaskIdStreamGetInfiniteQueryKey = (options: Options<GetStreamApiTasksTaskIdStreamGetData>): QueryKey<Options<GetStreamApiTasksTaskIdStreamGetData>> => createQueryKey('getStreamApiTasksTaskIdStreamGet', options, true);
+
+/**
+ * A page of a task's agent transcript
+ *
+ * The chunks after ``after``, in transcript order (08 §Tasks).
+ *
+ * ``after=0`` is the whole transcript from the start, which is what a
+ * tab opening on a finished attempt asks for; a client following a
+ * live one passes the ``seq_to`` of the ephemeral ``task.stream`` event
+ * it just received (18) and appends what comes back.
+ */
+export const getStreamApiTasksTaskIdStreamGetInfiniteOptions = (options: Options<GetStreamApiTasksTaskIdStreamGetData>) => {
+    const opts = infiniteQueryOptions<GetStreamApiTasksTaskIdStreamGetResponse, GetStreamApiTasksTaskIdStreamGetError, InfiniteData<GetStreamApiTasksTaskIdStreamGetResponse>, QueryKey<Options<GetStreamApiTasksTaskIdStreamGetData>>, number | Pick<QueryKey<Options<GetStreamApiTasksTaskIdStreamGetData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+    // @ts-ignore
+    {
+        queryFn: async ({ pageParam, queryKey, signal }) => {
+            // @ts-ignore
+            const page: Pick<QueryKey<Options<GetStreamApiTasksTaskIdStreamGetData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+                query: {
+                    after: pageParam
+                }
+            };
+            const params = createInfiniteParams(queryKey, page);
+            const { data } = await getStreamApiTasksTaskIdStreamGet({
+                ...options,
+                ...params,
+                signal,
+                throwOnError: true
+            });
+            return data;
+        },
+        queryKey: getStreamApiTasksTaskIdStreamGetInfiniteQueryKey(options)
+    });
+    return opts as Omit<typeof opts, 'initialData'>;
 };
 
 export const listWorkflowsApiWorkflowsGetQueryKey = (options?: Options<ListWorkflowsApiWorkflowsGetData>) => createQueryKey('listWorkflowsApiWorkflowsGet', options);

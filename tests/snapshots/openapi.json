@@ -9,6 +9,29 @@
         "additionalProperties": true,
         "type": "object"
       },
+      "Answer": {
+        "description": "Answer a request (`POST /api/requests/{id}/answer`, 06 \u00a7The model).\n\n``option_id`` for an ``options`` request and ``value`` for a ``text``\nor ``form`` one. Both are optional here because ``value`` may\nlegitimately be any JSON \u2014 including ``null``, which is why \"which one\nwas given\" cannot be decided by looking at the values alone: the\nrequest's own ``mode`` decides, and the request service refuses the\nmismatch with the error code 06 \u00a7Errors names for it.",
+        "properties": {
+          "option_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The chosen option, for an `options` request.",
+            "title": "Option Id"
+          },
+          "value": {
+            "description": "The answer, for a `text` or `form` request.",
+            "title": "Value"
+          }
+        },
+        "title": "Answer",
+        "type": "object"
+      },
       "AnswerAuthor": {
         "description": "Who answered. ``engine`` is a headless fallback: a permission\ntimeout action or a declined elicitation (06 \u00a7Timeouts).",
         "enum": [
@@ -57,6 +80,18 @@
         ],
         "title": "BranchRef",
         "type": "object"
+      },
+      "ChunkKind": {
+        "description": "The kinds of the agent transcript (05 \u00a7The ACP client).\n\n``text`` and ``thought`` are the assistant's message and reasoning\nchunks, ``tool_call``/``tool_result`` the ACP tool updates, ``notice``\na line the fa\u00e7ade itself wrote.",
+        "enum": [
+          "text",
+          "thought",
+          "tool_call",
+          "tool_result",
+          "notice"
+        ],
+        "title": "ChunkKind",
+        "type": "string"
       },
       "Created": {
         "description": "The 201 body of ``POST /api/workflows/{name}/runs`` (08 \u00a7Workflows).",
@@ -546,6 +581,22 @@
           "features"
         ],
         "title": "Me",
+        "type": "object"
+      },
+      "Move": {
+        "description": "Move a task's work to another node (`POST /api/tasks/{id}/move`).",
+        "properties": {
+          "node": {
+            "description": "The node to enqueue the work at.",
+            "minLength": 1,
+            "title": "Node",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node"
+        ],
+        "title": "Move",
         "type": "object"
       },
       "NewRun": {
@@ -1369,6 +1420,26 @@
         "additionalProperties": true,
         "type": "object"
       },
+      "SetStatus": {
+        "description": "Write one of the three statuses an operator may set (08 \u00a7Tasks).\n\nThe other four are the engine's own record of what happened and are\nnot an operator's to declare.",
+        "properties": {
+          "status": {
+            "description": "`ready` re-dispatches the task, `cancelled` stops it, `dead_letter` files it as failed for good.",
+            "enum": [
+              "ready",
+              "cancelled",
+              "dead_letter"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "SetStatus",
+        "type": "object"
+      },
       "SourceNode": {
         "description": "Where one node's body starts in the returned source.",
         "properties": {
@@ -1414,12 +1485,107 @@
         "title": "SourceOut",
         "type": "object"
       },
+      "StreamChunk": {
+        "description": "One segment of an agent transcript (05 \u00a7The ACP client).",
+        "properties": {
+          "created": {
+            "description": "When it was recorded.",
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/ChunkKind",
+            "description": "What kind of segment this is."
+          },
+          "seq": {
+            "description": "The per-task cursor `?after=` pages by.",
+            "title": "Seq",
+            "type": "integer"
+          },
+          "text": {
+            "description": "The segment itself.",
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "seq",
+          "kind",
+          "text",
+          "created"
+        ],
+        "title": "StreamChunk",
+        "type": "object"
+      },
+      "StreamOut": {
+        "description": "A page of one task's transcript (08 \u00a7Tasks).\n\n``last_seq`` is the highest sequence *stored* for the task, not the\nhighest in this page, so a client that has caught up can tell. ``live``\nsays the attempt is still running \u2014 ``in_progress`` or ``waiting``,\nbecause a waiting attempt goes on writing once its request is\nanswered \u2014 which is what stops the SPA polling a transcript that will\nnever grow again.",
+        "properties": {
+          "chunks": {
+            "description": "The page, in sequence order.",
+            "items": {
+              "$ref": "#/components/schemas/StreamChunk"
+            },
+            "title": "Chunks",
+            "type": "array"
+          },
+          "last_seq": {
+            "description": "The highest sequence stored for this task.",
+            "title": "Last Seq",
+            "type": "integer"
+          },
+          "live": {
+            "description": "Whether the attempt is still running (`in_progress` or `waiting`), so the transcript may still grow.",
+            "title": "Live",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "chunks",
+          "last_seq",
+          "live"
+        ],
+        "title": "StreamOut",
+        "type": "object"
+      },
       "SubmissionAccepted": {
         "additionalProperties": true,
         "type": "object"
       },
       "SubmissionAcceptedEvent": {
         "additionalProperties": true,
+        "type": "object"
+      },
+      "SubmissionOut": {
+        "description": "One value an agent submitted for a task (03 \u00a7Submission).",
+        "properties": {
+          "created": {
+            "description": "When it was accepted.",
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "id": {
+            "description": "The submission id.",
+            "title": "Id",
+            "type": "integer"
+          },
+          "payload": {
+            "description": "The value, as it was accepted.",
+            "title": "Payload"
+          },
+          "task_id": {
+            "description": "The attempt it was submitted for.",
+            "title": "Task Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "task_id",
+          "created"
+        ],
+        "title": "SubmissionOut",
         "type": "object"
       },
       "SubmissionRejected": {
@@ -1452,6 +1618,157 @@
       },
       "TaskDeadLetteredEvent": {
         "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskDetail": {
+        "description": "A task and the values submitted against it (08 \u00a7Tasks).\n\nThe operator view: 08 overloads nothing by credential, so an agent\nreading its own task gets a different model on a different router\n(`/api/agent/`), and this one never has a token to omit.",
+        "properties": {
+          "attempt": {
+            "description": "Which attempt of that node this row is, from 1.",
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "branch": {
+            "description": "The fan-out stack this attempt is inside.",
+            "items": {
+              "$ref": "#/components/schemas/athanore__api__schemas__tasks__BranchFrame"
+            },
+            "title": "Branch",
+            "type": "array"
+          },
+          "created": {
+            "description": "When the row was enqueued.",
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the attempt failed, when it did.",
+            "title": "Error"
+          },
+          "explicit": {
+            "description": "Whether that priority was declared on the node rather than defaulted.",
+            "title": "Explicit",
+            "type": "boolean"
+          },
+          "finished": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it ended.",
+            "title": "Finished"
+          },
+          "id": {
+            "description": "The task id, unique across every run.",
+            "title": "Id",
+            "type": "integer"
+          },
+          "lineage": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where this attempt came from: its reason and its parent.",
+            "title": "Lineage"
+          },
+          "node": {
+            "description": "The node whose body this attempt runs.",
+            "title": "Node",
+            "type": "string"
+          },
+          "payload": {
+            "description": "The value the task was enqueued with.",
+            "title": "Payload"
+          },
+          "priority": {
+            "description": "The dispatch priority this attempt was given.",
+            "title": "Priority",
+            "type": "integer"
+          },
+          "result": {
+            "description": "What the body returned, once it has.",
+            "title": "Result"
+          },
+          "run_id": {
+            "description": "The run this attempt belongs to.",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "started": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it was claimed.",
+            "title": "Started"
+          },
+          "stats": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The agent's measurements for this attempt (05 \u00a7Stats entry); absent when nothing measured it.",
+            "title": "Stats"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus",
+            "description": "The task state machine of 03."
+          },
+          "submissions": {
+            "description": "Every accepted submission, oldest first.",
+            "items": {
+              "$ref": "#/components/schemas/SubmissionOut"
+            },
+            "title": "Submissions",
+            "type": "array"
+          },
+          "terminal": {
+            "description": "Whether the attempt finished with no transition, making its `result` a branch output.",
+            "title": "Terminal",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "run_id",
+          "node",
+          "attempt",
+          "status",
+          "priority",
+          "explicit",
+          "terminal",
+          "created"
+        ],
+        "title": "TaskDetail",
         "type": "object"
       },
       "TaskDone": {
@@ -1900,6 +2217,174 @@
         "summary": "Whether the caller needs a token, and has one",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/api/requests": {
+      "get": {
+        "description": "The requests of every run, or of one, oldest first.\n\n\"Pending\" is narrower than \"unanswered\": a request whose task has\nended is **stale** and leaves the inbox, because an answer to it\nwould reach nobody (06 \u00a7Restart durability). It stays in the run's\nown history, and ``pending=false`` here shows it too, with\n``stale: true`` on it.\n\nAn application with no store holds no requests and answers with an\nempty list; a ``run`` that names no run is a filter that matches\nnothing rather than a 404.",
+        "operationId": "list_requests_api_requests_get",
+        "parameters": [
+          {
+            "description": "Only requests a person can still act on: unanswered, with the attempt that asked still running.",
+            "in": "query",
+            "name": "pending",
+            "required": false,
+            "schema": {
+              "default": true,
+              "description": "Only requests a person can still act on: unanswered, with the attempt that asked still running.",
+              "title": "Pending",
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Only requests of this run.",
+            "in": "query",
+            "name": "run",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only requests of this run.",
+              "title": "Run"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RequestView"
+                  },
+                  "title": "Response List Requests Api Requests Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "The inbox: every request still waiting on a person",
+        "tags": [
+          "requests"
+        ]
+      }
+    },
+    "/api/requests/{request_id}": {
+      "get": {
+        "description": "One request, answered or not, with the node that asked.",
+        "operationId": "get_request_api_requests__request_id__get",
+        "parameters": [
+          {
+            "description": "The request id, unique across runs.",
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "description": "The request id, unique across runs.",
+              "title": "Request Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "One request and its answer",
+        "tags": [
+          "requests"
+        ]
+      }
+    },
+    "/api/requests/{request_id}/answer": {
+      "post": {
+        "description": "Record the one answer this request may have, and return it.\n\n``option_id`` for an ``options`` request and ``value`` for a ``text``\nor ``form`` one; the request's own ``mode`` decides which of the two\nis read, so a ``value`` sent to an ``options`` request is not an\nanswer that request could have (06 \u00a7Service).\n\nThe response is the **updated** view rather than the answer row (08\n\u00a7Requests): the SPA re-renders the card it just answered, and\n``pending``, ``answer`` and ``answered_by`` are all part of what\nchanged. The author is ``user`` \u2014 this route is the operator's, and\nthe other author, ``engine``, belongs to the headless fallbacks that\nrecord an answer without a person (06 \u00a7Timeouts).",
+        "operationId": "answer_request_api_requests__request_id__answer_post",
+        "parameters": [
+          {
+            "description": "The request id, unique across runs.",
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "description": "The request id, unique across runs.",
+              "title": "Request Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Answer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Answer a request",
+        "tags": [
+          "requests"
         ]
       }
     },
@@ -2722,6 +3207,278 @@
         "summary": "Let a paused run dispatch again",
         "tags": [
           "runs"
+        ]
+      }
+    },
+    "/api/tasks/{task_id}": {
+      "get": {
+        "description": "The operator view of a task: 08's ``TaskRow`` plus ``submissions``.\n\nEvery accepted submission, oldest first, because \"last valid wins\"\n(D5) is a rule about which one the body reads and not about which\nones happened: an operator reading a repaired attempt wants the\nrejected shape and the accepted one.\n\nNo token, in this response or any other: a task token is\nheader-only (12 \u00a7Task tokens), and ``TaskDetail`` has no field that\ncould carry one.",
+        "operationId": "get_task_api_tasks__task_id__get",
+        "parameters": [
+          {
+            "description": "The task id, unique across runs.",
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "description": "The task id, unique across runs.",
+              "title": "Task Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "One attempt and what was submitted for it",
+        "tags": [
+          "tasks"
+        ]
+      }
+    },
+    "/api/tasks/{task_id}/move": {
+      "post": {
+        "description": "Cancel the attempt and enqueue its payload at ``node``.\n\n409 ``conflict`` when ``node`` is a **join** (04 \u00a7Fan-in): a join is\ndispatched by its arrivals and called with all of them, so a task\nmoved into one would be a join attempt holding a single branch's\npayload, with no arrival recorded and a run left waiting for\nbranches that already landed.",
+        "operationId": "move_task_api_tasks__task_id__move_post",
+        "parameters": [
+          {
+            "description": "The task id, unique across runs.",
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "description": "The task id, unique across runs.",
+              "title": "Task Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Move"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Move a task's work to another node",
+        "tags": [
+          "tasks"
+        ]
+      }
+    },
+    "/api/tasks/{task_id}/retry": {
+      "post": {
+        "description": "Enqueue the next attempt of a task that has stopped.\n\nSame node, same payload, same branch and the same ``created``, so a\nretry keeps its place in the dispatch order (``Ops.retry``). Refused\nwith 409 ``conflict`` while the task is still going: a second attempt\nof a task that already has one is two attempts of one task.",
+        "operationId": "retry_task_api_tasks__task_id__retry_post",
+        "parameters": [
+          {
+            "description": "The task id, unique across runs.",
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "description": "The task id, unique across runs.",
+              "title": "Task Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Queue another attempt of a task",
+        "tags": [
+          "tasks"
+        ]
+      }
+    },
+    "/api/tasks/{task_id}/status": {
+      "post": {
+        "description": "Put the task in one of the three statuses an operator may write.\n\n``ready`` re-dispatches it and re-opens a terminal run, ``cancelled``\nstops it and ``dead_letter`` files it as failed for good; the other\nfour statuses are the engine's record of what happened and are not an\noperator's to declare, which is why the body's field is a\n``Literal`` and a fourth value is a 422 before the engine is reached.",
+        "operationId": "set_status_api_tasks__task_id__status_post",
+        "parameters": [
+          {
+            "description": "The task id, unique across runs.",
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "description": "The task id, unique across runs.",
+              "title": "Task Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetStatus"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Write a task's status",
+        "tags": [
+          "tasks"
+        ]
+      }
+    },
+    "/api/tasks/{task_id}/stream": {
+      "get": {
+        "description": "The chunks after ``after``, in transcript order (08 \u00a7Tasks).\n\n``after=0`` is the whole transcript from the start, which is what a\ntab opening on a finished attempt asks for; a client following a\nlive one passes the ``seq_to`` of the ephemeral ``task.stream`` event\nit just received (18) and appends what comes back.",
+        "operationId": "get_stream_api_tasks__task_id__stream_get",
+        "parameters": [
+          {
+            "description": "The task id, unique across runs.",
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "description": "The task id, unique across runs.",
+              "title": "Task Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Return chunks after this sequence number.",
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "description": "Return chunks after this sequence number.",
+              "minimum": 0,
+              "title": "After",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "How many chunks to return.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "description": "How many chunks to return.",
+              "maximum": 5000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StreamOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "A page of a task's agent transcript",
+        "tags": [
+          "tasks"
         ]
       }
     },

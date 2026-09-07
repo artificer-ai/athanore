@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AppendLogApiRunsRunIdLogPostData, AppendLogApiRunsRunIdLogPostErrors, AppendLogApiRunsRunIdLogPostResponses, CancelRunApiRunsRunIdCancelPostData, CancelRunApiRunsRunIdCancelPostErrors, CancelRunApiRunsRunIdCancelPostResponses, DeleteRunApiRunsRunIdDeleteData, DeleteRunApiRunsRunIdDeleteErrors, DeleteRunApiRunsRunIdDeleteResponses, EditRunApiRunsRunIdPatchData, EditRunApiRunsRunIdPatchErrors, EditRunApiRunsRunIdPatchResponses, GetEventsApiRunsRunIdEventsGetData, GetEventsApiRunsRunIdEventsGetErrors, GetEventsApiRunsRunIdEventsGetResponses, GetGraphApiRunsRunIdGraphGetData, GetGraphApiRunsRunIdGraphGetErrors, GetGraphApiRunsRunIdGraphGetResponses, GetLogApiRunsRunIdLogGetData, GetLogApiRunsRunIdLogGetErrors, GetLogApiRunsRunIdLogGetResponses, GetRequestsApiRunsRunIdRequestsGetData, GetRequestsApiRunsRunIdRequestsGetErrors, GetRequestsApiRunsRunIdRequestsGetResponses, GetRunApiRunsRunIdGetData, GetRunApiRunsRunIdGetErrors, GetRunApiRunsRunIdGetResponses, GetSourceApiWorkflowsNameSourceGetData, GetSourceApiWorkflowsNameSourceGetErrors, GetSourceApiWorkflowsNameSourceGetResponses, GetWorkflowApiWorkflowsNameGetData, GetWorkflowApiWorkflowsNameGetErrors, GetWorkflowApiWorkflowsNameGetResponses, HealthApiHealthGetData, HealthApiHealthGetResponses, ListRunsApiRunsGetData, ListRunsApiRunsGetErrors, ListRunsApiRunsGetResponses, ListWorkflowsApiWorkflowsGetData, ListWorkflowsApiWorkflowsGetResponses, MeApiMeGetData, MeApiMeGetResponses, MoveRunApiRunsRunIdPositionPostData, MoveRunApiRunsRunIdPositionPostErrors, MoveRunApiRunsRunIdPositionPostResponses, PauseRunApiRunsRunIdPausePostData, PauseRunApiRunsRunIdPausePostErrors, PauseRunApiRunsRunIdPausePostResponses, RerunNodeApiRunsRunIdRerunPostData, RerunNodeApiRunsRunIdRerunPostErrors, RerunNodeApiRunsRunIdRerunPostResponses, ResumeRunApiRunsRunIdResumePostData, ResumeRunApiRunsRunIdResumePostErrors, ResumeRunApiRunsRunIdResumePostResponses, SubmitRunApiWorkflowsNameRunsPostData, SubmitRunApiWorkflowsNameRunsPostErrors, SubmitRunApiWorkflowsNameRunsPostResponses } from './types.gen';
+import type { AnswerRequestApiRequestsRequestIdAnswerPostData, AnswerRequestApiRequestsRequestIdAnswerPostErrors, AnswerRequestApiRequestsRequestIdAnswerPostResponses, AppendLogApiRunsRunIdLogPostData, AppendLogApiRunsRunIdLogPostErrors, AppendLogApiRunsRunIdLogPostResponses, CancelRunApiRunsRunIdCancelPostData, CancelRunApiRunsRunIdCancelPostErrors, CancelRunApiRunsRunIdCancelPostResponses, DeleteRunApiRunsRunIdDeleteData, DeleteRunApiRunsRunIdDeleteErrors, DeleteRunApiRunsRunIdDeleteResponses, EditRunApiRunsRunIdPatchData, EditRunApiRunsRunIdPatchErrors, EditRunApiRunsRunIdPatchResponses, GetEventsApiRunsRunIdEventsGetData, GetEventsApiRunsRunIdEventsGetErrors, GetEventsApiRunsRunIdEventsGetResponses, GetGraphApiRunsRunIdGraphGetData, GetGraphApiRunsRunIdGraphGetErrors, GetGraphApiRunsRunIdGraphGetResponses, GetLogApiRunsRunIdLogGetData, GetLogApiRunsRunIdLogGetErrors, GetLogApiRunsRunIdLogGetResponses, GetRequestApiRequestsRequestIdGetData, GetRequestApiRequestsRequestIdGetErrors, GetRequestApiRequestsRequestIdGetResponses, GetRequestsApiRunsRunIdRequestsGetData, GetRequestsApiRunsRunIdRequestsGetErrors, GetRequestsApiRunsRunIdRequestsGetResponses, GetRunApiRunsRunIdGetData, GetRunApiRunsRunIdGetErrors, GetRunApiRunsRunIdGetResponses, GetSourceApiWorkflowsNameSourceGetData, GetSourceApiWorkflowsNameSourceGetErrors, GetSourceApiWorkflowsNameSourceGetResponses, GetStreamApiTasksTaskIdStreamGetData, GetStreamApiTasksTaskIdStreamGetErrors, GetStreamApiTasksTaskIdStreamGetResponses, GetTaskApiTasksTaskIdGetData, GetTaskApiTasksTaskIdGetErrors, GetTaskApiTasksTaskIdGetResponses, GetWorkflowApiWorkflowsNameGetData, GetWorkflowApiWorkflowsNameGetErrors, GetWorkflowApiWorkflowsNameGetResponses, HealthApiHealthGetData, HealthApiHealthGetResponses, ListRequestsApiRequestsGetData, ListRequestsApiRequestsGetErrors, ListRequestsApiRequestsGetResponses, ListRunsApiRunsGetData, ListRunsApiRunsGetErrors, ListRunsApiRunsGetResponses, ListWorkflowsApiWorkflowsGetData, ListWorkflowsApiWorkflowsGetResponses, MeApiMeGetData, MeApiMeGetResponses, MoveRunApiRunsRunIdPositionPostData, MoveRunApiRunsRunIdPositionPostErrors, MoveRunApiRunsRunIdPositionPostResponses, MoveTaskApiTasksTaskIdMovePostData, MoveTaskApiTasksTaskIdMovePostErrors, MoveTaskApiTasksTaskIdMovePostResponses, PauseRunApiRunsRunIdPausePostData, PauseRunApiRunsRunIdPausePostErrors, PauseRunApiRunsRunIdPausePostResponses, RerunNodeApiRunsRunIdRerunPostData, RerunNodeApiRunsRunIdRerunPostErrors, RerunNodeApiRunsRunIdRerunPostResponses, ResumeRunApiRunsRunIdResumePostData, ResumeRunApiRunsRunIdResumePostErrors, ResumeRunApiRunsRunIdResumePostResponses, RetryTaskApiTasksTaskIdRetryPostData, RetryTaskApiTasksTaskIdRetryPostErrors, RetryTaskApiTasksTaskIdRetryPostResponses, SetStatusApiTasksTaskIdStatusPostData, SetStatusApiTasksTaskIdStatusPostErrors, SetStatusApiTasksTaskIdStatusPostResponses, SubmitRunApiWorkflowsNameRunsPostData, SubmitRunApiWorkflowsNameRunsPostErrors, SubmitRunApiWorkflowsNameRunsPostResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -38,6 +38,56 @@ export const healthApiHealthGet = <ThrowOnError extends boolean = false>(options
  * false}`, which is the client's cue to ask for a token.
  */
 export const meApiMeGet = <ThrowOnError extends boolean = false>(options?: Options<MeApiMeGetData, ThrowOnError>): RequestResult<MeApiMeGetResponses, unknown, ThrowOnError> => (options?.client ?? client).get<MeApiMeGetResponses, unknown, ThrowOnError>({ url: '/api/me', ...options });
+
+/**
+ * The inbox: every request still waiting on a person
+ *
+ * The requests of every run, or of one, oldest first.
+ *
+ * "Pending" is narrower than "unanswered": a request whose task has
+ * ended is **stale** and leaves the inbox, because an answer to it
+ * would reach nobody (06 §Restart durability). It stays in the run's
+ * own history, and ``pending=false`` here shows it too, with
+ * ``stale: true`` on it.
+ *
+ * An application with no store holds no requests and answers with an
+ * empty list; a ``run`` that names no run is a filter that matches
+ * nothing rather than a 404.
+ */
+export const listRequestsApiRequestsGet = <ThrowOnError extends boolean = false>(options?: Options<ListRequestsApiRequestsGetData, ThrowOnError>): RequestResult<ListRequestsApiRequestsGetResponses, ListRequestsApiRequestsGetErrors, ThrowOnError> => (options?.client ?? client).get<ListRequestsApiRequestsGetResponses, ListRequestsApiRequestsGetErrors, ThrowOnError>({ url: '/api/requests', ...options });
+
+/**
+ * One request and its answer
+ *
+ * One request, answered or not, with the node that asked.
+ */
+export const getRequestApiRequestsRequestIdGet = <ThrowOnError extends boolean = false>(options: Options<GetRequestApiRequestsRequestIdGetData, ThrowOnError>): RequestResult<GetRequestApiRequestsRequestIdGetResponses, GetRequestApiRequestsRequestIdGetErrors, ThrowOnError> => (options.client ?? client).get<GetRequestApiRequestsRequestIdGetResponses, GetRequestApiRequestsRequestIdGetErrors, ThrowOnError>({ url: '/api/requests/{request_id}', ...options });
+
+/**
+ * Answer a request
+ *
+ * Record the one answer this request may have, and return it.
+ *
+ * ``option_id`` for an ``options`` request and ``value`` for a ``text``
+ * or ``form`` one; the request's own ``mode`` decides which of the two
+ * is read, so a ``value`` sent to an ``options`` request is not an
+ * answer that request could have (06 §Service).
+ *
+ * The response is the **updated** view rather than the answer row (08
+ * §Requests): the SPA re-renders the card it just answered, and
+ * ``pending``, ``answer`` and ``answered_by`` are all part of what
+ * changed. The author is ``user`` — this route is the operator's, and
+ * the other author, ``engine``, belongs to the headless fallbacks that
+ * record an answer without a person (06 §Timeouts).
+ */
+export const answerRequestApiRequestsRequestIdAnswerPost = <ThrowOnError extends boolean = false>(options: Options<AnswerRequestApiRequestsRequestIdAnswerPostData, ThrowOnError>): RequestResult<AnswerRequestApiRequestsRequestIdAnswerPostResponses, AnswerRequestApiRequestsRequestIdAnswerPostErrors, ThrowOnError> => (options.client ?? client).post<AnswerRequestApiRequestsRequestIdAnswerPostResponses, AnswerRequestApiRequestsRequestIdAnswerPostErrors, ThrowOnError>({
+    url: '/api/requests/{request_id}/answer',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Every run, in dispatch order
@@ -229,6 +279,86 @@ export const rerunNodeApiRunsRunIdRerunPost = <ThrowOnError extends boolean = fa
  * Resume a `paused` run; 409 on anything else.
  */
 export const resumeRunApiRunsRunIdResumePost = <ThrowOnError extends boolean = false>(options: Options<ResumeRunApiRunsRunIdResumePostData, ThrowOnError>): RequestResult<ResumeRunApiRunsRunIdResumePostResponses, ResumeRunApiRunsRunIdResumePostErrors, ThrowOnError> => (options.client ?? client).post<ResumeRunApiRunsRunIdResumePostResponses, ResumeRunApiRunsRunIdResumePostErrors, ThrowOnError>({ url: '/api/runs/{run_id}/resume', ...options });
+
+/**
+ * One attempt and what was submitted for it
+ *
+ * The operator view of a task: 08's ``TaskRow`` plus ``submissions``.
+ *
+ * Every accepted submission, oldest first, because "last valid wins"
+ * (D5) is a rule about which one the body reads and not about which
+ * ones happened: an operator reading a repaired attempt wants the
+ * rejected shape and the accepted one.
+ *
+ * No token, in this response or any other: a task token is
+ * header-only (12 §Task tokens), and ``TaskDetail`` has no field that
+ * could carry one.
+ */
+export const getTaskApiTasksTaskIdGet = <ThrowOnError extends boolean = false>(options: Options<GetTaskApiTasksTaskIdGetData, ThrowOnError>): RequestResult<GetTaskApiTasksTaskIdGetResponses, GetTaskApiTasksTaskIdGetErrors, ThrowOnError> => (options.client ?? client).get<GetTaskApiTasksTaskIdGetResponses, GetTaskApiTasksTaskIdGetErrors, ThrowOnError>({ url: '/api/tasks/{task_id}', ...options });
+
+/**
+ * Move a task's work to another node
+ *
+ * Cancel the attempt and enqueue its payload at ``node``.
+ *
+ * 409 ``conflict`` when ``node`` is a **join** (04 §Fan-in): a join is
+ * dispatched by its arrivals and called with all of them, so a task
+ * moved into one would be a join attempt holding a single branch's
+ * payload, with no arrival recorded and a run left waiting for
+ * branches that already landed.
+ */
+export const moveTaskApiTasksTaskIdMovePost = <ThrowOnError extends boolean = false>(options: Options<MoveTaskApiTasksTaskIdMovePostData, ThrowOnError>): RequestResult<MoveTaskApiTasksTaskIdMovePostResponses, MoveTaskApiTasksTaskIdMovePostErrors, ThrowOnError> => (options.client ?? client).post<MoveTaskApiTasksTaskIdMovePostResponses, MoveTaskApiTasksTaskIdMovePostErrors, ThrowOnError>({
+    url: '/api/tasks/{task_id}/move',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Queue another attempt of a task
+ *
+ * Enqueue the next attempt of a task that has stopped.
+ *
+ * Same node, same payload, same branch and the same ``created``, so a
+ * retry keeps its place in the dispatch order (``Ops.retry``). Refused
+ * with 409 ``conflict`` while the task is still going: a second attempt
+ * of a task that already has one is two attempts of one task.
+ */
+export const retryTaskApiTasksTaskIdRetryPost = <ThrowOnError extends boolean = false>(options: Options<RetryTaskApiTasksTaskIdRetryPostData, ThrowOnError>): RequestResult<RetryTaskApiTasksTaskIdRetryPostResponses, RetryTaskApiTasksTaskIdRetryPostErrors, ThrowOnError> => (options.client ?? client).post<RetryTaskApiTasksTaskIdRetryPostResponses, RetryTaskApiTasksTaskIdRetryPostErrors, ThrowOnError>({ url: '/api/tasks/{task_id}/retry', ...options });
+
+/**
+ * Write a task's status
+ *
+ * Put the task in one of the three statuses an operator may write.
+ *
+ * ``ready`` re-dispatches it and re-opens a terminal run, ``cancelled``
+ * stops it and ``dead_letter`` files it as failed for good; the other
+ * four statuses are the engine's record of what happened and are not an
+ * operator's to declare, which is why the body's field is a
+ * ``Literal`` and a fourth value is a 422 before the engine is reached.
+ */
+export const setStatusApiTasksTaskIdStatusPost = <ThrowOnError extends boolean = false>(options: Options<SetStatusApiTasksTaskIdStatusPostData, ThrowOnError>): RequestResult<SetStatusApiTasksTaskIdStatusPostResponses, SetStatusApiTasksTaskIdStatusPostErrors, ThrowOnError> => (options.client ?? client).post<SetStatusApiTasksTaskIdStatusPostResponses, SetStatusApiTasksTaskIdStatusPostErrors, ThrowOnError>({
+    url: '/api/tasks/{task_id}/status',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * A page of a task's agent transcript
+ *
+ * The chunks after ``after``, in transcript order (08 §Tasks).
+ *
+ * ``after=0`` is the whole transcript from the start, which is what a
+ * tab opening on a finished attempt asks for; a client following a
+ * live one passes the ``seq_to`` of the ephemeral ``task.stream`` event
+ * it just received (18) and appends what comes back.
+ */
+export const getStreamApiTasksTaskIdStreamGet = <ThrowOnError extends boolean = false>(options: Options<GetStreamApiTasksTaskIdStreamGetData, ThrowOnError>): RequestResult<GetStreamApiTasksTaskIdStreamGetResponses, GetStreamApiTasksTaskIdStreamGetErrors, ThrowOnError> => (options.client ?? client).get<GetStreamApiTasksTaskIdStreamGetResponses, GetStreamApiTasksTaskIdStreamGetErrors, ThrowOnError>({ url: '/api/tasks/{task_id}/stream', ...options });
 
 /**
  * Every workflow this server can run

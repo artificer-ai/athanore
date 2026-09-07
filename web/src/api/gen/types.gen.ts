@@ -13,6 +13,33 @@ export type AgentStatsEvent = {
 };
 
 /**
+ * Answer
+ *
+ * Answer a request (`POST /api/requests/{id}/answer`, 06 §The model).
+ *
+ * ``option_id`` for an ``options`` request and ``value`` for a ``text``
+ * or ``form`` one. Both are optional here because ``value`` may
+ * legitimately be any JSON — including ``null``, which is why "which one
+ * was given" cannot be decided by looking at the values alone: the
+ * request's own ``mode`` decides, and the request service refuses the
+ * mismatch with the error code 06 §Errors names for it.
+ */
+export type Answer = {
+    /**
+     * Option Id
+     *
+     * The chosen option, for an `options` request.
+     */
+    option_id?: string | null;
+    /**
+     * Value
+     *
+     * The answer, for a `text` or `form` request.
+     */
+    value?: unknown;
+};
+
+/**
  * AnswerAuthor
  *
  * Who answered. ``engine`` is a headless fallback: a permission
@@ -66,6 +93,17 @@ export type BranchRef = {
      */
     key?: unknown;
 };
+
+/**
+ * ChunkKind
+ *
+ * The kinds of the agent transcript (05 §The ACP client).
+ *
+ * ``text`` and ``thought`` are the assistant's message and reasoning
+ * chunks, ``tool_call``/``tool_result`` the ACP tool updates, ``notice``
+ * a line the façade itself wrote.
+ */
+export type ChunkKind = 'text' | 'thought' | 'tool_call' | 'tool_result' | 'notice';
 
 /**
  * Created
@@ -467,6 +505,20 @@ export type Me = {
      * The running Athanore version.
      */
     version: string;
+};
+
+/**
+ * Move
+ *
+ * Move a task's work to another node (`POST /api/tasks/{id}/move`).
+ */
+export type Move = {
+    /**
+     * Node
+     *
+     * The node to enqueue the work at.
+     */
+    node: string;
 };
 
 /**
@@ -1176,6 +1228,23 @@ export type RunUpdatedEvent = {
 };
 
 /**
+ * SetStatus
+ *
+ * Write one of the three statuses an operator may set (08 §Tasks).
+ *
+ * The other four are the engine's own record of what happened and are
+ * not an operator's to declare.
+ */
+export type SetStatus = {
+    /**
+     * Status
+     *
+     * `ready` re-dispatches the task, `cancelled` stops it, `dead_letter` files it as failed for good.
+     */
+    status: 'ready' | 'cancelled' | 'dead_letter';
+};
+
+/**
  * SourceNode
  *
  * Where one node's body starts in the returned source.
@@ -1222,12 +1291,107 @@ export type SourceOut = {
     source: string;
 };
 
+/**
+ * StreamChunk
+ *
+ * One segment of an agent transcript (05 §The ACP client).
+ */
+export type StreamChunk = {
+    /**
+     * Created
+     *
+     * When it was recorded.
+     */
+    created: string;
+    /**
+     * What kind of segment this is.
+     */
+    kind: ChunkKind;
+    /**
+     * Seq
+     *
+     * The per-task cursor `?after=` pages by.
+     */
+    seq: number;
+    /**
+     * Text
+     *
+     * The segment itself.
+     */
+    text: string;
+};
+
+/**
+ * StreamOut
+ *
+ * A page of one task's transcript (08 §Tasks).
+ *
+ * ``last_seq`` is the highest sequence *stored* for the task, not the
+ * highest in this page, so a client that has caught up can tell. ``live``
+ * says the attempt is still running — ``in_progress`` or ``waiting``,
+ * because a waiting attempt goes on writing once its request is
+ * answered — which is what stops the SPA polling a transcript that will
+ * never grow again.
+ */
+export type StreamOut = {
+    /**
+     * Chunks
+     *
+     * The page, in sequence order.
+     */
+    chunks: Array<StreamChunk>;
+    /**
+     * Last Seq
+     *
+     * The highest sequence stored for this task.
+     */
+    last_seq: number;
+    /**
+     * Live
+     *
+     * Whether the attempt is still running (`in_progress` or `waiting`), so the transcript may still grow.
+     */
+    live: boolean;
+};
+
 export type SubmissionAccepted = {
     [key: string]: unknown;
 };
 
 export type SubmissionAcceptedEvent = {
     [key: string]: unknown;
+};
+
+/**
+ * SubmissionOut
+ *
+ * One value an agent submitted for a task (03 §Submission).
+ */
+export type SubmissionOut = {
+    /**
+     * Created
+     *
+     * When it was accepted.
+     */
+    created: string;
+    /**
+     * Id
+     *
+     * The submission id.
+     */
+    id: number;
+    /**
+     * Payload
+     *
+     * The value, as it was accepted.
+     */
+    payload?: unknown;
+    /**
+     * Task Id
+     *
+     * The attempt it was submitted for.
+     */
+    task_id: number;
 };
 
 export type SubmissionRejected = {
@@ -1260,6 +1424,128 @@ export type TaskDeadLettered = {
 
 export type TaskDeadLetteredEvent = {
     [key: string]: unknown;
+};
+
+/**
+ * TaskDetail
+ *
+ * A task and the values submitted against it (08 §Tasks).
+ *
+ * The operator view: 08 overloads nothing by credential, so an agent
+ * reading its own task gets a different model on a different router
+ * (`/api/agent/`), and this one never has a token to omit.
+ */
+export type TaskDetail = {
+    /**
+     * Attempt
+     *
+     * Which attempt of that node this row is, from 1.
+     */
+    attempt: number;
+    /**
+     * Branch
+     *
+     * The fan-out stack this attempt is inside.
+     */
+    branch?: Array<AthanoreApiSchemasTasksBranchFrame>;
+    /**
+     * Created
+     *
+     * When the row was enqueued.
+     */
+    created: string;
+    /**
+     * Error
+     *
+     * Why the attempt failed, when it did.
+     */
+    error?: string | null;
+    /**
+     * Explicit
+     *
+     * Whether that priority was declared on the node rather than defaulted.
+     */
+    explicit: boolean;
+    /**
+     * Finished
+     *
+     * When it ended.
+     */
+    finished?: string | null;
+    /**
+     * Id
+     *
+     * The task id, unique across every run.
+     */
+    id: number;
+    /**
+     * Lineage
+     *
+     * Where this attempt came from: its reason and its parent.
+     */
+    lineage?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Node
+     *
+     * The node whose body this attempt runs.
+     */
+    node: string;
+    /**
+     * Payload
+     *
+     * The value the task was enqueued with.
+     */
+    payload?: unknown;
+    /**
+     * Priority
+     *
+     * The dispatch priority this attempt was given.
+     */
+    priority: number;
+    /**
+     * Result
+     *
+     * What the body returned, once it has.
+     */
+    result?: unknown;
+    /**
+     * Run Id
+     *
+     * The run this attempt belongs to.
+     */
+    run_id: string;
+    /**
+     * Started
+     *
+     * When it was claimed.
+     */
+    started?: string | null;
+    /**
+     * Stats
+     *
+     * The agent's measurements for this attempt (05 §Stats entry); absent when nothing measured it.
+     */
+    stats?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * The task state machine of 03.
+     */
+    status: TaskStatus;
+    /**
+     * Submissions
+     *
+     * Every accepted submission, oldest first.
+     */
+    submissions?: Array<SubmissionOut>;
+    /**
+     * Terminal
+     *
+     * Whether the attempt finished with no transition, making its `result` a branch output.
+     */
+    terminal: boolean;
 };
 
 export type TaskDone = {
@@ -1653,6 +1939,110 @@ export type MeApiMeGetResponses = {
 };
 
 export type MeApiMeGetResponse = MeApiMeGetResponses[keyof MeApiMeGetResponses];
+
+export type ListRequestsApiRequestsGetData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Pending
+         *
+         * Only requests a person can still act on: unanswered, with the attempt that asked still running.
+         */
+        pending?: boolean;
+        /**
+         * Run
+         *
+         * Only requests of this run.
+         */
+        run?: string | null;
+    };
+    url: '/api/requests';
+};
+
+export type ListRequestsApiRequestsGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListRequestsApiRequestsGetError = ListRequestsApiRequestsGetErrors[keyof ListRequestsApiRequestsGetErrors];
+
+export type ListRequestsApiRequestsGetResponses = {
+    /**
+     * Response List Requests Api Requests Get
+     *
+     * Successful Response
+     */
+    200: Array<RequestView>;
+};
+
+export type ListRequestsApiRequestsGetResponse = ListRequestsApiRequestsGetResponses[keyof ListRequestsApiRequestsGetResponses];
+
+export type GetRequestApiRequestsRequestIdGetData = {
+    body?: never;
+    path: {
+        /**
+         * Request Id
+         *
+         * The request id, unique across runs.
+         */
+        request_id: number;
+    };
+    query?: never;
+    url: '/api/requests/{request_id}';
+};
+
+export type GetRequestApiRequestsRequestIdGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetRequestApiRequestsRequestIdGetError = GetRequestApiRequestsRequestIdGetErrors[keyof GetRequestApiRequestsRequestIdGetErrors];
+
+export type GetRequestApiRequestsRequestIdGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: RequestView;
+};
+
+export type GetRequestApiRequestsRequestIdGetResponse = GetRequestApiRequestsRequestIdGetResponses[keyof GetRequestApiRequestsRequestIdGetResponses];
+
+export type AnswerRequestApiRequestsRequestIdAnswerPostData = {
+    body: Answer;
+    path: {
+        /**
+         * Request Id
+         *
+         * The request id, unique across runs.
+         */
+        request_id: number;
+    };
+    query?: never;
+    url: '/api/requests/{request_id}/answer';
+};
+
+export type AnswerRequestApiRequestsRequestIdAnswerPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AnswerRequestApiRequestsRequestIdAnswerPostError = AnswerRequestApiRequestsRequestIdAnswerPostErrors[keyof AnswerRequestApiRequestsRequestIdAnswerPostErrors];
+
+export type AnswerRequestApiRequestsRequestIdAnswerPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: RequestView;
+};
+
+export type AnswerRequestApiRequestsRequestIdAnswerPostResponse = AnswerRequestApiRequestsRequestIdAnswerPostResponses[keyof AnswerRequestApiRequestsRequestIdAnswerPostResponses];
 
 export type ListRunsApiRunsGetData = {
     body?: never;
@@ -2128,6 +2518,179 @@ export type ResumeRunApiRunsRunIdResumePostResponses = {
 };
 
 export type ResumeRunApiRunsRunIdResumePostResponse = ResumeRunApiRunsRunIdResumePostResponses[keyof ResumeRunApiRunsRunIdResumePostResponses];
+
+export type GetTaskApiTasksTaskIdGetData = {
+    body?: never;
+    path: {
+        /**
+         * Task Id
+         *
+         * The task id, unique across runs.
+         */
+        task_id: number;
+    };
+    query?: never;
+    url: '/api/tasks/{task_id}';
+};
+
+export type GetTaskApiTasksTaskIdGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetTaskApiTasksTaskIdGetError = GetTaskApiTasksTaskIdGetErrors[keyof GetTaskApiTasksTaskIdGetErrors];
+
+export type GetTaskApiTasksTaskIdGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: TaskDetail;
+};
+
+export type GetTaskApiTasksTaskIdGetResponse = GetTaskApiTasksTaskIdGetResponses[keyof GetTaskApiTasksTaskIdGetResponses];
+
+export type MoveTaskApiTasksTaskIdMovePostData = {
+    body: Move;
+    path: {
+        /**
+         * Task Id
+         *
+         * The task id, unique across runs.
+         */
+        task_id: number;
+    };
+    query?: never;
+    url: '/api/tasks/{task_id}/move';
+};
+
+export type MoveTaskApiTasksTaskIdMovePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type MoveTaskApiTasksTaskIdMovePostError = MoveTaskApiTasksTaskIdMovePostErrors[keyof MoveTaskApiTasksTaskIdMovePostErrors];
+
+export type MoveTaskApiTasksTaskIdMovePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: TaskRef;
+};
+
+export type MoveTaskApiTasksTaskIdMovePostResponse = MoveTaskApiTasksTaskIdMovePostResponses[keyof MoveTaskApiTasksTaskIdMovePostResponses];
+
+export type RetryTaskApiTasksTaskIdRetryPostData = {
+    body?: never;
+    path: {
+        /**
+         * Task Id
+         *
+         * The task id, unique across runs.
+         */
+        task_id: number;
+    };
+    query?: never;
+    url: '/api/tasks/{task_id}/retry';
+};
+
+export type RetryTaskApiTasksTaskIdRetryPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RetryTaskApiTasksTaskIdRetryPostError = RetryTaskApiTasksTaskIdRetryPostErrors[keyof RetryTaskApiTasksTaskIdRetryPostErrors];
+
+export type RetryTaskApiTasksTaskIdRetryPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: TaskRef;
+};
+
+export type RetryTaskApiTasksTaskIdRetryPostResponse = RetryTaskApiTasksTaskIdRetryPostResponses[keyof RetryTaskApiTasksTaskIdRetryPostResponses];
+
+export type SetStatusApiTasksTaskIdStatusPostData = {
+    body: SetStatus;
+    path: {
+        /**
+         * Task Id
+         *
+         * The task id, unique across runs.
+         */
+        task_id: number;
+    };
+    query?: never;
+    url: '/api/tasks/{task_id}/status';
+};
+
+export type SetStatusApiTasksTaskIdStatusPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetStatusApiTasksTaskIdStatusPostError = SetStatusApiTasksTaskIdStatusPostErrors[keyof SetStatusApiTasksTaskIdStatusPostErrors];
+
+export type SetStatusApiTasksTaskIdStatusPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: Ok;
+};
+
+export type SetStatusApiTasksTaskIdStatusPostResponse = SetStatusApiTasksTaskIdStatusPostResponses[keyof SetStatusApiTasksTaskIdStatusPostResponses];
+
+export type GetStreamApiTasksTaskIdStreamGetData = {
+    body?: never;
+    path: {
+        /**
+         * Task Id
+         *
+         * The task id, unique across runs.
+         */
+        task_id: number;
+    };
+    query?: {
+        /**
+         * After
+         *
+         * Return chunks after this sequence number.
+         */
+        after?: number;
+        /**
+         * Limit
+         *
+         * How many chunks to return.
+         */
+        limit?: number;
+    };
+    url: '/api/tasks/{task_id}/stream';
+};
+
+export type GetStreamApiTasksTaskIdStreamGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetStreamApiTasksTaskIdStreamGetError = GetStreamApiTasksTaskIdStreamGetErrors[keyof GetStreamApiTasksTaskIdStreamGetErrors];
+
+export type GetStreamApiTasksTaskIdStreamGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: StreamOut;
+};
+
+export type GetStreamApiTasksTaskIdStreamGetResponse = GetStreamApiTasksTaskIdStreamGetResponses[keyof GetStreamApiTasksTaskIdStreamGetResponses];
 
 export type ListWorkflowsApiWorkflowsGetData = {
     body?: never;
