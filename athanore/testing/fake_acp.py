@@ -839,7 +839,14 @@ class FakeACPAgent:
 
 
 def _config_option(spec: Mapping[str, Any]) -> dict[str, Any]:
-    """One advertised ``session/new`` config option, ACP's select shape."""
+    """One advertised ``session/new`` config option, ACP's select shape.
+
+    A selectable value is ``{value, name}``: that is
+    ``SessionConfigSelectOption`` in the SDK, and ``configOptions`` is
+    parsed with ``skip_invalid_items``, so an option spelled any other
+    way is silently dropped by a real client rather than refused — and a
+    façade resolving an id by category would find nothing to resolve.
+    """
 
     values = list(spec["values"])
     return {
@@ -848,7 +855,7 @@ def _config_option(spec: Mapping[str, Any]) -> dict[str, Any]:
         "name": spec["id"],
         "category": spec["category"],
         "currentValue": values[0],
-        "options": [{"id": value, "name": value} for value in values],
+        "options": [{"value": value, "name": value} for value in values],
     }
 
 
