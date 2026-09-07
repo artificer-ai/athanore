@@ -4,6 +4,69 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+export type AgentStats = {
+    [key: string]: unknown;
+};
+
+export type AgentStatsEvent = {
+    [key: string]: unknown;
+};
+
+/**
+ * AnswerAuthor
+ *
+ * Who answered. ``engine`` is a headless fallback: a permission
+ * timeout action or a declined elicitation (06 §Timeouts).
+ */
+export type AnswerAuthor = 'user' | 'engine';
+
+/**
+ * Arrivals
+ *
+ * How much of an open fan-out has reached a join (04 §Fan-in).
+ *
+ * The innermost pending fan-out, which is the one the operator is
+ * waiting on; the SPA renders it as `2 of 3 arrived` (10 §Graph pane).
+ */
+export type Arrivals = {
+    /**
+     * Arrived
+     *
+     * Branches that have reached the join.
+     */
+    arrived: number;
+    /**
+     * Count
+     *
+     * Branches the fan-out opened.
+     */
+    count: number;
+};
+
+/**
+ * BranchRef
+ *
+ * Which branch an output came out of (D58).
+ *
+ * The index and the key of each frame, and not the frame's ``fanout`` or
+ * ``count``: an output names its branch so a consumer can group by it,
+ * and the task it came from is in the same entry for anything more.
+ */
+export type BranchRef = {
+    /**
+     * Index
+     *
+     * The branch's zero-based index in its fan-out.
+     */
+    index: number;
+    /**
+     * Key
+     *
+     * The payload that branch was given.
+     */
+    key?: unknown;
+};
+
 /**
  * Created
  *
@@ -16,6 +79,191 @@ export type Created = {
      * The id of the run that was queued.
      */
     run_id: string;
+};
+
+/**
+ * EdgeKind
+ *
+ * What kind of edge one node's arrow to another is (08 §Graph semantics).
+ */
+export type EdgeKind = 'forward' | 'back' | 'join';
+
+/**
+ * EditRun
+ *
+ * Change a run's title, its description, or both (`PATCH /api/runs/{id}`).
+ *
+ * Both fields are optional and a field that is absent is left alone —
+ * which is why they are optional rather than defaulted: an edit that
+ * sent no description must not blank one. An edit that names neither is
+ * accepted and changes nothing, which is what ``Ops.edit`` does with it:
+ * a patch is not the place to refuse a caller for being redundant.
+ */
+export type EditRun = {
+    /**
+     * Description
+     *
+     * The new description, if changing.
+     */
+    description?: string | null;
+    /**
+     * Title
+     *
+     * The new title, if changing.
+     */
+    title?: string | null;
+};
+
+export type EngineRecovered = {
+    [key: string]: unknown;
+};
+
+export type EngineRecoveredEvent = {
+    [key: string]: unknown;
+};
+
+export type EngineStopping = {
+    [key: string]: unknown;
+};
+
+export type EngineStoppingEvent = {
+    [key: string]: unknown;
+};
+
+/**
+ * GraphBranch
+ *
+ * The tasks of one node that belong to one branch of a fan-out.
+ *
+ * ``from_task`` is the fan-out that produced the branch — the
+ * ``lineage.from`` of the first task in the branch chain whose parent
+ * returned a list — and is ``null`` for a node reached by a single path,
+ * which has exactly one branch.
+ */
+export type GraphBranch = {
+    /**
+     * From Task
+     *
+     * The fan-out task this branch came out of.
+     */
+    from_task?: number | null;
+    /**
+     * Tasks
+     *
+     * This node's attempts in that branch, oldest first.
+     */
+    tasks?: Array<number>;
+};
+
+/**
+ * GraphEdge
+ *
+ * One arrow of the finalized graph, and how often this run took it.
+ *
+ * ``from`` is a Python keyword, so the field is ``from_`` and carries
+ * ``from`` as its alias — the name 08 fixes on the wire.
+ */
+export type GraphEdge = {
+    /**
+     * From
+     *
+     * The node the arrow leaves.
+     */
+    from: string;
+    /**
+     * Forward, a loop back, or an arrow into a join.
+     */
+    kind: EdgeKind;
+    /**
+     * To
+     *
+     * The node it points at.
+     */
+    to: string;
+    /**
+     * Traversed
+     *
+     * How often this run took the edge: `task.enqueued reason=transition` between the two nodes, plus `join.arrived` for a join edge.
+     */
+    traversed: number;
+};
+
+/**
+ * GraphNode
+ *
+ * One node of the graph, with this run's history on it.
+ */
+export type GraphNode = {
+    /**
+     * For a join with a fan-out still open, how much of it has arrived; absent otherwise.
+     */
+    arrivals?: Arrivals | null;
+    /**
+     * Attempts
+     *
+     * How many task rows this node has in this run.
+     */
+    attempts: number;
+    /**
+     * Branches
+     *
+     * The node's tasks grouped by the fan-out that produced them.
+     */
+    branches?: Array<GraphBranch>;
+    /**
+     * Generation
+     *
+     * BFS depth from the start node.
+     */
+    generation: number;
+    /**
+     * Join
+     *
+     * Whether the node waits for a fan-out to complete.
+     */
+    join: boolean;
+    /**
+     * Last Task Id
+     *
+     * The highest task id of the node, the one the task drawer opens; null when the node has no task.
+     */
+    last_task_id?: number | null;
+    /**
+     * Live
+     *
+     * Whether a `node`-slot plugin panel should show: the node is in progress or waiting, or it has at least one done attempt (09 §Slots).
+     */
+    live: boolean;
+    /**
+     * Name
+     *
+     * The node's name.
+     */
+    name: string;
+    /**
+     * What the node is doing, by 08's precedence.
+     */
+    state: NodeState;
+};
+
+/**
+ * GraphOut
+ *
+ * The graph of one run (08 §Runs, `/graph`).
+ */
+export type GraphOut = {
+    /**
+     * Edges
+     *
+     * Every edge of the finalized graph.
+     */
+    edges: Array<GraphEdge>;
+    /**
+     * Nodes
+     *
+     * Every node of the workflow.
+     */
+    nodes: Array<GraphNode>;
 };
 
 /**
@@ -66,6 +314,121 @@ export type Health = {
      * The running Athanore version.
      */
     version: string;
+};
+
+export type JoinArrived = {
+    [key: string]: unknown;
+};
+
+export type JoinArrivedEvent = {
+    [key: string]: unknown;
+};
+
+export type LogAppended = {
+    [key: string]: unknown;
+};
+
+export type LogAppendedEvent = {
+    [key: string]: unknown;
+};
+
+/**
+ * LogAuthor
+ *
+ * Who wrote a work-log entry.
+ */
+export type LogAuthor = 'agent' | 'engine' | 'user';
+
+/**
+ * LogEntry
+ *
+ * One entry of a run's work log, append-only (03).
+ *
+ * The work log is the inter-stage channel (D4): the engine's failures,
+ * the operator's notes and every agent deliverable, in one ordered list.
+ * ``kind`` is absent on a plain entry.
+ */
+export type LogEntry = {
+    /**
+     * Who wrote it.
+     */
+    author: LogAuthor;
+    /**
+     * Created
+     *
+     * When it was written.
+     */
+    created: string;
+    /**
+     * Id
+     *
+     * The entry id; the log is ordered by it.
+     */
+    id: number;
+    /**
+     * What it is, for filtering; absent on a plain entry.
+     */
+    kind?: LogKind | null;
+    /**
+     * Node
+     *
+     * The node it was written under; `user` for an operator note with no node in flight.
+     */
+    node: string;
+    /**
+     * Run Id
+     *
+     * The run the entry belongs to.
+     */
+    run_id: string;
+    /**
+     * Task Id
+     *
+     * The attempt that wrote it, when one did.
+     */
+    task_id?: number | null;
+    /**
+     * Text
+     *
+     * The entry itself, never truncated.
+     */
+    text: string;
+};
+
+/**
+ * LogKind
+ *
+ * What a work-log entry is, for filtering (the agent view drops
+ * ``stats``; 08 §Agent-facing).
+ */
+export type LogKind = 'deliverable' | 'note' | 'stats' | 'failure';
+
+/**
+ * LogRef
+ *
+ * The id of a work-log entry that was appended (08 §Runs).
+ */
+export type LogRef = {
+    /**
+     * Log Id
+     *
+     * The id of the entry that was written.
+     */
+    log_id: number;
+};
+
+/**
+ * LogText
+ *
+ * Append an entry to a run's work log (`POST /api/runs/{id}/log`).
+ */
+export type LogText = {
+    /**
+     * Text
+     *
+     * The entry, written verbatim and never truncated.
+     */
+    text: string;
 };
 
 /**
@@ -185,6 +548,50 @@ export type NodeOut = {
 };
 
 /**
+ * NodeState
+ *
+ * What a node is doing in one run, in 08 §Graph semantics' precedence.
+ *
+ * Declared in precedence order, highest first, so the rule is the
+ * member order and not a table kept somewhere else. ``failed`` outranks
+ * ``done`` but is itself outranked by ``ready``: a failed attempt whose
+ * retry is queued reports ``ready``, because that retry row exists and
+ * the node is going to run again. ``idle`` means no task of this node
+ * was ever created in this run.
+ *
+ * The SPA colours by this alone (10 §Status colours).
+ */
+export type NodeState = 'in_progress' | 'waiting' | 'ready' | 'dead_letter' | 'failed' | 'done' | 'cancelled' | 'idle';
+
+/**
+ * Ok
+ *
+ * An operation that succeeded and has nothing else to report.
+ *
+ * ``note`` is the one place a router adds a sentence about *how* it
+ * succeeded — 08 §Runs' `{ok, note?}` — and is omitted when there is
+ * nothing to say rather than sent as an empty string.
+ */
+export type Ok = {
+    /**
+     * Note
+     *
+     * What was unusual about the success, when anything was.
+     */
+    note?: string | null;
+    /**
+     * Ok
+     *
+     * Always true; a failure is an error body.
+     */
+    ok?: boolean;
+};
+
+export type PluginEvent = {
+    [key: string]: unknown;
+};
+
+/**
  * PoolHealth
  *
  * One pool's capacity and what it is spending right now.
@@ -202,6 +609,570 @@ export type PoolHealth = {
      * Slots leased right now.
      */
     in_flight: number;
+};
+
+/**
+ * Position
+ *
+ * Move a run in the dispatch list (`POST /api/runs/{id}/position`, D57).
+ *
+ * Exactly one of the two. ``direction`` swaps with the neighbour above
+ * (``-1``) or below (``+1``) and is a no-op at the ends — still a 200,
+ * reporting the position the run already had. ``index`` is the
+ * **zero-based** list index to move to, clamped to the list; New Run's
+ * "top" is `{"index": 0}` and "bottom" is the default, which needs no
+ * call at all.
+ */
+export type Position = {
+    /**
+     * Direction
+     *
+     * Swap with the neighbour above (-1) or below (1).
+     */
+    direction?: -1 | 1 | null;
+    /**
+     * Index
+     *
+     * The zero-based list index to move to, clamped.
+     */
+    index?: number | null;
+};
+
+/**
+ * PositionOut
+ *
+ * Where a run sits in the dispatch list after a move (D57).
+ */
+export type PositionOut = {
+    /**
+     * Position
+     *
+     * The run's place in the dispatch list after the move, numbered from 1. The `index` that asked for it is zero-based (D57).
+     */
+    position: number;
+};
+
+export type RequestAnswered = {
+    [key: string]: unknown;
+};
+
+export type RequestAnsweredEvent = {
+    [key: string]: unknown;
+};
+
+/**
+ * RequestKind
+ *
+ * What the request is about. A label for the UI; nothing keys on it.
+ */
+export type RequestKind = 'permission' | 'elicitation' | 'question';
+
+/**
+ * RequestMode
+ *
+ * The shape of the answer a request expects (06 §The model).
+ */
+export type RequestMode = 'options' | 'form' | 'text';
+
+export type RequestOpened = {
+    [key: string]: unknown;
+};
+
+export type RequestOpenedEvent = {
+    [key: string]: unknown;
+};
+
+/**
+ * RequestOption
+ *
+ * One choice an ``options`` request offers (06 §The model).
+ *
+ * The agent's options verbatim for an ACP permission: the operator
+ * picks under the labels the agent used, and the ``option_id`` that
+ * goes back is the one it will be given (05 §Policies).
+ */
+export type RequestOption = {
+    /**
+     * Kind
+     *
+     * The ACP permission kind, when the option came from one.
+     */
+    kind?: string | null;
+    /**
+     * Name
+     *
+     * What to show the operator.
+     */
+    name: string;
+    /**
+     * Option Id
+     *
+     * The id an answer names.
+     */
+    option_id: string;
+};
+
+/**
+ * RequestSource
+ *
+ * Who raised the request: the agent mid-turn, or the node body.
+ */
+export type RequestSource = 'agent' | 'node';
+
+/**
+ * RequestView
+ *
+ * A request, its answer, and the node that asked (08 §Requests).
+ *
+ * ``schema`` is spelled ``schema_`` in Python — a field named ``schema``
+ * shadows an attribute of ``BaseModel`` — and keeps ``schema`` as its
+ * alias, which is the name 08 fixes on the wire.
+ */
+export type RequestView = {
+    /**
+     * Age
+     *
+     * Seconds since it was opened, when it was read.
+     */
+    age: number;
+    /**
+     * Answer
+     *
+     * The chosen `option_id`, or the value of a `text` or `form` answer. Null both before an answer and for an answer that was null.
+     */
+    answer?: unknown;
+    /**
+     * Who answered; the field to test for having an answer at all.
+     */
+    answered_by?: AnswerAuthor | null;
+    /**
+     * Created
+     *
+     * When the request was opened.
+     */
+    created: string;
+    /**
+     * Id
+     *
+     * The request id.
+     */
+    id: number;
+    /**
+     * What the request is about; a label.
+     */
+    kind: RequestKind;
+    /**
+     * The shape of the answer expected.
+     */
+    mode: RequestMode;
+    /**
+     * Node
+     *
+     * The node that attempt runs.
+     */
+    node: string;
+    /**
+     * Options
+     *
+     * The choices, for an `options` request.
+     */
+    options?: Array<RequestOption> | null;
+    /**
+     * Pending
+     *
+     * Unanswered, with an attempt still waiting.
+     */
+    pending: boolean;
+    /**
+     * Prompt
+     *
+     * What the operator is being asked.
+     */
+    prompt: string;
+    /**
+     * Run Id
+     *
+     * The run it belongs to.
+     */
+    run_id: string;
+    /**
+     * Schema
+     *
+     * The JSON Schema the answer must fit, for a `form` request.
+     */
+    schema?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Whether the agent asked mid-turn or the node body did.
+     */
+    source: RequestSource;
+    /**
+     * Stale
+     *
+     * Unanswered, with no attempt left to consume an answer: in history, out of the inbox, and no longer answerable.
+     */
+    stale: boolean;
+    /**
+     * Task Id
+     *
+     * The attempt that asked.
+     */
+    task_id: number;
+    /**
+     * Tool Call
+     *
+     * What the agent was about to do, for a permission request.
+     */
+    tool_call?: {
+        [key: string]: unknown;
+    } | null;
+};
+
+/**
+ * Rerun
+ *
+ * Run a node again (`POST /api/runs/{id}/rerun`).
+ *
+ * The payload and branch it last had are re-used; a rerun of a join
+ * replays the arrivals it fired on (04 §Operator operations).
+ */
+export type Rerun = {
+    /**
+     * Node
+     *
+     * The node to run again.
+     */
+    node: string;
+};
+
+export type RunCancelled = {
+    [key: string]: unknown;
+};
+
+export type RunCancelledEvent = {
+    [key: string]: unknown;
+};
+
+export type RunChanges = {
+    [key: string]: unknown;
+};
+
+export type RunCompleted = {
+    [key: string]: unknown;
+};
+
+export type RunCompletedEvent = {
+    [key: string]: unknown;
+};
+
+export type RunCreated = {
+    [key: string]: unknown;
+};
+
+export type RunCreatedEvent = {
+    [key: string]: unknown;
+};
+
+export type RunDeleted = {
+    [key: string]: unknown;
+};
+
+export type RunDeletedEvent = {
+    [key: string]: unknown;
+};
+
+/**
+ * RunDetail
+ *
+ * A run, its tasks and its totals (08 §Runs).
+ */
+export type RunDetail = {
+    /**
+     * Created
+     *
+     * When the run was submitted.
+     */
+    created: string;
+    /**
+     * Current Nodes
+     *
+     * The nodes with an in-progress or waiting attempt right now.
+     */
+    current_nodes?: Array<string>;
+    /**
+     * Description
+     *
+     * The operator's description.
+     */
+    description?: string;
+    /**
+     * Id
+     *
+     * The run id, a ULID.
+     */
+    id: string;
+    /**
+     * Output
+     *
+     * The run's output: one value for a single terminal task, a list in branch order when several branches terminated (D58). Null before the run ends, and also when it ended by returning null.
+     */
+    output?: unknown;
+    /**
+     * Outputs
+     *
+     * One entry per terminal task, always a list (D58).
+     */
+    outputs?: Array<RunOutput>;
+    /**
+     * Pending Requests
+     *
+     * Unanswered, non-stale requests waiting on a person.
+     */
+    pending_requests?: number;
+    /**
+     * Position
+     *
+     * The run's place in the dispatch list; runs are numbered 1..n in list order.
+     */
+    position: number;
+    /**
+     * The agent totals of the run.
+     */
+    stats?: RunStats;
+    /**
+     * The run state machine of 03.
+     */
+    status: RunStatus;
+    /**
+     * Tasks
+     *
+     * Every attempt of the run, oldest first.
+     */
+    tasks?: Array<TaskView>;
+    /**
+     * Title
+     *
+     * The operator's title for the run.
+     */
+    title: string;
+    /**
+     * Unregistered
+     *
+     * Whether this server has no workflow of that name registered.
+     */
+    unregistered?: boolean;
+    /**
+     * Updated
+     *
+     * When anything about it last changed.
+     */
+    updated: string;
+    /**
+     * Workflow
+     *
+     * The workflow this run executes.
+     */
+    workflow: string;
+};
+
+export type RunFailed = {
+    [key: string]: unknown;
+};
+
+export type RunFailedEvent = {
+    [key: string]: unknown;
+};
+
+/**
+ * RunOutput
+ *
+ * One terminal task's value, with the branch it came out of (D58).
+ */
+export type RunOutput = {
+    /**
+     * Branch
+     *
+     * The fan-out stack the attempt was inside, outermost first; empty for a run that never fanned out.
+     */
+    branch?: Array<BranchRef>;
+    /**
+     * Node
+     *
+     * The node that attempt ran.
+     */
+    node: string;
+    /**
+     * Task Id
+     *
+     * The terminal attempt that produced it.
+     */
+    task_id: number;
+    /**
+     * Value
+     *
+     * What the body returned.
+     */
+    value?: unknown;
+};
+
+export type RunPaused = {
+    [key: string]: unknown;
+};
+
+export type RunPausedEvent = {
+    [key: string]: unknown;
+};
+
+export type RunReordered = {
+    [key: string]: unknown;
+};
+
+export type RunReorderedEvent = {
+    [key: string]: unknown;
+};
+
+export type RunResumed = {
+    [key: string]: unknown;
+};
+
+export type RunResumedEvent = {
+    [key: string]: unknown;
+};
+
+export type RunStarted = {
+    [key: string]: unknown;
+};
+
+export type RunStartedEvent = {
+    [key: string]: unknown;
+};
+
+/**
+ * RunStats
+ *
+ * A run's agent totals, summed over its attempts (05 §Stats).
+ *
+ * Every field is optional and nothing is zero-filled: a provider that
+ * reported no cost leaves ``cost`` absent rather than claiming zero (01
+ * §Real data only). ``duration_s`` is the sum of the attempts' durations
+ * and not wall-clock time, which fan-out would make meaningless.
+ */
+export type RunStats = {
+    /**
+     * Cost
+     */
+    cost?: number | null;
+    /**
+     * Duration S
+     */
+    duration_s?: number | null;
+    /**
+     * Input Tokens
+     */
+    input_tokens?: number | null;
+    /**
+     * Output Tokens
+     */
+    output_tokens?: number | null;
+    /**
+     * Tool Calls
+     */
+    tool_calls?: number | null;
+    /**
+     * Total Tokens
+     */
+    total_tokens?: number | null;
+};
+
+/**
+ * RunStatus
+ *
+ * The run state machine of 03.
+ *
+ * ``queued`` is new in v1: a run that exists but has dispatched nothing,
+ * so "waiting for a slot" is visible. The three terminal states are
+ * re-openable by retry, rerun and move.
+ */
+export type RunStatus = 'queued' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
+
+/**
+ * RunSummary
+ *
+ * One row of the run list (08 §Runs).
+ *
+ * ``current_nodes`` is plural because a fan-out puts a run in several
+ * nodes at once. ``unregistered`` is not stored: it says this server has
+ * no workflow of that name registered, so the run is shown but nothing
+ * will dispatch it (03 §Run).
+ */
+export type RunSummary = {
+    /**
+     * Created
+     *
+     * When the run was submitted.
+     */
+    created: string;
+    /**
+     * Current Nodes
+     *
+     * The nodes with an in-progress or waiting attempt right now.
+     */
+    current_nodes?: Array<string>;
+    /**
+     * Id
+     *
+     * The run id, a ULID.
+     */
+    id: string;
+    /**
+     * Pending Requests
+     *
+     * Unanswered, non-stale requests waiting on a person.
+     */
+    pending_requests?: number;
+    /**
+     * Position
+     *
+     * The run's place in the dispatch list; runs are numbered 1..n in list order.
+     */
+    position: number;
+    /**
+     * The run state machine of 03.
+     */
+    status: RunStatus;
+    /**
+     * Title
+     *
+     * The operator's title for the run.
+     */
+    title: string;
+    /**
+     * Unregistered
+     *
+     * Whether this server has no workflow of that name registered.
+     */
+    unregistered?: boolean;
+    /**
+     * Updated
+     *
+     * When anything about it last changed.
+     */
+    updated: string;
+    /**
+     * Workflow
+     *
+     * The workflow this run executes.
+     */
+    workflow: string;
+};
+
+export type RunUpdated = {
+    [key: string]: unknown;
+};
+
+export type RunUpdatedEvent = {
+    [key: string]: unknown;
 };
 
 /**
@@ -249,6 +1220,259 @@ export type SourceOut = {
      * That module's text, in full.
      */
     source: string;
+};
+
+export type SubmissionAccepted = {
+    [key: string]: unknown;
+};
+
+export type SubmissionAcceptedEvent = {
+    [key: string]: unknown;
+};
+
+export type SubmissionRejected = {
+    [key: string]: unknown;
+};
+
+export type SubmissionRejectedEvent = {
+    [key: string]: unknown;
+};
+
+export type SubmissionRepair = {
+    [key: string]: unknown;
+};
+
+export type SubmissionRepairEvent = {
+    [key: string]: unknown;
+};
+
+export type TaskCancelled = {
+    [key: string]: unknown;
+};
+
+export type TaskCancelledEvent = {
+    [key: string]: unknown;
+};
+
+export type TaskDeadLettered = {
+    [key: string]: unknown;
+};
+
+export type TaskDeadLetteredEvent = {
+    [key: string]: unknown;
+};
+
+export type TaskDone = {
+    [key: string]: unknown;
+};
+
+export type TaskDoneEvent = {
+    [key: string]: unknown;
+};
+
+export type TaskEnqueued = {
+    [key: string]: unknown;
+};
+
+export type TaskEnqueuedEvent = {
+    [key: string]: unknown;
+};
+
+export type TaskFailed = {
+    [key: string]: unknown;
+};
+
+export type TaskFailedEvent = {
+    [key: string]: unknown;
+};
+
+export type TaskMoved = {
+    [key: string]: unknown;
+};
+
+export type TaskMovedEvent = {
+    [key: string]: unknown;
+};
+
+/**
+ * TaskRef
+ *
+ * The id of a task an operator verb queued.
+ *
+ * The answer to ``rerun``, ``retry`` and ``move``: each of the three
+ * ends with a **new** attempt row, and this is its id (08 §Runs,
+ * §Tasks).
+ */
+export type TaskRef = {
+    /**
+     * Task Id
+     *
+     * The id of the task that was enqueued.
+     */
+    task_id: number;
+};
+
+export type TaskResumed = {
+    [key: string]: unknown;
+};
+
+export type TaskResumedEvent = {
+    [key: string]: unknown;
+};
+
+export type TaskStarted = {
+    [key: string]: unknown;
+};
+
+export type TaskStartedEvent = {
+    [key: string]: unknown;
+};
+
+/**
+ * TaskStatus
+ *
+ * The task state machine of 03.
+ *
+ * ``waiting`` is a body parked in ``human_input``; it holds no pool slot
+ * (04 §Waiting). ``failed`` is the record of one attempt — the retry is a
+ * new row — and ``dead_letter`` is the attempt that exhausted them.
+ */
+export type TaskStatus = 'ready' | 'in_progress' | 'waiting' | 'done' | 'failed' | 'dead_letter' | 'cancelled';
+
+export type TaskStatusSet = {
+    [key: string]: unknown;
+};
+
+export type TaskStatusSetEvent = {
+    [key: string]: unknown;
+};
+
+export type TaskStream = {
+    [key: string]: unknown;
+};
+
+export type TaskStreamEvent = {
+    [key: string]: unknown;
+};
+
+/**
+ * TaskView
+ *
+ * One attempt of one node in one run. **Never** carries a token.
+ */
+export type TaskView = {
+    /**
+     * Attempt
+     *
+     * Which attempt of that node this row is, from 1.
+     */
+    attempt: number;
+    /**
+     * Branch
+     *
+     * The fan-out stack this attempt is inside.
+     */
+    branch?: Array<AthanoreApiSchemasTasksBranchFrame>;
+    /**
+     * Created
+     *
+     * When the row was enqueued.
+     */
+    created: string;
+    /**
+     * Error
+     *
+     * Why the attempt failed, when it did.
+     */
+    error?: string | null;
+    /**
+     * Explicit
+     *
+     * Whether that priority was declared on the node rather than defaulted.
+     */
+    explicit: boolean;
+    /**
+     * Finished
+     *
+     * When it ended.
+     */
+    finished?: string | null;
+    /**
+     * Id
+     *
+     * The task id, unique across every run.
+     */
+    id: number;
+    /**
+     * Lineage
+     *
+     * Where this attempt came from: its reason and its parent.
+     */
+    lineage?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Node
+     *
+     * The node whose body this attempt runs.
+     */
+    node: string;
+    /**
+     * Payload
+     *
+     * The value the task was enqueued with.
+     */
+    payload?: unknown;
+    /**
+     * Priority
+     *
+     * The dispatch priority this attempt was given.
+     */
+    priority: number;
+    /**
+     * Result
+     *
+     * What the body returned, once it has.
+     */
+    result?: unknown;
+    /**
+     * Run Id
+     *
+     * The run this attempt belongs to.
+     */
+    run_id: string;
+    /**
+     * Started
+     *
+     * When it was claimed.
+     */
+    started?: string | null;
+    /**
+     * Stats
+     *
+     * The agent's measurements for this attempt (05 §Stats entry); absent when nothing measured it.
+     */
+    stats?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * The task state machine of 03.
+     */
+    status: TaskStatus;
+    /**
+     * Terminal
+     *
+     * Whether the attempt finished with no transition, making its `result` a branch output.
+     */
+    terminal: boolean;
+};
+
+export type TaskWaiting = {
+    [key: string]: unknown;
+};
+
+export type TaskWaitingEvent = {
+    [key: string]: unknown;
 };
 
 /**
@@ -358,6 +1582,46 @@ export type WorkflowPlugin = {
     }>;
 };
 
+/**
+ * BranchFrame
+ *
+ * One frame of a task's fan-out stack (04 §Branch frames).
+ *
+ * Frames nest, outermost first: a branch that fans out again pushes a
+ * second frame. ``key`` is the payload that branch was given, which is
+ * the branch's identity in every list the SPA groups by it.
+ */
+export type AthanoreApiSchemasTasksBranchFrame = {
+    /**
+     * Count
+     *
+     * How many branches that fan-out opened.
+     */
+    count: number;
+    /**
+     * Fanout
+     *
+     * The task whose return value fanned out.
+     */
+    fanout: number;
+    /**
+     * Index
+     *
+     * This branch's zero-based index in that fan-out.
+     */
+    index: number;
+    /**
+     * Key
+     *
+     * The payload this branch was given.
+     */
+    key?: unknown;
+};
+
+export type AthanoreEventsPayloadsBranchFrame = {
+    [key: string]: unknown;
+};
+
 export type HealthApiHealthGetData = {
     body?: never;
     path?: never;
@@ -389,6 +1653,481 @@ export type MeApiMeGetResponses = {
 };
 
 export type MeApiMeGetResponse = MeApiMeGetResponses[keyof MeApiMeGetResponses];
+
+export type ListRunsApiRunsGetData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Status
+         *
+         * Only runs in this status.
+         */
+        status?: RunStatus | null;
+        /**
+         * Workflow
+         *
+         * Only runs of this workflow.
+         */
+        workflow?: string | null;
+    };
+    url: '/api/runs';
+};
+
+export type ListRunsApiRunsGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListRunsApiRunsGetError = ListRunsApiRunsGetErrors[keyof ListRunsApiRunsGetErrors];
+
+export type ListRunsApiRunsGetResponses = {
+    /**
+     * Response List Runs Api Runs Get
+     *
+     * Successful Response
+     */
+    200: Array<RunSummary>;
+};
+
+export type ListRunsApiRunsGetResponse = ListRunsApiRunsGetResponses[keyof ListRunsApiRunsGetResponses];
+
+export type DeleteRunApiRunsRunIdDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         *
+         * The run id, a ULID.
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/runs/{run_id}';
+};
+
+export type DeleteRunApiRunsRunIdDeleteErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteRunApiRunsRunIdDeleteError = DeleteRunApiRunsRunIdDeleteErrors[keyof DeleteRunApiRunsRunIdDeleteErrors];
+
+export type DeleteRunApiRunsRunIdDeleteResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteRunApiRunsRunIdDeleteResponse = DeleteRunApiRunsRunIdDeleteResponses[keyof DeleteRunApiRunsRunIdDeleteResponses];
+
+export type GetRunApiRunsRunIdGetData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         *
+         * The run id, a ULID.
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/runs/{run_id}';
+};
+
+export type GetRunApiRunsRunIdGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetRunApiRunsRunIdGetError = GetRunApiRunsRunIdGetErrors[keyof GetRunApiRunsRunIdGetErrors];
+
+export type GetRunApiRunsRunIdGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: RunDetail;
+};
+
+export type GetRunApiRunsRunIdGetResponse = GetRunApiRunsRunIdGetResponses[keyof GetRunApiRunsRunIdGetResponses];
+
+export type EditRunApiRunsRunIdPatchData = {
+    body: EditRun;
+    path: {
+        /**
+         * Run Id
+         *
+         * The run id, a ULID.
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/runs/{run_id}';
+};
+
+export type EditRunApiRunsRunIdPatchErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type EditRunApiRunsRunIdPatchError = EditRunApiRunsRunIdPatchErrors[keyof EditRunApiRunsRunIdPatchErrors];
+
+export type EditRunApiRunsRunIdPatchResponses = {
+    /**
+     * Successful Response
+     */
+    200: RunDetail;
+};
+
+export type EditRunApiRunsRunIdPatchResponse = EditRunApiRunsRunIdPatchResponses[keyof EditRunApiRunsRunIdPatchResponses];
+
+export type CancelRunApiRunsRunIdCancelPostData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         *
+         * The run id, a ULID.
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/runs/{run_id}/cancel';
+};
+
+export type CancelRunApiRunsRunIdCancelPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type CancelRunApiRunsRunIdCancelPostError = CancelRunApiRunsRunIdCancelPostErrors[keyof CancelRunApiRunsRunIdCancelPostErrors];
+
+export type CancelRunApiRunsRunIdCancelPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: Ok;
+};
+
+export type CancelRunApiRunsRunIdCancelPostResponse = CancelRunApiRunsRunIdCancelPostResponses[keyof CancelRunApiRunsRunIdCancelPostResponses];
+
+export type GetEventsApiRunsRunIdEventsGetData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         *
+         * The run id, a ULID.
+         */
+        run_id: string;
+    };
+    query?: {
+        /**
+         * After
+         *
+         * Return events after this event id.
+         */
+        after?: number;
+        /**
+         * Limit
+         *
+         * How many events to return.
+         */
+        limit?: number;
+    };
+    url: '/api/runs/{run_id}/events';
+};
+
+export type GetEventsApiRunsRunIdEventsGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetEventsApiRunsRunIdEventsGetError = GetEventsApiRunsRunIdEventsGetErrors[keyof GetEventsApiRunsRunIdEventsGetErrors];
+
+export type GetEventsApiRunsRunIdEventsGetResponses = {
+    /**
+     * Response Get Events Api Runs  Run Id  Events Get
+     *
+     * Successful Response
+     */
+    200: Array<RunCreatedEvent | RunStartedEvent | RunUpdatedEvent | RunReorderedEvent | RunPausedEvent | RunResumedEvent | RunCancelledEvent | RunDeletedEvent | RunCompletedEvent | RunFailedEvent | TaskEnqueuedEvent | JoinArrivedEvent | TaskStartedEvent | TaskDoneEvent | TaskFailedEvent | TaskDeadLetteredEvent | TaskWaitingEvent | TaskResumedEvent | TaskCancelledEvent | TaskMovedEvent | TaskStatusSetEvent | TaskStreamEvent | SubmissionAcceptedEvent | SubmissionRejectedEvent | SubmissionRepairEvent | RequestOpenedEvent | RequestAnsweredEvent | LogAppendedEvent | AgentStatsEvent | EngineRecoveredEvent | EngineStoppingEvent | PluginEvent>;
+};
+
+export type GetEventsApiRunsRunIdEventsGetResponse = GetEventsApiRunsRunIdEventsGetResponses[keyof GetEventsApiRunsRunIdEventsGetResponses];
+
+export type GetGraphApiRunsRunIdGraphGetData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         *
+         * The run id, a ULID.
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/runs/{run_id}/graph';
+};
+
+export type GetGraphApiRunsRunIdGraphGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetGraphApiRunsRunIdGraphGetError = GetGraphApiRunsRunIdGraphGetErrors[keyof GetGraphApiRunsRunIdGraphGetErrors];
+
+export type GetGraphApiRunsRunIdGraphGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: GraphOut;
+};
+
+export type GetGraphApiRunsRunIdGraphGetResponse = GetGraphApiRunsRunIdGraphGetResponses[keyof GetGraphApiRunsRunIdGraphGetResponses];
+
+export type GetLogApiRunsRunIdLogGetData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         *
+         * The run id, a ULID.
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/runs/{run_id}/log';
+};
+
+export type GetLogApiRunsRunIdLogGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetLogApiRunsRunIdLogGetError = GetLogApiRunsRunIdLogGetErrors[keyof GetLogApiRunsRunIdLogGetErrors];
+
+export type GetLogApiRunsRunIdLogGetResponses = {
+    /**
+     * Response Get Log Api Runs  Run Id  Log Get
+     *
+     * Successful Response
+     */
+    200: Array<LogEntry>;
+};
+
+export type GetLogApiRunsRunIdLogGetResponse = GetLogApiRunsRunIdLogGetResponses[keyof GetLogApiRunsRunIdLogGetResponses];
+
+export type AppendLogApiRunsRunIdLogPostData = {
+    body: LogText;
+    path: {
+        /**
+         * Run Id
+         *
+         * The run id, a ULID.
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/runs/{run_id}/log';
+};
+
+export type AppendLogApiRunsRunIdLogPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AppendLogApiRunsRunIdLogPostError = AppendLogApiRunsRunIdLogPostErrors[keyof AppendLogApiRunsRunIdLogPostErrors];
+
+export type AppendLogApiRunsRunIdLogPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: LogRef;
+};
+
+export type AppendLogApiRunsRunIdLogPostResponse = AppendLogApiRunsRunIdLogPostResponses[keyof AppendLogApiRunsRunIdLogPostResponses];
+
+export type PauseRunApiRunsRunIdPausePostData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         *
+         * The run id, a ULID.
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/runs/{run_id}/pause';
+};
+
+export type PauseRunApiRunsRunIdPausePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PauseRunApiRunsRunIdPausePostError = PauseRunApiRunsRunIdPausePostErrors[keyof PauseRunApiRunsRunIdPausePostErrors];
+
+export type PauseRunApiRunsRunIdPausePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: Ok;
+};
+
+export type PauseRunApiRunsRunIdPausePostResponse = PauseRunApiRunsRunIdPausePostResponses[keyof PauseRunApiRunsRunIdPausePostResponses];
+
+export type MoveRunApiRunsRunIdPositionPostData = {
+    body: Position;
+    path: {
+        /**
+         * Run Id
+         *
+         * The run id, a ULID.
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/runs/{run_id}/position';
+};
+
+export type MoveRunApiRunsRunIdPositionPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type MoveRunApiRunsRunIdPositionPostError = MoveRunApiRunsRunIdPositionPostErrors[keyof MoveRunApiRunsRunIdPositionPostErrors];
+
+export type MoveRunApiRunsRunIdPositionPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: PositionOut;
+};
+
+export type MoveRunApiRunsRunIdPositionPostResponse = MoveRunApiRunsRunIdPositionPostResponses[keyof MoveRunApiRunsRunIdPositionPostResponses];
+
+export type GetRequestsApiRunsRunIdRequestsGetData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         *
+         * The run id, a ULID.
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/runs/{run_id}/requests';
+};
+
+export type GetRequestsApiRunsRunIdRequestsGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetRequestsApiRunsRunIdRequestsGetError = GetRequestsApiRunsRunIdRequestsGetErrors[keyof GetRequestsApiRunsRunIdRequestsGetErrors];
+
+export type GetRequestsApiRunsRunIdRequestsGetResponses = {
+    /**
+     * Response Get Requests Api Runs  Run Id  Requests Get
+     *
+     * Successful Response
+     */
+    200: Array<RequestView>;
+};
+
+export type GetRequestsApiRunsRunIdRequestsGetResponse = GetRequestsApiRunsRunIdRequestsGetResponses[keyof GetRequestsApiRunsRunIdRequestsGetResponses];
+
+export type RerunNodeApiRunsRunIdRerunPostData = {
+    body: Rerun;
+    path: {
+        /**
+         * Run Id
+         *
+         * The run id, a ULID.
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/runs/{run_id}/rerun';
+};
+
+export type RerunNodeApiRunsRunIdRerunPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RerunNodeApiRunsRunIdRerunPostError = RerunNodeApiRunsRunIdRerunPostErrors[keyof RerunNodeApiRunsRunIdRerunPostErrors];
+
+export type RerunNodeApiRunsRunIdRerunPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: TaskRef;
+};
+
+export type RerunNodeApiRunsRunIdRerunPostResponse = RerunNodeApiRunsRunIdRerunPostResponses[keyof RerunNodeApiRunsRunIdRerunPostResponses];
+
+export type ResumeRunApiRunsRunIdResumePostData = {
+    body?: never;
+    path: {
+        /**
+         * Run Id
+         *
+         * The run id, a ULID.
+         */
+        run_id: string;
+    };
+    query?: never;
+    url: '/api/runs/{run_id}/resume';
+};
+
+export type ResumeRunApiRunsRunIdResumePostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ResumeRunApiRunsRunIdResumePostError = ResumeRunApiRunsRunIdResumePostErrors[keyof ResumeRunApiRunsRunIdResumePostErrors];
+
+export type ResumeRunApiRunsRunIdResumePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: Ok;
+};
+
+export type ResumeRunApiRunsRunIdResumePostResponse = ResumeRunApiRunsRunIdResumePostResponses[keyof ResumeRunApiRunsRunIdResumePostResponses];
 
 export type ListWorkflowsApiWorkflowsGetData = {
     body?: never;

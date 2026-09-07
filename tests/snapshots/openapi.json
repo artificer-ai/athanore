@@ -1,6 +1,63 @@
 {
   "components": {
     "schemas": {
+      "AgentStats": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "AgentStatsEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "AnswerAuthor": {
+        "description": "Who answered. ``engine`` is a headless fallback: a permission\ntimeout action or a declined elicitation (06 \u00a7Timeouts).",
+        "enum": [
+          "user",
+          "engine"
+        ],
+        "title": "AnswerAuthor",
+        "type": "string"
+      },
+      "Arrivals": {
+        "description": "How much of an open fan-out has reached a join (04 \u00a7Fan-in).\n\nThe innermost pending fan-out, which is the one the operator is\nwaiting on; the SPA renders it as `2 of 3 arrived` (10 \u00a7Graph pane).",
+        "properties": {
+          "arrived": {
+            "description": "Branches that have reached the join.",
+            "title": "Arrived",
+            "type": "integer"
+          },
+          "count": {
+            "description": "Branches the fan-out opened.",
+            "title": "Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "arrived",
+          "count"
+        ],
+        "title": "Arrivals",
+        "type": "object"
+      },
+      "BranchRef": {
+        "description": "Which branch an output came out of (D58).\n\nThe index and the key of each frame, and not the frame's ``fanout`` or\n``count``: an output names its branch so a consumer can group by it,\nand the task it came from is in the same entry for anything more.",
+        "properties": {
+          "index": {
+            "description": "The branch's zero-based index in its fan-out.",
+            "title": "Index",
+            "type": "integer"
+          },
+          "key": {
+            "description": "The payload that branch was given.",
+            "title": "Key"
+          }
+        },
+        "required": [
+          "index"
+        ],
+        "title": "BranchRef",
+        "type": "object"
+      },
       "Created": {
         "description": "The 201 body of ``POST /api/workflows/{name}/runs`` (08 \u00a7Workflows).",
         "properties": {
@@ -14,6 +71,225 @@
           "run_id"
         ],
         "title": "Created",
+        "type": "object"
+      },
+      "EdgeKind": {
+        "description": "What kind of edge one node's arrow to another is (08 \u00a7Graph semantics).",
+        "enum": [
+          "forward",
+          "back",
+          "join"
+        ],
+        "title": "EdgeKind",
+        "type": "string"
+      },
+      "EditRun": {
+        "description": "Change a run's title, its description, or both (`PATCH /api/runs/{id}`).\n\nBoth fields are optional and a field that is absent is left alone \u2014\nwhich is why they are optional rather than defaulted: an edit that\nsent no description must not blank one. An edit that names neither is\naccepted and changes nothing, which is what ``Ops.edit`` does with it:\na patch is not the place to refuse a caller for being redundant.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The new description, if changing.",
+            "title": "Description"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The new title, if changing.",
+            "title": "Title"
+          }
+        },
+        "title": "EditRun",
+        "type": "object"
+      },
+      "EngineRecovered": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "EngineRecoveredEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "EngineStopping": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "EngineStoppingEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "GraphBranch": {
+        "description": "The tasks of one node that belong to one branch of a fan-out.\n\n``from_task`` is the fan-out that produced the branch \u2014 the\n``lineage.from`` of the first task in the branch chain whose parent\nreturned a list \u2014 and is ``null`` for a node reached by a single path,\nwhich has exactly one branch.",
+        "properties": {
+          "from_task": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The fan-out task this branch came out of.",
+            "title": "From Task"
+          },
+          "tasks": {
+            "description": "This node's attempts in that branch, oldest first.",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Tasks",
+            "type": "array"
+          }
+        },
+        "title": "GraphBranch",
+        "type": "object"
+      },
+      "GraphEdge": {
+        "description": "One arrow of the finalized graph, and how often this run took it.\n\n``from`` is a Python keyword, so the field is ``from_`` and carries\n``from`` as its alias \u2014 the name 08 fixes on the wire.",
+        "properties": {
+          "from": {
+            "description": "The node the arrow leaves.",
+            "title": "From",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/EdgeKind",
+            "description": "Forward, a loop back, or an arrow into a join."
+          },
+          "to": {
+            "description": "The node it points at.",
+            "title": "To",
+            "type": "string"
+          },
+          "traversed": {
+            "description": "How often this run took the edge: `task.enqueued reason=transition` between the two nodes, plus `join.arrived` for a join edge.",
+            "title": "Traversed",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "kind",
+          "traversed"
+        ],
+        "title": "GraphEdge",
+        "type": "object"
+      },
+      "GraphNode": {
+        "description": "One node of the graph, with this run's history on it.",
+        "properties": {
+          "arrivals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Arrivals"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "For a join with a fan-out still open, how much of it has arrived; absent otherwise."
+          },
+          "attempts": {
+            "description": "How many task rows this node has in this run.",
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "branches": {
+            "description": "The node's tasks grouped by the fan-out that produced them.",
+            "items": {
+              "$ref": "#/components/schemas/GraphBranch"
+            },
+            "title": "Branches",
+            "type": "array"
+          },
+          "generation": {
+            "description": "BFS depth from the start node.",
+            "title": "Generation",
+            "type": "integer"
+          },
+          "join": {
+            "description": "Whether the node waits for a fan-out to complete.",
+            "title": "Join",
+            "type": "boolean"
+          },
+          "last_task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The highest task id of the node, the one the task drawer opens; null when the node has no task.",
+            "title": "Last Task Id"
+          },
+          "live": {
+            "description": "Whether a `node`-slot plugin panel should show: the node is in progress or waiting, or it has at least one done attempt (09 \u00a7Slots).",
+            "title": "Live",
+            "type": "boolean"
+          },
+          "name": {
+            "description": "The node's name.",
+            "title": "Name",
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/NodeState",
+            "description": "What the node is doing, by 08's precedence."
+          }
+        },
+        "required": [
+          "name",
+          "generation",
+          "join",
+          "state",
+          "live",
+          "attempts"
+        ],
+        "title": "GraphNode",
+        "type": "object"
+      },
+      "GraphOut": {
+        "description": "The graph of one run (08 \u00a7Runs, `/graph`).",
+        "properties": {
+          "edges": {
+            "description": "Every edge of the finalized graph.",
+            "items": {
+              "$ref": "#/components/schemas/GraphEdge"
+            },
+            "title": "Edges",
+            "type": "array"
+          },
+          "nodes": {
+            "description": "Every node of the workflow.",
+            "items": {
+              "$ref": "#/components/schemas/GraphNode"
+            },
+            "title": "Nodes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "nodes",
+          "edges"
+        ],
+        "title": "GraphOut",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -87,6 +363,142 @@
           "version"
         ],
         "title": "Health",
+        "type": "object"
+      },
+      "JoinArrived": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "JoinArrivedEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "LogAppended": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "LogAppendedEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "LogAuthor": {
+        "description": "Who wrote a work-log entry.",
+        "enum": [
+          "agent",
+          "engine",
+          "user"
+        ],
+        "title": "LogAuthor",
+        "type": "string"
+      },
+      "LogEntry": {
+        "description": "One entry of a run's work log, append-only (03).\n\nThe work log is the inter-stage channel (D4): the engine's failures,\nthe operator's notes and every agent deliverable, in one ordered list.\n``kind`` is absent on a plain entry.",
+        "properties": {
+          "author": {
+            "$ref": "#/components/schemas/LogAuthor",
+            "description": "Who wrote it."
+          },
+          "created": {
+            "description": "When it was written.",
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "id": {
+            "description": "The entry id; the log is ordered by it.",
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LogKind"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What it is, for filtering; absent on a plain entry."
+          },
+          "node": {
+            "description": "The node it was written under; `user` for an operator note with no node in flight.",
+            "title": "Node",
+            "type": "string"
+          },
+          "run_id": {
+            "description": "The run the entry belongs to.",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The attempt that wrote it, when one did.",
+            "title": "Task Id"
+          },
+          "text": {
+            "description": "The entry itself, never truncated.",
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "run_id",
+          "node",
+          "author",
+          "text",
+          "created"
+        ],
+        "title": "LogEntry",
+        "type": "object"
+      },
+      "LogKind": {
+        "description": "What a work-log entry is, for filtering (the agent view drops\n``stats``; 08 \u00a7Agent-facing).",
+        "enum": [
+          "deliverable",
+          "note",
+          "stats",
+          "failure"
+        ],
+        "title": "LogKind",
+        "type": "string"
+      },
+      "LogRef": {
+        "description": "The id of a work-log entry that was appended (08 \u00a7Runs).",
+        "properties": {
+          "log_id": {
+            "description": "The id of the entry that was written.",
+            "title": "Log Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "log_id"
+        ],
+        "title": "LogRef",
+        "type": "object"
+      },
+      "LogText": {
+        "description": "Append an entry to a run's work log (`POST /api/runs/{id}/log`).",
+        "properties": {
+          "text": {
+            "description": "The entry, written verbatim and never truncated.",
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "LogText",
         "type": "object"
       },
       "Me": {
@@ -236,6 +648,50 @@
         "title": "NodeOut",
         "type": "object"
       },
+      "NodeState": {
+        "description": "What a node is doing in one run, in 08 \u00a7Graph semantics' precedence.\n\nDeclared in precedence order, highest first, so the rule is the\nmember order and not a table kept somewhere else. ``failed`` outranks\n``done`` but is itself outranked by ``ready``: a failed attempt whose\nretry is queued reports ``ready``, because that retry row exists and\nthe node is going to run again. ``idle`` means no task of this node\nwas ever created in this run.\n\nThe SPA colours by this alone (10 \u00a7Status colours).",
+        "enum": [
+          "in_progress",
+          "waiting",
+          "ready",
+          "dead_letter",
+          "failed",
+          "done",
+          "cancelled",
+          "idle"
+        ],
+        "title": "NodeState",
+        "type": "string"
+      },
+      "Ok": {
+        "description": "An operation that succeeded and has nothing else to report.\n\n``note`` is the one place a router adds a sentence about *how* it\nsucceeded \u2014 08 \u00a7Runs' `{ok, note?}` \u2014 and is omitted when there is\nnothing to say rather than sent as an empty string.",
+        "properties": {
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What was unusual about the success, when anything was.",
+            "title": "Note"
+          },
+          "ok": {
+            "default": true,
+            "description": "Always true; a failure is an error body.",
+            "title": "Ok",
+            "type": "boolean"
+          }
+        },
+        "title": "Ok",
+        "type": "object"
+      },
+      "PluginEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
       "PoolHealth": {
         "description": "One pool's capacity and what it is spending right now.",
         "properties": {
@@ -255,6 +711,662 @@
           "in_flight"
         ],
         "title": "PoolHealth",
+        "type": "object"
+      },
+      "Position": {
+        "description": "Move a run in the dispatch list (`POST /api/runs/{id}/position`, D57).\n\nExactly one of the two. ``direction`` swaps with the neighbour above\n(``-1``) or below (``+1``) and is a no-op at the ends \u2014 still a 200,\nreporting the position the run already had. ``index`` is the\n**zero-based** list index to move to, clamped to the list; New Run's\n\"top\" is `{\"index\": 0}` and \"bottom\" is the default, which needs no\ncall at all.",
+        "properties": {
+          "direction": {
+            "anyOf": [
+              {
+                "enum": [
+                  -1,
+                  1
+                ],
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Swap with the neighbour above (-1) or below (1).",
+            "title": "Direction"
+          },
+          "index": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The zero-based list index to move to, clamped.",
+            "title": "Index"
+          }
+        },
+        "title": "Position",
+        "type": "object"
+      },
+      "PositionOut": {
+        "description": "Where a run sits in the dispatch list after a move (D57).",
+        "properties": {
+          "position": {
+            "description": "The run's place in the dispatch list after the move, numbered from 1. The `index` that asked for it is zero-based (D57).",
+            "title": "Position",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "position"
+        ],
+        "title": "PositionOut",
+        "type": "object"
+      },
+      "RequestAnswered": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RequestAnsweredEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RequestKind": {
+        "description": "What the request is about. A label for the UI; nothing keys on it.",
+        "enum": [
+          "permission",
+          "elicitation",
+          "question"
+        ],
+        "title": "RequestKind",
+        "type": "string"
+      },
+      "RequestMode": {
+        "description": "The shape of the answer a request expects (06 \u00a7The model).",
+        "enum": [
+          "options",
+          "form",
+          "text"
+        ],
+        "title": "RequestMode",
+        "type": "string"
+      },
+      "RequestOpened": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RequestOpenedEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RequestOption": {
+        "description": "One choice an ``options`` request offers (06 \u00a7The model).\n\nThe agent's options verbatim for an ACP permission: the operator\npicks under the labels the agent used, and the ``option_id`` that\ngoes back is the one it will be given (05 \u00a7Policies).",
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The ACP permission kind, when the option came from one.",
+            "title": "Kind"
+          },
+          "name": {
+            "description": "What to show the operator.",
+            "title": "Name",
+            "type": "string"
+          },
+          "option_id": {
+            "description": "The id an answer names.",
+            "title": "Option Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "option_id",
+          "name"
+        ],
+        "title": "RequestOption",
+        "type": "object"
+      },
+      "RequestSource": {
+        "description": "Who raised the request: the agent mid-turn, or the node body.",
+        "enum": [
+          "agent",
+          "node"
+        ],
+        "title": "RequestSource",
+        "type": "string"
+      },
+      "RequestView": {
+        "description": "A request, its answer, and the node that asked (08 \u00a7Requests).\n\n``schema`` is spelled ``schema_`` in Python \u2014 a field named ``schema``\nshadows an attribute of ``BaseModel`` \u2014 and keeps ``schema`` as its\nalias, which is the name 08 fixes on the wire.",
+        "properties": {
+          "age": {
+            "description": "Seconds since it was opened, when it was read.",
+            "title": "Age",
+            "type": "number"
+          },
+          "answer": {
+            "description": "The chosen `option_id`, or the value of a `text` or `form` answer. Null both before an answer and for an answer that was null.",
+            "title": "Answer"
+          },
+          "answered_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnswerAuthor"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who answered; the field to test for having an answer at all."
+          },
+          "created": {
+            "description": "When the request was opened.",
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "id": {
+            "description": "The request id.",
+            "title": "Id",
+            "type": "integer"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/RequestKind",
+            "description": "What the request is about; a label."
+          },
+          "mode": {
+            "$ref": "#/components/schemas/RequestMode",
+            "description": "The shape of the answer expected."
+          },
+          "node": {
+            "description": "The node that attempt runs.",
+            "title": "Node",
+            "type": "string"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/RequestOption"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The choices, for an `options` request.",
+            "title": "Options"
+          },
+          "pending": {
+            "description": "Unanswered, with an attempt still waiting.",
+            "title": "Pending",
+            "type": "boolean"
+          },
+          "prompt": {
+            "description": "What the operator is being asked.",
+            "title": "Prompt",
+            "type": "string"
+          },
+          "run_id": {
+            "description": "The run it belongs to.",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The JSON Schema the answer must fit, for a `form` request.",
+            "title": "Schema"
+          },
+          "source": {
+            "$ref": "#/components/schemas/RequestSource",
+            "description": "Whether the agent asked mid-turn or the node body did."
+          },
+          "stale": {
+            "description": "Unanswered, with no attempt left to consume an answer: in history, out of the inbox, and no longer answerable.",
+            "title": "Stale",
+            "type": "boolean"
+          },
+          "task_id": {
+            "description": "The attempt that asked.",
+            "title": "Task Id",
+            "type": "integer"
+          },
+          "tool_call": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the agent was about to do, for a permission request.",
+            "title": "Tool Call"
+          }
+        },
+        "required": [
+          "id",
+          "run_id",
+          "task_id",
+          "node",
+          "prompt",
+          "mode",
+          "source",
+          "kind",
+          "pending",
+          "stale",
+          "created",
+          "age"
+        ],
+        "title": "RequestView",
+        "type": "object"
+      },
+      "Rerun": {
+        "description": "Run a node again (`POST /api/runs/{id}/rerun`).\n\nThe payload and branch it last had are re-used; a rerun of a join\nreplays the arrivals it fired on (04 \u00a7Operator operations).",
+        "properties": {
+          "node": {
+            "description": "The node to run again.",
+            "minLength": 1,
+            "title": "Node",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node"
+        ],
+        "title": "Rerun",
+        "type": "object"
+      },
+      "RunCancelled": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RunCancelledEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RunChanges": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RunCompleted": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RunCompletedEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RunCreated": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RunCreatedEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RunDeleted": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RunDeletedEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RunDetail": {
+        "description": "A run, its tasks and its totals (08 \u00a7Runs).",
+        "properties": {
+          "created": {
+            "description": "When the run was submitted.",
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "current_nodes": {
+            "description": "The nodes with an in-progress or waiting attempt right now.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Current Nodes",
+            "type": "array"
+          },
+          "description": {
+            "default": "",
+            "description": "The operator's description.",
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "description": "The run id, a ULID.",
+            "title": "Id",
+            "type": "string"
+          },
+          "output": {
+            "description": "The run's output: one value for a single terminal task, a list in branch order when several branches terminated (D58). Null before the run ends, and also when it ended by returning null.",
+            "title": "Output"
+          },
+          "outputs": {
+            "description": "One entry per terminal task, always a list (D58).",
+            "items": {
+              "$ref": "#/components/schemas/RunOutput"
+            },
+            "title": "Outputs",
+            "type": "array"
+          },
+          "pending_requests": {
+            "default": 0,
+            "description": "Unanswered, non-stale requests waiting on a person.",
+            "title": "Pending Requests",
+            "type": "integer"
+          },
+          "position": {
+            "description": "The run's place in the dispatch list; runs are numbered 1..n in list order.",
+            "title": "Position",
+            "type": "integer"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/RunStats",
+            "description": "The agent totals of the run."
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus",
+            "description": "The run state machine of 03."
+          },
+          "tasks": {
+            "description": "Every attempt of the run, oldest first.",
+            "items": {
+              "$ref": "#/components/schemas/TaskView"
+            },
+            "title": "Tasks",
+            "type": "array"
+          },
+          "title": {
+            "description": "The operator's title for the run.",
+            "title": "Title",
+            "type": "string"
+          },
+          "unregistered": {
+            "default": false,
+            "description": "Whether this server has no workflow of that name registered.",
+            "title": "Unregistered",
+            "type": "boolean"
+          },
+          "updated": {
+            "description": "When anything about it last changed.",
+            "format": "date-time",
+            "title": "Updated",
+            "type": "string"
+          },
+          "workflow": {
+            "description": "The workflow this run executes.",
+            "title": "Workflow",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workflow",
+          "title",
+          "status",
+          "position",
+          "created",
+          "updated"
+        ],
+        "title": "RunDetail",
+        "type": "object"
+      },
+      "RunFailed": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RunFailedEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RunOutput": {
+        "description": "One terminal task's value, with the branch it came out of (D58).",
+        "properties": {
+          "branch": {
+            "description": "The fan-out stack the attempt was inside, outermost first; empty for a run that never fanned out.",
+            "items": {
+              "$ref": "#/components/schemas/BranchRef"
+            },
+            "title": "Branch",
+            "type": "array"
+          },
+          "node": {
+            "description": "The node that attempt ran.",
+            "title": "Node",
+            "type": "string"
+          },
+          "task_id": {
+            "description": "The terminal attempt that produced it.",
+            "title": "Task Id",
+            "type": "integer"
+          },
+          "value": {
+            "description": "What the body returned.",
+            "title": "Value"
+          }
+        },
+        "required": [
+          "task_id",
+          "node"
+        ],
+        "title": "RunOutput",
+        "type": "object"
+      },
+      "RunPaused": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RunPausedEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RunReordered": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RunReorderedEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RunResumed": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RunResumedEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RunStarted": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RunStartedEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RunStats": {
+        "description": "A run's agent totals, summed over its attempts (05 \u00a7Stats).\n\nEvery field is optional and nothing is zero-filled: a provider that\nreported no cost leaves ``cost`` absent rather than claiming zero (01\n\u00a7Real data only). ``duration_s`` is the sum of the attempts' durations\nand not wall-clock time, which fan-out would make meaningless.",
+        "properties": {
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          },
+          "duration_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration S"
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "tool_calls": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Calls"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tokens"
+          }
+        },
+        "title": "RunStats",
+        "type": "object"
+      },
+      "RunStatus": {
+        "description": "The run state machine of 03.\n\n``queued`` is new in v1: a run that exists but has dispatched nothing,\nso \"waiting for a slot\" is visible. The three terminal states are\nre-openable by retry, rerun and move.",
+        "enum": [
+          "queued",
+          "running",
+          "paused",
+          "completed",
+          "failed",
+          "cancelled"
+        ],
+        "title": "RunStatus",
+        "type": "string"
+      },
+      "RunSummary": {
+        "description": "One row of the run list (08 \u00a7Runs).\n\n``current_nodes`` is plural because a fan-out puts a run in several\nnodes at once. ``unregistered`` is not stored: it says this server has\nno workflow of that name registered, so the run is shown but nothing\nwill dispatch it (03 \u00a7Run).",
+        "properties": {
+          "created": {
+            "description": "When the run was submitted.",
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "current_nodes": {
+            "description": "The nodes with an in-progress or waiting attempt right now.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Current Nodes",
+            "type": "array"
+          },
+          "id": {
+            "description": "The run id, a ULID.",
+            "title": "Id",
+            "type": "string"
+          },
+          "pending_requests": {
+            "default": 0,
+            "description": "Unanswered, non-stale requests waiting on a person.",
+            "title": "Pending Requests",
+            "type": "integer"
+          },
+          "position": {
+            "description": "The run's place in the dispatch list; runs are numbered 1..n in list order.",
+            "title": "Position",
+            "type": "integer"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus",
+            "description": "The run state machine of 03."
+          },
+          "title": {
+            "description": "The operator's title for the run.",
+            "title": "Title",
+            "type": "string"
+          },
+          "unregistered": {
+            "default": false,
+            "description": "Whether this server has no workflow of that name registered.",
+            "title": "Unregistered",
+            "type": "boolean"
+          },
+          "updated": {
+            "description": "When anything about it last changed.",
+            "format": "date-time",
+            "title": "Updated",
+            "type": "string"
+          },
+          "workflow": {
+            "description": "The workflow this run executes.",
+            "title": "Workflow",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "workflow",
+          "title",
+          "status",
+          "position",
+          "created",
+          "updated"
+        ],
+        "title": "RunSummary",
+        "type": "object"
+      },
+      "RunUpdated": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "RunUpdatedEvent": {
+        "additionalProperties": true,
         "type": "object"
       },
       "SourceNode": {
@@ -300,6 +1412,290 @@
           "nodes"
         ],
         "title": "SourceOut",
+        "type": "object"
+      },
+      "SubmissionAccepted": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "SubmissionAcceptedEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "SubmissionRejected": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "SubmissionRejectedEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "SubmissionRepair": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "SubmissionRepairEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskCancelled": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskCancelledEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskDeadLettered": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskDeadLetteredEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskDone": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskDoneEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskEnqueued": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskEnqueuedEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskFailed": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskFailedEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskMoved": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskMovedEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskRef": {
+        "description": "The id of a task an operator verb queued.\n\nThe answer to ``rerun``, ``retry`` and ``move``: each of the three\nends with a **new** attempt row, and this is its id (08 \u00a7Runs,\n\u00a7Tasks).",
+        "properties": {
+          "task_id": {
+            "description": "The id of the task that was enqueued.",
+            "title": "Task Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "task_id"
+        ],
+        "title": "TaskRef",
+        "type": "object"
+      },
+      "TaskResumed": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskResumedEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskStarted": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskStartedEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskStatus": {
+        "description": "The task state machine of 03.\n\n``waiting`` is a body parked in ``human_input``; it holds no pool slot\n(04 \u00a7Waiting). ``failed`` is the record of one attempt \u2014 the retry is a\nnew row \u2014 and ``dead_letter`` is the attempt that exhausted them.",
+        "enum": [
+          "ready",
+          "in_progress",
+          "waiting",
+          "done",
+          "failed",
+          "dead_letter",
+          "cancelled"
+        ],
+        "title": "TaskStatus",
+        "type": "string"
+      },
+      "TaskStatusSet": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskStatusSetEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskStream": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskStreamEvent": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskView": {
+        "description": "One attempt of one node in one run. **Never** carries a token.",
+        "properties": {
+          "attempt": {
+            "description": "Which attempt of that node this row is, from 1.",
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "branch": {
+            "description": "The fan-out stack this attempt is inside.",
+            "items": {
+              "$ref": "#/components/schemas/athanore__api__schemas__tasks__BranchFrame"
+            },
+            "title": "Branch",
+            "type": "array"
+          },
+          "created": {
+            "description": "When the row was enqueued.",
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why the attempt failed, when it did.",
+            "title": "Error"
+          },
+          "explicit": {
+            "description": "Whether that priority was declared on the node rather than defaulted.",
+            "title": "Explicit",
+            "type": "boolean"
+          },
+          "finished": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it ended.",
+            "title": "Finished"
+          },
+          "id": {
+            "description": "The task id, unique across every run.",
+            "title": "Id",
+            "type": "integer"
+          },
+          "lineage": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where this attempt came from: its reason and its parent.",
+            "title": "Lineage"
+          },
+          "node": {
+            "description": "The node whose body this attempt runs.",
+            "title": "Node",
+            "type": "string"
+          },
+          "payload": {
+            "description": "The value the task was enqueued with.",
+            "title": "Payload"
+          },
+          "priority": {
+            "description": "The dispatch priority this attempt was given.",
+            "title": "Priority",
+            "type": "integer"
+          },
+          "result": {
+            "description": "What the body returned, once it has.",
+            "title": "Result"
+          },
+          "run_id": {
+            "description": "The run this attempt belongs to.",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "started": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it was claimed.",
+            "title": "Started"
+          },
+          "stats": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The agent's measurements for this attempt (05 \u00a7Stats entry); absent when nothing measured it.",
+            "title": "Stats"
+          },
+          "status": {
+            "$ref": "#/components/schemas/TaskStatus",
+            "description": "The task state machine of 03."
+          },
+          "terminal": {
+            "description": "Whether the attempt finished with no transition, making its `result` a branch output.",
+            "title": "Terminal",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "run_id",
+          "node",
+          "attempt",
+          "status",
+          "priority",
+          "explicit",
+          "terminal",
+          "created"
+        ],
+        "title": "TaskView",
+        "type": "object"
+      },
+      "TaskWaiting": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "TaskWaitingEvent": {
+        "additionalProperties": true,
         "type": "object"
       },
       "ValidationError": {
@@ -419,6 +1815,41 @@
         },
         "title": "WorkflowPlugin",
         "type": "object"
+      },
+      "athanore__api__schemas__tasks__BranchFrame": {
+        "description": "One frame of a task's fan-out stack (04 \u00a7Branch frames).\n\nFrames nest, outermost first: a branch that fans out again pushes a\nsecond frame. ``key`` is the payload that branch was given, which is\nthe branch's identity in every list the SPA groups by it.",
+        "properties": {
+          "count": {
+            "description": "How many branches that fan-out opened.",
+            "title": "Count",
+            "type": "integer"
+          },
+          "fanout": {
+            "description": "The task whose return value fanned out.",
+            "title": "Fanout",
+            "type": "integer"
+          },
+          "index": {
+            "description": "This branch's zero-based index in that fan-out.",
+            "title": "Index",
+            "type": "integer"
+          },
+          "key": {
+            "description": "The payload this branch was given.",
+            "title": "Key"
+          }
+        },
+        "required": [
+          "fanout",
+          "index",
+          "count"
+        ],
+        "title": "BranchFrame",
+        "type": "object"
+      },
+      "athanore__events__payloads__BranchFrame": {
+        "additionalProperties": true,
+        "type": "object"
       }
     }
   },
@@ -469,6 +1900,828 @@
         "summary": "Whether the caller needs a token, and has one",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/api/runs": {
+      "get": {
+        "description": "The run list of 08 \u00a7Runs, whole.\n\nRun lists are small and return whole (08 \u00a7Conventions). The order is\nthe dispatch order \u2014 ``position`` ascending \u2014 so the list the\noperator reads is the order the scheduler will claim in.\n\nAn application with no store has no runs and answers with an empty\nlist: \"nothing to ask\" and \"nothing queued\" are the same fact for a\nserver that holds no work, unlike ``/api/health``'s counts.",
+        "operationId": "list_runs_api_runs_get",
+        "parameters": [
+          {
+            "description": "Only runs in this status.",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/RunStatus"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only runs in this status.",
+              "title": "Status"
+            }
+          },
+          {
+            "description": "Only runs of this workflow.",
+            "in": "query",
+            "name": "workflow",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only runs of this workflow.",
+              "title": "Workflow"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RunSummary"
+                  },
+                  "title": "Response List Runs Api Runs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Every run, in dispatch order",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}": {
+      "delete": {
+        "description": "Cancel what is outstanding, then remove the run.\n\nBoth halves are ``Ops.delete``'s, in that order and for its reason:\nthe attempts are killed against rows that still exist.",
+        "operationId": "delete_run_api_runs__run_id__delete",
+        "parameters": [
+          {
+            "description": "The run id, a ULID.",
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "description": "The run id, a ULID.",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete a run and everything under it",
+        "tags": [
+          "runs"
+        ]
+      },
+      "get": {
+        "description": "A run with everything the overview pane draws (08 \u00a7Runs).\n\n``current_nodes`` and ``pending_requests`` are the list query's two\nderived fields, recomputed from this read: the attempts are already\nin hand, so the in-flight nodes cost nothing, and the pending\nrequests are one indexed query over this run alone.",
+        "operationId": "get_run_api_runs__run_id__get",
+        "parameters": [
+          {
+            "description": "The run id, a ULID.",
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "description": "The run id, a ULID.",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "One run, its attempts and its totals",
+        "tags": [
+          "runs"
+        ]
+      },
+      "patch": {
+        "description": "Write the fields the body names, and answer with the run.\n\nA field the body omits is left alone, which is why an edit that\nnames neither is accepted and changes nothing (``Ops.edit``). The\nresponse is the whole detail rather than the edited row: the SPA\nre-renders the overview from it, and a second GET to get the\nattempts back would be a round trip for nothing.",
+        "operationId": "edit_run_api_runs__run_id__patch",
+        "parameters": [
+          {
+            "description": "The run id, a ULID.",
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "description": "The run id, a ULID.",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EditRun"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Change a run's title or description",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/cancel": {
+      "post": {
+        "description": "Cancel the run and every outstanding attempt; 409 if it has ended.\n\nThe ``note`` names how many attempts were stopped, because that is\nthe part of the outcome the request could not predict: a run with\nnothing in flight and a run with three agents mid-turn are the same\ncall and very different events. It is omitted when there were none,\nrather than sent as \"0 attempts\".",
+        "operationId": "cancel_run_api_runs__run_id__cancel_post",
+        "parameters": [
+          {
+            "description": "The run id, a ULID.",
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "description": "The run id, a ULID.",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "End a run and everything under it",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/events": {
+      "get": {
+        "description": "One page of the run's history, oldest first.\n\nThe same typed envelope the SSE feed sends (18 \u00a7Typing), so a client\nthat caught up from here and then subscribed switches sources\nwithout switching shapes. `task.stream` is ephemeral and is never\nstored, so it never appears in a page.",
+        "operationId": "get_events_api_runs__run_id__events_get",
+        "parameters": [
+          {
+            "description": "The run id, a ULID.",
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "description": "The run id, a ULID.",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Return events after this event id.",
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "description": "Return events after this event id.",
+              "minimum": 0,
+              "title": "After",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "How many events to return.",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 500,
+              "description": "How many events to return.",
+              "maximum": 5000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "oneOf": [
+                      {
+                        "$ref": "#/components/schemas/RunCreatedEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/RunStartedEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/RunUpdatedEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/RunReorderedEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/RunPausedEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/RunResumedEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/RunCancelledEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/RunDeletedEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/RunCompletedEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/RunFailedEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/TaskEnqueuedEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/JoinArrivedEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/TaskStartedEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/TaskDoneEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/TaskFailedEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/TaskDeadLetteredEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/TaskWaitingEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/TaskResumedEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/TaskCancelledEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/TaskMovedEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/TaskStatusSetEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/TaskStreamEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/SubmissionAcceptedEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/SubmissionRejectedEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/SubmissionRepairEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/RequestOpenedEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/RequestAnsweredEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/LogAppendedEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/AgentStatsEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/EngineRecoveredEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/EngineStoppingEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/PluginEvent"
+                      }
+                    ]
+                  },
+                  "title": "Response Get Events Api Runs  Run Id  Events Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "A run's stored events",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/graph": {
+      "get": {
+        "description": "The registered graph with this run's history projected onto it.\n\nA run whose workflow this server does not have registered is a 404\n``unknown_workflow``: there is no graph to project onto, and the run\nlist already says so with ``unregistered`` rather than pretending a\nshape.",
+        "operationId": "get_graph_api_runs__run_id__graph_get",
+        "parameters": [
+          {
+            "description": "The run id, a ULID.",
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "description": "The run id, a ULID.",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GraphOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "The workflow's graph, for this run",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/log": {
+      "get": {
+        "description": "Every entry of the work log, oldest first and never truncated.\n\nWhole, and unpaged: the log is bounded by the number of stages\nrather than by agent output (08 \u00a7Agent-facing). The `stats` entries\nan agent never sees are here \u2014 token counts are operator\ninformation.",
+        "operationId": "get_log_api_runs__run_id__log_get",
+        "parameters": [
+          {
+            "description": "The run id, a ULID.",
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "description": "The run id, a ULID.",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/LogEntry"
+                  },
+                  "title": "Response Get Log Api Runs  Run Id  Log Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "A run's work log",
+        "tags": [
+          "runs"
+        ]
+      },
+      "post": {
+        "description": "Write a `user` entry under the run's current node.\n\nThe node is the one node with an attempt in flight, and ``user``\nwhen there is not exactly one: a note filed under one branch of a\nfan-out would claim a context it does not have (``Ops.append_log``).",
+        "operationId": "append_log_api_runs__run_id__log_post",
+        "parameters": [
+          {
+            "description": "The run id, a ULID.",
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "description": "The run id, a ULID.",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogText"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Append an operator note to the work log",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/pause": {
+      "post": {
+        "description": "Pause a `queued` or `running` run; 409 on anything else.\n\nPause is about the **next** task: an attempt already in flight runs\nto its end and enqueues its successor, and that successor waits (04\n\u00a7Operator operations). Killing running work is ``/cancel``.",
+        "operationId": "pause_run_api_runs__run_id__pause_post",
+        "parameters": [
+          {
+            "description": "The run id, a ULID.",
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "description": "The run id, a ULID.",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Stop a run dispatching",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/position": {
+      "post": {
+        "description": "Swap with a neighbour, or move to a zero-based index (D57).\n\nBoth ends are a no-op that still answers 200 with the position the\nrun already had, and an ``index`` outside the list is clamped to it:\n\"top\" is `{\"index\": 0}` and there is nothing for the caller to\nbounds-check. The body model has already refused neither-or-both of\nthe two fields.",
+        "operationId": "move_run_api_runs__run_id__position_post",
+        "parameters": [
+          {
+            "description": "The run id, a ULID.",
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "description": "The run id, a ULID.",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Position"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PositionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Move a run in the dispatch list",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/requests": {
+      "get": {
+        "description": "Every request the run opened, answered or not, oldest first.\n\nThe run's history rather than the inbox: a stale request \u2014 one whose\nattempt is gone \u2014 stays here and leaves ``/api/requests?pending=true``\n(06 \u00a7Restart durability).",
+        "operationId": "get_requests_api_runs__run_id__requests_get",
+        "parameters": [
+          {
+            "description": "The run id, a ULID.",
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "description": "The run id, a ULID.",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RequestView"
+                  },
+                  "title": "Response Get Requests Api Runs  Run Id  Requests Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "A run's requests",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/rerun": {
+      "post": {
+        "description": "Enqueue a fresh attempt of ``node`` with the payload it last had.\n\nA join replays the arrivals the store holds rather than the payload\nits task was given, which is what makes a rerun the remedy for a\nbranch that arrived late (04 \u00a7Failure and operator semantics).",
+        "operationId": "rerun_node_api_runs__run_id__rerun_post",
+        "parameters": [
+          {
+            "description": "The run id, a ULID.",
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "description": "The run id, a ULID.",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Rerun"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run a node again",
+        "tags": [
+          "runs"
+        ]
+      }
+    },
+    "/api/runs/{run_id}/resume": {
+      "post": {
+        "description": "Resume a `paused` run; 409 on anything else.",
+        "operationId": "resume_run_api_runs__run_id__resume_post",
+        "parameters": [
+          {
+            "description": "The run id, a ULID.",
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "description": "The run id, a ULID.",
+              "title": "Run Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Let a paused run dispatch again",
+        "tags": [
+          "runs"
         ]
       }
     },
