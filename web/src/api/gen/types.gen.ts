@@ -87,7 +87,7 @@ export type AgentStatsEvent = {
     /**
      * Name
      */
-    name?: 'agent.stats';
+    name: 'agent.stats';
     /**
      * Run Id
      */
@@ -506,7 +506,7 @@ export type EngineRecoveredEvent = {
     /**
      * Name
      */
-    name?: 'engine.recovered';
+    name: 'engine.recovered';
     /**
      * Run Id
      */
@@ -545,7 +545,7 @@ export type EngineStoppingEvent = {
     /**
      * Name
      */
-    name?: 'engine.stopping';
+    name: 'engine.stopping';
     /**
      * Run Id
      */
@@ -805,7 +805,7 @@ export type JoinArrivedEvent = {
     /**
      * Name
      */
-    name?: 'join.arrived';
+    name: 'join.arrived';
     /**
      * Run Id
      */
@@ -860,7 +860,7 @@ export type LogAppendedEvent = {
     /**
      * Name
      */
-    name?: 'log.appended';
+    name: 'log.appended';
     /**
      * Run Id
      */
@@ -1286,7 +1286,7 @@ export type RequestAnsweredEvent = {
     /**
      * Name
      */
-    name?: 'request.answered';
+    name: 'request.answered';
     /**
      * Run Id
      */
@@ -1357,7 +1357,7 @@ export type RequestOpenedEvent = {
     /**
      * Name
      */
-    name?: 'request.opened';
+    name: 'request.opened';
     /**
      * Run Id
      */
@@ -1558,7 +1558,7 @@ export type RunCancelledEvent = {
     /**
      * Name
      */
-    name?: 'run.cancelled';
+    name: 'run.cancelled';
     /**
      * Run Id
      */
@@ -1633,7 +1633,7 @@ export type RunCompletedEvent = {
     /**
      * Name
      */
-    name?: 'run.completed';
+    name: 'run.completed';
     /**
      * Run Id
      */
@@ -1678,7 +1678,7 @@ export type RunCreatedEvent = {
     /**
      * Name
      */
-    name?: 'run.created';
+    name: 'run.created';
     /**
      * Run Id
      */
@@ -1721,7 +1721,7 @@ export type RunDeletedEvent = {
     /**
      * Name
      */
-    name?: 'run.deleted';
+    name: 'run.deleted';
     /**
      * Run Id
      */
@@ -1866,7 +1866,7 @@ export type RunFailedEvent = {
     /**
      * Name
      */
-    name?: 'run.failed';
+    name: 'run.failed';
     /**
      * Run Id
      */
@@ -1932,7 +1932,7 @@ export type RunPausedEvent = {
     /**
      * Name
      */
-    name?: 'run.paused';
+    name: 'run.paused';
     /**
      * Run Id
      */
@@ -1973,7 +1973,7 @@ export type RunReorderedEvent = {
     /**
      * Name
      */
-    name?: 'run.reordered';
+    name: 'run.reordered';
     /**
      * Run Id
      */
@@ -2007,7 +2007,7 @@ export type RunResumedEvent = {
     /**
      * Name
      */
-    name?: 'run.resumed';
+    name: 'run.resumed';
     /**
      * Run Id
      */
@@ -2050,7 +2050,7 @@ export type RunStartedEvent = {
     /**
      * Name
      */
-    name?: 'run.started';
+    name: 'run.started';
     /**
      * Run Id
      */
@@ -2203,7 +2203,7 @@ export type RunUpdatedEvent = {
     /**
      * Name
      */
-    name?: 'run.updated';
+    name: 'run.updated';
     /**
      * Run Id
      */
@@ -2373,7 +2373,7 @@ export type SubmissionAcceptedEvent = {
     /**
      * Name
      */
-    name?: 'submission.accepted';
+    name: 'submission.accepted';
     /**
      * Run Id
      */
@@ -2446,7 +2446,7 @@ export type SubmissionRejectedEvent = {
     /**
      * Name
      */
-    name?: 'submission.rejected';
+    name: 'submission.rejected';
     /**
      * Run Id
      */
@@ -2491,7 +2491,7 @@ export type SubmissionRepairEvent = {
     /**
      * Name
      */
-    name?: 'submission.repair';
+    name: 'submission.repair';
     /**
      * Run Id
      */
@@ -2536,7 +2536,7 @@ export type TaskCancelledEvent = {
     /**
      * Name
      */
-    name?: 'task.cancelled';
+    name: 'task.cancelled';
     /**
      * Run Id
      */
@@ -2581,7 +2581,7 @@ export type TaskDeadLetteredEvent = {
     /**
      * Name
      */
-    name?: 'task.dead_lettered';
+    name: 'task.dead_lettered';
     /**
      * Run Id
      */
@@ -2752,7 +2752,7 @@ export type TaskDoneEvent = {
     /**
      * Name
      */
-    name?: 'task.done';
+    name: 'task.done';
     /**
      * Run Id
      */
@@ -2816,7 +2816,7 @@ export type TaskEnqueuedEvent = {
     /**
      * Name
      */
-    name?: 'task.enqueued';
+    name: 'task.enqueued';
     /**
      * Run Id
      */
@@ -2873,7 +2873,7 @@ export type TaskFailedEvent = {
     /**
      * Name
      */
-    name?: 'task.failed';
+    name: 'task.failed';
     /**
      * Run Id
      */
@@ -2918,7 +2918,7 @@ export type TaskMovedEvent = {
     /**
      * Name
      */
-    name?: 'task.moved';
+    name: 'task.moved';
     /**
      * Run Id
      */
@@ -2981,7 +2981,7 @@ export type TaskResumedEvent = {
     /**
      * Name
      */
-    name?: 'task.resumed';
+    name: 'task.resumed';
     /**
      * Run Id
      */
@@ -3022,7 +3022,7 @@ export type TaskStartedEvent = {
     /**
      * Name
      */
-    name?: 'task.started';
+    name: 'task.started';
     /**
      * Run Id
      */
@@ -3078,7 +3078,7 @@ export type TaskStatusSetEvent = {
     /**
      * Name
      */
-    name?: 'task.status_set';
+    name: 'task.status_set';
     /**
      * Run Id
      */
@@ -3123,7 +3123,7 @@ export type TaskStreamEvent = {
     /**
      * Name
      */
-    name?: 'task.stream';
+    name: 'task.stream';
     /**
      * Run Id
      */
@@ -3276,7 +3276,7 @@ export type TaskWaitingEvent = {
     /**
      * Name
      */
-    name?: 'task.waiting';
+    name: 'task.waiting';
     /**
      * Run Id
      */

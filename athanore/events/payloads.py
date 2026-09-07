@@ -24,7 +24,8 @@ from __future__ import annotations
 
 from datetime import datetime
 from functools import cache
-from typing import Annotated, Any, Literal, Union, cast, get_args
+from types import NoneType, UnionType
+from typing import Annotated, Any, Literal, Union, cast, get_args, get_origin
 
 from pydantic import (
     AliasChoices,
@@ -48,24 +49,38 @@ from athanore.events.names import PLUGIN_PREFIX, EventName, is_known
 # --------------------------------------------------------------------------
 
 
+def _admits_none(annotation: Any) -> bool:
+    """Whether a field annotated ``annotation`` can hold ``None``."""
+    if annotation is None or annotation is NoneType or annotation is Any:
+        return True
+    if get_origin(annotation) in (Union, UnionType):
+        return any(_admits_none(arg) for arg in get_args(annotation))
+    return False
+
+
 @cache
 def _wire(model: type[BaseModel]) -> tuple[dict[str, str], frozenset[str]]:
     """Serialization keys for ``model``: renames, and which may be omitted.
 
     A field's wire key is its serialization alias where it has one
     (``task.cancelled`` carries ``from``, which is not a Python
-    identifier). A field with a default is one of 18's ``?`` fields and may
-    be dropped when it is unset.
+    identifier).
+
+    A key is omittable — one of 18's ``?`` fields — only if the field has a
+    default *and* its annotation admits ``None``, because that pair is what
+    it takes for ``_omit_absent`` to ever drop it. A ``Literal`` with a
+    default, which is how every envelope pins its own ``name``, is
+    therefore not omittable: the wire always carries it.
     """
     renames: dict[str, str] = {}
-    optional: set[str] = set()
+    omittable: set[str] = set()
     for name, field in model.model_fields.items():
         key = field.serialization_alias or name
         if key != name:
             renames[name] = key
-        if not field.is_required():
-            optional.add(key)
-    return renames, frozenset(optional)
+        if not field.is_required() and _admits_none(field.annotation):
+            omittable.add(key)
+    return renames, frozenset(omittable)
 
 
 class EventModel(BaseModel):
@@ -75,12 +90,12 @@ class EventModel(BaseModel):
 
     @model_serializer(mode="wrap")
     def _omit_absent(self, handler: SerializerFunctionWrapHandler) -> dict[str, Any]:
-        renames, optional = _wire(type(self))
+        renames, omittable = _wire(type(self))
         dumped: dict[str, Any] = handler(self)
         out: dict[str, Any] = {}
         for name, value in dumped.items():
             key = renames.get(name, name)
-            if value is None and key in optional:
+            if value is None and key in omittable:
                 continue
             out[key] = value
         return out
@@ -101,16 +116,38 @@ class EventModel(BaseModel):
 
         Dropping the ``serialization`` entry before handing the core
         schema on makes serialization render what validation renders —
-        this model's own fields, which is exactly what ``_omit_absent``
-        emits, minus the optional ones it leaves out. Those stay
-        nullable-and-not-required here, which is the honest reading of
-        "may be absent" for a client (T048).
+        this model's own fields.
+
+        Validation's ``required`` is then the wrong list: it omits every
+        field that has a default, and a default is only half of what makes
+        a field absent on the wire. ``_omit_absent`` drops a key when its
+        value is ``None`` *and* the key is omittable, so the omittable set
+        of :func:`_wire` — a default and an annotation that admits ``None``
+        — is exactly what a client may not find. Everything else is
+        required, including the ``Literal`` ``name`` each envelope pins
+        itself with, which 18 §Typing tags the union by and 18 §Envelope
+        never lists among the fields that may be absent (T048).
         """
 
         described = {
             key: value for key, value in core_schema.items() if key != "serialization"
         }
-        return handler(cast(CoreSchema, described))
+        schema = handler(cast(CoreSchema, described))
+        described_schema = handler.resolve_ref_schema(schema)
+        properties = described_schema.get("properties", {})
+        renames, omittable = _wire(cls)
+        # A renamed field is keyed here by whichever spelling the schema
+        # uses, so neither of a renamed omittable field's two may end up
+        # required.
+        absent = omittable.union(
+            name for name, key in renames.items() if key in omittable
+        )
+        required = [key for key in properties if key not in absent]
+        if required:
+            described_schema["required"] = required
+        else:
+            described_schema.pop("required", None)
+        return schema
 
 
 # --------------------------------------------------------------------------

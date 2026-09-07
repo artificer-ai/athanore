@@ -2288,7 +2288,10 @@ is a component the SPA's union is generated from, and `EventModel` now
 describes its own wire shape in serialization mode: the envelopes were
 opaque objects, because pydantic reads a model serializer's return type
 as the serialization schema, and 18 §Typing's `oneOf` per event is only
-a discriminated union if the variants say anything at all.
+a discriminated union if the variants say anything at all — and only a
+*tagged* one if the tag is always there, so the same override restates
+`required` as what the wire always carries: everything but `id`,
+`run_id` and `task_id`, the three 18 §Envelope allows to be missing.
 
 ### T049 — Plugin declarations, registry, manifest (A3.8, D50)
 

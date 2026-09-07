@@ -206,13 +206,21 @@ def test_each_event_envelope_pins_its_own_name(snapshot: dict[str, Any]) -> None
 
     The union is only a discriminated union in TypeScript if the variants
     are described at all — a serialiser's return type once made every one
-    of them an opaque object (T048).
+    of them an opaque object (T048) — and it is only *tagged* if the tag is
+    always there. 18 §Envelope names `id`, `run_id` and `task_id` as the
+    only fields that may be absent, so every other one is required, `name`
+    included.
     """
     schemas = snapshot["components"]["schemas"]
+    absent = {"id", "run_id", "task_id"}
     for name, envelope in ENVELOPES.items():
         variant = schemas[envelope.__name__]
         assert variant["properties"]["name"]["const"] == name.value
         assert "$ref" in variant["properties"]["data"]
+        assert "name" in variant["required"], "the union's tag is never absent"
+        assert set(variant["required"]) == set(variant["properties"]) - absent
+    plugin = schemas["PluginEvent"]
+    assert set(plugin["required"]) == set(plugin["properties"]) - absent
     page = snapshot["paths"]["/api/runs/{run_id}/events"]["get"]
     schema = page["responses"]["200"]["content"]["application/json"]["schema"]
     refs = {one["$ref"] for one in schema["items"]["oneOf"]}
