@@ -26,12 +26,18 @@ the author cannot read it.
 ``services.run.list()`` is scoped too: it lists **this workflow's** runs.
 An unscoped list would be the reach across workflows the manifest and the
 404 above are there to prevent.
+
+``services.run`` is also where a pane *reads* a run: :meth:`detail`,
+:meth:`log_entries` and :meth:`events` answer the three questions a run
+pane asks — what did the attempts cost, what is in the work log, and
+what happened. They are the run in scope and nothing wider, so they
+carry the same ownership the 404 above establishes (D140).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from athanore.engine.services import (
     EventPort,
@@ -45,7 +51,14 @@ from athanore.engine.services import (
 )
 from athanore.plugins.decl import PluginError
 from athanore.plugins.registry import BUILTIN_WORKFLOW
-from athanore.store.rows import RunRow, RunSummary, TaskRow
+from athanore.store.rows import (
+    EventRow,
+    LogEntryRow,
+    RunRow,
+    RunStats,
+    RunSummary,
+    TaskRow,
+)
 from athanore.store.uow import Store
 
 if TYPE_CHECKING:  # pragma: no cover - imported for types only
@@ -61,6 +74,7 @@ __all__ = [
     "PluginHost",
     "PluginRuns",
     "PluginServices",
+    "RunDetailRows",
     "owns_run",
 ]
 
@@ -74,6 +88,20 @@ NO_RUN = "no run in scope"
 NO_TASK = "no task in scope"
 
 
+class RunDetailRows(NamedTuple):
+    """A run, its every attempt, and the totals of their stats entries.
+
+    What :meth:`PluginRuns.detail` answers with, and the same three
+    values ``RunRepo.detail`` returns — so a pane that totals a run and
+    ``GET /api/runs/{id}`` read the same numbers out of the same query
+    rather than summing them twice and disagreeing.
+    """
+
+    run: RunRow
+    tasks: list[TaskRow]
+    stats: RunStats
+
+
 class PluginRuns:
     """The runs a plugin may see: its own workflow's.
 
@@ -81,6 +109,14 @@ class PluginRuns:
     :meth:`list` works in every scope, which is what a ``global`` pane
     showing "everything queued" needs (09 §Context and scopes), and is
     filtered to this workflow so a plugin cannot enumerate another's.
+
+    :meth:`detail`, :meth:`log_entries` and :meth:`events` are the reads
+    a pane makes *about* the run in scope: its attempts and totals, its
+    work log, and its history. They are run-scoped like :meth:`get` and
+    refuse the same way, and they are here rather than anywhere narrower
+    because a pane that draws a run is the most ordinary plugin there is
+    — the builtin overview and log panes are written against exactly
+    these three and get no more than any other plugin does (D140).
 
     The builtin scope (``_builtin``) is the exception on both counts: its
     panels apply to every run, so its list is every run.
@@ -108,6 +144,56 @@ class PluginRuns:
         workflow = None if self._workflow == BUILTIN_WORKFLOW else self._workflow
         async with self._store.reader() as reader:
             return await reader.runs.list(status=status, workflow=workflow)
+
+    async def detail(self) -> RunDetailRows:
+        """The run in scope, its attempts, and their summed stats.
+
+        One read, and the same one ``GET /api/runs/{id}`` makes: the
+        totals span every attempt, failed ones included, because the
+        tokens a dead-lettered attempt spent were still spent (05 §Stats
+        entry).
+        """
+
+        run_id = self._run_id
+        if run_id is None:
+            raise PluginError(400, NO_RUN)
+        async with self._store.reader() as reader:
+            detail = await reader.runs.detail(run_id)
+        if detail is None:
+            raise PluginError(404, f"run {run_id!r} no longer exists")
+        run, tasks, stats = detail
+        return RunDetailRows(run, tasks, stats)
+
+    async def log_entries(
+        self, after: int = 0, limit: int | None = None
+    ) -> list[LogEntryRow]:
+        """The work log of the run in scope, oldest first (03 §LogEntry).
+
+        The whole run's, not one attempt's: ``services.log`` is the
+        attempt's *append*, and a pane that draws the log draws all of
+        it. Returned whole because a run's log is bounded by the number
+        of stages (08 §Agent-facing).
+        """
+
+        if self._run_id is None:
+            raise PluginError(400, NO_RUN)
+        async with self._store.reader() as reader:
+            return await reader.log.list(self._run_id, after=after, limit=limit)
+
+    async def events(self, after: int = 0, limit: int | None = None) -> list[EventRow]:
+        """The stored events of the run in scope, oldest first (03).
+
+        The run's history as the audit trail kept it, which is what a
+        pane needs to show what happened between two log entries.
+        ``task.stream`` is never stored, so it never appears here.
+        """
+
+        if self._run_id is None:
+            raise PluginError(400, NO_RUN)
+        async with self._store.reader() as reader:
+            return await reader.events.list_for_run(
+                self._run_id, after=after, limit=limit
+            )
 
 
 class PluginServices:

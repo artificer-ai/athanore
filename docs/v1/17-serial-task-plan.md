@@ -2407,6 +2407,36 @@ pane), `graph` (`custom` `<ath-run-graph>`). Manifest lists them under
 source totals equal `RunDetail.stats`; log source interleaves.
 **Done.** Tests pass; snapshot updated.
 
+**Status.** Done. The five panes the SPA shows for every run, declared
+through the same API a third party uses. `BuiltinWorkflow` is the scope
+they hang on — a `Workflow` named `_builtin` with no nodes, whose
+`node()` refuses and whose `finalize()` is the empty graph, so a
+declaration cannot silently become work nothing dispatches — and
+`builtin_spec()` is that workflow collected and put through the same six
+checks of `validate` a registered workflow's declarations go through.
+`overview` is a route and a `dashboard` pane: TOKENS, COST, DURATION and
+POSITION, a `kv` `meta` grid, and one table row per node the run has
+entered, with the attempts collapsed into ATT. Its totals are
+`RunRepo.detail`'s — the read `GET /api/runs/{id}` makes — so the tile
+and `RunDetail.stats` cannot drift, and nothing is zero-filled: a run no
+agent has touched shows two tiles rather than four claiming zero.
+`log` merges the work log with the run's stored events on `created`,
+tie-broken entry-before-event, dropping the five names 10 §Panes gives to
+other panes and rendering each event to one short sentence from its 18
+payload — `engineering → qa` for an edge, `attempt 2 failed: …` for a
+failure. `agent`, `requests` and `graph` are `custom` panes over
+`<ath-agent-stream>`, `<ath-requests>` and `<ath-run-graph>`; `requests`
+declares the global inbox as well, so the manifest carries six panels for
+the five builtins, in declaration order, first. A builtin gets no
+privileged access, which is what added `services.run.detail()`,
+`log_entries()` and `events()` — the three reads a run pane makes,
+available to every plugin (D140). Nothing here mounts itself:
+`plugins.builtin` is an independent sibling of `api` in the top tier, so
+`with_builtins(specs)` is what the composition root of T051 hands
+`create_app`. The snapshot is unchanged — a plugin route belongs to
+whatever is installed and was never in the committed contract — and 09
+and 10 now agree on the pane order, which is the manifest's.
+
 ### T051 — `Server` host with uvicorn (A1.13)
 
 **Do.** `athanore/server.py`: `class Server(settings=None)`: `register(wf,

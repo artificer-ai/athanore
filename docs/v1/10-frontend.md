@@ -68,6 +68,12 @@ Builtins first, then the selected run's plugin panes (09). `←`/`→` cycle
 with wrap; `1`–`9` jump; the index persists across selection changes
 (it is a property of the operator's attention, not the run).
 
+The order is the **manifest's** and is not hard-coded here: the builtins
+are declared like any other plugin (09 §Builtins are plugins) and the
+manifest lists them first, in the order below. The mock draws `graph`
+before `requests`; the manifest's order is the one that ships, because
+the pane host reads the manifest and has no list of its own.
+
 1. **overview** — `STATS` metric tiles (TOKENS, COST, DURATION, POSITION)
    in a 1 px-gapped grid; per-node token bars (accent for the active
    node, accent-700 otherwise); a two-column `kv` meta grid (RUN,
@@ -107,14 +113,15 @@ with wrap; `1`–`9` jump; the index persists across selection changes
    docks under the stream when the focused task has open requests
    (options as outlined buttons styled by kind, text as an input, form as
    a generated form). This is where permissions get answered.
-4. **graph** — `WORKFLOW GRAPH · <workflow>` with a legend (active /
-   done / failed). See §Graph pane.
-5. **requests** — the mock's `messages` pane, re-purposed: one card per
+4. **requests** — the mock's `messages` pane, re-purposed: one card per
    request (`node → operator`, or `agent → operator` for permissions and
    elicitations), timestamp, prompt, then the answer or the answer
    controls. Athanore has no node-to-node messages; the work log is the
    inter-node channel, so this pane shows the human-in-the-loop history
-   instead (15, D33).
+   instead (15, D33). Its `global` twin is the inbox, shown when no run
+   is selected.
+5. **graph** — `WORKFLOW GRAPH · <workflow>` with a legend (active /
+   done / failed). See §Graph pane.
 6. **plugin panes** — `PLUGIN · <title> · <source>`; a note, metric
    tiles, a table, and the footer line `registered by <workflow> · panes
    are contributed with @wf.panel(...)`. Rendered by the `dashboard`
