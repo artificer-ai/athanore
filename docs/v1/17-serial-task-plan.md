@@ -2037,6 +2037,32 @@ in any response (recursive walk).
 **Done.** `tests/test_edit_run.py` deleted; ledger rows for the four API
 halves ticked.
 
+**Status.** Done. `athanore/api/routers/runs.py` is the fourteen routes
+of 08 §Runs: the list (`?status=&workflow=`, with `unregistered` filled
+in from the registry), the detail, `PATCH`, `DELETE`, `pause`/`resume`/
+`cancel`, `rerun`, `position`, `POST`/`GET /log`, `GET /events`,
+`GET /requests` and `GET /graph`. Every verb is one call into
+`engine.ops`; no precondition is re-checked at the API, so the 404s,
+409s and 422s are the engine's refusals mapped by T042's table. The
+detail recomputes the list query's two derived fields from the read it
+already made — `current_nodes` from the attempts that are `in_progress`
+or `waiting`, `pending_requests` from the run's pending request views —
+and fills `outputs` from the terminal attempts (D58). `/graph` is the
+projection of 08 §Graph semantics: `state` by the precedence read off
+`NodeState`'s member order, `live`, `attempts`, `last_task_id`,
+`branches` grouped by the whole branch-frame stack, `arrivals` from
+`JoinRepo.incomplete`, and `edges[].kind` with `traversed` counted off
+the run's `task.enqueued reason=transition` and `join.arrived` events,
+paged. `tests/api/test_runs_api.py` is 67 tests including the eight rows
+of the precedence table, a fan-out reporting one branch per branch, a
+join reporting `2 of 3`, `{index}` clamping at both ends, and a
+`client` fixture that walks every JSON body this suite produces and
+fails on a `token` or `token_hash` key at any depth. D131 records the
+choices. Ledger rows for `test_edit_run.py`, `test_pause.py`,
+`test_run_log.py`, `test_management.py` and `test_priority.py` note
+their API halves as landed; `tests/test_edit_run.py` is the MVP
+checkout's and is never written to from here (D65).
+
 ### T044b — Tasks and requests routers (A3.3)
 
 **Do.** `routers/tasks.py`: get (+ submissions, no token), `/stream`

@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { GetSourceApiWorkflowsNameSourceGetData, GetSourceApiWorkflowsNameSourceGetErrors, GetSourceApiWorkflowsNameSourceGetResponses, GetWorkflowApiWorkflowsNameGetData, GetWorkflowApiWorkflowsNameGetErrors, GetWorkflowApiWorkflowsNameGetResponses, HealthApiHealthGetData, HealthApiHealthGetResponses, ListWorkflowsApiWorkflowsGetData, ListWorkflowsApiWorkflowsGetResponses, MeApiMeGetData, MeApiMeGetResponses, SubmitRunApiWorkflowsNameRunsPostData, SubmitRunApiWorkflowsNameRunsPostErrors, SubmitRunApiWorkflowsNameRunsPostResponses } from './types.gen';
+import type { AppendLogApiRunsRunIdLogPostData, AppendLogApiRunsRunIdLogPostErrors, AppendLogApiRunsRunIdLogPostResponses, CancelRunApiRunsRunIdCancelPostData, CancelRunApiRunsRunIdCancelPostErrors, CancelRunApiRunsRunIdCancelPostResponses, DeleteRunApiRunsRunIdDeleteData, DeleteRunApiRunsRunIdDeleteErrors, DeleteRunApiRunsRunIdDeleteResponses, EditRunApiRunsRunIdPatchData, EditRunApiRunsRunIdPatchErrors, EditRunApiRunsRunIdPatchResponses, GetEventsApiRunsRunIdEventsGetData, GetEventsApiRunsRunIdEventsGetErrors, GetEventsApiRunsRunIdEventsGetResponses, GetGraphApiRunsRunIdGraphGetData, GetGraphApiRunsRunIdGraphGetErrors, GetGraphApiRunsRunIdGraphGetResponses, GetLogApiRunsRunIdLogGetData, GetLogApiRunsRunIdLogGetErrors, GetLogApiRunsRunIdLogGetResponses, GetRequestsApiRunsRunIdRequestsGetData, GetRequestsApiRunsRunIdRequestsGetErrors, GetRequestsApiRunsRunIdRequestsGetResponses, GetRunApiRunsRunIdGetData, GetRunApiRunsRunIdGetErrors, GetRunApiRunsRunIdGetResponses, GetSourceApiWorkflowsNameSourceGetData, GetSourceApiWorkflowsNameSourceGetErrors, GetSourceApiWorkflowsNameSourceGetResponses, GetWorkflowApiWorkflowsNameGetData, GetWorkflowApiWorkflowsNameGetErrors, GetWorkflowApiWorkflowsNameGetResponses, HealthApiHealthGetData, HealthApiHealthGetResponses, ListRunsApiRunsGetData, ListRunsApiRunsGetErrors, ListRunsApiRunsGetResponses, ListWorkflowsApiWorkflowsGetData, ListWorkflowsApiWorkflowsGetResponses, MeApiMeGetData, MeApiMeGetResponses, MoveRunApiRunsRunIdPositionPostData, MoveRunApiRunsRunIdPositionPostErrors, MoveRunApiRunsRunIdPositionPostResponses, PauseRunApiRunsRunIdPausePostData, PauseRunApiRunsRunIdPausePostErrors, PauseRunApiRunsRunIdPausePostResponses, RerunNodeApiRunsRunIdRerunPostData, RerunNodeApiRunsRunIdRerunPostErrors, RerunNodeApiRunsRunIdRerunPostResponses, ResumeRunApiRunsRunIdResumePostData, ResumeRunApiRunsRunIdResumePostErrors, ResumeRunApiRunsRunIdResumePostResponses, SubmitRunApiWorkflowsNameRunsPostData, SubmitRunApiWorkflowsNameRunsPostErrors, SubmitRunApiWorkflowsNameRunsPostResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -38,6 +38,197 @@ export const healthApiHealthGet = <ThrowOnError extends boolean = false>(options
  * false}`, which is the client's cue to ask for a token.
  */
 export const meApiMeGet = <ThrowOnError extends boolean = false>(options?: Options<MeApiMeGetData, ThrowOnError>): RequestResult<MeApiMeGetResponses, unknown, ThrowOnError> => (options?.client ?? client).get<MeApiMeGetResponses, unknown, ThrowOnError>({ url: '/api/me', ...options });
+
+/**
+ * Every run, in dispatch order
+ *
+ * The run list of 08 §Runs, whole.
+ *
+ * Run lists are small and return whole (08 §Conventions). The order is
+ * the dispatch order — ``position`` ascending — so the list the
+ * operator reads is the order the scheduler will claim in.
+ *
+ * An application with no store has no runs and answers with an empty
+ * list: "nothing to ask" and "nothing queued" are the same fact for a
+ * server that holds no work, unlike ``/api/health``'s counts.
+ */
+export const listRunsApiRunsGet = <ThrowOnError extends boolean = false>(options?: Options<ListRunsApiRunsGetData, ThrowOnError>): RequestResult<ListRunsApiRunsGetResponses, ListRunsApiRunsGetErrors, ThrowOnError> => (options?.client ?? client).get<ListRunsApiRunsGetResponses, ListRunsApiRunsGetErrors, ThrowOnError>({ url: '/api/runs', ...options });
+
+/**
+ * Delete a run and everything under it
+ *
+ * Cancel what is outstanding, then remove the run.
+ *
+ * Both halves are ``Ops.delete``'s, in that order and for its reason:
+ * the attempts are killed against rows that still exist.
+ */
+export const deleteRunApiRunsRunIdDelete = <ThrowOnError extends boolean = false>(options: Options<DeleteRunApiRunsRunIdDeleteData, ThrowOnError>): RequestResult<DeleteRunApiRunsRunIdDeleteResponses, DeleteRunApiRunsRunIdDeleteErrors, ThrowOnError> => (options.client ?? client).delete<DeleteRunApiRunsRunIdDeleteResponses, DeleteRunApiRunsRunIdDeleteErrors, ThrowOnError>({ url: '/api/runs/{run_id}', ...options });
+
+/**
+ * One run, its attempts and its totals
+ *
+ * A run with everything the overview pane draws (08 §Runs).
+ *
+ * ``current_nodes`` and ``pending_requests`` are the list query's two
+ * derived fields, recomputed from this read: the attempts are already
+ * in hand, so the in-flight nodes cost nothing, and the pending
+ * requests are one indexed query over this run alone.
+ */
+export const getRunApiRunsRunIdGet = <ThrowOnError extends boolean = false>(options: Options<GetRunApiRunsRunIdGetData, ThrowOnError>): RequestResult<GetRunApiRunsRunIdGetResponses, GetRunApiRunsRunIdGetErrors, ThrowOnError> => (options.client ?? client).get<GetRunApiRunsRunIdGetResponses, GetRunApiRunsRunIdGetErrors, ThrowOnError>({ url: '/api/runs/{run_id}', ...options });
+
+/**
+ * Change a run's title or description
+ *
+ * Write the fields the body names, and answer with the run.
+ *
+ * A field the body omits is left alone, which is why an edit that
+ * names neither is accepted and changes nothing (``Ops.edit``). The
+ * response is the whole detail rather than the edited row: the SPA
+ * re-renders the overview from it, and a second GET to get the
+ * attempts back would be a round trip for nothing.
+ */
+export const editRunApiRunsRunIdPatch = <ThrowOnError extends boolean = false>(options: Options<EditRunApiRunsRunIdPatchData, ThrowOnError>): RequestResult<EditRunApiRunsRunIdPatchResponses, EditRunApiRunsRunIdPatchErrors, ThrowOnError> => (options.client ?? client).patch<EditRunApiRunsRunIdPatchResponses, EditRunApiRunsRunIdPatchErrors, ThrowOnError>({
+    url: '/api/runs/{run_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * End a run and everything under it
+ *
+ * Cancel the run and every outstanding attempt; 409 if it has ended.
+ *
+ * The ``note`` names how many attempts were stopped, because that is
+ * the part of the outcome the request could not predict: a run with
+ * nothing in flight and a run with three agents mid-turn are the same
+ * call and very different events. It is omitted when there were none,
+ * rather than sent as "0 attempts".
+ */
+export const cancelRunApiRunsRunIdCancelPost = <ThrowOnError extends boolean = false>(options: Options<CancelRunApiRunsRunIdCancelPostData, ThrowOnError>): RequestResult<CancelRunApiRunsRunIdCancelPostResponses, CancelRunApiRunsRunIdCancelPostErrors, ThrowOnError> => (options.client ?? client).post<CancelRunApiRunsRunIdCancelPostResponses, CancelRunApiRunsRunIdCancelPostErrors, ThrowOnError>({ url: '/api/runs/{run_id}/cancel', ...options });
+
+/**
+ * A run's stored events
+ *
+ * One page of the run's history, oldest first.
+ *
+ * The same typed envelope the SSE feed sends (18 §Typing), so a client
+ * that caught up from here and then subscribed switches sources
+ * without switching shapes. `task.stream` is ephemeral and is never
+ * stored, so it never appears in a page.
+ */
+export const getEventsApiRunsRunIdEventsGet = <ThrowOnError extends boolean = false>(options: Options<GetEventsApiRunsRunIdEventsGetData, ThrowOnError>): RequestResult<GetEventsApiRunsRunIdEventsGetResponses, GetEventsApiRunsRunIdEventsGetErrors, ThrowOnError> => (options.client ?? client).get<GetEventsApiRunsRunIdEventsGetResponses, GetEventsApiRunsRunIdEventsGetErrors, ThrowOnError>({ url: '/api/runs/{run_id}/events', ...options });
+
+/**
+ * The workflow's graph, for this run
+ *
+ * The registered graph with this run's history projected onto it.
+ *
+ * A run whose workflow this server does not have registered is a 404
+ * ``unknown_workflow``: there is no graph to project onto, and the run
+ * list already says so with ``unregistered`` rather than pretending a
+ * shape.
+ */
+export const getGraphApiRunsRunIdGraphGet = <ThrowOnError extends boolean = false>(options: Options<GetGraphApiRunsRunIdGraphGetData, ThrowOnError>): RequestResult<GetGraphApiRunsRunIdGraphGetResponses, GetGraphApiRunsRunIdGraphGetErrors, ThrowOnError> => (options.client ?? client).get<GetGraphApiRunsRunIdGraphGetResponses, GetGraphApiRunsRunIdGraphGetErrors, ThrowOnError>({ url: '/api/runs/{run_id}/graph', ...options });
+
+/**
+ * A run's work log
+ *
+ * Every entry of the work log, oldest first and never truncated.
+ *
+ * Whole, and unpaged: the log is bounded by the number of stages
+ * rather than by agent output (08 §Agent-facing). The `stats` entries
+ * an agent never sees are here — token counts are operator
+ * information.
+ */
+export const getLogApiRunsRunIdLogGet = <ThrowOnError extends boolean = false>(options: Options<GetLogApiRunsRunIdLogGetData, ThrowOnError>): RequestResult<GetLogApiRunsRunIdLogGetResponses, GetLogApiRunsRunIdLogGetErrors, ThrowOnError> => (options.client ?? client).get<GetLogApiRunsRunIdLogGetResponses, GetLogApiRunsRunIdLogGetErrors, ThrowOnError>({ url: '/api/runs/{run_id}/log', ...options });
+
+/**
+ * Append an operator note to the work log
+ *
+ * Write a `user` entry under the run's current node.
+ *
+ * The node is the one node with an attempt in flight, and ``user``
+ * when there is not exactly one: a note filed under one branch of a
+ * fan-out would claim a context it does not have (``Ops.append_log``).
+ */
+export const appendLogApiRunsRunIdLogPost = <ThrowOnError extends boolean = false>(options: Options<AppendLogApiRunsRunIdLogPostData, ThrowOnError>): RequestResult<AppendLogApiRunsRunIdLogPostResponses, AppendLogApiRunsRunIdLogPostErrors, ThrowOnError> => (options.client ?? client).post<AppendLogApiRunsRunIdLogPostResponses, AppendLogApiRunsRunIdLogPostErrors, ThrowOnError>({
+    url: '/api/runs/{run_id}/log',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Stop a run dispatching
+ *
+ * Pause a `queued` or `running` run; 409 on anything else.
+ *
+ * Pause is about the **next** task: an attempt already in flight runs
+ * to its end and enqueues its successor, and that successor waits (04
+ * §Operator operations). Killing running work is ``/cancel``.
+ */
+export const pauseRunApiRunsRunIdPausePost = <ThrowOnError extends boolean = false>(options: Options<PauseRunApiRunsRunIdPausePostData, ThrowOnError>): RequestResult<PauseRunApiRunsRunIdPausePostResponses, PauseRunApiRunsRunIdPausePostErrors, ThrowOnError> => (options.client ?? client).post<PauseRunApiRunsRunIdPausePostResponses, PauseRunApiRunsRunIdPausePostErrors, ThrowOnError>({ url: '/api/runs/{run_id}/pause', ...options });
+
+/**
+ * Move a run in the dispatch list
+ *
+ * Swap with a neighbour, or move to a zero-based index (D57).
+ *
+ * Both ends are a no-op that still answers 200 with the position the
+ * run already had, and an ``index`` outside the list is clamped to it:
+ * "top" is `{"index": 0}` and there is nothing for the caller to
+ * bounds-check. The body model has already refused neither-or-both of
+ * the two fields.
+ */
+export const moveRunApiRunsRunIdPositionPost = <ThrowOnError extends boolean = false>(options: Options<MoveRunApiRunsRunIdPositionPostData, ThrowOnError>): RequestResult<MoveRunApiRunsRunIdPositionPostResponses, MoveRunApiRunsRunIdPositionPostErrors, ThrowOnError> => (options.client ?? client).post<MoveRunApiRunsRunIdPositionPostResponses, MoveRunApiRunsRunIdPositionPostErrors, ThrowOnError>({
+    url: '/api/runs/{run_id}/position',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * A run's requests
+ *
+ * Every request the run opened, answered or not, oldest first.
+ *
+ * The run's history rather than the inbox: a stale request — one whose
+ * attempt is gone — stays here and leaves ``/api/requests?pending=true``
+ * (06 §Restart durability).
+ */
+export const getRequestsApiRunsRunIdRequestsGet = <ThrowOnError extends boolean = false>(options: Options<GetRequestsApiRunsRunIdRequestsGetData, ThrowOnError>): RequestResult<GetRequestsApiRunsRunIdRequestsGetResponses, GetRequestsApiRunsRunIdRequestsGetErrors, ThrowOnError> => (options.client ?? client).get<GetRequestsApiRunsRunIdRequestsGetResponses, GetRequestsApiRunsRunIdRequestsGetErrors, ThrowOnError>({ url: '/api/runs/{run_id}/requests', ...options });
+
+/**
+ * Run a node again
+ *
+ * Enqueue a fresh attempt of ``node`` with the payload it last had.
+ *
+ * A join replays the arrivals the store holds rather than the payload
+ * its task was given, which is what makes a rerun the remedy for a
+ * branch that arrived late (04 §Failure and operator semantics).
+ */
+export const rerunNodeApiRunsRunIdRerunPost = <ThrowOnError extends boolean = false>(options: Options<RerunNodeApiRunsRunIdRerunPostData, ThrowOnError>): RequestResult<RerunNodeApiRunsRunIdRerunPostResponses, RerunNodeApiRunsRunIdRerunPostErrors, ThrowOnError> => (options.client ?? client).post<RerunNodeApiRunsRunIdRerunPostResponses, RerunNodeApiRunsRunIdRerunPostErrors, ThrowOnError>({
+    url: '/api/runs/{run_id}/rerun',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Let a paused run dispatch again
+ *
+ * Resume a `paused` run; 409 on anything else.
+ */
+export const resumeRunApiRunsRunIdResumePost = <ThrowOnError extends boolean = false>(options: Options<ResumeRunApiRunsRunIdResumePostData, ThrowOnError>): RequestResult<ResumeRunApiRunsRunIdResumePostResponses, ResumeRunApiRunsRunIdResumePostErrors, ThrowOnError> => (options.client ?? client).post<ResumeRunApiRunsRunIdResumePostResponses, ResumeRunApiRunsRunIdResumePostErrors, ThrowOnError>({ url: '/api/runs/{run_id}/resume', ...options });
 
 /**
  * Every workflow this server can run
