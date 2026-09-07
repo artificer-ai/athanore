@@ -26,6 +26,13 @@ reach them too (D81).
 
 from __future__ import annotations
 
+from athanore.api.schemas.agent import (
+    AgentTask,
+    AnswerPoll,
+    Ask,
+    AskOption,
+    AskOut,
+)
 from athanore.api.schemas.bodies import (
     Answer,
     EditRun,
@@ -74,8 +81,13 @@ from athanore.api.schemas.workflows import (
 )
 
 __all__ = [
+    "AgentTask",
     "Answer",
+    "AnswerPoll",
     "Arrivals",
+    "Ask",
+    "AskOption",
+    "AskOut",
     "BranchFrame",
     "BranchRef",
     "Created",

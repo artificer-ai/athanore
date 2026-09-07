@@ -6,12 +6,12 @@ bind with one answers 401 or 200 on the header, `require_token` turns the
 same rule on for loopback, and a task token works for exactly one task
 for exactly as long as that attempt is live.
 
-The routes are built for the test rather than imported. The operator
-routers arrive in T044 and the agent router in T045; what has to hold now
-is that the two dependencies decide correctly, so this module hangs three
-routes off a real `create_app()` — one guarded by `operator_auth`, one at
-`/api/events` (the one path with the query-parameter exception), and one
-under `/api/agent/` taking `task_auth` — and drives them over ASGI.
+What has to hold here is that the two dependencies decide correctly, so
+the subject is the door rather than the room behind it. `task_auth` is
+exercised against the real agent route (T045); `operator_auth` is
+exercised against two routes this module hangs off a real `create_app()`
+— one plainly guarded, and one at `/api/events`, the one path with the
+query-parameter exception, whose own router arrives in T046.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ import logging
 from collections.abc import AsyncIterator, Iterator
 from datetime import datetime
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Any
 
 import httpx
 import pytest
@@ -32,7 +32,6 @@ from athanore.api import VERSION
 from athanore.api.app import create_app
 from athanore.api.deps import MissingOperatorToken, auth_mode
 from athanore.api.deps import operator_auth as operator_auth_dep
-from athanore.api.deps import task_auth as task_auth_dep
 from athanore.engine import Engine
 from athanore.engine.pools import Pool
 from athanore.events.bus import EventBus
@@ -40,7 +39,7 @@ from athanore.logging import REDACTED, configure_logging
 from athanore.settings import AthanoreSettings
 from athanore.store.engine import make_engine
 from athanore.store.repos.tasks import ClaimedTask
-from athanore.store.rows import TaskRow, TaskStatus
+from athanore.store.rows import TaskStatus
 from athanore.store.tables import metadata
 from athanore.store.uow import Store
 
@@ -90,7 +89,7 @@ def build_app(
     store: Store | None = None,
     engine: Engine | None = None,
 ) -> FastAPI:
-    """A real application, plus the three routes the dependencies guard."""
+    """A real application, plus the two routes T046 has not landed yet."""
 
     app = create_app(settings=settings, engine=engine, store=store)
 
@@ -102,12 +101,6 @@ def build_app(
     @app.get("/api/events", dependencies=[Depends(operator_auth_dep)])
     async def events() -> dict[str, bool]:
         return {"ok": True}
-
-    @app.get("/api/agent/tasks/{task_id}")
-    async def agent_task(
-        task: Annotated[TaskRow, Depends(task_auth_dep)],
-    ) -> dict[str, Any]:
-        return {"task_id": task.id, "status": task.status.value}
 
     return app
 
@@ -402,7 +395,7 @@ async def test_a_task_token_reaches_its_own_task(tmp_path: Path, store: Store) -
         )
 
     assert response.status_code == 200
-    assert response.json() == {"task_id": claimed.task.id, "status": "in_progress"}
+    assert response.json()["task_id"] == claimed.task.id
 
 
 async def test_a_task_token_does_not_reach_another_task(

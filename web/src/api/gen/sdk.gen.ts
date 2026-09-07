@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AnswerRequestApiRequestsRequestIdAnswerPostData, AnswerRequestApiRequestsRequestIdAnswerPostErrors, AnswerRequestApiRequestsRequestIdAnswerPostResponses, AppendLogApiRunsRunIdLogPostData, AppendLogApiRunsRunIdLogPostErrors, AppendLogApiRunsRunIdLogPostResponses, CancelRunApiRunsRunIdCancelPostData, CancelRunApiRunsRunIdCancelPostErrors, CancelRunApiRunsRunIdCancelPostResponses, DeleteRunApiRunsRunIdDeleteData, DeleteRunApiRunsRunIdDeleteErrors, DeleteRunApiRunsRunIdDeleteResponses, EditRunApiRunsRunIdPatchData, EditRunApiRunsRunIdPatchErrors, EditRunApiRunsRunIdPatchResponses, GetEventsApiRunsRunIdEventsGetData, GetEventsApiRunsRunIdEventsGetErrors, GetEventsApiRunsRunIdEventsGetResponses, GetGraphApiRunsRunIdGraphGetData, GetGraphApiRunsRunIdGraphGetErrors, GetGraphApiRunsRunIdGraphGetResponses, GetLogApiRunsRunIdLogGetData, GetLogApiRunsRunIdLogGetErrors, GetLogApiRunsRunIdLogGetResponses, GetRequestApiRequestsRequestIdGetData, GetRequestApiRequestsRequestIdGetErrors, GetRequestApiRequestsRequestIdGetResponses, GetRequestsApiRunsRunIdRequestsGetData, GetRequestsApiRunsRunIdRequestsGetErrors, GetRequestsApiRunsRunIdRequestsGetResponses, GetRunApiRunsRunIdGetData, GetRunApiRunsRunIdGetErrors, GetRunApiRunsRunIdGetResponses, GetSourceApiWorkflowsNameSourceGetData, GetSourceApiWorkflowsNameSourceGetErrors, GetSourceApiWorkflowsNameSourceGetResponses, GetStreamApiTasksTaskIdStreamGetData, GetStreamApiTasksTaskIdStreamGetErrors, GetStreamApiTasksTaskIdStreamGetResponses, GetTaskApiTasksTaskIdGetData, GetTaskApiTasksTaskIdGetErrors, GetTaskApiTasksTaskIdGetResponses, GetWorkflowApiWorkflowsNameGetData, GetWorkflowApiWorkflowsNameGetErrors, GetWorkflowApiWorkflowsNameGetResponses, HealthApiHealthGetData, HealthApiHealthGetResponses, ListRequestsApiRequestsGetData, ListRequestsApiRequestsGetErrors, ListRequestsApiRequestsGetResponses, ListRunsApiRunsGetData, ListRunsApiRunsGetErrors, ListRunsApiRunsGetResponses, ListWorkflowsApiWorkflowsGetData, ListWorkflowsApiWorkflowsGetResponses, MeApiMeGetData, MeApiMeGetResponses, MoveRunApiRunsRunIdPositionPostData, MoveRunApiRunsRunIdPositionPostErrors, MoveRunApiRunsRunIdPositionPostResponses, MoveTaskApiTasksTaskIdMovePostData, MoveTaskApiTasksTaskIdMovePostErrors, MoveTaskApiTasksTaskIdMovePostResponses, PauseRunApiRunsRunIdPausePostData, PauseRunApiRunsRunIdPausePostErrors, PauseRunApiRunsRunIdPausePostResponses, RerunNodeApiRunsRunIdRerunPostData, RerunNodeApiRunsRunIdRerunPostErrors, RerunNodeApiRunsRunIdRerunPostResponses, ResumeRunApiRunsRunIdResumePostData, ResumeRunApiRunsRunIdResumePostErrors, ResumeRunApiRunsRunIdResumePostResponses, RetryTaskApiTasksTaskIdRetryPostData, RetryTaskApiTasksTaskIdRetryPostErrors, RetryTaskApiTasksTaskIdRetryPostResponses, SetStatusApiTasksTaskIdStatusPostData, SetStatusApiTasksTaskIdStatusPostErrors, SetStatusApiTasksTaskIdStatusPostResponses, SubmitRunApiWorkflowsNameRunsPostData, SubmitRunApiWorkflowsNameRunsPostErrors, SubmitRunApiWorkflowsNameRunsPostResponses } from './types.gen';
+import type { AnswerRequestApiRequestsRequestIdAnswerPostData, AnswerRequestApiRequestsRequestIdAnswerPostErrors, AnswerRequestApiRequestsRequestIdAnswerPostResponses, AppendLogApiAgentTasksTaskIdLogPostData, AppendLogApiAgentTasksTaskIdLogPostErrors, AppendLogApiAgentTasksTaskIdLogPostResponses, AppendLogApiRunsRunIdLogPostData, AppendLogApiRunsRunIdLogPostErrors, AppendLogApiRunsRunIdLogPostResponses, AskApiAgentTasksTaskIdAskPostData, AskApiAgentTasksTaskIdAskPostErrors, AskApiAgentTasksTaskIdAskPostResponses, CancelRunApiRunsRunIdCancelPostData, CancelRunApiRunsRunIdCancelPostErrors, CancelRunApiRunsRunIdCancelPostResponses, DeleteRunApiRunsRunIdDeleteData, DeleteRunApiRunsRunIdDeleteErrors, DeleteRunApiRunsRunIdDeleteResponses, EditRunApiRunsRunIdPatchData, EditRunApiRunsRunIdPatchErrors, EditRunApiRunsRunIdPatchResponses, GetEventsApiRunsRunIdEventsGetData, GetEventsApiRunsRunIdEventsGetErrors, GetEventsApiRunsRunIdEventsGetResponses, GetGraphApiRunsRunIdGraphGetData, GetGraphApiRunsRunIdGraphGetErrors, GetGraphApiRunsRunIdGraphGetResponses, GetLogApiRunsRunIdLogGetData, GetLogApiRunsRunIdLogGetErrors, GetLogApiRunsRunIdLogGetResponses, GetRequestApiRequestsRequestIdGetData, GetRequestApiRequestsRequestIdGetErrors, GetRequestApiRequestsRequestIdGetResponses, GetRequestsApiRunsRunIdRequestsGetData, GetRequestsApiRunsRunIdRequestsGetErrors, GetRequestsApiRunsRunIdRequestsGetResponses, GetRunApiRunsRunIdGetData, GetRunApiRunsRunIdGetErrors, GetRunApiRunsRunIdGetResponses, GetSourceApiWorkflowsNameSourceGetData, GetSourceApiWorkflowsNameSourceGetErrors, GetSourceApiWorkflowsNameSourceGetResponses, GetStreamApiTasksTaskIdStreamGetData, GetStreamApiTasksTaskIdStreamGetErrors, GetStreamApiTasksTaskIdStreamGetResponses, GetTaskApiAgentTasksTaskIdGetData, GetTaskApiAgentTasksTaskIdGetErrors, GetTaskApiAgentTasksTaskIdGetResponses, GetTaskApiTasksTaskIdGetData, GetTaskApiTasksTaskIdGetErrors, GetTaskApiTasksTaskIdGetResponses, GetWorkflowApiWorkflowsNameGetData, GetWorkflowApiWorkflowsNameGetErrors, GetWorkflowApiWorkflowsNameGetResponses, HealthApiHealthGetData, HealthApiHealthGetResponses, ListRequestsApiRequestsGetData, ListRequestsApiRequestsGetErrors, ListRequestsApiRequestsGetResponses, ListRunsApiRunsGetData, ListRunsApiRunsGetErrors, ListRunsApiRunsGetResponses, ListWorkflowsApiWorkflowsGetData, ListWorkflowsApiWorkflowsGetResponses, MeApiMeGetData, MeApiMeGetResponses, MoveRunApiRunsRunIdPositionPostData, MoveRunApiRunsRunIdPositionPostErrors, MoveRunApiRunsRunIdPositionPostResponses, MoveTaskApiTasksTaskIdMovePostData, MoveTaskApiTasksTaskIdMovePostErrors, MoveTaskApiTasksTaskIdMovePostResponses, PauseRunApiRunsRunIdPausePostData, PauseRunApiRunsRunIdPausePostErrors, PauseRunApiRunsRunIdPausePostResponses, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetData, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetErrors, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetResponses, RerunNodeApiRunsRunIdRerunPostData, RerunNodeApiRunsRunIdRerunPostErrors, RerunNodeApiRunsRunIdRerunPostResponses, ResumeRunApiRunsRunIdResumePostData, ResumeRunApiRunsRunIdResumePostErrors, ResumeRunApiRunsRunIdResumePostResponses, RetryTaskApiTasksTaskIdRetryPostData, RetryTaskApiTasksTaskIdRetryPostErrors, RetryTaskApiTasksTaskIdRetryPostResponses, SetStatusApiTasksTaskIdStatusPostData, SetStatusApiTasksTaskIdStatusPostErrors, SetStatusApiTasksTaskIdStatusPostResponses, SubmitApiAgentTasksTaskIdSubmitPostData, SubmitApiAgentTasksTaskIdSubmitPostErrors, SubmitApiAgentTasksTaskIdSubmitPostResponses, SubmitRunApiWorkflowsNameRunsPostData, SubmitRunApiWorkflowsNameRunsPostErrors, SubmitRunApiWorkflowsNameRunsPostResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -17,6 +17,129 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
      */
     meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
+
+/**
+ * Read this task: its brief and the work log
+ *
+ * Everything the agent needs to start, and nothing else (08).
+ *
+ * The title and the description are the run's — the brief an operator
+ * submitted — and ``input`` is the payload this node was enqueued with,
+ * ``null`` when it had none. ``log`` is the run's work log, oldest
+ * first, uncapped and untruncated: it is the inter-stage channel (D4),
+ * it is bounded by the number of stages rather than by agent output,
+ * and a retried attempt reads the ``failure`` entry that says why the
+ * last one failed.
+ *
+ * The ``stats`` entries are dropped (D56). ``output_schema`` is here
+ * only while a façade has declared an ``output_model`` on this
+ * attempt's live context: the ``native`` tooling tier reads it to build
+ * its ``submit_result`` tool (05 §Tooling tiers), and an agent with no
+ * model declared is not required to submit anything.
+ */
+export const getTaskApiAgentTasksTaskIdGet = <ThrowOnError extends boolean = false>(options: Options<GetTaskApiAgentTasksTaskIdGetData, ThrowOnError>): RequestResult<GetTaskApiAgentTasksTaskIdGetResponses, GetTaskApiAgentTasksTaskIdGetErrors, ThrowOnError> => (options.client ?? client).get<GetTaskApiAgentTasksTaskIdGetResponses, GetTaskApiAgentTasksTaskIdGetErrors, ThrowOnError>({ url: '/api/agent/tasks/{task_id}', ...options });
+
+/**
+ * Ask the operator a question
+ *
+ * Open a request against this attempt, if the agent may ask at all.
+ *
+ * 403 unless the façade running this attempt declared
+ * ``ask_policy="http"`` (05 §Policies): an agent cannot grant itself
+ * the right to interrupt a person, and the policy lives on the agent
+ * class the workflow chose. The prompt sections that tell an agent how
+ * to ask are omitted when it is off (19), so a 403 here is an agent
+ * that went looking.
+ *
+ * What was sent decides the mode: ``options`` for a pick-one question,
+ * ``schema`` for a form — whose answer is validated against that very
+ * schema where it lands, by the validator registered here (06
+ * §Service) — and neither for free text. The request is opened with
+ * ``source="agent"`` and no ordinal, because a re-executed attempt does
+ * not reproduce a turn statement for statement (06 §Restart
+ * durability).
+ *
+ * The answer does not come back here: the caller polls
+ * ``/requests/{rid}``, which is what lets the agent keep its turn
+ * rather than holding this connection open.
+ */
+export const askApiAgentTasksTaskIdAskPost = <ThrowOnError extends boolean = false>(options: Options<AskApiAgentTasksTaskIdAskPostData, ThrowOnError>): RequestResult<AskApiAgentTasksTaskIdAskPostResponses, AskApiAgentTasksTaskIdAskPostErrors, ThrowOnError> => (options.client ?? client).post<AskApiAgentTasksTaskIdAskPostResponses, AskApiAgentTasksTaskIdAskPostErrors, ThrowOnError>({
+    url: '/api/agent/tasks/{task_id}/ask',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Append this attempt's deliverable
+ *
+ * Write one entry to the run's work log, author ``agent``.
+ *
+ * The deliverable of a stage, which is what the next stage reads (D4).
+ * It is written through the attempt's own
+ * :class:`~athanore.engine.services.LogService`, so it carries this
+ * task's id and node and emits the ``log.appended`` the SPA re-renders
+ * on — the same call a node body makes, reached over HTTP.
+ */
+export const appendLogApiAgentTasksTaskIdLogPost = <ThrowOnError extends boolean = false>(options: Options<AppendLogApiAgentTasksTaskIdLogPostData, ThrowOnError>): RequestResult<AppendLogApiAgentTasksTaskIdLogPostResponses, AppendLogApiAgentTasksTaskIdLogPostErrors, ThrowOnError> => (options.client ?? client).post<AppendLogApiAgentTasksTaskIdLogPostResponses, AppendLogApiAgentTasksTaskIdLogPostErrors, ThrowOnError>({
+    url: '/api/agent/tasks/{task_id}/log',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Wait for the answer to a question
+ *
+ * The answer, waiting up to ``wait`` seconds for one to land.
+ *
+ * ``wait`` is clamped to :data:`MAX_WAIT` rather than refused, so 19's
+ * instruction — poll with ``?wait=60`` and repeat until it says
+ * ``answered`` — is a loop that costs one request per minute and not a
+ * spin. The wait ends the moment the answer is recorded, not when the
+ * clamp expires.
+ *
+ * A request of **another** task is a 404, not someone else's answer: a
+ * token names one attempt and this route reads only what that attempt
+ * opened (12 §Task tokens).
+ *
+ * Nothing is claimed. An agent that lost a response and asked again
+ * gets the same answer again, which is what makes a dropped connection
+ * cost nothing (06 §Service).
+ */
+export const pollRequestApiAgentTasksTaskIdRequestsRequestIdGet = <ThrowOnError extends boolean = false>(options: Options<PollRequestApiAgentTasksTaskIdRequestsRequestIdGetData, ThrowOnError>): RequestResult<PollRequestApiAgentTasksTaskIdRequestsRequestIdGetResponses, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetErrors, ThrowOnError> => (options.client ?? client).get<PollRequestApiAgentTasksTaskIdRequestsRequestIdGetResponses, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetErrors, ThrowOnError>({ url: '/api/agent/tasks/{task_id}/requests/{request_id}', ...options });
+
+/**
+ * Submit this task's structured result
+ *
+ * Record a value for this attempt, if it fits what was asked for.
+ *
+ * With an ``output_model`` declared, a misfit is a 422 carrying
+ * ``errors`` and ``schema`` and nothing is stored: the agent reads the
+ * two in its own tool output and can fix the shape inside the same turn
+ * (05 §Submissions). The rejection is also left on the context as
+ * ``ctx.last_rejection``, which is what 19's repair turn quotes back if
+ * the turn ends without a valid submission.
+ *
+ * With none declared, any JSON is stored as it arrived.
+ *
+ * Submitting twice is not an error: the **latest valid** payload wins
+ * (D5), and a body reads it with ``submissions.latest()``. A submission
+ * never routes anything — the node body decides — so an agent cannot
+ * move its own task.
+ */
+export const submitApiAgentTasksTaskIdSubmitPost = <ThrowOnError extends boolean = false>(options: Options<SubmitApiAgentTasksTaskIdSubmitPostData, ThrowOnError>): RequestResult<SubmitApiAgentTasksTaskIdSubmitPostResponses, SubmitApiAgentTasksTaskIdSubmitPostErrors, ThrowOnError> => (options.client ?? client).post<SubmitApiAgentTasksTaskIdSubmitPostResponses, SubmitApiAgentTasksTaskIdSubmitPostErrors, ThrowOnError>({
+    url: '/api/agent/tasks/{task_id}/submit',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * Liveness and version

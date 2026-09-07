@@ -31,7 +31,7 @@ from athanore.api import VERSION
 from athanore.api.deps import check_operator_token
 from athanore.api.errors import install_error_handlers
 from athanore.api.middleware import BodyLimitMiddleware
-from athanore.api.routers import requests, runs, system, tasks, workflows
+from athanore.api.routers import agent, requests, runs, system, tasks, workflows
 from athanore.engine import Engine
 from athanore.settings import AthanoreSettings
 from athanore.store.clock import now
@@ -101,5 +101,6 @@ def create_app(
     app.include_router(runs.router)
     app.include_router(tasks.router)
     app.include_router(requests.router)
+    app.include_router(agent.router)
 
     return app

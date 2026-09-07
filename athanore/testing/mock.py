@@ -10,10 +10,10 @@ They are doubles, not shortcuts (`AGENTS.md` §Quality bar). Each one
 takes the same path through the same objects as the real façade does:
 :class:`MockAgent` declares its ``output_model`` on the
 :class:`~athanore.engine.context.TaskContext` for the duration of the
-run, records its submission through the service the endpoint records
-through — **validating it the way the endpoint validates it**, so a
-misfit payload rejects and sets ``ctx.last_rejection`` — and attaches the
-latest submission at the end. :class:`StatsMockAgent` records exactly one
+run, **submits over HTTP to the agent API** with the task token — the
+same endpoint, the same validation, and the same 422 that records the
+rejection and sets ``ctx.last_rejection`` — and attaches the latest
+submission at the end. :class:`StatsMockAgent` records exactly one
 entry per ``run()``, on the success path and on the failure path, through
 :func:`~athanore.agents.stats.record_entry`. What they leave out is the
 subprocess.
@@ -26,19 +26,26 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from typing import Any, get_args
 
+import httpx
 from pydantic import BaseModel
 
-from athanore.agents.base import Agent, AgentError, AgentResult
+from athanore.agents.base import Agent, AgentError, AgentResult, task_base
 from athanore.agents.stats import (
     SessionStats,
     StatsReason,
     build_entry,
     record_entry,
 )
-from athanore.agents.submissions import attach, validate_submission
+from athanore.agents.submissions import attach
 from athanore.engine.context import TaskContext, maybe_current_task
 
-__all__ = ["FakeStatsProvider", "MockAgent", "StatsMockAgent"]
+__all__ = ["SUBMIT_TIMEOUT", "FakeStatsProvider", "MockAgent", "StatsMockAgent"]
+
+#: How long :class:`MockAgent` gives the agent API to answer a
+#: submission. Generous, because it is never the thing under test: a
+#: double that timed out would report a failure about the fixture rather
+#: than about the code being exercised.
+SUBMIT_TIMEOUT = 30.0
 
 #: The keys of a scripted stats dict that are :func:`build_entry` keyword
 #: arguments, and the ones that belong under its ``usage``. Between them
@@ -68,10 +75,12 @@ class MockAgent(Agent):
         What :attr:`AgentResult.output` carries. The shortest double:
         nothing is submitted and nothing is stored.
     ``submit``
-        A payload to submit, taking the endpoint's path: validated
-        against the declared ``output_model``, accepted when it fits and
-        rejected — ``submission.rejected``, ``ctx.last_rejection`` —
-        when it does not.
+        A payload to submit, over HTTP to
+        ``{ctx.api_base}/api/agent/tasks/{id}/submit`` with the task
+        token, which is the round trip a real agent makes. The endpoint
+        validates it against the declared ``output_model``, accepts it
+        when it fits and rejects it — ``submission.rejected``,
+        ``ctx.last_rejection`` — when it does not.
     ``log``
         A deliverable to append to the run's work log, author ``agent``.
     ``stream``
@@ -139,16 +148,25 @@ class MockAgent(Agent):
         await ctx.services.log.append(str(text), author="agent")
 
     async def _submit_payload(self, ctx: TaskContext | None) -> None:
-        """Submit like the endpoint does: validate, then accept or reject.
+        """Submit the way a real agent submits: over HTTP, with the token.
 
-        T045 gives the agent API a ``POST /api/agent/tasks/{id}/submit``,
-        and this becomes an httpx POST to ``ctx.api_base`` carrying
-        ``ctx.token`` — the same round trip a real agent makes. Until
-        that endpoint exists there is nothing to post to, so the double
-        takes the path the endpoint will take, one layer below it:
-        :func:`validate_submission` is the predicate the endpoint
-        applies, and ``ctx.services.submissions`` is the transaction it
-        commits.
+        ``POST {ctx.api_base}/api/agent/tasks/{id}/submit`` carrying
+        ``X-Athanore-Token`` — the same round trip an ACP subprocess
+        makes from its curl line, and the same endpoint that validates
+        against the declared ``output_model``, stores the fit and records
+        the rejection a repair turn quotes (08 §Agent-facing). The double
+        leaves out
+        the subprocess and nothing else, so the decision about whether a
+        payload is acceptable is not one this class gets to make.
+
+        A 422 is a submission that did not fit: it is the endpoint's
+        answer, it has already written ``submission.rejected`` and
+        ``ctx.last_rejection``, and the run goes on to fail in
+        :func:`~athanore.agents.submissions.attach` for want of a valid
+        submission — which is what a real agent's unrepaired misfit does
+        too. Any other refusal is the double being pointed at a server
+        that will not take its work, and it is raised rather than passed
+        over.
         """
 
         payload = _value(self._submit)
@@ -158,16 +176,20 @@ class MockAgent(Agent):
             raise AgentError("MockAgent(submit=…) needs a task context")
         if isinstance(payload, BaseModel):
             payload = payload.model_dump(mode="json")
-        ok, errors, _value_ = validate_submission(ctx.output_model, payload)
-        if ok:
-            await ctx.services.submissions.accept(payload)
+        url = f"{task_base(ctx)}/submit"
+        try:
+            async with httpx.AsyncClient(timeout=SUBMIT_TIMEOUT) as client:
+                response = await client.post(
+                    url, json=payload, headers={"X-Athanore-Token": ctx.token}
+                )
+        except httpx.HTTPError as exc:
+            raise AgentError(f"could not reach the agent API at {url}: {exc}") from exc
+        if response.status_code in (200, 422):
             return
-        model = ctx.output_model
-        schema = {} if model is None else model.model_json_schema()
-        ctx.last_rejection = {
-            **await ctx.services.submissions.reject(errors, schema),
-            "payload": payload,
-        }
+        raise AgentError(
+            f"the agent API refused this submission: "
+            f"{response.status_code} {response.text}"
+        )
 
 
 class StatsMockAgent(MockAgent):

@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { answerRequestApiRequestsRequestIdAnswerPost, appendLogApiRunsRunIdLogPost, cancelRunApiRunsRunIdCancelPost, deleteRunApiRunsRunIdDelete, editRunApiRunsRunIdPatch, getEventsApiRunsRunIdEventsGet, getGraphApiRunsRunIdGraphGet, getLogApiRunsRunIdLogGet, getRequestApiRequestsRequestIdGet, getRequestsApiRunsRunIdRequestsGet, getRunApiRunsRunIdGet, getSourceApiWorkflowsNameSourceGet, getStreamApiTasksTaskIdStreamGet, getTaskApiTasksTaskIdGet, getWorkflowApiWorkflowsNameGet, healthApiHealthGet, listRequestsApiRequestsGet, listRunsApiRunsGet, listWorkflowsApiWorkflowsGet, meApiMeGet, moveRunApiRunsRunIdPositionPost, moveTaskApiTasksTaskIdMovePost, type Options, pauseRunApiRunsRunIdPausePost, rerunNodeApiRunsRunIdRerunPost, resumeRunApiRunsRunIdResumePost, retryTaskApiTasksTaskIdRetryPost, setStatusApiTasksTaskIdStatusPost, submitRunApiWorkflowsNameRunsPost } from '../sdk.gen';
-import type { AnswerRequestApiRequestsRequestIdAnswerPostData, AnswerRequestApiRequestsRequestIdAnswerPostError, AnswerRequestApiRequestsRequestIdAnswerPostResponse, AppendLogApiRunsRunIdLogPostData, AppendLogApiRunsRunIdLogPostError, AppendLogApiRunsRunIdLogPostResponse, CancelRunApiRunsRunIdCancelPostData, CancelRunApiRunsRunIdCancelPostError, CancelRunApiRunsRunIdCancelPostResponse, DeleteRunApiRunsRunIdDeleteData, DeleteRunApiRunsRunIdDeleteError, DeleteRunApiRunsRunIdDeleteResponse, EditRunApiRunsRunIdPatchData, EditRunApiRunsRunIdPatchError, EditRunApiRunsRunIdPatchResponse, GetEventsApiRunsRunIdEventsGetData, GetEventsApiRunsRunIdEventsGetError, GetEventsApiRunsRunIdEventsGetResponse, GetGraphApiRunsRunIdGraphGetData, GetGraphApiRunsRunIdGraphGetError, GetGraphApiRunsRunIdGraphGetResponse, GetLogApiRunsRunIdLogGetData, GetLogApiRunsRunIdLogGetError, GetLogApiRunsRunIdLogGetResponse, GetRequestApiRequestsRequestIdGetData, GetRequestApiRequestsRequestIdGetError, GetRequestApiRequestsRequestIdGetResponse, GetRequestsApiRunsRunIdRequestsGetData, GetRequestsApiRunsRunIdRequestsGetError, GetRequestsApiRunsRunIdRequestsGetResponse, GetRunApiRunsRunIdGetData, GetRunApiRunsRunIdGetError, GetRunApiRunsRunIdGetResponse, GetSourceApiWorkflowsNameSourceGetData, GetSourceApiWorkflowsNameSourceGetError, GetSourceApiWorkflowsNameSourceGetResponse, GetStreamApiTasksTaskIdStreamGetData, GetStreamApiTasksTaskIdStreamGetError, GetStreamApiTasksTaskIdStreamGetResponse, GetTaskApiTasksTaskIdGetData, GetTaskApiTasksTaskIdGetError, GetTaskApiTasksTaskIdGetResponse, GetWorkflowApiWorkflowsNameGetData, GetWorkflowApiWorkflowsNameGetError, GetWorkflowApiWorkflowsNameGetResponse, HealthApiHealthGetData, HealthApiHealthGetResponse, ListRequestsApiRequestsGetData, ListRequestsApiRequestsGetError, ListRequestsApiRequestsGetResponse, ListRunsApiRunsGetData, ListRunsApiRunsGetError, ListRunsApiRunsGetResponse, ListWorkflowsApiWorkflowsGetData, ListWorkflowsApiWorkflowsGetResponse, MeApiMeGetData, MeApiMeGetResponse, MoveRunApiRunsRunIdPositionPostData, MoveRunApiRunsRunIdPositionPostError, MoveRunApiRunsRunIdPositionPostResponse, MoveTaskApiTasksTaskIdMovePostData, MoveTaskApiTasksTaskIdMovePostError, MoveTaskApiTasksTaskIdMovePostResponse, PauseRunApiRunsRunIdPausePostData, PauseRunApiRunsRunIdPausePostError, PauseRunApiRunsRunIdPausePostResponse, RerunNodeApiRunsRunIdRerunPostData, RerunNodeApiRunsRunIdRerunPostError, RerunNodeApiRunsRunIdRerunPostResponse, ResumeRunApiRunsRunIdResumePostData, ResumeRunApiRunsRunIdResumePostError, ResumeRunApiRunsRunIdResumePostResponse, RetryTaskApiTasksTaskIdRetryPostData, RetryTaskApiTasksTaskIdRetryPostError, RetryTaskApiTasksTaskIdRetryPostResponse, SetStatusApiTasksTaskIdStatusPostData, SetStatusApiTasksTaskIdStatusPostError, SetStatusApiTasksTaskIdStatusPostResponse, SubmitRunApiWorkflowsNameRunsPostData, SubmitRunApiWorkflowsNameRunsPostError, SubmitRunApiWorkflowsNameRunsPostResponse } from '../types.gen';
+import { answerRequestApiRequestsRequestIdAnswerPost, appendLogApiAgentTasksTaskIdLogPost, appendLogApiRunsRunIdLogPost, askApiAgentTasksTaskIdAskPost, cancelRunApiRunsRunIdCancelPost, deleteRunApiRunsRunIdDelete, editRunApiRunsRunIdPatch, getEventsApiRunsRunIdEventsGet, getGraphApiRunsRunIdGraphGet, getLogApiRunsRunIdLogGet, getRequestApiRequestsRequestIdGet, getRequestsApiRunsRunIdRequestsGet, getRunApiRunsRunIdGet, getSourceApiWorkflowsNameSourceGet, getStreamApiTasksTaskIdStreamGet, getTaskApiAgentTasksTaskIdGet, getTaskApiTasksTaskIdGet, getWorkflowApiWorkflowsNameGet, healthApiHealthGet, listRequestsApiRequestsGet, listRunsApiRunsGet, listWorkflowsApiWorkflowsGet, meApiMeGet, moveRunApiRunsRunIdPositionPost, moveTaskApiTasksTaskIdMovePost, type Options, pauseRunApiRunsRunIdPausePost, pollRequestApiAgentTasksTaskIdRequestsRequestIdGet, rerunNodeApiRunsRunIdRerunPost, resumeRunApiRunsRunIdResumePost, retryTaskApiTasksTaskIdRetryPost, setStatusApiTasksTaskIdStatusPost, submitApiAgentTasksTaskIdSubmitPost, submitRunApiWorkflowsNameRunsPost } from '../sdk.gen';
+import type { AnswerRequestApiRequestsRequestIdAnswerPostData, AnswerRequestApiRequestsRequestIdAnswerPostError, AnswerRequestApiRequestsRequestIdAnswerPostResponse, AppendLogApiAgentTasksTaskIdLogPostData, AppendLogApiAgentTasksTaskIdLogPostError, AppendLogApiAgentTasksTaskIdLogPostResponse, AppendLogApiRunsRunIdLogPostData, AppendLogApiRunsRunIdLogPostError, AppendLogApiRunsRunIdLogPostResponse, AskApiAgentTasksTaskIdAskPostData, AskApiAgentTasksTaskIdAskPostError, AskApiAgentTasksTaskIdAskPostResponse, CancelRunApiRunsRunIdCancelPostData, CancelRunApiRunsRunIdCancelPostError, CancelRunApiRunsRunIdCancelPostResponse, DeleteRunApiRunsRunIdDeleteData, DeleteRunApiRunsRunIdDeleteError, DeleteRunApiRunsRunIdDeleteResponse, EditRunApiRunsRunIdPatchData, EditRunApiRunsRunIdPatchError, EditRunApiRunsRunIdPatchResponse, GetEventsApiRunsRunIdEventsGetData, GetEventsApiRunsRunIdEventsGetError, GetEventsApiRunsRunIdEventsGetResponse, GetGraphApiRunsRunIdGraphGetData, GetGraphApiRunsRunIdGraphGetError, GetGraphApiRunsRunIdGraphGetResponse, GetLogApiRunsRunIdLogGetData, GetLogApiRunsRunIdLogGetError, GetLogApiRunsRunIdLogGetResponse, GetRequestApiRequestsRequestIdGetData, GetRequestApiRequestsRequestIdGetError, GetRequestApiRequestsRequestIdGetResponse, GetRequestsApiRunsRunIdRequestsGetData, GetRequestsApiRunsRunIdRequestsGetError, GetRequestsApiRunsRunIdRequestsGetResponse, GetRunApiRunsRunIdGetData, GetRunApiRunsRunIdGetError, GetRunApiRunsRunIdGetResponse, GetSourceApiWorkflowsNameSourceGetData, GetSourceApiWorkflowsNameSourceGetError, GetSourceApiWorkflowsNameSourceGetResponse, GetStreamApiTasksTaskIdStreamGetData, GetStreamApiTasksTaskIdStreamGetError, GetStreamApiTasksTaskIdStreamGetResponse, GetTaskApiAgentTasksTaskIdGetData, GetTaskApiAgentTasksTaskIdGetError, GetTaskApiAgentTasksTaskIdGetResponse, GetTaskApiTasksTaskIdGetData, GetTaskApiTasksTaskIdGetError, GetTaskApiTasksTaskIdGetResponse, GetWorkflowApiWorkflowsNameGetData, GetWorkflowApiWorkflowsNameGetError, GetWorkflowApiWorkflowsNameGetResponse, HealthApiHealthGetData, HealthApiHealthGetResponse, ListRequestsApiRequestsGetData, ListRequestsApiRequestsGetError, ListRequestsApiRequestsGetResponse, ListRunsApiRunsGetData, ListRunsApiRunsGetError, ListRunsApiRunsGetResponse, ListWorkflowsApiWorkflowsGetData, ListWorkflowsApiWorkflowsGetResponse, MeApiMeGetData, MeApiMeGetResponse, MoveRunApiRunsRunIdPositionPostData, MoveRunApiRunsRunIdPositionPostError, MoveRunApiRunsRunIdPositionPostResponse, MoveTaskApiTasksTaskIdMovePostData, MoveTaskApiTasksTaskIdMovePostError, MoveTaskApiTasksTaskIdMovePostResponse, PauseRunApiRunsRunIdPausePostData, PauseRunApiRunsRunIdPausePostError, PauseRunApiRunsRunIdPausePostResponse, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetData, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetError, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetResponse, RerunNodeApiRunsRunIdRerunPostData, RerunNodeApiRunsRunIdRerunPostError, RerunNodeApiRunsRunIdRerunPostResponse, ResumeRunApiRunsRunIdResumePostData, ResumeRunApiRunsRunIdResumePostError, ResumeRunApiRunsRunIdResumePostResponse, RetryTaskApiTasksTaskIdRetryPostData, RetryTaskApiTasksTaskIdRetryPostError, RetryTaskApiTasksTaskIdRetryPostResponse, SetStatusApiTasksTaskIdStatusPostData, SetStatusApiTasksTaskIdStatusPostError, SetStatusApiTasksTaskIdStatusPostResponse, SubmitApiAgentTasksTaskIdSubmitPostData, SubmitApiAgentTasksTaskIdSubmitPostError, SubmitApiAgentTasksTaskIdSubmitPostResponse, SubmitRunApiWorkflowsNameRunsPostData, SubmitRunApiWorkflowsNameRunsPostError, SubmitRunApiWorkflowsNameRunsPostResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -37,6 +37,170 @@ const createQueryKey = <TOptions extends Options>(id: string, options?: TOptions
         params.query = options.query;
     }
     return [params];
+};
+
+export const getTaskApiAgentTasksTaskIdGetQueryKey = (options: Options<GetTaskApiAgentTasksTaskIdGetData>) => createQueryKey('getTaskApiAgentTasksTaskIdGet', options);
+
+/**
+ * Read this task: its brief and the work log
+ *
+ * Everything the agent needs to start, and nothing else (08).
+ *
+ * The title and the description are the run's — the brief an operator
+ * submitted — and ``input`` is the payload this node was enqueued with,
+ * ``null`` when it had none. ``log`` is the run's work log, oldest
+ * first, uncapped and untruncated: it is the inter-stage channel (D4),
+ * it is bounded by the number of stages rather than by agent output,
+ * and a retried attempt reads the ``failure`` entry that says why the
+ * last one failed.
+ *
+ * The ``stats`` entries are dropped (D56). ``output_schema`` is here
+ * only while a façade has declared an ``output_model`` on this
+ * attempt's live context: the ``native`` tooling tier reads it to build
+ * its ``submit_result`` tool (05 §Tooling tiers), and an agent with no
+ * model declared is not required to submit anything.
+ */
+export const getTaskApiAgentTasksTaskIdGetOptions = (options: Options<GetTaskApiAgentTasksTaskIdGetData>) => queryOptions<GetTaskApiAgentTasksTaskIdGetResponse, GetTaskApiAgentTasksTaskIdGetError, GetTaskApiAgentTasksTaskIdGetResponse, ReturnType<typeof getTaskApiAgentTasksTaskIdGetQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getTaskApiAgentTasksTaskIdGet({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getTaskApiAgentTasksTaskIdGetQueryKey(options)
+});
+
+/**
+ * Ask the operator a question
+ *
+ * Open a request against this attempt, if the agent may ask at all.
+ *
+ * 403 unless the façade running this attempt declared
+ * ``ask_policy="http"`` (05 §Policies): an agent cannot grant itself
+ * the right to interrupt a person, and the policy lives on the agent
+ * class the workflow chose. The prompt sections that tell an agent how
+ * to ask are omitted when it is off (19), so a 403 here is an agent
+ * that went looking.
+ *
+ * What was sent decides the mode: ``options`` for a pick-one question,
+ * ``schema`` for a form — whose answer is validated against that very
+ * schema where it lands, by the validator registered here (06
+ * §Service) — and neither for free text. The request is opened with
+ * ``source="agent"`` and no ordinal, because a re-executed attempt does
+ * not reproduce a turn statement for statement (06 §Restart
+ * durability).
+ *
+ * The answer does not come back here: the caller polls
+ * ``/requests/{rid}``, which is what lets the agent keep its turn
+ * rather than holding this connection open.
+ */
+export const askApiAgentTasksTaskIdAskPostMutation = (options?: Partial<Options<AskApiAgentTasksTaskIdAskPostData>>): UseMutationOptions<AskApiAgentTasksTaskIdAskPostResponse, AskApiAgentTasksTaskIdAskPostError, Options<AskApiAgentTasksTaskIdAskPostData>> => {
+    const mutationOptions: UseMutationOptions<AskApiAgentTasksTaskIdAskPostResponse, AskApiAgentTasksTaskIdAskPostError, Options<AskApiAgentTasksTaskIdAskPostData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await askApiAgentTasksTaskIdAskPost({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Append this attempt's deliverable
+ *
+ * Write one entry to the run's work log, author ``agent``.
+ *
+ * The deliverable of a stage, which is what the next stage reads (D4).
+ * It is written through the attempt's own
+ * :class:`~athanore.engine.services.LogService`, so it carries this
+ * task's id and node and emits the ``log.appended`` the SPA re-renders
+ * on — the same call a node body makes, reached over HTTP.
+ */
+export const appendLogApiAgentTasksTaskIdLogPostMutation = (options?: Partial<Options<AppendLogApiAgentTasksTaskIdLogPostData>>): UseMutationOptions<AppendLogApiAgentTasksTaskIdLogPostResponse, AppendLogApiAgentTasksTaskIdLogPostError, Options<AppendLogApiAgentTasksTaskIdLogPostData>> => {
+    const mutationOptions: UseMutationOptions<AppendLogApiAgentTasksTaskIdLogPostResponse, AppendLogApiAgentTasksTaskIdLogPostError, Options<AppendLogApiAgentTasksTaskIdLogPostData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await appendLogApiAgentTasksTaskIdLogPost({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const pollRequestApiAgentTasksTaskIdRequestsRequestIdGetQueryKey = (options: Options<PollRequestApiAgentTasksTaskIdRequestsRequestIdGetData>) => createQueryKey('pollRequestApiAgentTasksTaskIdRequestsRequestIdGet', options);
+
+/**
+ * Wait for the answer to a question
+ *
+ * The answer, waiting up to ``wait`` seconds for one to land.
+ *
+ * ``wait`` is clamped to :data:`MAX_WAIT` rather than refused, so 19's
+ * instruction — poll with ``?wait=60`` and repeat until it says
+ * ``answered`` — is a loop that costs one request per minute and not a
+ * spin. The wait ends the moment the answer is recorded, not when the
+ * clamp expires.
+ *
+ * A request of **another** task is a 404, not someone else's answer: a
+ * token names one attempt and this route reads only what that attempt
+ * opened (12 §Task tokens).
+ *
+ * Nothing is claimed. An agent that lost a response and asked again
+ * gets the same answer again, which is what makes a dropped connection
+ * cost nothing (06 §Service).
+ */
+export const pollRequestApiAgentTasksTaskIdRequestsRequestIdGetOptions = (options: Options<PollRequestApiAgentTasksTaskIdRequestsRequestIdGetData>) => queryOptions<PollRequestApiAgentTasksTaskIdRequestsRequestIdGetResponse, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetError, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetResponse, ReturnType<typeof pollRequestApiAgentTasksTaskIdRequestsRequestIdGetQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await pollRequestApiAgentTasksTaskIdRequestsRequestIdGet({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: pollRequestApiAgentTasksTaskIdRequestsRequestIdGetQueryKey(options)
+});
+
+/**
+ * Submit this task's structured result
+ *
+ * Record a value for this attempt, if it fits what was asked for.
+ *
+ * With an ``output_model`` declared, a misfit is a 422 carrying
+ * ``errors`` and ``schema`` and nothing is stored: the agent reads the
+ * two in its own tool output and can fix the shape inside the same turn
+ * (05 §Submissions). The rejection is also left on the context as
+ * ``ctx.last_rejection``, which is what 19's repair turn quotes back if
+ * the turn ends without a valid submission.
+ *
+ * With none declared, any JSON is stored as it arrived.
+ *
+ * Submitting twice is not an error: the **latest valid** payload wins
+ * (D5), and a body reads it with ``submissions.latest()``. A submission
+ * never routes anything — the node body decides — so an agent cannot
+ * move its own task.
+ */
+export const submitApiAgentTasksTaskIdSubmitPostMutation = (options?: Partial<Options<SubmitApiAgentTasksTaskIdSubmitPostData>>): UseMutationOptions<SubmitApiAgentTasksTaskIdSubmitPostResponse, SubmitApiAgentTasksTaskIdSubmitPostError, Options<SubmitApiAgentTasksTaskIdSubmitPostData>> => {
+    const mutationOptions: UseMutationOptions<SubmitApiAgentTasksTaskIdSubmitPostResponse, SubmitApiAgentTasksTaskIdSubmitPostError, Options<SubmitApiAgentTasksTaskIdSubmitPostData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await submitApiAgentTasksTaskIdSubmitPost({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
 };
 
 export const healthApiHealthGetQueryKey = (options?: Options<HealthApiHealthGetData>) => createQueryKey('healthApiHealthGet', options);
