@@ -13,6 +13,81 @@ export type AgentStatsEvent = {
 };
 
 /**
+ * AgentTask
+ *
+ * One attempt as the agent running it sees it (08 §Agent-facing).
+ *
+ * The identity of the attempt, the run's title and description, the
+ * payload the node was called with, and the work log that is the
+ * inter-stage channel (D4). Everything an agent needs to start, and
+ * nothing an operator route would add.
+ */
+export type AgentTask = {
+    /**
+     * Attempt
+     *
+     * Which attempt of this node this is, from 1.
+     */
+    attempt: number;
+    /**
+     * Description
+     *
+     * The operator's longer brief for the run.
+     */
+    description: string;
+    /**
+     * Input
+     *
+     * The payload the node was enqueued with; null when it had none.
+     */
+    input?: unknown;
+    /**
+     * Log
+     *
+     * The run's work log, oldest first and never truncated, without the `stats` entries.
+     */
+    log: Array<LogEntry>;
+    /**
+     * Node
+     *
+     * The node this attempt executes.
+     */
+    node: string;
+    /**
+     * Output Schema
+     *
+     * The JSON Schema a submission must fit, when the agent façade running this attempt declared an `output_model`.
+     */
+    output_schema?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Run Id
+     *
+     * The run the attempt belongs to.
+     */
+    run_id: string;
+    /**
+     * Task Id
+     *
+     * This attempt's id; the one the token is for.
+     */
+    task_id: number;
+    /**
+     * Title
+     *
+     * The operator's title for the run.
+     */
+    title: string;
+    /**
+     * Workflow
+     *
+     * The workflow being run.
+     */
+    workflow: string;
+};
+
+/**
  * Answer
  *
  * Answer a request (`POST /api/requests/{id}/answer`, 06 §The model).
@@ -48,6 +123,47 @@ export type Answer = {
 export type AnswerAuthor = 'user' | 'engine';
 
 /**
+ * AnswerPoll
+ *
+ * The result of one long-poll (`GET …/requests/{rid}`, 06 §Surfaces).
+ *
+ * ``answered`` is the field to branch on. Until it is true the other
+ * two are absent, because a request with no answer has no author
+ * either; once it is true ``answer`` is the chosen ``option_id`` of an
+ * ``options`` request and the value of a ``text`` or ``form`` one —
+ * the same folding :class:`~athanore.store.rows.RequestView` does, so
+ * an operator reading the request and the agent reading its answer see
+ * the same value.
+ *
+ * Re-delivery is idempotent: nothing is claimed by a poll, so an agent
+ * that lost a response and asked again gets the same answer again.
+ */
+export type AnswerPoll = {
+    /**
+     * Answer
+     *
+     * The chosen `option_id`, or the value of a `text` or `form` answer. Null before an answer, and for an answer that was null.
+     */
+    answer?: unknown;
+    /**
+     * Answered
+     *
+     * Whether an answer has been recorded.
+     */
+    answered: boolean;
+    /**
+     * Who answered: the operator, or the engine on a headless fallback. Null until answered.
+     */
+    answered_by?: AnswerAuthor | null;
+    /**
+     * Request Id
+     *
+     * The request that was polled.
+     */
+    request_id: number;
+};
+
+/**
  * Arrivals
  *
  * How much of an open fan-out has reached a join (04 §Fan-in).
@@ -68,6 +184,92 @@ export type Arrivals = {
      * Branches the fan-out opened.
      */
     count: number;
+};
+
+/**
+ * Ask
+ *
+ * A question an agent puts to the operator (`POST …/ask`, 06).
+ *
+ * ``schema`` is spelled ``schema_`` in Python, as it is in
+ * :class:`~athanore.api.schemas.requests.RequestView`, and keeps
+ * ``schema`` as its alias — the name 08 and the curl line of 19 fix on
+ * the wire.
+ */
+export type Ask = {
+    /**
+     * Options
+     *
+     * The choices, for a pick-one question. A bare string is an option that is its own id and label.
+     */
+    options?: Array<string | AskOption> | null;
+    /**
+     * Prompt
+     *
+     * The question, as the operator will read it.
+     */
+    prompt: string;
+    /**
+     * Schema
+     *
+     * A JSON Schema the answer must fit, for a form question.
+     */
+    schema?: {
+        [key: string]: unknown;
+    } | null;
+};
+
+/**
+ * AskOption
+ *
+ * One choice an agent offers the operator (08 §Agent-facing).
+ *
+ * ``option_id`` is what an answer names and what comes back from the
+ * long-poll; ``name`` is what the operator is shown and defaults to the
+ * id, which is what a bare string in ``options`` is short for.
+ */
+export type AskOption = {
+    /**
+     * Kind
+     *
+     * A label for the option; carried through as given.
+     */
+    kind?: string | null;
+    /**
+     * Name
+     *
+     * What to show the operator; the `option_id` when omitted.
+     */
+    name?: string | null;
+    /**
+     * Option Id
+     *
+     * The id an answer names.
+     */
+    option_id: string;
+};
+
+/**
+ * AskOut
+ *
+ * The request an ask opened (08 §Agent-facing).
+ *
+ * ``mode`` is reported back because the agent did not choose it
+ * directly: it sent options, a schema or neither, and this is what that
+ * was read as — which is also what tells it what shape of answer to
+ * expect from the long-poll.
+ */
+export type AskOut = {
+    /**
+     * The shape of the answer expected.
+     */
+    mode: RequestMode;
+    /**
+     * Request Id
+     *
+     * The id to poll for an answer.
+     */
+    request_id: number;
 };
 
 /**
@@ -1907,6 +2109,224 @@ export type AthanoreApiSchemasTasksBranchFrame = {
 export type AthanoreEventsPayloadsBranchFrame = {
     [key: string]: unknown;
 };
+
+export type GetTaskApiAgentTasksTaskIdGetData = {
+    body?: never;
+    headers: {
+        /**
+         * X-Athanore-Token
+         *
+         * The task token, from the claimed attempt.
+         */
+        'x-athanore-token': string;
+    };
+    path: {
+        /**
+         * Task Id
+         *
+         * The task the token was minted for.
+         */
+        task_id: number;
+    };
+    query?: never;
+    url: '/api/agent/tasks/{task_id}';
+};
+
+export type GetTaskApiAgentTasksTaskIdGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetTaskApiAgentTasksTaskIdGetError = GetTaskApiAgentTasksTaskIdGetErrors[keyof GetTaskApiAgentTasksTaskIdGetErrors];
+
+export type GetTaskApiAgentTasksTaskIdGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: AgentTask;
+};
+
+export type GetTaskApiAgentTasksTaskIdGetResponse = GetTaskApiAgentTasksTaskIdGetResponses[keyof GetTaskApiAgentTasksTaskIdGetResponses];
+
+export type AskApiAgentTasksTaskIdAskPostData = {
+    body: Ask;
+    headers: {
+        /**
+         * X-Athanore-Token
+         *
+         * The task token, from the claimed attempt.
+         */
+        'x-athanore-token': string;
+    };
+    path: {
+        /**
+         * Task Id
+         *
+         * The task the token was minted for.
+         */
+        task_id: number;
+    };
+    query?: never;
+    url: '/api/agent/tasks/{task_id}/ask';
+};
+
+export type AskApiAgentTasksTaskIdAskPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AskApiAgentTasksTaskIdAskPostError = AskApiAgentTasksTaskIdAskPostErrors[keyof AskApiAgentTasksTaskIdAskPostErrors];
+
+export type AskApiAgentTasksTaskIdAskPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: AskOut;
+};
+
+export type AskApiAgentTasksTaskIdAskPostResponse = AskApiAgentTasksTaskIdAskPostResponses[keyof AskApiAgentTasksTaskIdAskPostResponses];
+
+export type AppendLogApiAgentTasksTaskIdLogPostData = {
+    body: LogText;
+    headers: {
+        /**
+         * X-Athanore-Token
+         *
+         * The task token, from the claimed attempt.
+         */
+        'x-athanore-token': string;
+    };
+    path: {
+        /**
+         * Task Id
+         *
+         * The task the token was minted for.
+         */
+        task_id: number;
+    };
+    query?: never;
+    url: '/api/agent/tasks/{task_id}/log';
+};
+
+export type AppendLogApiAgentTasksTaskIdLogPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type AppendLogApiAgentTasksTaskIdLogPostError = AppendLogApiAgentTasksTaskIdLogPostErrors[keyof AppendLogApiAgentTasksTaskIdLogPostErrors];
+
+export type AppendLogApiAgentTasksTaskIdLogPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: LogRef;
+};
+
+export type AppendLogApiAgentTasksTaskIdLogPostResponse = AppendLogApiAgentTasksTaskIdLogPostResponses[keyof AppendLogApiAgentTasksTaskIdLogPostResponses];
+
+export type PollRequestApiAgentTasksTaskIdRequestsRequestIdGetData = {
+    body?: never;
+    headers: {
+        /**
+         * X-Athanore-Token
+         *
+         * The task token, from the claimed attempt.
+         */
+        'x-athanore-token': string;
+    };
+    path: {
+        /**
+         * Task Id
+         *
+         * The task the token was minted for.
+         */
+        task_id: number;
+        /**
+         * Request Id
+         *
+         * A request this task opened.
+         */
+        request_id: number;
+    };
+    query?: {
+        /**
+         * Wait
+         *
+         * Seconds to wait for an answer before reporting that there is none yet. Clamped to [0, 120].
+         */
+        wait?: number;
+    };
+    url: '/api/agent/tasks/{task_id}/requests/{request_id}';
+};
+
+export type PollRequestApiAgentTasksTaskIdRequestsRequestIdGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type PollRequestApiAgentTasksTaskIdRequestsRequestIdGetError = PollRequestApiAgentTasksTaskIdRequestsRequestIdGetErrors[keyof PollRequestApiAgentTasksTaskIdRequestsRequestIdGetErrors];
+
+export type PollRequestApiAgentTasksTaskIdRequestsRequestIdGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: AnswerPoll;
+};
+
+export type PollRequestApiAgentTasksTaskIdRequestsRequestIdGetResponse = PollRequestApiAgentTasksTaskIdRequestsRequestIdGetResponses[keyof PollRequestApiAgentTasksTaskIdRequestsRequestIdGetResponses];
+
+export type SubmitApiAgentTasksTaskIdSubmitPostData = {
+    /**
+     * Payload
+     *
+     * The result, as JSON. Any shape when no `output_model` is declared; otherwise it must fit the schema `GET /api/agent/tasks/{id}` reports.
+     */
+    body: unknown;
+    headers: {
+        /**
+         * X-Athanore-Token
+         *
+         * The task token, from the claimed attempt.
+         */
+        'x-athanore-token': string;
+    };
+    path: {
+        /**
+         * Task Id
+         *
+         * The task the token was minted for.
+         */
+        task_id: number;
+    };
+    query?: never;
+    url: '/api/agent/tasks/{task_id}/submit';
+};
+
+export type SubmitApiAgentTasksTaskIdSubmitPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SubmitApiAgentTasksTaskIdSubmitPostError = SubmitApiAgentTasksTaskIdSubmitPostErrors[keyof SubmitApiAgentTasksTaskIdSubmitPostErrors];
+
+export type SubmitApiAgentTasksTaskIdSubmitPostResponses = {
+    /**
+     * Successful Response
+     */
+    200: Ok;
+};
+
+export type SubmitApiAgentTasksTaskIdSubmitPostResponse = SubmitApiAgentTasksTaskIdSubmitPostResponses[keyof SubmitApiAgentTasksTaskIdSubmitPostResponses];
 
 export type HealthApiHealthGetData = {
     body?: never;

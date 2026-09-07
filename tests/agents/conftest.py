@@ -262,14 +262,16 @@ class AgentAPI:
     ends in ``no_submission`` and the repair loop is the only thing the
     suite can see.
 
-    T045 owns the real endpoints. This is the same path one layer down —
+    :mod:`athanore.api.routers.agent` is the real thing, and it needs an
+    engine with the attempt registered on its live registry; this suite
+    builds a context and no engine, because its subject is the façade.
+    So this is the same path one layer down —
     :func:`~athanore.agents.submissions.validate_submission`, then
     ``services.submissions.accept`` or ``reject`` plus
-    ``ctx.last_rejection`` — which is exactly what ``MockAgent(submit=…)``
-    does under its own ``# T045`` marker, and what the endpoint will do
-    above it. What it is faithful about is what the fake depends on: the
-    paths, the ``X-Athanore-Token`` header, and the 422 that drives a
-    repair turn.
+    ``ctx.last_rejection`` — which is what the endpoint does above it and
+    what ``tests/api/test_agent_api.py`` tests it doing. What this
+    fixture is faithful about is what the fake depends on: the paths, the
+    ``X-Athanore-Token`` header, and the 422 that drives a repair turn.
     """
 
     def __init__(self) -> None:
@@ -315,7 +317,7 @@ async def agent_api() -> AsyncIterator[AgentAPI]:
     ``/api/agent/tasks/{id}/log`` and ``/submit`` are what the ``http``
     tier's curl lines reach and what ``FakeACPAgent`` POSTs to.
     ``/mcp/agent`` is the tool server the ``mcp`` tier hands to
-    ``session/new`` (T045a owns the real one), and **its tools call those
+    ``session/new`` (T045a mounts the real one), and **its tools call those
     same endpoints over HTTP** — which is what 05 means by "all three sit
     on the agent HTTP API of 08, which stays the single substrate".
     """

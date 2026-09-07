@@ -9,6 +9,83 @@
         "additionalProperties": true,
         "type": "object"
       },
+      "AgentTask": {
+        "description": "One attempt as the agent running it sees it (08 \u00a7Agent-facing).\n\nThe identity of the attempt, the run's title and description, the\npayload the node was called with, and the work log that is the\ninter-stage channel (D4). Everything an agent needs to start, and\nnothing an operator route would add.",
+        "properties": {
+          "attempt": {
+            "description": "Which attempt of this node this is, from 1.",
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "description": {
+            "description": "The operator's longer brief for the run.",
+            "title": "Description",
+            "type": "string"
+          },
+          "input": {
+            "description": "The payload the node was enqueued with; null when it had none.",
+            "title": "Input"
+          },
+          "log": {
+            "description": "The run's work log, oldest first and never truncated, without the `stats` entries.",
+            "items": {
+              "$ref": "#/components/schemas/LogEntry"
+            },
+            "title": "Log",
+            "type": "array"
+          },
+          "node": {
+            "description": "The node this attempt executes.",
+            "title": "Node",
+            "type": "string"
+          },
+          "output_schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The JSON Schema a submission must fit, when the agent fa\u00e7ade running this attempt declared an `output_model`.",
+            "title": "Output Schema"
+          },
+          "run_id": {
+            "description": "The run the attempt belongs to.",
+            "title": "Run Id",
+            "type": "string"
+          },
+          "task_id": {
+            "description": "This attempt's id; the one the token is for.",
+            "title": "Task Id",
+            "type": "integer"
+          },
+          "title": {
+            "description": "The operator's title for the run.",
+            "title": "Title",
+            "type": "string"
+          },
+          "workflow": {
+            "description": "The workflow being run.",
+            "title": "Workflow",
+            "type": "string"
+          }
+        },
+        "required": [
+          "task_id",
+          "run_id",
+          "workflow",
+          "node",
+          "attempt",
+          "title",
+          "description",
+          "log"
+        ],
+        "title": "AgentTask",
+        "type": "object"
+      },
       "Answer": {
         "description": "Answer a request (`POST /api/requests/{id}/answer`, 06 \u00a7The model).\n\n``option_id`` for an ``options`` request and ``value`` for a ``text``\nor ``form`` one. Both are optional here because ``value`` may\nlegitimately be any JSON \u2014 including ``null``, which is why \"which one\nwas given\" cannot be decided by looking at the values alone: the\nrequest's own ``mode`` decides, and the request service refuses the\nmismatch with the error code 06 \u00a7Errors names for it.",
         "properties": {
@@ -41,6 +118,42 @@
         "title": "AnswerAuthor",
         "type": "string"
       },
+      "AnswerPoll": {
+        "description": "The result of one long-poll (`GET \u2026/requests/{rid}`, 06 \u00a7Surfaces).\n\n``answered`` is the field to branch on. Until it is true the other\ntwo are absent, because a request with no answer has no author\neither; once it is true ``answer`` is the chosen ``option_id`` of an\n``options`` request and the value of a ``text`` or ``form`` one \u2014\nthe same folding :class:`~athanore.store.rows.RequestView` does, so\nan operator reading the request and the agent reading its answer see\nthe same value.\n\nRe-delivery is idempotent: nothing is claimed by a poll, so an agent\nthat lost a response and asked again gets the same answer again.",
+        "properties": {
+          "answer": {
+            "description": "The chosen `option_id`, or the value of a `text` or `form` answer. Null before an answer, and for an answer that was null.",
+            "title": "Answer"
+          },
+          "answered": {
+            "description": "Whether an answer has been recorded.",
+            "title": "Answered",
+            "type": "boolean"
+          },
+          "answered_by": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnswerAuthor"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Who answered: the operator, or the engine on a headless fallback. Null until answered."
+          },
+          "request_id": {
+            "description": "The request that was polled.",
+            "title": "Request Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "request_id",
+          "answered"
+        ],
+        "title": "AnswerPoll",
+        "type": "object"
+      },
       "Arrivals": {
         "description": "How much of an open fan-out has reached a join (04 \u00a7Fan-in).\n\nThe innermost pending fan-out, which is the one the operator is\nwaiting on; the SPA renders it as `2 of 3 arrived` (10 \u00a7Graph pane).",
         "properties": {
@@ -60,6 +173,117 @@
           "count"
         ],
         "title": "Arrivals",
+        "type": "object"
+      },
+      "Ask": {
+        "description": "A question an agent puts to the operator (`POST \u2026/ask`, 06).\n\n``schema`` is spelled ``schema_`` in Python, as it is in\n:class:`~athanore.api.schemas.requests.RequestView`, and keeps\n``schema`` as its alias \u2014 the name 08 and the curl line of 19 fix on\nthe wire.",
+        "properties": {
+          "options": {
+            "anyOf": [
+              {
+                "items": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AskOption"
+                    }
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The choices, for a pick-one question. A bare string is an option that is its own id and label.",
+            "title": "Options"
+          },
+          "prompt": {
+            "description": "The question, as the operator will read it.",
+            "minLength": 1,
+            "title": "Prompt",
+            "type": "string"
+          },
+          "schema": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A JSON Schema the answer must fit, for a form question.",
+            "title": "Schema"
+          }
+        },
+        "required": [
+          "prompt"
+        ],
+        "title": "Ask",
+        "type": "object"
+      },
+      "AskOption": {
+        "description": "One choice an agent offers the operator (08 \u00a7Agent-facing).\n\n``option_id`` is what an answer names and what comes back from the\nlong-poll; ``name`` is what the operator is shown and defaults to the\nid, which is what a bare string in ``options`` is short for.",
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A label for the option; carried through as given.",
+            "title": "Kind"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What to show the operator; the `option_id` when omitted.",
+            "title": "Name"
+          },
+          "option_id": {
+            "description": "The id an answer names.",
+            "minLength": 1,
+            "title": "Option Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "option_id"
+        ],
+        "title": "AskOption",
+        "type": "object"
+      },
+      "AskOut": {
+        "description": "The request an ask opened (08 \u00a7Agent-facing).\n\n``mode`` is reported back because the agent did not choose it\ndirectly: it sent options, a schema or neither, and this is what that\nwas read as \u2014 which is also what tells it what shape of answer to\nexpect from the long-poll.",
+        "properties": {
+          "mode": {
+            "$ref": "#/components/schemas/RequestMode",
+            "description": "The shape of the answer expected."
+          },
+          "request_id": {
+            "description": "The id to poll for an answer.",
+            "title": "Request Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "request_id",
+          "mode"
+        ],
+        "title": "AskOut",
         "type": "object"
       },
       "BranchRef": {
@@ -2176,6 +2400,340 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/agent/tasks/{task_id}": {
+      "get": {
+        "description": "Everything the agent needs to start, and nothing else (08).\n\nThe title and the description are the run's \u2014 the brief an operator\nsubmitted \u2014 and ``input`` is the payload this node was enqueued with,\n``null`` when it had none. ``log`` is the run's work log, oldest\nfirst, uncapped and untruncated: it is the inter-stage channel (D4),\nit is bounded by the number of stages rather than by agent output,\nand a retried attempt reads the ``failure`` entry that says why the\nlast one failed.\n\nThe ``stats`` entries are dropped (D56). ``output_schema`` is here\nonly while a fa\u00e7ade has declared an ``output_model`` on this\nattempt's live context: the ``native`` tooling tier reads it to build\nits ``submit_result`` tool (05 \u00a7Tooling tiers), and an agent with no\nmodel declared is not required to submit anything.",
+        "operationId": "get_task_api_agent_tasks__task_id__get",
+        "parameters": [
+          {
+            "description": "The task the token was minted for.",
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "description": "The task the token was minted for.",
+              "title": "Task Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The task token, from the claimed attempt.",
+            "in": "header",
+            "name": "x-athanore-token",
+            "required": true,
+            "schema": {
+              "description": "The task token, from the claimed attempt.",
+              "title": "X-Athanore-Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentTask"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read this task: its brief and the work log",
+        "tags": [
+          "agent"
+        ]
+      }
+    },
+    "/api/agent/tasks/{task_id}/ask": {
+      "post": {
+        "description": "Open a request against this attempt, if the agent may ask at all.\n\n403 unless the fa\u00e7ade running this attempt declared\n``ask_policy=\"http\"`` (05 \u00a7Policies): an agent cannot grant itself\nthe right to interrupt a person, and the policy lives on the agent\nclass the workflow chose. The prompt sections that tell an agent how\nto ask are omitted when it is off (19), so a 403 here is an agent\nthat went looking.\n\nWhat was sent decides the mode: ``options`` for a pick-one question,\n``schema`` for a form \u2014 whose answer is validated against that very\nschema where it lands, by the validator registered here (06\n\u00a7Service) \u2014 and neither for free text. The request is opened with\n``source=\"agent\"`` and no ordinal, because a re-executed attempt does\nnot reproduce a turn statement for statement (06 \u00a7Restart\ndurability).\n\nThe answer does not come back here: the caller polls\n``/requests/{rid}``, which is what lets the agent keep its turn\nrather than holding this connection open.",
+        "operationId": "ask_api_agent_tasks__task_id__ask_post",
+        "parameters": [
+          {
+            "description": "The task the token was minted for.",
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "description": "The task the token was minted for.",
+              "title": "Task Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The task token, from the claimed attempt.",
+            "in": "header",
+            "name": "x-athanore-token",
+            "required": true,
+            "schema": {
+              "description": "The task token, from the claimed attempt.",
+              "title": "X-Athanore-Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Ask"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ask the operator a question",
+        "tags": [
+          "agent"
+        ]
+      }
+    },
+    "/api/agent/tasks/{task_id}/log": {
+      "post": {
+        "description": "Write one entry to the run's work log, author ``agent``.\n\nThe deliverable of a stage, which is what the next stage reads (D4).\nIt is written through the attempt's own\n:class:`~athanore.engine.services.LogService`, so it carries this\ntask's id and node and emits the ``log.appended`` the SPA re-renders\non \u2014 the same call a node body makes, reached over HTTP.",
+        "operationId": "append_log_api_agent_tasks__task_id__log_post",
+        "parameters": [
+          {
+            "description": "The task the token was minted for.",
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "description": "The task the token was minted for.",
+              "title": "Task Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The task token, from the claimed attempt.",
+            "in": "header",
+            "name": "x-athanore-token",
+            "required": true,
+            "schema": {
+              "description": "The task token, from the claimed attempt.",
+              "title": "X-Athanore-Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogText"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LogRef"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Append this attempt's deliverable",
+        "tags": [
+          "agent"
+        ]
+      }
+    },
+    "/api/agent/tasks/{task_id}/requests/{request_id}": {
+      "get": {
+        "description": "The answer, waiting up to ``wait`` seconds for one to land.\n\n``wait`` is clamped to :data:`MAX_WAIT` rather than refused, so 19's\ninstruction \u2014 poll with ``?wait=60`` and repeat until it says\n``answered`` \u2014 is a loop that costs one request per minute and not a\nspin. The wait ends the moment the answer is recorded, not when the\nclamp expires.\n\nA request of **another** task is a 404, not someone else's answer: a\ntoken names one attempt and this route reads only what that attempt\nopened (12 \u00a7Task tokens).\n\nNothing is claimed. An agent that lost a response and asked again\ngets the same answer again, which is what makes a dropped connection\ncost nothing (06 \u00a7Service).",
+        "operationId": "poll_request_api_agent_tasks__task_id__requests__request_id__get",
+        "parameters": [
+          {
+            "description": "The task the token was minted for.",
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "description": "The task the token was minted for.",
+              "title": "Task Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "A request this task opened.",
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "description": "A request this task opened.",
+              "title": "Request Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Seconds to wait for an answer before reporting that there is none yet. Clamped to [0, 120].",
+            "in": "query",
+            "name": "wait",
+            "required": false,
+            "schema": {
+              "default": 0.0,
+              "description": "Seconds to wait for an answer before reporting that there is none yet. Clamped to [0, 120].",
+              "title": "Wait",
+              "type": "number"
+            }
+          },
+          {
+            "description": "The task token, from the claimed attempt.",
+            "in": "header",
+            "name": "x-athanore-token",
+            "required": true,
+            "schema": {
+              "description": "The task token, from the claimed attempt.",
+              "title": "X-Athanore-Token",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnswerPoll"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Wait for the answer to a question",
+        "tags": [
+          "agent"
+        ]
+      }
+    },
+    "/api/agent/tasks/{task_id}/submit": {
+      "post": {
+        "description": "Record a value for this attempt, if it fits what was asked for.\n\nWith an ``output_model`` declared, a misfit is a 422 carrying\n``errors`` and ``schema`` and nothing is stored: the agent reads the\ntwo in its own tool output and can fix the shape inside the same turn\n(05 \u00a7Submissions). The rejection is also left on the context as\n``ctx.last_rejection``, which is what 19's repair turn quotes back if\nthe turn ends without a valid submission.\n\nWith none declared, any JSON is stored as it arrived.\n\nSubmitting twice is not an error: the **latest valid** payload wins\n(D5), and a body reads it with ``submissions.latest()``. A submission\nnever routes anything \u2014 the node body decides \u2014 so an agent cannot\nmove its own task.",
+        "operationId": "submit_api_agent_tasks__task_id__submit_post",
+        "parameters": [
+          {
+            "description": "The task the token was minted for.",
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "description": "The task the token was minted for.",
+              "title": "Task Id",
+              "type": "integer"
+            }
+          },
+          {
+            "description": "The task token, from the claimed attempt.",
+            "in": "header",
+            "name": "x-athanore-token",
+            "required": true,
+            "schema": {
+              "description": "The task token, from the claimed attempt.",
+              "title": "X-Athanore-Token",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "description": "The result, as JSON. Any shape when no `output_model` is declared; otherwise it must fit the schema `GET /api/agent/tasks/{id}` reports.",
+                "title": "Payload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit this task's structured result",
+        "tags": [
+          "agent"
+        ]
+      }
+    },
     "/api/health": {
       "get": {
         "description": "Whether the server is up, which version it is, and what it is doing.\n\nPausing every run and then waiting for `tasks_in_progress` to reach\nzero here is how an operator drains a server before stopping it.",

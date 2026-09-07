@@ -2119,6 +2119,32 @@ and `test_ask.py`): 422 with schema; last valid wins; 409 after finish;
 ask 403 when off; long-poll returns on answer.
 **Done.** `tests/test_submissions.py`, `test_ask.py` deleted.
 
+**Status.** Done. `athanore/api/routers/agent.py` is the five rows of 08
+§Agent-facing under `Depends(task_auth)` and the `agent` tag, with
+`athanore/api/schemas/agent.py` carrying the models 08 names no class for
+(`AgentTask`, `Ask`, `AskOption`, `AskOut`, `AnswerPoll`). The read is
+the run's brief, the task's payload, the `output_schema` of a declared
+`output_model` and the work log **without its `stats` entries** (D56);
+`/log` and `/submit` write through the attempt's own services, so an
+entry carries this task's node and its `log.appended`, and a submission
+takes `validate_submission` — the predicate the repair loop applies —
+then `accept`, or `reject` plus the 422 `{errors, schema}` and the
+`ctx.last_rejection` 19 quotes back. 08's "409 if the task is not in
+progress" is implemented as **no live context**: the registry is the only
+thing that knows whether an attempt of this task is running here, and a
+token from an attempt that has *ended* is the door's 403 before that
+(D133). `/ask` is 403 unless `ctx.ask_policy == "http"`, opens the
+request with `source="agent"` and registers the schema as the answer's
+validator, and the long-poll clamps `?wait=` to `[0, 120]`, returns the
+moment the answer lands, folds it the way `RequestView` does and
+unregisters the validator it took. `MockAgent(submit=…)` now **posts to
+the endpoint** with the task token, which retires D122 (6)'s `# T045`
+marker; `tests/testing/conftest.py` grows the `served_context` that makes
+that a real round trip. `tests/api/test_agent_api.py` is 40 tests, and
+the `test_submissions.py` and `test_ask.py` ledger rows are ticked —
+neither file is deleted, because the MVP is a separate checkout this one
+never writes to (D65).
+
 ### T045a — MCP server at `/mcp/agent` (A3.4b, D63)
 
 **Do.** `athanore/api/mcp.py`: an `mcp` SDK server (streamable HTTP)

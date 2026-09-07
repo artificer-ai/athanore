@@ -1,11 +1,17 @@
 """`MockAgent`, `StatsMockAgent`, `FakeStatsProvider` (05 §Testing doubles).
 
 The subject is that these are *doubles*, not shortcuts: what they leave
-out is the subprocess and nothing else. A submission goes through the
-predicate the endpoint applies and lands in the table a body reads; a
-misfit rejects and leaves the rejection the repair turn quotes; a stats
-entry is built by the builder the façade uses and recorded exactly once,
-on the failure path as well as the success path.
+out is the subprocess and nothing else. A submission is an HTTP POST to
+the agent API with the task token and lands in the table a body reads; a
+misfit is refused by the endpoint with a 422 and leaves the rejection the
+repair turn quotes; a stats entry is built by the builder the façade uses
+and recorded exactly once, on the failure path as well as the success
+path.
+
+The tests that submit take `served_context` rather than `context`: a
+submission needs a claimed attempt, a live context on the engine's
+registry and an application listening, because none of those three is
+faked (T045).
 """
 
 from __future__ import annotations
@@ -62,9 +68,9 @@ async def test_the_prompt_is_kept_for_the_tests_that_are_about_it(
 
 
 async def test_a_submission_is_stored_and_attached_as_the_declared_model(
-    context: Context, store: Store
+    served_context: Context, store: Store
 ) -> None:
-    ctx = await context()
+    ctx = await served_context()
     with bind(ctx):
         result = await Reviewer(submit={"verdict": "approve"}).run()
     assert isinstance(result.output, Review)
@@ -75,9 +81,9 @@ async def test_a_submission_is_stored_and_attached_as_the_declared_model(
 
 
 async def test_a_pydantic_payload_is_submitted_as_json(
-    context: Context, store: Store
+    served_context: Context, store: Store
 ) -> None:
-    ctx = await context()
+    ctx = await served_context()
     with bind(ctx):
         await Reviewer(submit=Review(verdict="reject", notes="no")).run()
     async with store.reader() as reader:
@@ -102,11 +108,11 @@ class Capturing(Reviewer):
 
 
 async def test_a_misfit_submission_rejects_and_leaves_the_repair_material(
-    context: Context, store: Store
+    served_context: Context, store: Store
 ) -> None:
-    """Exactly what the endpoint does with a 422 (05 §Submissions, T045)."""
+    """Exactly what the endpoint answers with a 422 (05 §Submissions)."""
 
-    ctx = await context()
+    ctx = await served_context()
     agent = Capturing(submit={"wrong": 1})
     with bind(ctx), pytest.raises(AgentError, match="valid submission"):
         await agent.run()
@@ -120,9 +126,9 @@ async def test_a_misfit_submission_rejects_and_leaves_the_repair_material(
 
 
 async def test_a_submission_needs_no_model_when_none_is_declared(
-    context: Context,
+    served_context: Context,
 ) -> None:
-    ctx = await context()
+    ctx = await served_context()
     with bind(ctx):
         result = await MockAgent(submit={"anything": True}).run()
     assert result.output == {"anything": True}
@@ -178,11 +184,11 @@ async def test_every_argument_may_be_a_callable(context: Context, store: Store) 
 
 
 async def test_the_declaration_is_restored_on_the_way_out(
-    context: Context,
+    served_context: Context,
 ) -> None:
     """A body may run two agents in sequence (05 §Session lifecycle, 3)."""
 
-    ctx = await context()
+    ctx = await served_context()
     with bind(ctx):
         await Reviewer(submit={"verdict": "approve"}).run()
         assert ctx.output_model is None
