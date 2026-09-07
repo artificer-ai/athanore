@@ -1825,7 +1825,11 @@ is still not buildable**: 08 has carried `output_schema?` on
 `athanore/api/routers/` is empty until T045 — so the OpenAPI snapshot and
 the generated client are unchanged (the snapshot still has one path), and
 T045's **Do** above now names the field so it cannot be lost. The
-extension is installed by a **mount**, not an image copy (D126).
+extension is installed by a **mount**, not an image copy (D126), on
+every service built from the dev image — `app` included, because a
+workflow served by `./scripts/run.sh` spawns its pi in that container
+rather than a sibling, and a pi without the extension is one that was
+told about five tools it has not got.
 `examples/tests/test_pi_extension.py` drives it three ways: `pi -e` in
 `--mode rpc` (which needs no model, and which a broken extension fails —
 asserted), a node harness that is the smallest possible `ExtensionAPI`,
