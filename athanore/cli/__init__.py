@@ -101,3 +101,15 @@ def athanore(
     """Athanore: an orchestrator for code-defined AI agent workflows."""
 
     ctx.obj = Options(url=url, token=token, json=json_output)
+
+
+# The verb modules, imported last and for their effect: each hangs its
+# commands on `app` above with typer's decorators, so `athanore serve`
+# exists without this module having to know what `serve` takes. Last
+# because the application has to exist before a module can decorate it,
+# which is also why they may import `app` and `Options` back from here —
+# both are bound by the time these lines run (E402 is that ordering, not
+# an accident).
+from athanore.cli import db as _db  # noqa: E402, F401
+from athanore.cli import serve as _serve  # noqa: E402, F401
+from athanore.cli import token as _token  # noqa: E402, F401

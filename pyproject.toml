@@ -25,6 +25,13 @@ dependencies = [
 [project.optional-dependencies]
 postgres = ["asyncpg"]
 
+# The command 11 documents. It names `main`, which returns the exit
+# status of 11 §Exit codes; the generated script is what turns that into
+# `sys.exit`. `python -m athanore.cli` reaches the same function without
+# a regenerated script, which is what the subprocess tests use.
+[project.scripts]
+athanore = "athanore.cli:main"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -156,6 +163,14 @@ ignore_imports = [
     # bus — it takes from below.
     "athanore.plugins.mount -> athanore.api.deps",
     "athanore.plugins.mount -> athanore.api.openapi",
+    # `athanore serve` is the composition root's command line (11
+    # §Server): it builds a `Server`, registers the workflows its targets
+    # name and calls `serve()`, so it is the same arrow `Workflow.run`
+    # draws and it is deferred for the same reason. Written inside the
+    # command body, `athanore db`, `athanore token` and `athanore login`
+    # — the verbs that repair an installation whose server will not start
+    # — never pull in uvicorn, the API and the store to parse a flag.
+    "athanore.cli.serve -> athanore.server",
     # The one arrow back up into the composition root, and the reason it
     # is written inside `Workflow.run` rather than at module scope:
     # `wf.run()` is 04 §Programmatic host's shorthand for "build a

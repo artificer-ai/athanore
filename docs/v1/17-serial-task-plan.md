@@ -2523,6 +2523,29 @@ Connection.backup`). `token show | rotate` (write `0600`, create
 and answers `/api/health` (subprocess with a timeout); `token rotate`
 mode bits; `db import-v0` on the fixture.
 **Done.** Tests pass.
+**Status.** Done. `cli/serve.py`, `cli/db.py` and `cli/token.py` are the
+verbs you run when the server is not running, and each hangs itself on the
+T052 application with typer's decorators (`cli/__init__.py` imports the
+three last, which is what makes `athanore serve` exist without the module
+knowing what `serve` takes). `serve` resolves its `module:wf` /
+`path/to/file.py:wf` targets — a file is executed with its own directory
+on `sys.path`, as running it would be — reads `[pools]` and `[workflows]`
+from `athanore.toml` (`serve.layout`; unknown pool, unknown key inside
+`[workflows.<name>]`, non-integer capacity all exit 2), builds a `Server`
+and prints the bound URL from a new `Server.serve(on_start=…)` callback,
+which is the only moment a `--port 0` bind is knowable and is what
+`--open` points a browser at. Discovery is the `serve.discovered()` hook,
+empty until T072 fills it. `db upgrade | current | backup | import-v0`
+act on `--db` or on the configured database; `backup` is
+`sqlite3.Connection.backup` (07 §Backups) and refuses another backend, an
+absent database and a destination that exists. `token show | rotate` and
+`login <url>` write `0600` files through one helper, creating
+`.athanore/` `0700` and narrowing a token file that was already wider. The
+`[project.scripts]` entry point D142 deferred lands here as `athanore =
+"athanore.cli:main"`, with `athanore/cli/__main__.py` as the `python -m`
+form the subprocess test spawns. `athanore.cli.serve -> athanore.server`
+is an `ignore_imports` entry, deferred into the command body for the
+reason `Workflow.run`'s is (D143).
 
 ### T054 — CLI inspect verbs (A3.10)
 
