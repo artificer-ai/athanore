@@ -1753,6 +1753,15 @@ drives the `mcp` tier end to end: the fake connects to the server it was
 handed with the real `mcp` client, and `append_log` and `submit_result`
 reach the task over the agent HTTP API — one substrate, three adapters.
 
+Like T039a it landed **inside the T039 commit** (`6c3c772`, merged as
+`f596c2f`), so `git log --grep "^T039b:"` finds only this line.
+Re-verified on `feat/T039b`: the gate is green, and the negotiation is
+now pinned in **both** directions — a declared `mcp` gets its server
+with nothing advertised, and a declared `http` is not upgraded by an
+advertisement, because `auto` is the only value `mcpCapabilities`
+answers. The `http` tier also asserts that the tool sentence is absent:
+one tier block per prompt, not two.
+
 ### T040 — Pi stats provider in `examples/` and the remaining agent tests (A2.8, A2.9)
 
 **Do.** `examples/pi/__init__.py`, `examples/pi/stats.py`: `class
