@@ -389,6 +389,45 @@ def test_wf_run_serves_the_workflow_and_stops(
     assert not thread.is_alive()
 
 
+def test_serve_hands_the_bound_url_to_on_start(tmp_path: Path) -> None:
+    """The callback `athanore serve` prints its URL from (T053, 11 §Server).
+
+    On `port=0` the bound port exists only once uvicorn is listening, and
+    `serve()` blocks from then on, so this is the one moment a caller can
+    be told. The callback stops the server it was handed, which is what
+    makes the test finite without a second thread.
+    """
+
+    server = Server(make_settings(tmp_path))
+    seen: list[str] = []
+
+    def announced(started: Server) -> None:
+        # On the server's own event loop, so it says its piece and asks
+        # for the stop rather than talking to the server it is inside.
+        seen.append(started.url)
+        started.request_stop()
+
+    server.serve(on_start=announced)
+
+    # The bound port, not the 0 that was asked for: the callback runs
+    # after `_adopt_bound_port`, which is the whole reason it exists.
+    assert seen == [f"http://127.0.0.1:{server.port}"]
+    assert server.port != 0
+
+
+def test_a_callback_that_raises_stops_the_server(tmp_path: Path) -> None:
+    """A server nobody could be told about does not stay up."""
+
+    server = Server(make_settings(tmp_path))
+
+    def announced(started: Server) -> None:
+        raise RuntimeError("nowhere to say it")
+
+    with pytest.raises(RuntimeError, match="nowhere to say it"):
+        server.serve(on_start=announced)
+    assert "stopped" in repr(server)
+
+
 def test_the_deprecated_alias_is_the_same_class() -> None:
     """`AthanoreServer` for one minor version (14 §Compatibility)."""
 

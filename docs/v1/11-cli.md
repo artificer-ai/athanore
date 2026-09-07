@@ -19,21 +19,32 @@ athanore serve [module:wf ...] [--host] [--port] [--workers N] [--db URL]
 Registers entry-point workflows (unless `--no-discover`) and any explicit
 `module:wf` / `path/to/file.py:wf`, reads pools from `athanore.toml`, runs
 migrations, and prints the URL. A non-loopback `--host` needs an operator
-token (`athanore token rotate` makes one). `--open` launches the browser. Replaces `python -m workflow`
-(examples keep a `__main__` that calls `Server` directly for the
-programmatic form).
+token (`athanore token rotate` makes one). `--open` launches the browser,
+at the URL that was printed — which on `--port 0` is knowable only once
+the socket is bound. Replaces `python -m workflow` (examples keep a
+`__main__` that calls `Server` directly for the programmatic form).
 
 ```
 athanore db upgrade | current | backup <path> | import-v0 <file>
 athanore token show | rotate
 ```
 
+`db` acts on `--db` if it is given and otherwise on the configured
+database, so `athanore db upgrade` in a project directory migrates what
+`athanore serve` there would open. `backup` is the SQLite backup API (07
+§Backups) and refuses another backend, an absent database, and a
+destination that already exists. `token rotate` writes
+`{root_path}/.athanore/token` mode `0600`, creating `.athanore/` mode
+`0700`, and narrows a file that was already wider; `token show` prints
+the effective token and where it came from.
+
 ## Client connection
 
 `--url` (default `http://127.0.0.1:4002`). No token is needed against a
 loopback server. For a network server pass `--token`, set
 `ATHANORE_TOKEN`, or store it with `athanore login <url>` in
-`~/.config/athanore/config.toml`.
+`~/.config/athanore/config.toml`. `login` prompts for the token with the
+input hidden, or takes it as `--token`, and writes the file `0600`.
 
 That file holds `url` and `token` as top-level strings and nothing else;
 an unknown key is an error rather than a default silently taken, and

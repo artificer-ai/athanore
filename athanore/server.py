@@ -44,6 +44,7 @@ import asyncio
 import contextlib
 import signal
 import socket
+from collections.abc import Callable
 from typing import Any
 
 import uvicorn
@@ -51,7 +52,7 @@ from fastapi import FastAPI
 from sqlalchemy.engine import make_url
 
 from athanore.api.app import create_app
-from athanore.api.deps import check_operator_token
+from athanore.api.deps import MissingOperatorToken, check_operator_token
 from athanore.cli.verbs import RESERVED
 from athanore.engine import SHUTDOWN_BUDGET, Engine, Pool
 from athanore.events.bus import EventBus
@@ -67,7 +68,14 @@ from athanore.store.retention import retention_loop
 from athanore.store.uow import Store
 from athanore.workflow import Workflow
 
-__all__ = ["AthanoreServer", "Server", "V0Database"]
+# `MissingOperatorToken` is `athanore.api.deps`'s, re-exported here because
+# the two refusals are one pair to whoever has to report them: they are
+# the two ways `athanore serve` cannot serve, and it prints each as a
+# sentence rather than a traceback (11 §Server). The CLI may not import
+# the one from `api` itself — `api` and `cli` are independent siblings of
+# the same tier (02 §Layering) — and the composition root, where both are
+# already raised, is the one place that names both.
+__all__ = ["AthanoreServer", "MissingOperatorToken", "Server", "V0Database"]
 
 _log = get_logger(__name__)
 
@@ -290,7 +298,7 @@ class Server:
         # next connection, so the same object serves the next `start()`.
         await self._sa_engine.dispose()
 
-    def serve(self) -> None:
+    def serve(self, on_start: Callable[[Server], None] | None = None) -> None:
         """Serve until stopped. Blocking — 04 §Programmatic host's form.
 
         Owns the event loop, so it is the entry point of a process rather
@@ -298,9 +306,22 @@ class Server:
         request the graceful stop of 04 §Shutdown, which is what makes a
         plain ``kill`` — systemd, ``docker stop``, a supervisor — run the
         engine's shutdown instead of dropping the process on the floor.
+
+        ``on_start`` is called once, with this server, after the socket
+        is bound and the application is answering. It exists because
+        :attr:`url` is not knowable before that on ``port=0`` and a
+        blocking call has no other moment to hand it back:
+        ``athanore serve`` prints that URL and ``--open`` points a
+        browser at it (11 §Server). A callback that raises stops the
+        server rather than leaving it serving something nobody was told
+        about.
+
+        It runs on the server's own event loop, so it announces and
+        returns: a blocking call *to this server* from inside it would
+        wait for a loop that is waiting for the callback.
         """
 
-        asyncio.run(self._serve_until_stopped())
+        asyncio.run(self._serve_until_stopped(on_start))
 
     def request_stop(self) -> None:
         """Ask a running server to stop, from anywhere.
@@ -534,8 +555,10 @@ class Server:
         except Exception:
             _log.exception("the retention loop stopped; history will not be pruned")
 
-    async def _serve_until_stopped(self) -> None:
-        """What :meth:`serve` runs: start, wait, stop.
+    async def _serve_until_stopped(
+        self, on_start: Callable[[Server], None] | None = None
+    ) -> None:
+        """What :meth:`serve` runs: start, announce, wait, stop.
 
         The wait ends on a signal, on :meth:`request_stop`, or on uvicorn
         exiting by itself — a socket lost, a lifespan that failed — so a
@@ -554,6 +577,8 @@ class Server:
         stopping = self._stopping
         serving = self._serve_task
         try:
+            if on_start is not None:
+                on_start(self)
             if stopping is not None and serving is not None:
                 waiter = asyncio.ensure_future(stopping.wait())
                 try:

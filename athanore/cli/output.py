@@ -35,6 +35,7 @@ from typing import Any, Final
 import httpx
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from athanore.cli.client import ApiClientError
@@ -48,7 +49,9 @@ __all__ = [
     "TableSpec",
     "dispatch",
     "emit",
+    "fail",
     "main",
+    "warn",
 ]
 
 #: 11 §Exit codes, one constant each.
@@ -171,13 +174,37 @@ def _text(data: Any, out: Console) -> None:
     out.print(_cell(data), highlight=False)
 
 
-def _fail(message: str, details: Sequence[str] = ()) -> None:
-    """Report a failure on stderr, so stdout stays the verb's output."""
+def fail(message: str, details: Sequence[str] = ()) -> None:
+    r"""Report a failure on stderr, so stdout stays the verb's output.
+
+    Public because the server-side verbs (11 §Server) report failures
+    that never went near the API — a port already in use, a database that
+    is not SQLite — and a second way of printing "Error:" would drift
+    from this one.
+
+    The message is escaped, never interpreted: it carries a path, a
+    server's sentence or a TOML key, and ``[workflows.demo]`` is a table
+    name rather than a style tag. Only the label around it is markup.
+    """
 
     console = Console(stderr=True)
-    console.print(f"[bold red]Error:[/] {message}", highlight=False)
+    console.print(f"[bold red]Error:[/] {escape(message)}", highlight=False)
     for detail in details:
-        console.print(f"  {detail}", highlight=False)
+        console.print(f"  {escape(detail)}", highlight=False)
+
+
+def warn(message: str) -> None:
+    """Report something worth saying that is not a failure.
+
+    On stderr with the failures, because it is not the verb's output
+    either, and worded as the warning it is: a verb that printed
+    "Error:" and then carried on would be telling the operator two
+    different things at once.
+    """
+
+    Console(stderr=True).print(
+        f"[bold yellow]Warning:[/] {escape(message)}", highlight=False
+    )
 
 
 def dispatch(app: typer.Typer, argv: Sequence[str] | None = None) -> int:
@@ -210,17 +237,17 @@ def dispatch(app: typer.Typer, argv: Sequence[str] | None = None) -> int:
     except typer.Abort:
         # Ctrl-C, or a confirmation answered "no". Nothing to report
         # beyond the fact, and it is not the server's fault.
-        _fail("aborted")
+        fail("aborted")
         return EXIT_API_ERROR
     except ApiClientError as exc:
-        _fail(exc.message, exc.details)
+        fail(exc.message, exc.details)
         return EXIT_API_ERROR
     except httpx.TransportError as exc:
         # No answer at all: nothing listening, a connection that died, a
         # request that timed out. `httpx.ConnectError` is the case 11
         # names and the common one; the rest of the family says the same
         # thing to the operator, and a traceback would say it worse.
-        _fail(f"{exc} ({type(exc).__name__})")
+        fail(f"{exc} ({type(exc).__name__})")
         return EXIT_UNREACHABLE
     # `typer.Exit(code)` surfaces as the return value rather than as an
     # exception when standalone mode is off, and `--help` returns 0 the
@@ -235,7 +262,7 @@ def _show(exc: Exception) -> None:
     if callable(show):
         show()
         return
-    _fail(str(exc))
+    fail(str(exc))
 
 
 def main(argv: Sequence[str] | None = None) -> int:
