@@ -1958,6 +1958,26 @@ valid only for its own task and only while in progress; expired after
 `finish`).
 **Done.** Tests pass.
 
+**Status.** Done. `athanore/api/deps.py` carries `auth_mode`,
+`check_operator_token` (the refusal `create_app` makes, so a `0.0.0.0`
+bind or `require_token` without a token is a startup failure rather than
+an API that only ever answers 401), `authenticated`, the `operator_auth`
+dependency — bearer compared with `hmac.compare_digest` over UTF-8
+bytes, `?access_token=` accepted for `GET /api/events` and no other path
+— and `task_auth`, which hashes the `X-Athanore-Token` header, requires
+the row it finds to be this `task_id` and still `in_progress` or
+`waiting`, and returns the `TaskRow`. `athanore/api/routers/system.py`
+is `GET /api/health` (`ok`, `version`, `runs_running`,
+`tasks_in_progress`, `pools`, the last three omitted when there is no
+store or engine to ask) and `GET /api/me` (`auth`, `authenticated`,
+`version`, `started_at`, `features`), both unauthenticated on every
+bind. `athanore/logging.py` gains `RedactingFilter` on the shared
+handler. Two repository methods answer the counts
+(`RunRepo.count_running`, `TaskRepo.count_in_progress`), and `VERSION`
+moves to `athanore/api/__init__.py` so the routers can read it. The ten
+choices the task left open are D129 in 15. Snapshot and TypeScript
+client regenerated.
+
 ### T044 — Response schemas and the workflows router (A3.3)
 
 **Do.** `athanore/api/schemas/*.py`: `RunSummary`, `RunDetail` (with

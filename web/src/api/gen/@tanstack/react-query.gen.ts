@@ -3,8 +3,8 @@
 import { type DefaultError, queryOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { healthApiHealthGet, type Options } from '../sdk.gen';
-import type { HealthApiHealthGetData, HealthApiHealthGetResponse } from '../types.gen';
+import { healthApiHealthGet, meApiMeGet, type Options } from '../sdk.gen';
+import type { HealthApiHealthGetData, HealthApiHealthGetResponse, MeApiMeGetData, MeApiMeGetResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -43,6 +43,11 @@ export const healthApiHealthGetQueryKey = (options?: Options<HealthApiHealthGetD
 
 /**
  * Liveness and version
+ *
+ * Whether the server is up, which version it is, and what it is doing.
+ *
+ * Pausing every run and then waiting for `tasks_in_progress` to reach
+ * zero here is how an operator drains a server before stopping it.
  */
 export const healthApiHealthGetOptions = (options?: Options<HealthApiHealthGetData>) => queryOptions<HealthApiHealthGetResponse, DefaultError, HealthApiHealthGetResponse, ReturnType<typeof healthApiHealthGetQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -55,4 +60,28 @@ export const healthApiHealthGetOptions = (options?: Options<HealthApiHealthGetDa
         return data;
     },
     queryKey: healthApiHealthGetQueryKey(options)
+});
+
+export const meApiMeGetQueryKey = (options?: Options<MeApiMeGetData>) => createQueryKey('meApiMeGet', options);
+
+/**
+ * Whether the caller needs a token, and has one
+ *
+ * Whether this server wants a token, and whether this request has one.
+ *
+ * Never requires one itself: a request with no credential on a server
+ * that wants one gets a 200 saying `{"auth": "token", "authenticated":
+ * false}`, which is the client's cue to ask for a token.
+ */
+export const meApiMeGetOptions = (options?: Options<MeApiMeGetData>) => queryOptions<MeApiMeGetResponse, DefaultError, MeApiMeGetResponse, ReturnType<typeof meApiMeGetQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await meApiMeGet({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: meApiMeGetQueryKey(options)
 });

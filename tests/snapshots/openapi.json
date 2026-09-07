@@ -2,12 +2,51 @@
   "components": {
     "schemas": {
       "Health": {
-        "description": "Liveness and version. Unauthenticated, and carries no ids.",
+        "description": "Liveness, version and counts. Unauthenticated, and carries no ids.",
         "properties": {
           "ok": {
             "description": "True whenever the server answers at all.",
             "title": "Ok",
             "type": "boolean"
+          },
+          "pools": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/PoolHealth"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Every registered pool by name. Omitted when this application has no engine; empty when the engine has no pools.",
+            "title": "Pools"
+          },
+          "runs_running": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Runs in the `running` status. Omitted when this application has no store to ask.",
+            "title": "Runs Running"
+          },
+          "tasks_in_progress": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Attempts in the `in_progress` status; a task parked on a human is `waiting` and is not counted. Omitted when this application has no store to ask.",
+            "title": "Tasks In Progress"
           },
           "version": {
             "description": "The running Athanore version.",
@@ -21,6 +60,74 @@
         ],
         "title": "Health",
         "type": "object"
+      },
+      "Me": {
+        "description": "What the caller may do, and which server they are talking to.",
+        "properties": {
+          "auth": {
+            "description": "`token` when operator endpoints require a bearer token, `off` on a plain loopback bind.",
+            "enum": [
+              "off",
+              "token"
+            ],
+            "title": "Auth",
+            "type": "string"
+          },
+          "authenticated": {
+            "description": "Whether this request carries operator rights. Always true when `auth` is `off`.",
+            "title": "Authenticated",
+            "type": "boolean"
+          },
+          "features": {
+            "description": "Optional capabilities this server has. Empty in v1.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Features",
+            "type": "array"
+          },
+          "started_at": {
+            "description": "When this process came up. A change means a restart, which is the SPA's cue to refetch the plugin manifest.",
+            "format": "date-time",
+            "title": "Started At",
+            "type": "string"
+          },
+          "version": {
+            "description": "The running Athanore version.",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "auth",
+          "authenticated",
+          "version",
+          "started_at",
+          "features"
+        ],
+        "title": "Me",
+        "type": "object"
+      },
+      "PoolHealth": {
+        "description": "One pool's capacity and what it is spending right now.",
+        "properties": {
+          "capacity": {
+            "description": "Slots the pool has, in total.",
+            "title": "Capacity",
+            "type": "integer"
+          },
+          "in_flight": {
+            "description": "Slots leased right now.",
+            "title": "In Flight",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "capacity",
+          "in_flight"
+        ],
+        "title": "PoolHealth",
+        "type": "object"
       }
     }
   },
@@ -32,6 +139,7 @@
   "paths": {
     "/api/health": {
       "get": {
+        "description": "Whether the server is up, which version it is, and what it is doing.\n\nPausing every run and then waiting for `tasks_in_progress` to reach\nzero here is how an operator drains a server before stopping it.",
         "operationId": "health_api_health_get",
         "responses": {
           "200": {
@@ -46,6 +154,28 @@
           }
         },
         "summary": "Liveness and version",
+        "tags": [
+          "system"
+        ]
+      }
+    },
+    "/api/me": {
+      "get": {
+        "description": "Whether this server wants a token, and whether this request has one.\n\nNever requires one itself: a request with no credential on a server\nthat wants one gets a 200 saying `{\"auth\": \"token\", \"authenticated\":\nfalse}`, which is the client's cue to ask for a token.",
+        "operationId": "me_api_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Whether the caller needs a token, and has one",
         "tags": [
           "system"
         ]

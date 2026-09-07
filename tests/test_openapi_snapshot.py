@@ -76,11 +76,39 @@ def test_the_rendering_is_deterministic(dumper: ModuleType) -> None:
 def test_the_document_describes_the_health_endpoint(
     snapshot: dict[str, Any],
 ) -> None:
-    """The one route there is (08 §System), with its response schema."""
+    """08 §System's first route, with its response schema."""
     assert snapshot["info"]["title"] == "Athanore"
     operation = snapshot["paths"]["/api/health"]["get"]
     assert operation["tags"] == ["system"]
     schema = operation["responses"]["200"]["content"]["application/json"]["schema"]
     assert schema["$ref"] == "#/components/schemas/Health"
     health = snapshot["components"]["schemas"]["Health"]
+    # Only the two an application without collaborators can answer are
+    # required; the counts are omitted rather than zero-filled (T043).
     assert sorted(health["required"]) == ["ok", "version"]
+    assert set(health["properties"]) == {
+        "ok",
+        "version",
+        "runs_running",
+        "tasks_in_progress",
+        "pools",
+    }
+
+
+def test_the_document_describes_the_me_endpoint(snapshot: dict[str, Any]) -> None:
+    """08 §System's second route: what the SPA reads before anything else."""
+    operation = snapshot["paths"]["/api/me"]["get"]
+    assert operation["tags"] == ["system"]
+    schema = operation["responses"]["200"]["content"]["application/json"]["schema"]
+    assert schema["$ref"] == "#/components/schemas/Me"
+    me = snapshot["components"]["schemas"]["Me"]
+    assert sorted(me["required"]) == [
+        "auth",
+        "authenticated",
+        "features",
+        "started_at",
+        "version",
+    ]
+    # `auth` is an enum on both sides, so the generated client gives the
+    # SPA a union rather than a bare string (03 §Conventions).
+    assert me["properties"]["auth"]["enum"] == ["off", "token"]

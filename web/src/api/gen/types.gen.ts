@@ -7,7 +7,7 @@ export type ClientOptions = {
 /**
  * Health
  *
- * Liveness and version. Unauthenticated, and carries no ids.
+ * Liveness, version and counts. Unauthenticated, and carries no ids.
  */
 export type Health = {
     /**
@@ -17,11 +17,89 @@ export type Health = {
      */
     ok: boolean;
     /**
+     * Pools
+     *
+     * Every registered pool by name. Omitted when this application has no engine; empty when the engine has no pools.
+     */
+    pools?: {
+        [key: string]: PoolHealth;
+    } | null;
+    /**
+     * Runs Running
+     *
+     * Runs in the `running` status. Omitted when this application has no store to ask.
+     */
+    runs_running?: number | null;
+    /**
+     * Tasks In Progress
+     *
+     * Attempts in the `in_progress` status; a task parked on a human is `waiting` and is not counted. Omitted when this application has no store to ask.
+     */
+    tasks_in_progress?: number | null;
+    /**
      * Version
      *
      * The running Athanore version.
      */
     version: string;
+};
+
+/**
+ * Me
+ *
+ * What the caller may do, and which server they are talking to.
+ */
+export type Me = {
+    /**
+     * Auth
+     *
+     * `token` when operator endpoints require a bearer token, `off` on a plain loopback bind.
+     */
+    auth: 'off' | 'token';
+    /**
+     * Authenticated
+     *
+     * Whether this request carries operator rights. Always true when `auth` is `off`.
+     */
+    authenticated: boolean;
+    /**
+     * Features
+     *
+     * Optional capabilities this server has. Empty in v1.
+     */
+    features: Array<string>;
+    /**
+     * Started At
+     *
+     * When this process came up. A change means a restart, which is the SPA's cue to refetch the plugin manifest.
+     */
+    started_at: string;
+    /**
+     * Version
+     *
+     * The running Athanore version.
+     */
+    version: string;
+};
+
+/**
+ * PoolHealth
+ *
+ * One pool's capacity and what it is spending right now.
+ */
+export type PoolHealth = {
+    /**
+     * Capacity
+     *
+     * Slots the pool has, in total.
+     */
+    capacity: number;
+    /**
+     * In Flight
+     *
+     * Slots leased right now.
+     */
+    in_flight: number;
 };
 
 export type HealthApiHealthGetData = {
@@ -39,3 +117,19 @@ export type HealthApiHealthGetResponses = {
 };
 
 export type HealthApiHealthGetResponse = HealthApiHealthGetResponses[keyof HealthApiHealthGetResponses];
+
+export type MeApiMeGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/me';
+};
+
+export type MeApiMeGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: Me;
+};
+
+export type MeApiMeGetResponse = MeApiMeGetResponses[keyof MeApiMeGetResponses];

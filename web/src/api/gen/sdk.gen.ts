@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { HealthApiHealthGetData, HealthApiHealthGetResponses } from './types.gen';
+import type { HealthApiHealthGetData, HealthApiHealthGetResponses, MeApiMeGetData, MeApiMeGetResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -20,5 +20,21 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 
 /**
  * Liveness and version
+ *
+ * Whether the server is up, which version it is, and what it is doing.
+ *
+ * Pausing every run and then waiting for `tasks_in_progress` to reach
+ * zero here is how an operator drains a server before stopping it.
  */
 export const healthApiHealthGet = <ThrowOnError extends boolean = false>(options?: Options<HealthApiHealthGetData, ThrowOnError>): RequestResult<HealthApiHealthGetResponses, unknown, ThrowOnError> => (options?.client ?? client).get<HealthApiHealthGetResponses, unknown, ThrowOnError>({ url: '/api/health', ...options });
+
+/**
+ * Whether the caller needs a token, and has one
+ *
+ * Whether this server wants a token, and whether this request has one.
+ *
+ * Never requires one itself: a request with no credential on a server
+ * that wants one gets a 200 saying `{"auth": "token", "authenticated":
+ * false}`, which is the client's cue to ask for a token.
+ */
+export const meApiMeGet = <ThrowOnError extends boolean = false>(options?: Options<MeApiMeGetData, ThrowOnError>): RequestResult<MeApiMeGetResponses, unknown, ThrowOnError> => (options?.client ?? client).get<MeApiMeGetResponses, unknown, ThrowOnError>({ url: '/api/me', ...options });

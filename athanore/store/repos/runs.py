@@ -246,6 +246,21 @@ class RunRepo(Repo):
         result = await self.conn.execute(select(runs).where(runs.c.id == run_id))
         return self._first(RunRow, result)
 
+    async def count_running(self) -> int:
+        """How many runs are ``running`` — ``/api/health``'s ``runs_running``.
+
+        A count, never a list: the health endpoint reports no ids
+        (08 §System), and a server with thousands of runs must not
+        serialise any of them to answer a poll.
+        """
+
+        result = await self.conn.execute(
+            select(func.count())
+            .select_from(runs)
+            .where(runs.c.status == RunStatus.running.value)
+        )
+        return int(result.scalar_one())
+
     async def list(
         self, status: str | None = None, workflow: str | None = None
     ) -> list[RunSummary]:

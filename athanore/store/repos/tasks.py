@@ -50,7 +50,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any, NamedTuple
 
-from sqlalchemy import Select, case, select
+from sqlalchemy import Select, case, func, select
 
 from athanore.store.clock import now
 from athanore.store.repos.base import (
@@ -240,6 +240,23 @@ class TaskRepo(Repo):
             select(tasks).where(tasks.c.run_id == run_id).order_by(tasks.c.id)
         )
         return self._rows(TaskRow, result)
+
+    async def count_in_progress(self) -> int:
+        """How many attempts are ``in_progress`` — ``/api/health``'s count.
+
+        ``in_progress`` only. A ``waiting`` attempt is parked on a human
+        and holds no pool slot (04 §Waiting), so counting it would make
+        the drain recipe of 04 §Shutdown — pause everything, wait for
+        ``tasks_in_progress == 0`` — never finish while a question is
+        unanswered.
+        """
+
+        result = await self.conn.execute(
+            select(func.count())
+            .select_from(tasks)
+            .where(tasks.c.status == TaskStatus.in_progress.value)
+        )
+        return int(result.scalar_one())
 
     async def by_token_hash(self, hash_: str) -> TaskRow | None:
         """The attempt a task token belongs to, or ``None``.
