@@ -116,7 +116,13 @@ type = "layers"
 # else — sits at the bottom with `graph`. Those two are what
 # `workflow.py` and `registry` join, and why 02 §Layering names
 # `plugins.decl` beside `graph`.
+#
+# `athanore.server` is the composition root (T051), so it is a tier of
+# its own above everything: it builds the store, the engine and the
+# application and hands them to each other, and nothing may import it
+# back.
 layers = [
+    "athanore.server",
     "athanore.api | athanore.cli | athanore.plugins.builtin",
     "athanore.plugins.mount",
     "athanore.plugins.context",
@@ -150,6 +156,14 @@ ignore_imports = [
     # bus — it takes from below.
     "athanore.plugins.mount -> athanore.api.deps",
     "athanore.plugins.mount -> athanore.api.openapi",
+    # The one arrow back up into the composition root, and the reason it
+    # is written inside `Workflow.run` rather than at module scope:
+    # `wf.run()` is 04 §Programmatic host's shorthand for "build a
+    # `Server`, register this, serve", so the module that defines a
+    # workflow would otherwise pull in uvicorn, the API and the store to
+    # let an author declare a node. Deferred to call time, it is an
+    # arrow no import of `athanore.workflow` ever follows.
+    "athanore.workflow -> athanore.server",
 ]
 
 [[tool.importlinter.contracts]]

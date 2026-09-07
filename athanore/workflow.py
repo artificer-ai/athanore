@@ -301,8 +301,7 @@ class Workflow:
         which an author needs to *define* a workflow, and
         :mod:`athanore.workflow` sits below all of them.
         """
-        # `athanore.server` is T051's module; the ignore comes off with it.
-        from athanore.server import Server  # pyright: ignore[reportMissingImports]
+        from athanore.server import Server
         from athanore.settings import AthanoreSettings
 
         server = Server(AthanoreSettings(**settings) if settings else None)

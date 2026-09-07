@@ -2452,6 +2452,26 @@ and serves. `AthanoreServer = Server` alias.
 **Tests.** `tests/test_server.py`: start/stop twice in one loop; port 0
 picks a free port; reserved name rejected; `wf.run` smoke via a thread.
 **Done.** Tests pass.
+**Status.** Done. `athanore/server.py` is the composition root: it builds
+the bus, the SQLAlchemy engine, the `Store`, the `RequestService` and the
+`Engine` in `__init__` — a SQLAlchemy engine connects lazily, so a server
+that is never started opens no database, and `register` can reach the
+engine before anything is running. `register` finalizes, refuses a CLI
+verb, a pool name and a name already registered, then `collect`s and
+`validate`s the declarations and hands the graph to the engine, mutating
+nothing until every check has passed. `start()` refuses a bind nobody
+could authenticate against *before* it touches the database, refuses a v0
+database with the `db import-v0` hint, migrates, starts the engine,
+builds the app with `with_builtins(specs)` in front, binds uvicorn behind
+`_QuietUvicorn` and starts the retention loop; `stop()` stops the engine
+and closes the HTTP surface in that order (04 §Shutdown), and the pair
+may repeat on one object. `port=0` is adopted into `settings.port` and
+into a derived `public_url`, so the agents of an ephemeral bind are told
+where the server actually is. `RESERVED` lands in `athanore/cli/verbs.py`
+— T052's file, written now because this task's name check is its first
+reader — and `athanore.server` becomes the top tier of the layering
+contract, with `Workflow.run`'s deferred import of it the one ignored
+arrow back up (D141).
 
 ### T052 — CLI skeleton, client, output (A3.10)
 

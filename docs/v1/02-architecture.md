@@ -132,6 +132,14 @@ operator route, so it hangs on `api.deps.operator_auth` and declares
 `api.openapi`'s security requirement, and there is no lower place to put
 a door that has to be the same one (D138).
 
+`server.py` is the composition root and sits above the whole diagram: it
+builds the store, the engine and the application and hands them to each
+other, and nothing in the package imports it back. The one exception is
+written to be no exception at all — `Workflow.run()`, 04 §Programmatic
+host's one-workflow shorthand, imports `Server` *inside the method*, so
+the module an author defines a workflow in never pulls uvicorn, the API
+and the store in behind it.
+
 The `api` layer needs two things from the engine at request time: the
 live `TaskContext` of an in-flight task (to validate a submission against
 the declared `output_model` and to check `ask_policy`) and the operator

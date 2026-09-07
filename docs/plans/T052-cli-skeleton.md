@@ -26,7 +26,9 @@ and what the exit code is.
    show, logs, stream, workflows, requests, answer, permit, deny, pause,
    resume, cancel, rm, rerun, retry, move, set-status, edit, position,
    open}` — T051 checks workflow names against this, so it lives where
-   both can import it without a cycle.
+   both can import it without a cycle. **Already written**, by T051,
+   which is its first reader (D141): the file is there and holds exactly
+   this set, so this step is done.
 3. `cli/client.py`: `Client(url, token)` over httpx with
    `transport=HTTPTransport(retries=2)`, the bearer header, and an
    `events(after, names)` SSE iterator **shared with the tests**.
