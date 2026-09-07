@@ -102,6 +102,13 @@ scope without a task is `PluginError(400, "no task in scope")` — the
 same refusal one level in. `services.run.list()` lists the plugin's own
 workflow's runs and no others.
 
+`services.run` is also where a pane *reads* the run in scope:
+`get()` is the row, `detail()` is the run with its attempts and their
+summed stats — the same read `GET /api/runs/{id}` makes, so a pane's
+totals and `RunDetail.stats` cannot drift — `log_entries()` is the whole
+run's work log, and `events()` its stored history. All four refuse with
+`no run in scope` where there is no run.
+
 Handlers never get a partially-resolved context. Each of these is a 404
 *before* the handler runs, and never a 403 — whether a run exists is not
 something one workflow's plugin learns about another's:
@@ -238,6 +245,28 @@ The SPA ships the renderers for these element tags itself; the point is
 that their *placement and liveness* flow through the manifest, so the
 host page has no hard-coded knowledge of them. That is the proof the API
 is sufficient.
+
+They are declared on a `BuiltinWorkflow` — a `Workflow` named `_builtin`
+with no nodes and no runs of its own, which is what makes it the scope
+whose panels apply to every run (§Context and scopes). The table's order
+is the declaration order and therefore the manifest's, which is the order
+the SPA cycles the builtin panes in (10 §Panes); `requests` declares two
+panels, the run pane and the global inbox, so the manifest carries six
+panels for the five builtins.
+
+Nothing in `plugins/builtin/` mounts itself. It is an independent sibling
+of `api` in the top tier (02 §Layering), so the **host** composes: the
+spec `builtin_spec()` returns goes in front of the registered workflows'
+and the list is handed to `create_app(plugins=…)`. A plugin route is not
+part of the committed wire contract — a workflow's routes are declared by
+whatever is installed — so the OpenAPI snapshot is the document of
+`create_app()` with nothing registered, builtins included.
+
+A builtin gets no privileged access: it reads what it reads through a
+`PluginContext`, which is why `services.run` carries `detail()`,
+`log_entries()` and `events()` as well as `get()` and `list()` — the
+three reads a run pane makes, available to every plugin (§Context and
+scopes).
 
 ## Discovery
 
