@@ -84,6 +84,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from athanore.api import VERSION
 from athanore.api.deps import live_task
 from athanore.api.errors import ApiError, ErrorCode, api_error_for
+from athanore.api.openapi import API_ERROR_REF, TASK_TOKEN, TOKEN_HEADER
 from athanore.api.routers import agent
 from athanore.api.schemas import Ask, LogText
 from athanore.engine.context import TaskContext
@@ -100,9 +101,6 @@ MCP_PATH: Final = "/mcp/agent"
 #: namespaced by in most harnesses — ``mcp__athanore__append_log`` — and
 #: :mod:`athanore.agents.policies` already matches on that spelling.
 SERVER_NAME: Final = "athanore"
-
-#: The header the task token arrives in, and the only place it may (12).
-TOKEN_HEADER: Final = "X-Athanore-Token"
 
 #: Where :class:`TaskTokenGuard` leaves the attempt it authenticated, for
 #: the tool handlers to read off the same request.
@@ -564,6 +562,9 @@ PATH_ITEM: Final[dict[str, Any]] = {
             "document."
         ),
         "operationId": "mcp_agent",
+        # The same scheme the generated agent routes carry, so the
+        # document says this endpoint is the task token's too (08 §MCP).
+        "security": TASK_TOKEN,
         "parameters": [
             {
                 "name": TOKEN_HEADER,
@@ -588,20 +589,11 @@ PATH_ITEM: Final[dict[str, Any]] = {
             "403": {
                 "description": "The task token is not valid for a live attempt.",
                 "content": {
-                    "application/json": {
-                        # 08 §Conventions' error shape, written out rather
-                        # than referenced: this module adds no component to
-                        # the document, and the two keys are the whole of
-                        # what a refusal here carries.
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "error": {"type": "string"},
-                                "code": {"type": "string"},
-                            },
-                            "required": ["error", "code"],
-                        }
-                    }
+                    # 08 §Conventions' error shape, referenced rather than
+                    # written out: T048 gave the document an `ApiError`
+                    # component, so this refusal is described by the same
+                    # schema as every other one.
+                    "application/json": {"schema": {"$ref": API_ERROR_REF}}
                 },
             },
         },

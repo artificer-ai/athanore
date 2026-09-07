@@ -18,10 +18,15 @@ separate on purpose:
   field to exclude, which is a stronger guarantee than excluding one (12
   §Task tokens).
 
-The exception is the event envelope, which is re-exported from
+There are two exceptions. The event envelope is re-exported from
 :mod:`athanore.events.payloads` rather than restated, because 18 §Typing
 says so: the payloads sit below the API so the bus and the store can
-reach them too (D81).
+reach them too (D81). And :class:`athanore.api.schemas.errors.ApiError`
+— the error body of 08 §Conventions — is deliberately *not* re-exported,
+because it shares a name with the exception in :mod:`athanore.api.errors`
+that a router raises: ``ApiError`` imported from here would be the wrong
+one nine times out of ten, so the wire model has to be spelled out by
+module (D137).
 """
 
 from __future__ import annotations

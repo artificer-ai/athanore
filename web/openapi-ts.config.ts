@@ -16,7 +16,9 @@ export default defineConfig({
       // Naming a filter at all turns on the parser's orphan pruning;
       // keeping orphans is what the generated tree looked like before,
       // and the event payload schemas of 18 are reachable only through
-      // the envelope union, which this generator leaves opaque.
+      // the envelope union — which T048 made the document describe, so
+      // what they generate now is a discriminated union rather than the
+      // opaque objects this comment used to name (D137).
       orphans: true,
       operations: {
         // `GET /api/events` is the SSE feed (08 §Events). The SPA reads

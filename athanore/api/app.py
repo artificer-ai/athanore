@@ -35,6 +35,15 @@ from athanore.api.deps import check_operator_token
 from athanore.api.errors import install_error_handlers
 from athanore.api.mcp import mount as mount_mcp
 from athanore.api.middleware import BodyLimitMiddleware
+from athanore.api.openapi import (
+    AGENT_RESPONSES,
+    OPERATOR_BEARER,
+    OPERATOR_RESPONSES,
+    TAGS,
+    TASK_TOKEN,
+    install_openapi,
+    secure,
+)
 from athanore.api.routers import agent, requests, runs, system, tasks, workflows
 from athanore.api.sse import router as sse_router
 from athanore.api.static import install_cors, mount_spa
@@ -91,7 +100,12 @@ def create_app(
     settings = settings if settings is not None else AthanoreSettings()
     check_operator_token(settings)
 
-    app = FastAPI(title="Athanore", version=VERSION, lifespan=lifespan)
+    app = FastAPI(
+        title="Athanore",
+        version=VERSION,
+        lifespan=lifespan,
+        openapi_tags=TAGS,
+    )
     app.state.settings = settings
     app.state.engine = engine
     app.state.store = store
@@ -110,19 +124,35 @@ def create_app(
     # when `cors_origins` is unset, which is the default (12).
     install_cors(app, settings)
     install_error_handlers(app)
+    # Who may call what, in the document as well as in the code (08
+    # §OpenAPI): every router that depends on `operator_auth` declares
+    # `operatorBearer` and the 401 it answers without it, the agent
+    # router declares `taskToken` and its 403, and the system router
+    # declares neither because it is unauthenticated on any bind. Both
+    # sets carry the 422 of 08 §Conventions, which is what keeps FastAPI
+    # from writing one of its own.
+    for operator in (workflows.router, runs.router, tasks.router, requests.router):
+        secure(operator, OPERATOR_BEARER)
+    secure(sse_router, OPERATOR_BEARER)
+    secure(agent.router, TASK_TOKEN)
     app.include_router(system.router)
-    app.include_router(workflows.router)
-    app.include_router(runs.router)
-    app.include_router(tasks.router)
-    app.include_router(requests.router)
-    app.include_router(agent.router)
+    app.include_router(workflows.router, responses=OPERATOR_RESPONSES)
+    app.include_router(runs.router, responses=OPERATOR_RESPONSES)
+    app.include_router(tasks.router, responses=OPERATOR_RESPONSES)
+    app.include_router(requests.router, responses=OPERATOR_RESPONSES)
+    app.include_router(agent.router, responses=AGENT_RESPONSES)
     # Not under `routers/`: the stream is one endpoint and a generator,
     # and 02 §Package layout gives it its own module (`api/sse.py`).
-    app.include_router(sse_router)
+    app.include_router(sse_router, responses=OPERATOR_RESPONSES)
     # Last, and not a router: the same five capabilities as MCP tools,
     # on a mounted ASGI application with its own auth at the door (08
     # §MCP). The manager it returns is what `lifespan` runs.
     app.state.mcp = mount_mcp(app, settings)
+    # The last wrapper on the document's generation, so what it declares
+    # — the security schemes, and the 422 it prunes — covers the MCP path
+    # item the line above inserts as well as the generated routes (08
+    # §OpenAPI).
+    install_openapi(app)
     # The SPA at `/`, as the router's fallback rather than as a route:
     # every route is matched first — including the ones a plugin
     # registers after this call — and an unmatched path is the client

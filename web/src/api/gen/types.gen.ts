@@ -4,12 +4,98 @@ export type ClientOptions = {
     baseUrl: `${string}://${string}` | (string & {});
 };
 
+/**
+ * AgentStats
+ *
+ * The stats entry of 05 §Stats entry verbatim.
+ *
+ * Every measurement is optional because 05 omits what it cannot
+ * determine rather than zero-filling it (01 §Real data only).
+ */
 export type AgentStats = {
-    [key: string]: unknown;
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Cost
+     */
+    cost?: number | null;
+    /**
+     * Denied Permissions
+     */
+    denied_permissions?: number | null;
+    /**
+     * Duration S
+     */
+    duration_s: number;
+    /**
+     * Input Tokens
+     */
+    input_tokens?: number | null;
+    /**
+     * Model
+     */
+    model?: string | null;
+    /**
+     * Node
+     */
+    node: string;
+    /**
+     * Output Tokens
+     */
+    output_tokens?: number | null;
+    /**
+     * Reason
+     */
+    reason?: 'refusal' | 'cancelled' | 'truncated' | 'timeout' | 'shutdown' | 'transport' | 'no_submission' | null;
+    /**
+     * Repair Turns
+     */
+    repair_turns?: number | null;
+    /**
+     * Session Id
+     */
+    session_id?: string | null;
+    /**
+     * Status
+     */
+    status: 'ok' | 'failed';
+    /**
+     * Tool Calls
+     */
+    tool_calls?: number | null;
+    /**
+     * Total Tokens
+     */
+    total_tokens?: number | null;
 };
 
+/**
+ * AgentStatsEvent
+ */
 export type AgentStatsEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: AgentStats;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'agent.stats';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
 /**
@@ -161,6 +247,44 @@ export type AnswerPoll = {
      * The request that was polled.
      */
     request_id: number;
+};
+
+/**
+ * ApiError
+ *
+ * The body of every refusal: ``{error, code, ...extras}``.
+ *
+ * ``code`` is the :class:`~athanore.api.errors.ErrorCode` vocabulary,
+ * referenced rather than inlined, which is how the SPA gets a union
+ * instead of a bare string (08 §OpenAPI). ``errors`` is the extra a
+ * validation failure and a rejected submission carry, and it is 18's
+ * :class:`~athanore.events.payloads.ValidationError` rather than a
+ * second model of the same three fields: one function
+ * (:func:`~athanore.agents.submissions.validate_submission`) projects
+ * pydantic's errors onto ``loc``/``msg``/``type``, and the list it
+ * returns is what the 422 body carries *and* what ``submission.rejected``
+ * publishes. The rest of 08's "...extras" are open, so the schema allows
+ * further properties rather than pretending the two named fields are all
+ * a body can hold.
+ */
+export type ApiError = {
+    /**
+     * The stable code a client branches on; the wording of `error` may change, this may not.
+     */
+    code: ErrorCode;
+    /**
+     * Error
+     *
+     * What went wrong, for a person to read.
+     */
+    error: string;
+    /**
+     * Errors
+     *
+     * Per-field detail, on a validation failure or a rejected submission. Absent otherwise.
+     */
+    errors?: Array<ValidationError> | null;
+    [key: string]: unknown;
 };
 
 /**
@@ -354,21 +478,105 @@ export type EditRun = {
     title?: string | null;
 };
 
+/**
+ * EngineRecovered
+ *
+ * Rows reset to ``ready`` at startup. No ``run_id``.
+ */
 export type EngineRecovered = {
-    [key: string]: unknown;
+    /**
+     * Task Ids
+     */
+    task_ids: Array<number>;
 };
 
+/**
+ * EngineRecoveredEvent
+ */
 export type EngineRecoveredEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: EngineRecovered;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'engine.recovered';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
+/**
+ * EngineStopping
+ *
+ * Attempts interrupted by a shutdown (04 §Shutdown). No ``run_id``.
+ */
 export type EngineStopping = {
-    [key: string]: unknown;
+    /**
+     * Task Ids
+     */
+    task_ids: Array<number>;
 };
 
+/**
+ * EngineStoppingEvent
+ */
 export type EngineStoppingEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: EngineStopping;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'engine.stopping';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
+
+/**
+ * ErrorCode
+ *
+ * The stable ``code`` of an error body — 08 §Conventions, in full.
+ *
+ * A code is a contract with the SPA and the CLI: it is what a client
+ * branches on, so it outlives any wording change to ``error``. Adding
+ * one is a change to 08 and to the TypeScript mirror, never to this
+ * module alone.
+ */
+export type ErrorCode = 'not_found' | 'conflict' | 'forbidden' | 'unauthorized' | 'validation' | 'invalid_option' | 'already_answered' | 'stale_request' | 'graph_error' | 'unknown_workflow' | 'unknown_node' | 'payload_too_large' | 'plugin_error';
+
+/**
+ * EventName
+ *
+ * Every event name in the vocabulary, one member per row of 03.
+ *
+ * Values are ``subject.verb``. Adding one is a change to 03 and to the
+ * TypeScript mirror, never to this module alone.
+ */
+export type EventName = 'run.created' | 'run.started' | 'run.updated' | 'run.reordered' | 'run.paused' | 'run.resumed' | 'run.cancelled' | 'run.deleted' | 'run.completed' | 'run.failed' | 'task.enqueued' | 'join.arrived' | 'task.started' | 'task.done' | 'task.failed' | 'task.dead_lettered' | 'task.waiting' | 'task.resumed' | 'task.cancelled' | 'task.moved' | 'task.status_set' | 'task.stream' | 'submission.accepted' | 'submission.rejected' | 'submission.repair' | 'request.opened' | 'request.answered' | 'log.appended' | 'agent.stats' | 'engine.recovered' | 'engine.stopping';
 
 /**
  * GraphBranch
@@ -507,16 +715,6 @@ export type GraphOut = {
 };
 
 /**
- * HTTPValidationError
- */
-export type HttpValidationError = {
-    /**
-     * Detail
-     */
-    detail?: Array<ValidationError>;
-};
-
-/**
  * Health
  *
  * Liveness, version and counts. Unauthenticated, and carries no ids.
@@ -556,20 +754,121 @@ export type Health = {
     version: string;
 };
 
+/**
+ * JoinArrived
+ *
+ * One per branch reaching a join.
+ *
+ * ``arrived == count`` means the join task was enqueued in the same
+ * transaction.
+ */
 export type JoinArrived = {
-    [key: string]: unknown;
+    /**
+     * Arrived
+     */
+    arrived: number;
+    /**
+     * Count
+     */
+    count: number;
+    /**
+     * Fanout Task
+     */
+    fanout_task: number;
+    /**
+     * Index
+     */
+    index: number;
+    /**
+     * Join
+     */
+    join: string;
+    /**
+     * Late
+     */
+    late: boolean;
 };
 
+/**
+ * JoinArrivedEvent
+ */
 export type JoinArrivedEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: JoinArrived;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'join.arrived';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
+/**
+ * LogAppended
+ *
+ * ``preview`` is the first 200 characters of the entry.
+ */
 export type LogAppended = {
-    [key: string]: unknown;
+    /**
+     * Author
+     */
+    author: string;
+    /**
+     * Kind
+     */
+    kind?: string | null;
+    /**
+     * Log Id
+     */
+    log_id: number;
+    /**
+     * Node
+     */
+    node: string;
+    /**
+     * Preview
+     */
+    preview: string;
 };
 
+/**
+ * LogAppendedEvent
+ */
 export type LogAppendedEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: LogAppended;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'log.appended';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
 /**
@@ -841,8 +1140,53 @@ export type Ok = {
     ok?: boolean;
 };
 
+/**
+ * PluginEvent
+ *
+ * ``plugin.<workflow>.<name>``: the vocabulary's open end.
+ *
+ * The handler's data is free-form, so the wire carries whatever it passed
+ * to ``ctx.services.events.publish``; 18 requires a JSON object, and the
+ * registry — not this model — enforces that ``<workflow>`` is the
+ * publishing workflow.
+ *
+ * ``name`` is the only one in the union that is not a
+ * :class:`~typing.Literal`, and it is declared as the whole vocabulary
+ * — ``EventName | str`` — rather than as a bare ``str``. The two are
+ * the same set of strings, so nothing is widened; what the wider
+ * spelling buys is a *reference* to the enum in the generated document,
+ * which is where 08 §OpenAPI wants the event-name enum published and
+ * where the SPA's TypeScript union is generated from (13 §Contract
+ * tests). The validator below is what actually narrows this field, to
+ * the ``plugin.`` namespace.
+ */
 export type PluginEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    /**
+     * Data
+     */
+    data: {
+        [key: string]: unknown;
+    };
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name: EventName | string;
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
 /**
@@ -906,12 +1250,51 @@ export type PositionOut = {
     position: number;
 };
 
+/**
+ * RequestAnswered
+ *
+ * ``value`` is not in the event (may be large or sensitive); fetch it.
+ */
 export type RequestAnswered = {
-    [key: string]: unknown;
+    /**
+     * Author
+     */
+    author: 'user' | 'engine';
+    /**
+     * Option Id
+     */
+    option_id?: string | null;
+    /**
+     * Request Id
+     */
+    request_id: number;
 };
 
+/**
+ * RequestAnsweredEvent
+ */
 export type RequestAnsweredEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: RequestAnswered;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'request.answered';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
 /**
@@ -928,12 +1311,61 @@ export type RequestKind = 'permission' | 'elicitation' | 'question';
  */
 export type RequestMode = 'options' | 'form' | 'text';
 
+/**
+ * RequestOpened
+ */
 export type RequestOpened = {
-    [key: string]: unknown;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Mode
+     */
+    mode: string;
+    /**
+     * Node
+     */
+    node: string;
+    /**
+     * Ordinal
+     */
+    ordinal?: number | null;
+    /**
+     * Request Id
+     */
+    request_id: number;
+    /**
+     * Source
+     */
+    source: string;
 };
 
+/**
+ * RequestOpenedEvent
+ */
 export type RequestOpenedEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: RequestOpened;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'request.opened';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
 /**
@@ -1100,40 +1532,204 @@ export type Rerun = {
     node: string;
 };
 
+/**
+ * RunCancelled
+ */
 export type RunCancelled = {
-    [key: string]: unknown;
+    /**
+     * Cancelled Tasks
+     */
+    cancelled_tasks: Array<number>;
 };
 
+/**
+ * RunCancelledEvent
+ */
 export type RunCancelledEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: RunCancelled;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'run.cancelled';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
+/**
+ * RunChanges
+ *
+ * The fields an edit or an op changed on a run; only those it changed.
+ */
 export type RunChanges = {
-    [key: string]: unknown;
+    /**
+     * Description
+     */
+    description?: string | null;
+    /**
+     * Status
+     */
+    status?: string | null;
+    /**
+     * Title
+     */
+    title?: string | null;
 };
 
+/**
+ * RunCompleted
+ *
+ * ``output`` follows the shape rule of 04 §Routing edge cases.
+ *
+ * ``node`` and ``task_id`` are the last landing task. ``output`` is
+ * required and may be ``null``: a body that returns ``None`` terminates
+ * the run with that value, which is not the same as an unknown one.
+ */
 export type RunCompleted = {
-    [key: string]: unknown;
+    /**
+     * Node
+     */
+    node: string;
+    /**
+     * Output
+     */
+    output: unknown;
+    /**
+     * Task Id
+     */
+    task_id: number;
+    /**
+     * Terminal Tasks
+     */
+    terminal_tasks: Array<number>;
 };
 
+/**
+ * RunCompletedEvent
+ */
 export type RunCompletedEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: RunCompleted;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'run.completed';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
+/**
+ * RunCreated
+ */
 export type RunCreated = {
-    [key: string]: unknown;
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Workflow
+     */
+    workflow: string;
 };
 
+/**
+ * RunCreatedEvent
+ */
 export type RunCreatedEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: RunCreated;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'run.created';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
+/**
+ * RunDeleted
+ *
+ * The last event of a run: it is deleted with the run, so SSE only.
+ */
 export type RunDeleted = {
-    [key: string]: unknown;
+    /**
+     * Title
+     */
+    title: string;
+    /**
+     * Workflow
+     */
+    workflow: string;
 };
 
+/**
+ * RunDeletedEvent
+ */
 export type RunDeletedEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: RunDeleted;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'run.deleted';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
 /**
@@ -1230,12 +1826,55 @@ export type RunDetail = {
     workflow: string;
 };
 
+/**
+ * RunFailed
+ *
+ * ``code`` is set when the run stalled on a partial join.
+ */
 export type RunFailed = {
-    [key: string]: unknown;
+    /**
+     * Code
+     */
+    code?: 'join_incomplete' | null;
+    /**
+     * Error
+     */
+    error: string;
+    /**
+     * Node
+     */
+    node: string;
+    /**
+     * Task Id
+     */
+    task_id: number;
 };
 
+/**
+ * RunFailedEvent
+ */
 export type RunFailedEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: RunFailed;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'run.failed';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
 /**
@@ -1270,36 +1909,156 @@ export type RunOutput = {
     value?: unknown;
 };
 
+/**
+ * RunPaused
+ */
 export type RunPaused = {
-    [key: string]: unknown;
+    [key: string]: never;
 };
 
+/**
+ * RunPausedEvent
+ */
 export type RunPausedEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: RunPaused;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'run.paused';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
+/**
+ * RunReordered
+ */
 export type RunReordered = {
-    [key: string]: unknown;
+    /**
+     * Position
+     */
+    position: number;
+    /**
+     * Previous
+     */
+    previous: number;
 };
 
+/**
+ * RunReorderedEvent
+ */
 export type RunReorderedEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: RunReordered;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'run.reordered';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
+/**
+ * RunResumed
+ */
 export type RunResumed = {
-    [key: string]: unknown;
+    [key: string]: never;
 };
 
+/**
+ * RunResumedEvent
+ */
 export type RunResumedEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: RunResumed;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'run.resumed';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
+/**
+ * RunStarted
+ *
+ * The first claim of the run.
+ */
 export type RunStarted = {
-    [key: string]: unknown;
+    /**
+     * Node
+     */
+    node: string;
+    /**
+     * Task Id
+     */
+    task_id: number;
 };
 
+/**
+ * RunStartedEvent
+ */
 export type RunStartedEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: RunStarted;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'run.started';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
 /**
@@ -1421,12 +2180,38 @@ export type RunSummary = {
     workflow: string;
 };
 
+/**
+ * RunUpdated
+ */
 export type RunUpdated = {
-    [key: string]: unknown;
+    changed: RunChanges;
 };
 
+/**
+ * RunUpdatedEvent
+ */
 export type RunUpdatedEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: RunUpdated;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'run.updated';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
 /**
@@ -1556,12 +2341,47 @@ export type StreamOut = {
     live: boolean;
 };
 
+/**
+ * SubmissionAccepted
+ *
+ * The payload itself is not in the event; fetch the task.
+ */
 export type SubmissionAccepted = {
-    [key: string]: unknown;
+    /**
+     * Node
+     */
+    node: string;
+    /**
+     * Submission Id
+     */
+    submission_id: number;
 };
 
+/**
+ * SubmissionAcceptedEvent
+ */
 export type SubmissionAcceptedEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: SubmissionAccepted;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'submission.accepted';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
 /**
@@ -1596,36 +2416,180 @@ export type SubmissionOut = {
     task_id: number;
 };
 
+/**
+ * SubmissionRejected
+ */
 export type SubmissionRejected = {
-    [key: string]: unknown;
+    /**
+     * Errors
+     */
+    errors: Array<ValidationError>;
+    /**
+     * Node
+     */
+    node: string;
 };
 
+/**
+ * SubmissionRejectedEvent
+ */
 export type SubmissionRejectedEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: SubmissionRejected;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'submission.rejected';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
+/**
+ * SubmissionRepair
+ */
 export type SubmissionRepair = {
-    [key: string]: unknown;
+    /**
+     * Node
+     */
+    node: string;
+    /**
+     * Reason
+     */
+    reason: 'nothing_submitted' | 'rejected';
+    /**
+     * Turn
+     */
+    turn: number;
 };
 
+/**
+ * SubmissionRepairEvent
+ */
 export type SubmissionRepairEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: SubmissionRepair;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'submission.repair';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
+/**
+ * TaskCancelled
+ */
 export type TaskCancelled = {
-    [key: string]: unknown;
+    /**
+     * From
+     */
+    from: string;
+    /**
+     * Node
+     */
+    node: string;
+    /**
+     * Reason
+     */
+    reason: 'cancel' | 'move' | 'delete' | 'set_status';
 };
 
+/**
+ * TaskCancelledEvent
+ */
 export type TaskCancelledEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: TaskCancelled;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'task.cancelled';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
+/**
+ * TaskDeadLettered
+ */
 export type TaskDeadLettered = {
-    [key: string]: unknown;
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Error
+     */
+    error: string;
+    /**
+     * Node
+     */
+    node: string;
 };
 
+/**
+ * TaskDeadLetteredEvent
+ */
 export type TaskDeadLetteredEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: TaskDeadLettered;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'task.dead_lettered';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
 /**
@@ -1750,36 +2714,219 @@ export type TaskDetail = {
     terminal: boolean;
 };
 
+/**
+ * TaskDone
+ */
 export type TaskDone = {
-    [key: string]: unknown;
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Node
+     */
+    node: string;
+    /**
+     * Terminal
+     */
+    terminal: boolean;
+    /**
+     * Transitions
+     */
+    transitions: Array<string>;
 };
 
+/**
+ * TaskDoneEvent
+ */
 export type TaskDoneEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: TaskDone;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'task.done';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
+/**
+ * TaskEnqueued
+ *
+ * ``branch`` omits ``key``; for ``reason=join`` ``from_task`` is the
+ * fan-out task and ``arrivals`` lists the arriving tasks.
+ */
 export type TaskEnqueued = {
-    [key: string]: unknown;
+    /**
+     * Arrivals
+     */
+    arrivals?: Array<number> | null;
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Branch
+     */
+    branch: Array<AthanoreEventsPayloadsBranchFrame>;
+    /**
+     * From Task
+     */
+    from_task?: number | null;
+    /**
+     * Node
+     */
+    node: string;
+    /**
+     * Payload Present
+     */
+    payload_present: boolean;
+    /**
+     * Reason
+     */
+    reason: 'start' | 'transition' | 'retry' | 'rerun' | 'move' | 'manual_retry' | 'set_status' | 'join';
 };
 
+/**
+ * TaskEnqueuedEvent
+ */
 export type TaskEnqueuedEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: TaskEnqueued;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'task.enqueued';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
+/**
+ * TaskFailed
+ */
 export type TaskFailed = {
-    [key: string]: unknown;
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Error
+     */
+    error: string;
+    /**
+     * Node
+     */
+    node: string;
+    /**
+     * Retry Task Id
+     */
+    retry_task_id?: number | null;
+    /**
+     * Retryable
+     */
+    retryable: boolean;
+    /**
+     * Will Retry
+     */
+    will_retry: boolean;
 };
 
+/**
+ * TaskFailedEvent
+ */
 export type TaskFailedEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: TaskFailed;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'task.failed';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
+/**
+ * TaskMoved
+ */
 export type TaskMoved = {
-    [key: string]: unknown;
+    /**
+     * New Task Id
+     */
+    new_task_id: number;
+    /**
+     * Node
+     */
+    node: string;
+    /**
+     * To
+     */
+    to: string;
 };
 
+/**
+ * TaskMovedEvent
+ */
 export type TaskMovedEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: TaskMoved;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'task.moved';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
 /**
@@ -1800,20 +2947,90 @@ export type TaskRef = {
     task_id: number;
 };
 
+/**
+ * TaskResumed
+ */
 export type TaskResumed = {
-    [key: string]: unknown;
+    /**
+     * Node
+     */
+    node: string;
+    /**
+     * Request Id
+     */
+    request_id: number;
+    /**
+     * Waited S
+     */
+    waited_s: number;
 };
 
+/**
+ * TaskResumedEvent
+ */
 export type TaskResumedEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: TaskResumed;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'task.resumed';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
+/**
+ * TaskStarted
+ */
 export type TaskStarted = {
-    [key: string]: unknown;
+    /**
+     * Attempt
+     */
+    attempt: number;
+    /**
+     * Node
+     */
+    node: string;
 };
 
+/**
+ * TaskStartedEvent
+ */
 export type TaskStartedEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: TaskStarted;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'task.started';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
 /**
@@ -1827,20 +3044,94 @@ export type TaskStartedEvent = {
  */
 export type TaskStatus = 'ready' | 'in_progress' | 'waiting' | 'done' | 'failed' | 'dead_letter' | 'cancelled';
 
+/**
+ * TaskStatusSet
+ */
 export type TaskStatusSet = {
-    [key: string]: unknown;
+    /**
+     * From
+     */
+    from: string;
+    /**
+     * Node
+     */
+    node: string;
+    /**
+     * To
+     */
+    to: string;
 };
 
+/**
+ * TaskStatusSetEvent
+ */
 export type TaskStatusSetEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: TaskStatusSet;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'task.status_set';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
+/**
+ * TaskStream
+ *
+ * Ephemeral; the content is fetched from ``/api/tasks/{id}/stream``.
+ */
 export type TaskStream = {
-    [key: string]: unknown;
+    /**
+     * Seq From
+     */
+    seq_from: number;
+    /**
+     * Seq To
+     */
+    seq_to: number;
 };
 
+/**
+ * TaskStreamEvent
+ *
+ * Ephemeral: published to the bus and SSE, never stored, no ``id``.
+ */
 export type TaskStreamEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: TaskStream;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'task.stream';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
 /**
@@ -1955,38 +3246,63 @@ export type TaskView = {
     terminal: boolean;
 };
 
+/**
+ * TaskWaiting
+ */
 export type TaskWaiting = {
-    [key: string]: unknown;
+    /**
+     * Node
+     */
+    node: string;
+    /**
+     * Request Id
+     */
+    request_id: number;
 };
 
+/**
+ * TaskWaitingEvent
+ */
 export type TaskWaitingEvent = {
-    [key: string]: unknown;
+    /**
+     * Created
+     */
+    created: string;
+    data: TaskWaiting;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name?: 'task.waiting';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
 };
 
 /**
  * ValidationError
+ *
+ * One pydantic error, as ``ValidationError.errors()`` reports it.
  */
 export type ValidationError = {
     /**
-     * Context
-     */
-    ctx?: {
-        [key: string]: unknown;
-    };
-    /**
-     * Input
-     */
-    input?: unknown;
-    /**
-     * Location
+     * Loc
      */
     loc: Array<string | number>;
     /**
-     * Message
+     * Msg
      */
     msg: string;
     /**
-     * Error Type
+     * Type
      */
     type: string;
 };
@@ -2106,8 +3422,24 @@ export type AthanoreApiSchemasTasksBranchFrame = {
     key?: unknown;
 };
 
+/**
+ * BranchFrame
+ *
+ * One fan-out frame of a task's branch, without its (large) key.
+ */
 export type AthanoreEventsPayloadsBranchFrame = {
-    [key: string]: unknown;
+    /**
+     * Count
+     */
+    count: number;
+    /**
+     * Fanout
+     */
+    fanout: number;
+    /**
+     * Index
+     */
+    index: number;
 };
 
 export type GetTaskApiAgentTasksTaskIdGetData = {
@@ -2134,9 +3466,13 @@ export type GetTaskApiAgentTasksTaskIdGetData = {
 
 export type GetTaskApiAgentTasksTaskIdGetErrors = {
     /**
-     * Validation Error
+     * The task token is not valid for this task.
      */
-    422: HttpValidationError;
+    403: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type GetTaskApiAgentTasksTaskIdGetError = GetTaskApiAgentTasksTaskIdGetErrors[keyof GetTaskApiAgentTasksTaskIdGetErrors];
@@ -2174,9 +3510,13 @@ export type AskApiAgentTasksTaskIdAskPostData = {
 
 export type AskApiAgentTasksTaskIdAskPostErrors = {
     /**
-     * Validation Error
+     * The task token is not valid for this task.
      */
-    422: HttpValidationError;
+    403: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type AskApiAgentTasksTaskIdAskPostError = AskApiAgentTasksTaskIdAskPostErrors[keyof AskApiAgentTasksTaskIdAskPostErrors];
@@ -2214,9 +3554,13 @@ export type AppendLogApiAgentTasksTaskIdLogPostData = {
 
 export type AppendLogApiAgentTasksTaskIdLogPostErrors = {
     /**
-     * Validation Error
+     * The task token is not valid for this task.
      */
-    422: HttpValidationError;
+    403: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type AppendLogApiAgentTasksTaskIdLogPostError = AppendLogApiAgentTasksTaskIdLogPostErrors[keyof AppendLogApiAgentTasksTaskIdLogPostErrors];
@@ -2267,9 +3611,13 @@ export type PollRequestApiAgentTasksTaskIdRequestsRequestIdGetData = {
 
 export type PollRequestApiAgentTasksTaskIdRequestsRequestIdGetErrors = {
     /**
-     * Validation Error
+     * The task token is not valid for this task.
      */
-    422: HttpValidationError;
+    403: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type PollRequestApiAgentTasksTaskIdRequestsRequestIdGetError = PollRequestApiAgentTasksTaskIdRequestsRequestIdGetErrors[keyof PollRequestApiAgentTasksTaskIdRequestsRequestIdGetErrors];
@@ -2312,9 +3660,13 @@ export type SubmitApiAgentTasksTaskIdSubmitPostData = {
 
 export type SubmitApiAgentTasksTaskIdSubmitPostErrors = {
     /**
-     * Validation Error
+     * The task token is not valid for this task.
      */
-    422: HttpValidationError;
+    403: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type SubmitApiAgentTasksTaskIdSubmitPostError = SubmitApiAgentTasksTaskIdSubmitPostErrors[keyof SubmitApiAgentTasksTaskIdSubmitPostErrors];
@@ -2382,9 +3734,13 @@ export type ListRequestsApiRequestsGetData = {
 
 export type ListRequestsApiRequestsGetErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type ListRequestsApiRequestsGetError = ListRequestsApiRequestsGetErrors[keyof ListRequestsApiRequestsGetErrors];
@@ -2416,9 +3772,13 @@ export type GetRequestApiRequestsRequestIdGetData = {
 
 export type GetRequestApiRequestsRequestIdGetErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type GetRequestApiRequestsRequestIdGetError = GetRequestApiRequestsRequestIdGetErrors[keyof GetRequestApiRequestsRequestIdGetErrors];
@@ -2448,9 +3808,13 @@ export type AnswerRequestApiRequestsRequestIdAnswerPostData = {
 
 export type AnswerRequestApiRequestsRequestIdAnswerPostErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type AnswerRequestApiRequestsRequestIdAnswerPostError = AnswerRequestApiRequestsRequestIdAnswerPostErrors[keyof AnswerRequestApiRequestsRequestIdAnswerPostErrors];
@@ -2486,9 +3850,13 @@ export type ListRunsApiRunsGetData = {
 
 export type ListRunsApiRunsGetErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type ListRunsApiRunsGetError = ListRunsApiRunsGetErrors[keyof ListRunsApiRunsGetErrors];
@@ -2520,9 +3888,13 @@ export type DeleteRunApiRunsRunIdDeleteData = {
 
 export type DeleteRunApiRunsRunIdDeleteErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type DeleteRunApiRunsRunIdDeleteError = DeleteRunApiRunsRunIdDeleteErrors[keyof DeleteRunApiRunsRunIdDeleteErrors];
@@ -2552,9 +3924,13 @@ export type GetRunApiRunsRunIdGetData = {
 
 export type GetRunApiRunsRunIdGetErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type GetRunApiRunsRunIdGetError = GetRunApiRunsRunIdGetErrors[keyof GetRunApiRunsRunIdGetErrors];
@@ -2584,9 +3960,13 @@ export type EditRunApiRunsRunIdPatchData = {
 
 export type EditRunApiRunsRunIdPatchErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type EditRunApiRunsRunIdPatchError = EditRunApiRunsRunIdPatchErrors[keyof EditRunApiRunsRunIdPatchErrors];
@@ -2616,9 +3996,13 @@ export type CancelRunApiRunsRunIdCancelPostData = {
 
 export type CancelRunApiRunsRunIdCancelPostErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type CancelRunApiRunsRunIdCancelPostError = CancelRunApiRunsRunIdCancelPostErrors[keyof CancelRunApiRunsRunIdCancelPostErrors];
@@ -2661,9 +4045,13 @@ export type GetEventsApiRunsRunIdEventsGetData = {
 
 export type GetEventsApiRunsRunIdEventsGetErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type GetEventsApiRunsRunIdEventsGetError = GetEventsApiRunsRunIdEventsGetErrors[keyof GetEventsApiRunsRunIdEventsGetErrors];
@@ -2695,9 +4083,13 @@ export type GetGraphApiRunsRunIdGraphGetData = {
 
 export type GetGraphApiRunsRunIdGraphGetErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type GetGraphApiRunsRunIdGraphGetError = GetGraphApiRunsRunIdGraphGetErrors[keyof GetGraphApiRunsRunIdGraphGetErrors];
@@ -2727,9 +4119,13 @@ export type GetLogApiRunsRunIdLogGetData = {
 
 export type GetLogApiRunsRunIdLogGetErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type GetLogApiRunsRunIdLogGetError = GetLogApiRunsRunIdLogGetErrors[keyof GetLogApiRunsRunIdLogGetErrors];
@@ -2761,9 +4157,13 @@ export type AppendLogApiRunsRunIdLogPostData = {
 
 export type AppendLogApiRunsRunIdLogPostErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type AppendLogApiRunsRunIdLogPostError = AppendLogApiRunsRunIdLogPostErrors[keyof AppendLogApiRunsRunIdLogPostErrors];
@@ -2793,9 +4193,13 @@ export type PauseRunApiRunsRunIdPausePostData = {
 
 export type PauseRunApiRunsRunIdPausePostErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type PauseRunApiRunsRunIdPausePostError = PauseRunApiRunsRunIdPausePostErrors[keyof PauseRunApiRunsRunIdPausePostErrors];
@@ -2825,9 +4229,13 @@ export type MoveRunApiRunsRunIdPositionPostData = {
 
 export type MoveRunApiRunsRunIdPositionPostErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type MoveRunApiRunsRunIdPositionPostError = MoveRunApiRunsRunIdPositionPostErrors[keyof MoveRunApiRunsRunIdPositionPostErrors];
@@ -2857,9 +4265,13 @@ export type GetRequestsApiRunsRunIdRequestsGetData = {
 
 export type GetRequestsApiRunsRunIdRequestsGetErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type GetRequestsApiRunsRunIdRequestsGetError = GetRequestsApiRunsRunIdRequestsGetErrors[keyof GetRequestsApiRunsRunIdRequestsGetErrors];
@@ -2891,9 +4303,13 @@ export type RerunNodeApiRunsRunIdRerunPostData = {
 
 export type RerunNodeApiRunsRunIdRerunPostErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type RerunNodeApiRunsRunIdRerunPostError = RerunNodeApiRunsRunIdRerunPostErrors[keyof RerunNodeApiRunsRunIdRerunPostErrors];
@@ -2923,9 +4339,13 @@ export type ResumeRunApiRunsRunIdResumePostData = {
 
 export type ResumeRunApiRunsRunIdResumePostErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type ResumeRunApiRunsRunIdResumePostError = ResumeRunApiRunsRunIdResumePostErrors[keyof ResumeRunApiRunsRunIdResumePostErrors];
@@ -2955,9 +4375,13 @@ export type GetTaskApiTasksTaskIdGetData = {
 
 export type GetTaskApiTasksTaskIdGetErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type GetTaskApiTasksTaskIdGetError = GetTaskApiTasksTaskIdGetErrors[keyof GetTaskApiTasksTaskIdGetErrors];
@@ -2987,9 +4411,13 @@ export type MoveTaskApiTasksTaskIdMovePostData = {
 
 export type MoveTaskApiTasksTaskIdMovePostErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type MoveTaskApiTasksTaskIdMovePostError = MoveTaskApiTasksTaskIdMovePostErrors[keyof MoveTaskApiTasksTaskIdMovePostErrors];
@@ -3019,9 +4447,13 @@ export type RetryTaskApiTasksTaskIdRetryPostData = {
 
 export type RetryTaskApiTasksTaskIdRetryPostErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type RetryTaskApiTasksTaskIdRetryPostError = RetryTaskApiTasksTaskIdRetryPostErrors[keyof RetryTaskApiTasksTaskIdRetryPostErrors];
@@ -3051,9 +4483,13 @@ export type SetStatusApiTasksTaskIdStatusPostData = {
 
 export type SetStatusApiTasksTaskIdStatusPostErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type SetStatusApiTasksTaskIdStatusPostError = SetStatusApiTasksTaskIdStatusPostErrors[keyof SetStatusApiTasksTaskIdStatusPostErrors];
@@ -3096,9 +4532,13 @@ export type GetStreamApiTasksTaskIdStreamGetData = {
 
 export type GetStreamApiTasksTaskIdStreamGetErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type GetStreamApiTasksTaskIdStreamGetError = GetStreamApiTasksTaskIdStreamGetErrors[keyof GetStreamApiTasksTaskIdStreamGetErrors];
@@ -3118,6 +4558,15 @@ export type ListWorkflowsApiWorkflowsGetData = {
     query?: never;
     url: '/api/workflows';
 };
+
+export type ListWorkflowsApiWorkflowsGetErrors = {
+    /**
+     * No operator token, on a bind that requires one.
+     */
+    401: ApiError;
+};
+
+export type ListWorkflowsApiWorkflowsGetError = ListWorkflowsApiWorkflowsGetErrors[keyof ListWorkflowsApiWorkflowsGetErrors];
 
 export type ListWorkflowsApiWorkflowsGetResponses = {
     /**
@@ -3146,9 +4595,13 @@ export type GetWorkflowApiWorkflowsNameGetData = {
 
 export type GetWorkflowApiWorkflowsNameGetErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type GetWorkflowApiWorkflowsNameGetError = GetWorkflowApiWorkflowsNameGetErrors[keyof GetWorkflowApiWorkflowsNameGetErrors];
@@ -3178,9 +4631,13 @@ export type SubmitRunApiWorkflowsNameRunsPostData = {
 
 export type SubmitRunApiWorkflowsNameRunsPostErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type SubmitRunApiWorkflowsNameRunsPostError = SubmitRunApiWorkflowsNameRunsPostErrors[keyof SubmitRunApiWorkflowsNameRunsPostErrors];
@@ -3210,9 +4667,13 @@ export type GetSourceApiWorkflowsNameSourceGetData = {
 
 export type GetSourceApiWorkflowsNameSourceGetErrors = {
     /**
-     * Validation Error
+     * No operator token, on a bind that requires one.
      */
-    422: HttpValidationError;
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
 };
 
 export type GetSourceApiWorkflowsNameSourceGetError = GetSourceApiWorkflowsNameSourceGetErrors[keyof GetSourceApiWorkflowsNameSourceGetErrors];
@@ -3243,10 +4704,7 @@ export type McpAgentErrors = {
     /**
      * The task token is not valid for a live attempt.
      */
-    403: {
-        code: string;
-        error: string;
-    };
+    403: ApiError;
 };
 
 export type McpAgentError = McpAgentErrors[keyof McpAgentErrors];

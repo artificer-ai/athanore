@@ -2264,6 +2264,32 @@ gen`. Extend the snapshot test with "every `EventName` appears in the
 schema enum".
 **Done.** CI contract job green.
 
+**Status.** Done. `athanore/api/openapi.py` holds what the document says
+about itself: the eight tags of 08 §OpenAPI in that document's order —
+`plugins` included, before T049a gives it an operation — and the two
+security schemes, `taskToken` in the `X-Athanore-Token` header and
+`operatorBearer`. `secure(router, requirement)` writes the requirement
+onto every route of a router through `openapi_extra`, so each operation
+declares the credential it wants: the agent's five routes and the MCP
+endpoint take the task token, every router that depends on
+`operator_auth` takes the bearer, and the system router declares neither
+because it is unauthenticated on any bind. `install_openapi(app)` puts
+`components.securitySchemes` on the finished document by wrapping
+`app.openapi`, the seam `api/mcp.py` already uses. Errors are described
+for the first time: `athanore/api/schemas/errors.py` is 08 §Conventions'
+`{error, code, ...extras}` as a model named for the schema 08 names, with
+`code` referencing the whole `ErrorCode` enum and `errors` reusing 18's
+`ValidationError`, and it is declared as the 401, 403 and 422 of every
+router — which also stops FastAPI injecting an `HTTPValidationError` of
+the wrong shape whose `ValidationError` was silently replacing 18's by
+name (D137). The 422 is taken back off the operations that have nothing
+to validate. `PluginEvent.name` is `EventName | str`, so the vocabulary
+is a component the SPA's union is generated from, and `EventModel` now
+describes its own wire shape in serialization mode: the envelopes were
+opaque objects, because pydantic reads a model serializer's return type
+as the serialization schema, and 18 §Typing's `oneOf` per event is only
+a discriminated union if the variants say anything at all.
+
 ### T049 — Plugin declarations, registry, manifest (A3.8, D50)
 
 **Do.** `athanore/plugins/decl.py`: `Route(path, methods, fn)`,

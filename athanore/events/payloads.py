@@ -32,11 +32,14 @@ from pydantic import (
     ConfigDict,
     Discriminator,
     Field,
+    GetJsonSchemaHandler,
     SerializerFunctionWrapHandler,
     Tag,
     field_validator,
     model_serializer,
 )
+from pydantic.json_schema import JsonSchemaValue
+from pydantic_core import CoreSchema
 
 from athanore.events.names import PLUGIN_PREFIX, EventName, is_known
 
@@ -81,6 +84,33 @@ class EventModel(BaseModel):
                 continue
             out[key] = value
         return out
+
+    @classmethod
+    def __get_pydantic_json_schema__(
+        cls, core_schema: CoreSchema, handler: GetJsonSchemaHandler
+    ) -> JsonSchemaValue:
+        """Describe the wire shape, not the serializer's return type.
+
+        ``_omit_absent`` is annotated ``-> dict[str, Any]``, and pydantic
+        takes a model serializer's return type as the model's
+        *serialization* schema — which is the mode OpenAPI generates a
+        response in. Left alone, every event in the document would be
+        ``{"type": "object", "additionalProperties": true}``: 18 §Typing
+        promises a ``oneOf`` per event and a discriminated union in the
+        generated TypeScript, and an opaque object delivers neither.
+
+        Dropping the ``serialization`` entry before handing the core
+        schema on makes serialization render what validation renders —
+        this model's own fields, which is exactly what ``_omit_absent``
+        emits, minus the optional ones it leaves out. Those stay
+        nullable-and-not-required here, which is the honest reading of
+        "may be absent" for a client (T048).
+        """
+
+        described = {
+            key: value for key, value in core_schema.items() if key != "serialization"
+        }
+        return handler(cast(CoreSchema, described))
 
 
 # --------------------------------------------------------------------------
@@ -576,9 +606,19 @@ class PluginEvent(EventFrame):
     to ``ctx.services.events.publish``; 18 requires a JSON object, and the
     registry — not this model — enforces that ``<workflow>`` is the
     publishing workflow.
+
+    ``name`` is the only one in the union that is not a
+    :class:`~typing.Literal`, and it is declared as the whole vocabulary
+    — ``EventName | str`` — rather than as a bare ``str``. The two are
+    the same set of strings, so nothing is widened; what the wider
+    spelling buys is a *reference* to the enum in the generated document,
+    which is where 08 §OpenAPI wants the event-name enum published and
+    where the SPA's TypeScript union is generated from (13 §Contract
+    tests). The validator below is what actually narrows this field, to
+    the ``plugin.`` namespace.
     """
 
-    name: str
+    name: EventName | str
     data: dict[str, Any]
 
     @field_validator("name")

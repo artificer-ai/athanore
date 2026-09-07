@@ -2,11 +2,214 @@
   "components": {
     "schemas": {
       "AgentStats": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "description": "The stats entry of 05 \u00a7Stats entry verbatim.\n\nEvery measurement is optional because 05 omits what it cannot\ndetermine rather than zero-filling it (01 \u00a7Real data only).",
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "cost": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost"
+          },
+          "denied_permissions": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Denied Permissions"
+          },
+          "duration_s": {
+            "title": "Duration S",
+            "type": "number"
+          },
+          "input_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model"
+          },
+          "node": {
+            "title": "Node",
+            "type": "string"
+          },
+          "output_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "enum": [
+                  "refusal",
+                  "cancelled",
+                  "truncated",
+                  "timeout",
+                  "shutdown",
+                  "transport",
+                  "no_submission"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "repair_turns": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repair Turns"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "tool_calls": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tool Calls"
+          },
+          "total_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Tokens"
+          }
+        },
+        "required": [
+          "node",
+          "attempt",
+          "status",
+          "duration_s"
+        ],
+        "title": "AgentStats",
         "type": "object"
       },
       "AgentStatsEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/AgentStats"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "agent.stats",
+            "default": "agent.stats",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "AgentStatsEvent",
         "type": "object"
       },
       "AgentTask": {
@@ -152,6 +355,42 @@
           "answered"
         ],
         "title": "AnswerPoll",
+        "type": "object"
+      },
+      "ApiError": {
+        "additionalProperties": true,
+        "description": "The body of every refusal: ``{error, code, ...extras}``.\n\n``code`` is the :class:`~athanore.api.errors.ErrorCode` vocabulary,\nreferenced rather than inlined, which is how the SPA gets a union\ninstead of a bare string (08 \u00a7OpenAPI). ``errors`` is the extra a\nvalidation failure and a rejected submission carry, and it is 18's\n:class:`~athanore.events.payloads.ValidationError` rather than a\nsecond model of the same three fields: one function\n(:func:`~athanore.agents.submissions.validate_submission`) projects\npydantic's errors onto ``loc``/``msg``/``type``, and the list it\nreturns is what the 422 body carries *and* what ``submission.rejected``\npublishes. The rest of 08's \"...extras\" are open, so the schema allows\nfurther properties rather than pretending the two named fields are all\na body can hold.",
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode",
+            "description": "The stable code a client branches on; the wording of `error` may change, this may not."
+          },
+          "error": {
+            "description": "What went wrong, for a person to read.",
+            "title": "Error",
+            "type": "string"
+          },
+          "errors": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ValidationError"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Per-field detail, on a validation failure or a rejected submission. Absent otherwise.",
+            "title": "Errors"
+          }
+        },
+        "required": [
+          "error",
+          "code"
+        ],
+        "title": "ApiError",
         "type": "object"
       },
       "Arrivals": {
@@ -375,20 +614,214 @@
         "type": "object"
       },
       "EngineRecovered": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "description": "Rows reset to ``ready`` at startup. No ``run_id``.",
+        "properties": {
+          "task_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Task Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "task_ids"
+        ],
+        "title": "EngineRecovered",
         "type": "object"
       },
       "EngineRecoveredEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EngineRecovered"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "engine.recovered",
+            "default": "engine.recovered",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "EngineRecoveredEvent",
         "type": "object"
       },
       "EngineStopping": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "description": "Attempts interrupted by a shutdown (04 \u00a7Shutdown). No ``run_id``.",
+        "properties": {
+          "task_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Task Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "task_ids"
+        ],
+        "title": "EngineStopping",
         "type": "object"
       },
       "EngineStoppingEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/EngineStopping"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "engine.stopping",
+            "default": "engine.stopping",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "EngineStoppingEvent",
         "type": "object"
+      },
+      "ErrorCode": {
+        "description": "The stable ``code`` of an error body \u2014 08 \u00a7Conventions, in full.\n\nA code is a contract with the SPA and the CLI: it is what a client\nbranches on, so it outlives any wording change to ``error``. Adding\none is a change to 08 and to the TypeScript mirror, never to this\nmodule alone.",
+        "enum": [
+          "not_found",
+          "conflict",
+          "forbidden",
+          "unauthorized",
+          "validation",
+          "invalid_option",
+          "already_answered",
+          "stale_request",
+          "graph_error",
+          "unknown_workflow",
+          "unknown_node",
+          "payload_too_large",
+          "plugin_error"
+        ],
+        "title": "ErrorCode",
+        "type": "string"
+      },
+      "EventName": {
+        "description": "Every event name in the vocabulary, one member per row of 03.\n\nValues are ``subject.verb``. Adding one is a change to 03 and to the\nTypeScript mirror, never to this module alone.",
+        "enum": [
+          "run.created",
+          "run.started",
+          "run.updated",
+          "run.reordered",
+          "run.paused",
+          "run.resumed",
+          "run.cancelled",
+          "run.deleted",
+          "run.completed",
+          "run.failed",
+          "task.enqueued",
+          "join.arrived",
+          "task.started",
+          "task.done",
+          "task.failed",
+          "task.dead_lettered",
+          "task.waiting",
+          "task.resumed",
+          "task.cancelled",
+          "task.moved",
+          "task.status_set",
+          "task.stream",
+          "submission.accepted",
+          "submission.rejected",
+          "submission.repair",
+          "request.opened",
+          "request.answered",
+          "log.appended",
+          "agent.stats",
+          "engine.recovered",
+          "engine.stopping"
+        ],
+        "title": "EventName",
+        "type": "string"
       },
       "GraphBranch": {
         "description": "The tasks of one node that belong to one branch of a fan-out.\n\n``from_task`` is the fan-out that produced the branch \u2014 the\n``lineage.from`` of the first task in the branch chain whose parent\nreturned a list \u2014 and is ``null`` for a node reached by a single path,\nwhich has exactly one branch.",
@@ -551,19 +984,6 @@
         "title": "GraphOut",
         "type": "object"
       },
-      "HTTPValidationError": {
-        "properties": {
-          "detail": {
-            "items": {
-              "$ref": "#/components/schemas/ValidationError"
-            },
-            "title": "Detail",
-            "type": "array"
-          }
-        },
-        "title": "HTTPValidationError",
-        "type": "object"
-      },
       "Health": {
         "description": "Liveness, version and counts. Unauthenticated, and carries no ids.",
         "properties": {
@@ -625,19 +1045,200 @@
         "type": "object"
       },
       "JoinArrived": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "description": "One per branch reaching a join.\n\n``arrived == count`` means the join task was enqueued in the same\ntransaction.",
+        "properties": {
+          "arrived": {
+            "title": "Arrived",
+            "type": "integer"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "fanout_task": {
+            "title": "Fanout Task",
+            "type": "integer"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "join": {
+            "title": "Join",
+            "type": "string"
+          },
+          "late": {
+            "title": "Late",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "join",
+          "fanout_task",
+          "index",
+          "count",
+          "arrived",
+          "late"
+        ],
+        "title": "JoinArrived",
         "type": "object"
       },
       "JoinArrivedEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/JoinArrived"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "join.arrived",
+            "default": "join.arrived",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "JoinArrivedEvent",
         "type": "object"
       },
       "LogAppended": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "description": "``preview`` is the first 200 characters of the entry.",
+        "properties": {
+          "author": {
+            "title": "Author",
+            "type": "string"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "log_id": {
+            "title": "Log Id",
+            "type": "integer"
+          },
+          "node": {
+            "title": "Node",
+            "type": "string"
+          },
+          "preview": {
+            "title": "Preview",
+            "type": "string"
+          }
+        },
+        "required": [
+          "log_id",
+          "author",
+          "node",
+          "preview"
+        ],
+        "title": "LogAppended",
         "type": "object"
       },
       "LogAppendedEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/LogAppended"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "log.appended",
+            "default": "log.appended",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "LogAppendedEvent",
         "type": "object"
       },
       "LogAuthor": {
@@ -964,7 +1565,70 @@
         "type": "object"
       },
       "PluginEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "description": "``plugin.<workflow>.<name>``: the vocabulary's open end.\n\nThe handler's data is free-form, so the wire carries whatever it passed\nto ``ctx.services.events.publish``; 18 requires a JSON object, and the\nregistry \u2014 not this model \u2014 enforces that ``<workflow>`` is the\npublishing workflow.\n\n``name`` is the only one in the union that is not a\n:class:`~typing.Literal`, and it is declared as the whole vocabulary\n\u2014 ``EventName | str`` \u2014 rather than as a bare ``str``. The two are\nthe same set of strings, so nothing is widened; what the wider\nspelling buys is a *reference* to the enum in the generated document,\nwhich is where 08 \u00a7OpenAPI wants the event-name enum published and\nwhere the SPA's TypeScript union is generated from (13 \u00a7Contract\ntests). The validator below is what actually narrows this field, to\nthe ``plugin.`` namespace.",
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "additionalProperties": true,
+            "title": "Data",
+            "type": "object"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EventName"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Name"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "name",
+          "data"
+        ],
+        "title": "PluginEvent",
         "type": "object"
       },
       "PoolHealth": {
@@ -1039,11 +1703,96 @@
         "type": "object"
       },
       "RequestAnswered": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "description": "``value`` is not in the event (may be large or sensitive); fetch it.",
+        "properties": {
+          "author": {
+            "enum": [
+              "user",
+              "engine"
+            ],
+            "title": "Author",
+            "type": "string"
+          },
+          "option_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Option Id"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "request_id",
+          "author"
+        ],
+        "title": "RequestAnswered",
         "type": "object"
       },
       "RequestAnsweredEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RequestAnswered"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "request.answered",
+            "default": "request.answered",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "RequestAnsweredEvent",
         "type": "object"
       },
       "RequestKind": {
@@ -1067,11 +1816,106 @@
         "type": "string"
       },
       "RequestOpened": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "node": {
+            "title": "Node",
+            "type": "string"
+          },
+          "ordinal": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ordinal"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "mode",
+          "kind",
+          "source",
+          "node"
+        ],
+        "title": "RequestOpened",
         "type": "object"
       },
       "RequestOpenedEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RequestOpened"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "request.opened",
+            "default": "request.opened",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "RequestOpenedEvent",
         "type": "object"
       },
       "RequestOption": {
@@ -1268,39 +2112,369 @@
         "type": "object"
       },
       "RunCancelled": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "cancelled_tasks": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Cancelled Tasks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "cancelled_tasks"
+        ],
+        "title": "RunCancelled",
         "type": "object"
       },
       "RunCancelledEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RunCancelled"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "run.cancelled",
+            "default": "run.cancelled",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "RunCancelledEvent",
         "type": "object"
       },
       "RunChanges": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "description": "The fields an edit or an op changed on a run; only those it changed.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "RunChanges",
         "type": "object"
       },
       "RunCompleted": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "description": "``output`` follows the shape rule of 04 \u00a7Routing edge cases.\n\n``node`` and ``task_id`` are the last landing task. ``output`` is\nrequired and may be ``null``: a body that returns ``None`` terminates\nthe run with that value, which is not the same as an unknown one.",
+        "properties": {
+          "node": {
+            "title": "Node",
+            "type": "string"
+          },
+          "output": {
+            "title": "Output"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "integer"
+          },
+          "terminal_tasks": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Terminal Tasks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "node",
+          "task_id",
+          "output",
+          "terminal_tasks"
+        ],
+        "title": "RunCompleted",
         "type": "object"
       },
       "RunCompletedEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RunCompleted"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "run.completed",
+            "default": "run.completed",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "RunCompletedEvent",
         "type": "object"
       },
       "RunCreated": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "workflow": {
+            "title": "Workflow",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow",
+          "title",
+          "position"
+        ],
+        "title": "RunCreated",
         "type": "object"
       },
       "RunCreatedEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RunCreated"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "run.created",
+            "default": "run.created",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "RunCreatedEvent",
         "type": "object"
       },
       "RunDeleted": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "description": "The last event of a run: it is deleted with the run, so SSE only.",
+        "properties": {
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "workflow": {
+            "title": "Workflow",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow",
+          "title"
+        ],
+        "title": "RunDeleted",
         "type": "object"
       },
       "RunDeletedEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RunDeleted"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "run.deleted",
+            "default": "run.deleted",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "RunDeletedEvent",
         "type": "object"
       },
       "RunDetail": {
@@ -1406,11 +2580,98 @@
         "type": "object"
       },
       "RunFailed": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "description": "``code`` is set when the run stalled on a partial join.",
+        "properties": {
+          "code": {
+            "anyOf": [
+              {
+                "const": "join_incomplete",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Code"
+          },
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "node": {
+            "title": "Node",
+            "type": "string"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "node",
+          "task_id",
+          "error"
+        ],
+        "title": "RunFailed",
         "type": "object"
       },
       "RunFailedEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RunFailed"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "run.failed",
+            "default": "run.failed",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "RunFailedEvent",
         "type": "object"
       },
       "RunOutput": {
@@ -1447,35 +2708,286 @@
         "type": "object"
       },
       "RunPaused": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {},
+        "title": "RunPaused",
         "type": "object"
       },
       "RunPausedEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RunPaused"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "run.paused",
+            "default": "run.paused",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "RunPausedEvent",
         "type": "object"
       },
       "RunReordered": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "previous": {
+            "title": "Previous",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "position",
+          "previous"
+        ],
+        "title": "RunReordered",
         "type": "object"
       },
       "RunReorderedEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RunReordered"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "run.reordered",
+            "default": "run.reordered",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "RunReorderedEvent",
         "type": "object"
       },
       "RunResumed": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {},
+        "title": "RunResumed",
         "type": "object"
       },
       "RunResumedEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RunResumed"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "run.resumed",
+            "default": "run.resumed",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "RunResumedEvent",
         "type": "object"
       },
       "RunStarted": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "description": "The first claim of the run.",
+        "properties": {
+          "node": {
+            "title": "Node",
+            "type": "string"
+          },
+          "task_id": {
+            "title": "Task Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "task_id",
+          "node"
+        ],
+        "title": "RunStarted",
         "type": "object"
       },
       "RunStartedEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RunStarted"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "run.started",
+            "default": "run.started",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "RunStartedEvent",
         "type": "object"
       },
       "RunStats": {
@@ -1637,11 +3149,74 @@
         "type": "object"
       },
       "RunUpdated": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "changed": {
+            "$ref": "#/components/schemas/RunChanges"
+          }
+        },
+        "required": [
+          "changed"
+        ],
+        "title": "RunUpdated",
         "type": "object"
       },
       "RunUpdatedEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/RunUpdated"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "run.updated",
+            "default": "run.updated",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "RunUpdatedEvent",
         "type": "object"
       },
       "SetStatus": {
@@ -1773,11 +3348,81 @@
         "type": "object"
       },
       "SubmissionAccepted": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "description": "The payload itself is not in the event; fetch the task.",
+        "properties": {
+          "node": {
+            "title": "Node",
+            "type": "string"
+          },
+          "submission_id": {
+            "title": "Submission Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "node",
+          "submission_id"
+        ],
+        "title": "SubmissionAccepted",
         "type": "object"
       },
       "SubmissionAcceptedEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SubmissionAccepted"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "submission.accepted",
+            "default": "submission.accepted",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "SubmissionAcceptedEvent",
         "type": "object"
       },
       "SubmissionOut": {
@@ -1813,35 +3458,339 @@
         "type": "object"
       },
       "SubmissionRejected": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "node": {
+            "title": "Node",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node",
+          "errors"
+        ],
+        "title": "SubmissionRejected",
         "type": "object"
       },
       "SubmissionRejectedEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SubmissionRejected"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "submission.rejected",
+            "default": "submission.rejected",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "SubmissionRejectedEvent",
         "type": "object"
       },
       "SubmissionRepair": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "node": {
+            "title": "Node",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "nothing_submitted",
+              "rejected"
+            ],
+            "title": "Reason",
+            "type": "string"
+          },
+          "turn": {
+            "title": "Turn",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "node",
+          "turn",
+          "reason"
+        ],
+        "title": "SubmissionRepair",
         "type": "object"
       },
       "SubmissionRepairEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/SubmissionRepair"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "submission.repair",
+            "default": "submission.repair",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "SubmissionRepairEvent",
         "type": "object"
       },
       "TaskCancelled": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "title": "From",
+            "type": "string"
+          },
+          "node": {
+            "title": "Node",
+            "type": "string"
+          },
+          "reason": {
+            "enum": [
+              "cancel",
+              "move",
+              "delete",
+              "set_status"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node",
+          "from",
+          "reason"
+        ],
+        "title": "TaskCancelled",
         "type": "object"
       },
       "TaskCancelledEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TaskCancelled"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "task.cancelled",
+            "default": "task.cancelled",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "TaskCancelledEvent",
         "type": "object"
       },
       "TaskDeadLettered": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "node": {
+            "title": "Node",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node",
+          "attempt",
+          "error"
+        ],
+        "title": "TaskDeadLettered",
         "type": "object"
       },
       "TaskDeadLetteredEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TaskDeadLettered"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "task.dead_lettered",
+            "default": "task.dead_lettered",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "TaskDeadLetteredEvent",
         "type": "object"
       },
       "TaskDetail": {
@@ -1996,35 +3945,409 @@
         "type": "object"
       },
       "TaskDone": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "node": {
+            "title": "Node",
+            "type": "string"
+          },
+          "terminal": {
+            "title": "Terminal",
+            "type": "boolean"
+          },
+          "transitions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Transitions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "node",
+          "attempt",
+          "transitions",
+          "terminal"
+        ],
+        "title": "TaskDone",
         "type": "object"
       },
       "TaskDoneEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TaskDone"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "task.done",
+            "default": "task.done",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "TaskDoneEvent",
         "type": "object"
       },
       "TaskEnqueued": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "description": "``branch`` omits ``key``; for ``reason=join`` ``from_task`` is the\nfan-out task and ``arrivals`` lists the arriving tasks.",
+        "properties": {
+          "arrivals": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Arrivals"
+          },
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "branch": {
+            "items": {
+              "$ref": "#/components/schemas/athanore__events__payloads__BranchFrame"
+            },
+            "title": "Branch",
+            "type": "array"
+          },
+          "from_task": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "From Task"
+          },
+          "node": {
+            "title": "Node",
+            "type": "string"
+          },
+          "payload_present": {
+            "title": "Payload Present",
+            "type": "boolean"
+          },
+          "reason": {
+            "enum": [
+              "start",
+              "transition",
+              "retry",
+              "rerun",
+              "move",
+              "manual_retry",
+              "set_status",
+              "join"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node",
+          "attempt",
+          "reason",
+          "payload_present",
+          "branch"
+        ],
+        "title": "TaskEnqueued",
         "type": "object"
       },
       "TaskEnqueuedEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TaskEnqueued"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "task.enqueued",
+            "default": "task.enqueued",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "TaskEnqueuedEvent",
         "type": "object"
       },
       "TaskFailed": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "error": {
+            "title": "Error",
+            "type": "string"
+          },
+          "node": {
+            "title": "Node",
+            "type": "string"
+          },
+          "retry_task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retry Task Id"
+          },
+          "retryable": {
+            "title": "Retryable",
+            "type": "boolean"
+          },
+          "will_retry": {
+            "title": "Will Retry",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "node",
+          "attempt",
+          "error",
+          "retryable",
+          "will_retry"
+        ],
+        "title": "TaskFailed",
         "type": "object"
       },
       "TaskFailedEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TaskFailed"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "task.failed",
+            "default": "task.failed",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "TaskFailedEvent",
         "type": "object"
       },
       "TaskMoved": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "new_task_id": {
+            "title": "New Task Id",
+            "type": "integer"
+          },
+          "node": {
+            "title": "Node",
+            "type": "string"
+          },
+          "to": {
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node",
+          "to",
+          "new_task_id"
+        ],
+        "title": "TaskMoved",
         "type": "object"
       },
       "TaskMovedEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TaskMoved"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "task.moved",
+            "default": "task.moved",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "TaskMovedEvent",
         "type": "object"
       },
       "TaskRef": {
@@ -2043,19 +4366,162 @@
         "type": "object"
       },
       "TaskResumed": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "node": {
+            "title": "Node",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "integer"
+          },
+          "waited_s": {
+            "title": "Waited S",
+            "type": "number"
+          }
+        },
+        "required": [
+          "node",
+          "request_id",
+          "waited_s"
+        ],
+        "title": "TaskResumed",
         "type": "object"
       },
       "TaskResumedEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TaskResumed"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "task.resumed",
+            "default": "task.resumed",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "TaskResumedEvent",
         "type": "object"
       },
       "TaskStarted": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "attempt": {
+            "title": "Attempt",
+            "type": "integer"
+          },
+          "node": {
+            "title": "Node",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node",
+          "attempt"
+        ],
+        "title": "TaskStarted",
         "type": "object"
       },
       "TaskStartedEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TaskStarted"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "task.started",
+            "default": "task.started",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "TaskStartedEvent",
         "type": "object"
       },
       "TaskStatus": {
@@ -2073,19 +4539,164 @@
         "type": "string"
       },
       "TaskStatusSet": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "title": "From",
+            "type": "string"
+          },
+          "node": {
+            "title": "Node",
+            "type": "string"
+          },
+          "to": {
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "node",
+          "from",
+          "to"
+        ],
+        "title": "TaskStatusSet",
         "type": "object"
       },
       "TaskStatusSetEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TaskStatusSet"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "task.status_set",
+            "default": "task.status_set",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "TaskStatusSetEvent",
         "type": "object"
       },
       "TaskStream": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "description": "Ephemeral; the content is fetched from ``/api/tasks/{id}/stream``.",
+        "properties": {
+          "seq_from": {
+            "title": "Seq From",
+            "type": "integer"
+          },
+          "seq_to": {
+            "title": "Seq To",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seq_from",
+          "seq_to"
+        ],
+        "title": "TaskStream",
         "type": "object"
       },
       "TaskStreamEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "description": "Ephemeral: published to the bus and SSE, never stored, no ``id``.",
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TaskStream"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "task.stream",
+            "default": "task.stream",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "TaskStreamEvent",
         "type": "object"
       },
       "TaskView": {
@@ -2232,22 +4843,86 @@
         "type": "object"
       },
       "TaskWaiting": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "node": {
+            "title": "Node",
+            "type": "string"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "node",
+          "request_id"
+        ],
+        "title": "TaskWaiting",
         "type": "object"
       },
       "TaskWaitingEvent": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/TaskWaiting"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "task.waiting",
+            "default": "task.waiting",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "data"
+        ],
+        "title": "TaskWaitingEvent",
         "type": "object"
       },
       "ValidationError": {
+        "additionalProperties": false,
+        "description": "One pydantic error, as ``ValidationError.errors()`` reports it.",
         "properties": {
-          "ctx": {
-            "title": "Context",
-            "type": "object"
-          },
-          "input": {
-            "title": "Input"
-          },
           "loc": {
             "items": {
               "anyOf": [
@@ -2259,15 +4934,15 @@
                 }
               ]
             },
-            "title": "Location",
+            "title": "Loc",
             "type": "array"
           },
           "msg": {
-            "title": "Message",
+            "title": "Msg",
             "type": "string"
           },
           "type": {
-            "title": "Error Type",
+            "title": "Type",
             "type": "string"
           }
         },
@@ -2389,8 +5064,42 @@
         "type": "object"
       },
       "athanore__events__payloads__BranchFrame": {
-        "additionalProperties": true,
+        "additionalProperties": false,
+        "description": "One fan-out frame of a task's branch, without its (large) key.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "fanout": {
+            "title": "Fanout",
+            "type": "integer"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "fanout",
+          "index",
+          "count"
+        ],
+        "title": "BranchFrame",
         "type": "object"
+      }
+    },
+    "securitySchemes": {
+      "operatorBearer": {
+        "description": "The operator token. Required on a non-loopback bind, or on a loopback bind with `require_token` set; on the default loopback bind these routes take no credential at all. `GET /api/events` additionally accepts it as `?access_token=`, because a browser's EventSource cannot set a header.",
+        "scheme": "bearer",
+        "type": "http"
+      },
+      "taskToken": {
+        "description": "The per-attempt task token. Minted at claim, valid only for the task it names and only while that attempt is in progress or waiting, and accepted in this header and nowhere else.",
+        "in": "header",
+        "name": "X-Athanore-Token",
+        "type": "apiKey"
       }
     }
   },
@@ -2439,17 +5148,32 @@
             },
             "description": "Successful Response"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "The task token is not valid for this task."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "taskToken": []
+          }
+        ],
         "summary": "Read this task: its brief and the work log",
         "tags": [
           "agent"
@@ -2505,17 +5229,32 @@
             },
             "description": "Successful Response"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "The task token is not valid for this task."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "taskToken": []
+          }
+        ],
         "summary": "Ask the operator a question",
         "tags": [
           "agent"
@@ -2571,17 +5310,32 @@
             },
             "description": "Successful Response"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "The task token is not valid for this task."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "taskToken": []
+          }
+        ],
         "summary": "Append this attempt's deliverable",
         "tags": [
           "agent"
@@ -2650,17 +5404,32 @@
             },
             "description": "Successful Response"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "The task token is not valid for this task."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "taskToken": []
+          }
+        ],
         "summary": "Wait for the answer to a question",
         "tags": [
           "agent"
@@ -2717,17 +5486,32 @@
             },
             "description": "Successful Response"
           },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "The task token is not valid for this task."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "taskToken": []
+          }
+        ],
         "summary": "Submit this task's structured result",
         "tags": [
           "agent"
@@ -2820,17 +5604,32 @@
             },
             "description": "An SSE stream. Each message is `id: <event id>`, `event: <event name>`, `data: <EventEnvelope as JSON>`. Ephemeral events (`task.stream`) carry no `id:`, and the `resync` control frame \u2014 sent when the replay overran `sse_replay_cap` or the server dropped events for a slow reader \u2014 carries neither an `id:` nor an event envelope."
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "The event stream",
         "tags": [
           "events"
@@ -2932,17 +5731,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "The inbox: every request still waiting on a person",
         "tags": [
           "requests"
@@ -2977,17 +5791,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "One request and its answer",
         "tags": [
           "requests"
@@ -3032,17 +5861,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "Answer a request",
         "tags": [
           "requests"
@@ -3106,17 +5950,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "Every run, in dispatch order",
         "tags": [
           "runs"
@@ -3144,17 +6003,32 @@
           "204": {
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "Delete a run and everything under it",
         "tags": [
           "runs"
@@ -3187,17 +6061,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "One run, its attempts and its totals",
         "tags": [
           "runs"
@@ -3240,17 +6129,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "Change a run's title or description",
         "tags": [
           "runs"
@@ -3285,17 +6189,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "End a run and everything under it",
         "tags": [
           "runs"
@@ -3458,17 +6377,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "A run's stored events",
         "tags": [
           "runs"
@@ -3503,17 +6437,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "The workflow's graph, for this run",
         "tags": [
           "runs"
@@ -3552,17 +6501,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "A run's work log",
         "tags": [
           "runs"
@@ -3605,17 +6569,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "Append an operator note to the work log",
         "tags": [
           "runs"
@@ -3650,17 +6629,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "Stop a run dispatching",
         "tags": [
           "runs"
@@ -3705,17 +6699,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "Move a run in the dispatch list",
         "tags": [
           "runs"
@@ -3754,17 +6763,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "A run's requests",
         "tags": [
           "runs"
@@ -3809,17 +6833,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "Run a node again",
         "tags": [
           "runs"
@@ -3854,17 +6893,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "Let a paused run dispatch again",
         "tags": [
           "runs"
@@ -3899,17 +6953,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "One attempt and what was submitted for it",
         "tags": [
           "tasks"
@@ -3954,17 +7023,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "Move a task's work to another node",
         "tags": [
           "tasks"
@@ -3999,17 +7083,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "Queue another attempt of a task",
         "tags": [
           "tasks"
@@ -4054,17 +7153,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "Write a task's status",
         "tags": [
           "tasks"
@@ -4126,17 +7240,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "A page of a task's agent transcript",
         "tags": [
           "tasks"
@@ -4161,8 +7290,23 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "Every workflow this server can run",
         "tags": [
           "workflows"
@@ -4197,17 +7341,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "One workflow",
         "tags": [
           "workflows"
@@ -4252,17 +7411,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "Submit a run",
         "tags": [
           "workflows"
@@ -4297,17 +7471,32 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
           "422": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
-            "description": "Validation Error"
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
           }
         },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
         "summary": "The Python a workflow is defined in",
         "tags": [
           "workflows"
@@ -4355,30 +7544,57 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "code": {
-                      "type": "string"
-                    },
-                    "error": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error",
-                    "code"
-                  ],
-                  "type": "object"
+                  "$ref": "#/components/schemas/ApiError"
                 }
               }
             },
             "description": "The task token is not valid for a live attempt."
           }
         },
+        "security": [
+          {
+            "taskToken": []
+          }
+        ],
         "summary": "Model Context Protocol server (streamable HTTP)",
         "tags": [
           "agent"
         ]
       }
     }
-  }
+  },
+  "tags": [
+    {
+      "description": "What this server can run, and how to start a run of it.",
+      "name": "workflows"
+    },
+    {
+      "description": "A run's state, its history and the operator verbs that change it.",
+      "name": "runs"
+    },
+    {
+      "description": "One attempt of one node: what it submitted, what it streamed, and the verbs that re-attempt it.",
+      "name": "tasks"
+    },
+    {
+      "description": "The inbox: everything waiting on a person, and the answers.",
+      "name": "requests"
+    },
+    {
+      "description": "What an ACP agent may call, authenticated by the task token of the attempt it is running.",
+      "name": "agent"
+    },
+    {
+      "description": "The manifest a workflow's declarations publish, and the routes and actions behind it.",
+      "name": "plugins"
+    },
+    {
+      "description": "The live feed: one server-sent event per event of the vocabulary.",
+      "name": "events"
+    },
+    {
+      "description": "Liveness and the caller's own standing. Unauthenticated, and carrying no ids.",
+      "name": "system"
+    }
+  ]
 }
