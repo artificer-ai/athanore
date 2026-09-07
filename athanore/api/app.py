@@ -36,6 +36,7 @@ from athanore.api.errors import install_error_handlers
 from athanore.api.mcp import mount as mount_mcp
 from athanore.api.middleware import BodyLimitMiddleware
 from athanore.api.routers import agent, requests, runs, system, tasks, workflows
+from athanore.api.sse import router as sse_router
 from athanore.engine import Engine
 from athanore.settings import AthanoreSettings
 from athanore.store.clock import now
@@ -108,6 +109,9 @@ def create_app(
     app.include_router(tasks.router)
     app.include_router(requests.router)
     app.include_router(agent.router)
+    # Not under `routers/`: the stream is one endpoint and a generator,
+    # and 02 §Package layout gives it its own module (`api/sse.py`).
+    app.include_router(sse_router)
     # Last, and not a router: the same five capabilities as MCP tools,
     # on a mounted ASGI application with its own auth at the door (08
     # §MCP). The manager it returns is what `lifespan` runs.
