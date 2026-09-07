@@ -1,6 +1,34 @@
 {
   "components": {
     "schemas": {
+      "Created": {
+        "description": "The 201 body of ``POST /api/workflows/{name}/runs`` (08 \u00a7Workflows).",
+        "properties": {
+          "run_id": {
+            "description": "The id of the run that was queued.",
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id"
+        ],
+        "title": "Created",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
       "Health": {
         "description": "Liveness, version and counts. Unauthenticated, and carries no ids.",
         "properties": {
@@ -108,6 +136,106 @@
         "title": "Me",
         "type": "object"
       },
+      "NewRun": {
+        "description": "Submit a run of a workflow (`POST /api/workflows/{name}/runs`).\n\nThe two fields become the start task's payload, which is why editing\neither afterwards does not rewrite it (04 \u00a7Submit a run).",
+        "properties": {
+          "description": {
+            "default": "",
+            "description": "Longer context for the run; the workflow's input.",
+            "title": "Description",
+            "type": "string"
+          },
+          "title": {
+            "description": "The operator's title for the run.",
+            "minLength": 1,
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "NewRun",
+        "type": "object"
+      },
+      "NodeOut": {
+        "description": "One node's edges and its options, as 08 \u00a7Workflows lists them.\n\n``priority`` and ``retries`` of ``null`` mean \"the server default\"\nand ``timeout`` of ``null`` means no wall-clock cap on one attempt \u2014\nthe node metadata of 04 \u00a7Node options, unresolved, because what the\ndefault *is* belongs to the settings of the server running it.",
+        "properties": {
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The body's docstring, unless the node overrode it.",
+            "title": "Description"
+          },
+          "edges": {
+            "description": "The nodes this one may transition to, in declaration order.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Edges",
+            "type": "array"
+          },
+          "generation": {
+            "description": "BFS depth from the start node; a loop-back edge targets a generation at or below its source.",
+            "title": "Generation",
+            "type": "integer"
+          },
+          "label": {
+            "description": "The display name; the function's name by default.",
+            "title": "Label",
+            "type": "string"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Dispatch priority, or null for the server default.",
+            "title": "Priority"
+          },
+          "retries": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Retry budget, or null for the server default.",
+            "title": "Retries"
+          },
+          "timeout": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Seconds one attempt may run, or null for no cap.",
+            "title": "Timeout"
+          }
+        },
+        "required": [
+          "edges",
+          "generation",
+          "label"
+        ],
+        "title": "NodeOut",
+        "type": "object"
+      },
       "PoolHealth": {
         "description": "One pool's capacity and what it is spending right now.",
         "properties": {
@@ -127,6 +255,169 @@
           "in_flight"
         ],
         "title": "PoolHealth",
+        "type": "object"
+      },
+      "SourceNode": {
+        "description": "Where one node's body starts in the returned source.",
+        "properties": {
+          "line": {
+            "description": "The 1-based line of the body's first decorator or `def`.",
+            "title": "Line",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "line"
+        ],
+        "title": "SourceNode",
+        "type": "object"
+      },
+      "SourceOut": {
+        "description": "A workflow's module source, and the line each node begins on.\n\n``nodes`` names the nodes whose bodies are defined **in this file**.\nA workflow may register a function imported from somewhere else; that\nnode has no line in this source, and it is left out rather than given\na number that points at the wrong text (01 \u00a7Real data only).",
+        "properties": {
+          "file": {
+            "description": "The absolute path of the module the source is from.",
+            "title": "File",
+            "type": "string"
+          },
+          "nodes": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/SourceNode"
+            },
+            "description": "The line each node's body starts on, for the nodes defined here.",
+            "title": "Nodes",
+            "type": "object"
+          },
+          "source": {
+            "description": "That module's text, in full.",
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file",
+          "source",
+          "nodes"
+        ],
+        "title": "SourceOut",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "WorkflowOut": {
+        "description": "One registered workflow: its graph, its capacity, its plugins.",
+        "properties": {
+          "capacity": {
+            "description": "Slots that pool has, in total.",
+            "title": "Capacity",
+            "type": "integer"
+          },
+          "in_flight": {
+            "description": "Slots of that pool leased right now, across every workflow bound to it.",
+            "title": "In Flight",
+            "type": "integer"
+          },
+          "name": {
+            "description": "The workflow's name, as it appears in URLs.",
+            "title": "Name",
+            "type": "string"
+          },
+          "nodes": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/NodeOut"
+            },
+            "description": "Every node of the finalized graph, by name.",
+            "title": "Nodes",
+            "type": "object"
+          },
+          "plugin": {
+            "$ref": "#/components/schemas/WorkflowPlugin",
+            "description": "What this workflow contributes to the UI (09)."
+          },
+          "pool": {
+            "description": "The pool this workflow's tasks are dispatched on.",
+            "title": "Pool",
+            "type": "string"
+          },
+          "start": {
+            "description": "The node a new run begins at.",
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "start",
+          "pool",
+          "capacity",
+          "in_flight",
+          "nodes",
+          "plugin"
+        ],
+        "title": "WorkflowOut",
+        "type": "object"
+      },
+      "WorkflowPlugin": {
+        "description": "The panels and actions a workflow contributes (09 \u00a7Wire contract).\n\nBoth lists are empty until the plugin registry lands: the field is\npart of the contract now so the SPA can read a workflow's plugin\nsurface from the workflow itself, and the entries it will carry are\nthe manifest's own (09).",
+        "properties": {
+          "actions": {
+            "description": "Action declarations, as `/api/plugins` lists them.",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Actions",
+            "type": "array"
+          },
+          "panels": {
+            "description": "Panel declarations, as `/api/plugins` lists them.",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Panels",
+            "type": "array"
+          }
+        },
+        "title": "WorkflowPlugin",
         "type": "object"
       }
     }
@@ -178,6 +469,177 @@
         "summary": "Whether the caller needs a token, and has one",
         "tags": [
           "system"
+        ]
+      }
+    },
+    "/api/workflows": {
+      "get": {
+        "description": "The registered workflows, by name.\n\nWhat the New Run overlay's workflow chips and the library's left list\nare built from (10 \u00a7Overlays). A server with nothing registered\nanswers with an empty list: it runs no workflows, which is a fact\nrather than a failure.",
+        "operationId": "list_workflows_api_workflows_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/WorkflowOut"
+                  },
+                  "title": "Response List Workflows Api Workflows Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Every workflow this server can run",
+        "tags": [
+          "workflows"
+        ]
+      }
+    },
+    "/api/workflows/{name}": {
+      "get": {
+        "description": "One registered workflow, or 404 `unknown_workflow`.",
+        "operationId": "get_workflow_api_workflows__name__get",
+        "parameters": [
+          {
+            "description": "The registered workflow's name.",
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "description": "The registered workflow's name.",
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "One workflow",
+        "tags": [
+          "workflows"
+        ]
+      }
+    },
+    "/api/workflows/{name}/runs": {
+      "post": {
+        "description": "Queue a run of this workflow, and return its id.\n\nThe run is `queued` rather than `running`: waiting for a slot is a\nstate an operator can see, and the first claim of one of its tasks is\nwhat flips it (03 \u00a7Run).",
+        "operationId": "submit_run_api_workflows__name__runs_post",
+        "parameters": [
+          {
+            "description": "The registered workflow's name.",
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "description": "The registered workflow's name.",
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewRun"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Created"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit a run",
+        "tags": [
+          "workflows"
+        ]
+      }
+    },
+    "/api/workflows/{name}/source": {
+      "get": {
+        "description": "The module a workflow's nodes are defined in, and their line numbers.\n\nThe file is the one the **start node's** body is defined in \u2014 the\nmodule the author wrote the workflow in \u2014 and ``nodes`` carries a line\nfor each node whose body is defined in that same file. A node whose\nfunction was imported from elsewhere is left out rather than given a\nline into text that does not contain it (01 \u00a7Real data only).\n\nA workflow whose source Python cannot produce \u2014 a body built by\n``exec``, or one whose file has been deleted since import \u2014 is a 404:\nthe workflow is registered, but this view of it does not exist.",
+        "operationId": "get_source_api_workflows__name__source_get",
+        "parameters": [
+          {
+            "description": "The registered workflow's name.",
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "description": "The registered workflow's name.",
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "The Python a workflow is defined in",
+        "tags": [
+          "workflows"
         ]
       }
     }

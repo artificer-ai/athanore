@@ -31,7 +31,7 @@ from athanore.api import VERSION
 from athanore.api.deps import check_operator_token
 from athanore.api.errors import install_error_handlers
 from athanore.api.middleware import BodyLimitMiddleware
-from athanore.api.routers import system
+from athanore.api.routers import system, workflows
 from athanore.engine import Engine
 from athanore.settings import AthanoreSettings
 from athanore.store.clock import now
@@ -97,5 +97,6 @@ def create_app(
     app.add_middleware(BodyLimitMiddleware, limit=settings.body_limit)
     install_error_handlers(app)
     app.include_router(system.router)
+    app.include_router(workflows.router)
 
     return app

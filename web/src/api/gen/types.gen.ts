@@ -5,6 +5,30 @@ export type ClientOptions = {
 };
 
 /**
+ * Created
+ *
+ * The 201 body of ``POST /api/workflows/{name}/runs`` (08 §Workflows).
+ */
+export type Created = {
+    /**
+     * Run Id
+     *
+     * The id of the run that was queued.
+     */
+    run_id: string;
+};
+
+/**
+ * HTTPValidationError
+ */
+export type HttpValidationError = {
+    /**
+     * Detail
+     */
+    detail?: Array<ValidationError>;
+};
+
+/**
  * Health
  *
  * Liveness, version and counts. Unauthenticated, and carries no ids.
@@ -83,6 +107,84 @@ export type Me = {
 };
 
 /**
+ * NewRun
+ *
+ * Submit a run of a workflow (`POST /api/workflows/{name}/runs`).
+ *
+ * The two fields become the start task's payload, which is why editing
+ * either afterwards does not rewrite it (04 §Submit a run).
+ */
+export type NewRun = {
+    /**
+     * Description
+     *
+     * Longer context for the run; the workflow's input.
+     */
+    description?: string;
+    /**
+     * Title
+     *
+     * The operator's title for the run.
+     */
+    title: string;
+};
+
+/**
+ * NodeOut
+ *
+ * One node's edges and its options, as 08 §Workflows lists them.
+ *
+ * ``priority`` and ``retries`` of ``null`` mean "the server default"
+ * and ``timeout`` of ``null`` means no wall-clock cap on one attempt —
+ * the node metadata of 04 §Node options, unresolved, because what the
+ * default *is* belongs to the settings of the server running it.
+ */
+export type NodeOut = {
+    /**
+     * Description
+     *
+     * The body's docstring, unless the node overrode it.
+     */
+    description?: string | null;
+    /**
+     * Edges
+     *
+     * The nodes this one may transition to, in declaration order.
+     */
+    edges: Array<string>;
+    /**
+     * Generation
+     *
+     * BFS depth from the start node; a loop-back edge targets a generation at or below its source.
+     */
+    generation: number;
+    /**
+     * Label
+     *
+     * The display name; the function's name by default.
+     */
+    label: string;
+    /**
+     * Priority
+     *
+     * Dispatch priority, or null for the server default.
+     */
+    priority?: number | null;
+    /**
+     * Retries
+     *
+     * Retry budget, or null for the server default.
+     */
+    retries?: number | null;
+    /**
+     * Timeout
+     *
+     * Seconds one attempt may run, or null for no cap.
+     */
+    timeout?: number | null;
+};
+
+/**
  * PoolHealth
  *
  * One pool's capacity and what it is spending right now.
@@ -100,6 +202,160 @@ export type PoolHealth = {
      * Slots leased right now.
      */
     in_flight: number;
+};
+
+/**
+ * SourceNode
+ *
+ * Where one node's body starts in the returned source.
+ */
+export type SourceNode = {
+    /**
+     * Line
+     *
+     * The 1-based line of the body's first decorator or `def`.
+     */
+    line: number;
+};
+
+/**
+ * SourceOut
+ *
+ * A workflow's module source, and the line each node begins on.
+ *
+ * ``nodes`` names the nodes whose bodies are defined **in this file**.
+ * A workflow may register a function imported from somewhere else; that
+ * node has no line in this source, and it is left out rather than given
+ * a number that points at the wrong text (01 §Real data only).
+ */
+export type SourceOut = {
+    /**
+     * File
+     *
+     * The absolute path of the module the source is from.
+     */
+    file: string;
+    /**
+     * Nodes
+     *
+     * The line each node's body starts on, for the nodes defined here.
+     */
+    nodes: {
+        [key: string]: SourceNode;
+    };
+    /**
+     * Source
+     *
+     * That module's text, in full.
+     */
+    source: string;
+};
+
+/**
+ * ValidationError
+ */
+export type ValidationError = {
+    /**
+     * Context
+     */
+    ctx?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Input
+     */
+    input?: unknown;
+    /**
+     * Location
+     */
+    loc: Array<string | number>;
+    /**
+     * Message
+     */
+    msg: string;
+    /**
+     * Error Type
+     */
+    type: string;
+};
+
+/**
+ * WorkflowOut
+ *
+ * One registered workflow: its graph, its capacity, its plugins.
+ */
+export type WorkflowOut = {
+    /**
+     * Capacity
+     *
+     * Slots that pool has, in total.
+     */
+    capacity: number;
+    /**
+     * In Flight
+     *
+     * Slots of that pool leased right now, across every workflow bound to it.
+     */
+    in_flight: number;
+    /**
+     * Name
+     *
+     * The workflow's name, as it appears in URLs.
+     */
+    name: string;
+    /**
+     * Nodes
+     *
+     * Every node of the finalized graph, by name.
+     */
+    nodes: {
+        [key: string]: NodeOut;
+    };
+    /**
+     * What this workflow contributes to the UI (09).
+     */
+    plugin: WorkflowPlugin;
+    /**
+     * Pool
+     *
+     * The pool this workflow's tasks are dispatched on.
+     */
+    pool: string;
+    /**
+     * Start
+     *
+     * The node a new run begins at.
+     */
+    start: string;
+};
+
+/**
+ * WorkflowPlugin
+ *
+ * The panels and actions a workflow contributes (09 §Wire contract).
+ *
+ * Both lists are empty until the plugin registry lands: the field is
+ * part of the contract now so the SPA can read a workflow's plugin
+ * surface from the workflow itself, and the entries it will carry are
+ * the manifest's own (09).
+ */
+export type WorkflowPlugin = {
+    /**
+     * Actions
+     *
+     * Action declarations, as `/api/plugins` lists them.
+     */
+    actions?: Array<{
+        [key: string]: unknown;
+    }>;
+    /**
+     * Panels
+     *
+     * Panel declarations, as `/api/plugins` lists them.
+     */
+    panels?: Array<{
+        [key: string]: unknown;
+    }>;
 };
 
 export type HealthApiHealthGetData = {
@@ -133,3 +389,117 @@ export type MeApiMeGetResponses = {
 };
 
 export type MeApiMeGetResponse = MeApiMeGetResponses[keyof MeApiMeGetResponses];
+
+export type ListWorkflowsApiWorkflowsGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/workflows';
+};
+
+export type ListWorkflowsApiWorkflowsGetResponses = {
+    /**
+     * Response List Workflows Api Workflows Get
+     *
+     * Successful Response
+     */
+    200: Array<WorkflowOut>;
+};
+
+export type ListWorkflowsApiWorkflowsGetResponse = ListWorkflowsApiWorkflowsGetResponses[keyof ListWorkflowsApiWorkflowsGetResponses];
+
+export type GetWorkflowApiWorkflowsNameGetData = {
+    body?: never;
+    path: {
+        /**
+         * Name
+         *
+         * The registered workflow's name.
+         */
+        name: string;
+    };
+    query?: never;
+    url: '/api/workflows/{name}';
+};
+
+export type GetWorkflowApiWorkflowsNameGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetWorkflowApiWorkflowsNameGetError = GetWorkflowApiWorkflowsNameGetErrors[keyof GetWorkflowApiWorkflowsNameGetErrors];
+
+export type GetWorkflowApiWorkflowsNameGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkflowOut;
+};
+
+export type GetWorkflowApiWorkflowsNameGetResponse = GetWorkflowApiWorkflowsNameGetResponses[keyof GetWorkflowApiWorkflowsNameGetResponses];
+
+export type SubmitRunApiWorkflowsNameRunsPostData = {
+    body: NewRun;
+    path: {
+        /**
+         * Name
+         *
+         * The registered workflow's name.
+         */
+        name: string;
+    };
+    query?: never;
+    url: '/api/workflows/{name}/runs';
+};
+
+export type SubmitRunApiWorkflowsNameRunsPostErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SubmitRunApiWorkflowsNameRunsPostError = SubmitRunApiWorkflowsNameRunsPostErrors[keyof SubmitRunApiWorkflowsNameRunsPostErrors];
+
+export type SubmitRunApiWorkflowsNameRunsPostResponses = {
+    /**
+     * Successful Response
+     */
+    201: Created;
+};
+
+export type SubmitRunApiWorkflowsNameRunsPostResponse = SubmitRunApiWorkflowsNameRunsPostResponses[keyof SubmitRunApiWorkflowsNameRunsPostResponses];
+
+export type GetSourceApiWorkflowsNameSourceGetData = {
+    body?: never;
+    path: {
+        /**
+         * Name
+         *
+         * The registered workflow's name.
+         */
+        name: string;
+    };
+    query?: never;
+    url: '/api/workflows/{name}/source';
+};
+
+export type GetSourceApiWorkflowsNameSourceGetErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type GetSourceApiWorkflowsNameSourceGetError = GetSourceApiWorkflowsNameSourceGetErrors[keyof GetSourceApiWorkflowsNameSourceGetErrors];
+
+export type GetSourceApiWorkflowsNameSourceGetResponses = {
+    /**
+     * Successful Response
+     */
+    200: SourceOut;
+};
+
+export type GetSourceApiWorkflowsNameSourceGetResponse = GetSourceApiWorkflowsNameSourceGetResponses[keyof GetSourceApiWorkflowsNameSourceGetResponses];
