@@ -1996,6 +1996,31 @@ options; 404 on unknown; `/source` returns lines per node; submit → 201
 and a `queued` run.
 **Done.** Tests pass; snapshot updated.
 
+**Status.** Done. `athanore/api/schemas/` is eight modules and one
+`__init__` that re-exports all of them: `common.py` (`Ok`, `Created`,
+`TaskRef`, `LogRef`), `workflows.py` (`NodeOut`, `WorkflowPlugin`,
+`WorkflowOut`, `SourceNode`, `SourceOut`), `runs.py` (`RunSummary`,
+`RunDetail`, `RunOutput`, `BranchRef`, `RunStats`, `LogEntry`,
+`PositionOut`), `tasks.py` (`TaskView`, `TaskDetail`, `SubmissionOut`,
+`BranchFrame`, `StreamChunk`, `StreamOut`), `graph.py` (`GraphOut`,
+`GraphNode`, `GraphEdge`, `GraphBranch`, `Arrivals`, `NodeState`,
+`EdgeKind`), `requests.py` (`RequestView`, `RequestOption`),
+`bodies.py` (the eight request bodies) and `events.py`, which
+**re-exports** `EventEnvelope` from `athanore/events/payloads.py`
+rather than restating it (18 §Typing, D81). The response models are the
+API's own rather than the store's read models serialised, and D130
+records why; `TaskView` has no `token_hash` field at all, which is a
+stronger guarantee than the store's `exclude=True`. The models T044a
+and T044b need land here, because their plans fence them to a router
+and a test file each. `athanore/api/routers/workflows.py` is the four
+routes of 08 §Workflows under `Depends(operator_auth)` and the
+`workflows` tag; `/source` reports the file the **start node's** body
+was defined in and gives a line only for the nodes defined in that same
+file (D130). A server built without an engine runs no workflows: the
+list is empty and every name is 404 `unknown_workflow`.
+`tests/api/conftest.py` is the store-plus-engine-plus-app fixture set
+the rest of the API suite is built on.
+
 ### T044a — Runs router including `/graph` and `/position` (A3.3, D57, D58)
 
 **Do.** `routers/runs.py`: every row of 08 §Runs. `/graph` per 08 §Graph

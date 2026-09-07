@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { HealthApiHealthGetData, HealthApiHealthGetResponses, MeApiMeGetData, MeApiMeGetResponses } from './types.gen';
+import type { GetSourceApiWorkflowsNameSourceGetData, GetSourceApiWorkflowsNameSourceGetErrors, GetSourceApiWorkflowsNameSourceGetResponses, GetWorkflowApiWorkflowsNameGetData, GetWorkflowApiWorkflowsNameGetErrors, GetWorkflowApiWorkflowsNameGetResponses, HealthApiHealthGetData, HealthApiHealthGetResponses, ListWorkflowsApiWorkflowsGetData, ListWorkflowsApiWorkflowsGetResponses, MeApiMeGetData, MeApiMeGetResponses, SubmitRunApiWorkflowsNameRunsPostData, SubmitRunApiWorkflowsNameRunsPostErrors, SubmitRunApiWorkflowsNameRunsPostResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -38,3 +38,57 @@ export const healthApiHealthGet = <ThrowOnError extends boolean = false>(options
  * false}`, which is the client's cue to ask for a token.
  */
 export const meApiMeGet = <ThrowOnError extends boolean = false>(options?: Options<MeApiMeGetData, ThrowOnError>): RequestResult<MeApiMeGetResponses, unknown, ThrowOnError> => (options?.client ?? client).get<MeApiMeGetResponses, unknown, ThrowOnError>({ url: '/api/me', ...options });
+
+/**
+ * Every workflow this server can run
+ *
+ * The registered workflows, by name.
+ *
+ * What the New Run overlay's workflow chips and the library's left list
+ * are built from (10 §Overlays). A server with nothing registered
+ * answers with an empty list: it runs no workflows, which is a fact
+ * rather than a failure.
+ */
+export const listWorkflowsApiWorkflowsGet = <ThrowOnError extends boolean = false>(options?: Options<ListWorkflowsApiWorkflowsGetData, ThrowOnError>): RequestResult<ListWorkflowsApiWorkflowsGetResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListWorkflowsApiWorkflowsGetResponses, unknown, ThrowOnError>({ url: '/api/workflows', ...options });
+
+/**
+ * One workflow
+ *
+ * One registered workflow, or 404 `unknown_workflow`.
+ */
+export const getWorkflowApiWorkflowsNameGet = <ThrowOnError extends boolean = false>(options: Options<GetWorkflowApiWorkflowsNameGetData, ThrowOnError>): RequestResult<GetWorkflowApiWorkflowsNameGetResponses, GetWorkflowApiWorkflowsNameGetErrors, ThrowOnError> => (options.client ?? client).get<GetWorkflowApiWorkflowsNameGetResponses, GetWorkflowApiWorkflowsNameGetErrors, ThrowOnError>({ url: '/api/workflows/{name}', ...options });
+
+/**
+ * Submit a run
+ *
+ * Queue a run of this workflow, and return its id.
+ *
+ * The run is `queued` rather than `running`: waiting for a slot is a
+ * state an operator can see, and the first claim of one of its tasks is
+ * what flips it (03 §Run).
+ */
+export const submitRunApiWorkflowsNameRunsPost = <ThrowOnError extends boolean = false>(options: Options<SubmitRunApiWorkflowsNameRunsPostData, ThrowOnError>): RequestResult<SubmitRunApiWorkflowsNameRunsPostResponses, SubmitRunApiWorkflowsNameRunsPostErrors, ThrowOnError> => (options.client ?? client).post<SubmitRunApiWorkflowsNameRunsPostResponses, SubmitRunApiWorkflowsNameRunsPostErrors, ThrowOnError>({
+    url: '/api/workflows/{name}/runs',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * The Python a workflow is defined in
+ *
+ * The module a workflow's nodes are defined in, and their line numbers.
+ *
+ * The file is the one the **start node's** body is defined in — the
+ * module the author wrote the workflow in — and ``nodes`` carries a line
+ * for each node whose body is defined in that same file. A node whose
+ * function was imported from elsewhere is left out rather than given a
+ * line into text that does not contain it (01 §Real data only).
+ *
+ * A workflow whose source Python cannot produce — a body built by
+ * ``exec``, or one whose file has been deleted since import — is a 404:
+ * the workflow is registered, but this view of it does not exist.
+ */
+export const getSourceApiWorkflowsNameSourceGet = <ThrowOnError extends boolean = false>(options: Options<GetSourceApiWorkflowsNameSourceGetData, ThrowOnError>): RequestResult<GetSourceApiWorkflowsNameSourceGetResponses, GetSourceApiWorkflowsNameSourceGetErrors, ThrowOnError> => (options.client ?? client).get<GetSourceApiWorkflowsNameSourceGetResponses, GetSourceApiWorkflowsNameSourceGetErrors, ThrowOnError>({ url: '/api/workflows/{name}/source', ...options });
