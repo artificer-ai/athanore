@@ -34,6 +34,10 @@ def test_the_version_is_the_installed_distribution() -> None:
 
 
 async def test_health_reports_ok_and_the_version(client: httpx.AsyncClient) -> None:
+    """The counts an app with no engine and no store cannot measure are
+    omitted rather than zero-filled (02 §Real data only); T043's
+    `tests/api/test_auth.py` asserts them where there is something to
+    count."""
     response = await client.get("/api/health")
     assert response.status_code == 200
     assert response.json() == {"ok": True, "version": VERSION}
