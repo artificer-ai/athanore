@@ -2488,6 +2488,27 @@ spec, json_flag)` (rich table or JSON); exit codes 0/1/2/3 via a
 `httpx.ConnectError`.
 **Tests.** `tests/cli/test_client.py`: exit codes; `--json` output parses.
 **Done.** Tests pass.
+**Status.** Done. `athanore/cli/` is an API client and nothing else:
+`client.py` holds where the server is (`resolve`, per field, over
+`--url/--token` → `ATHANORE_URL/ATHANORE_TOKEN` →
+`~/.config/athanore/config.toml` → the loopback default), how it is asked
+(httpx with the bearer header and `HTTPTransport(retries=2)`, the ceiling
+of AGENTS.md §Retries), and what a refusal means (`ApiClientError`
+carrying the `error`, the `code` and the body of 08 §Conventions).
+`Client.events` is the SSE half, and the tests read the stream through it
+rather than through a second parser — a frame's `id` is per frame, never
+carried forward, which is what makes `ServerEvent.id is None` mean the
+ephemeral `task.stream` and `resync` frames of 08. `output.py` owns both
+renderings — a rich table from a `Column` spec, or the whole unprojected
+value under `--json` — and `dispatch()`, the one wrapper that maps a
+failure onto 11 §Exit codes: it runs typer with `standalone_mode=False`
+so the four codes are the CLI's contract and not click's defaults, and
+anything outside `ApiClientError`, a parser refusal and
+`httpx.TransportError` keeps its traceback. The typer app carries the
+connection flags of 11 §Client connection on its callback and hands them
+to a verb as `Options` on `ctx.obj`; `RESERVED` was already in
+`cli/verbs.py`, written by T051 (D141). No verbs and no
+`[project.scripts]` entry point yet: both belong to T053 (D142).
 
 ### T053 — CLI server-side verbs: `serve`, `db`, `token`, `login` (A3.10)
 

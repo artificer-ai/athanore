@@ -35,6 +35,13 @@ loopback server. For a network server pass `--token`, set
 `ATHANORE_TOKEN`, or store it with `athanore login <url>` in
 `~/.config/athanore/config.toml`.
 
+That file holds `url` and `token` as top-level strings and nothing else;
+an unknown key is an error rather than a default silently taken, and
+`XDG_CONFIG_HOME` moves the directory if it is set. The url and the token
+are resolved independently and in that order — a `--url` on the command
+line with a token from the file is the ordinary way to reach a second
+server (D142).
+
 ## Verbs
 
 ```
