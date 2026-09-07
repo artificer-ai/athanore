@@ -18,8 +18,9 @@ rather than after.
 from __future__ import annotations
 
 import asyncio
+import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Final
 
 import httpx
 import pytest
@@ -367,3 +368,56 @@ async def test_a_missing_assets_directory_is_refused_at_registration(
 
     with pytest.raises(RuntimeError):
         static.mount_plugin_assets(serve(built), "gamedev", tmp_path / "nope")
+
+
+# -- the shipped build under the policy -------------------------------------
+
+#: The real `athanore/web/dist`, read from the package rather than from
+#: `static.DIST`, which the `serve` fixture patches per test.
+WHEEL_ASSETS: Final[Path] = Path(web.__file__).resolve().parent / "dist" / "assets"
+
+#: One `@font-face` block of a built stylesheet.
+FONT_FACE = re.compile(r"@font-face\s*\{[^}]*\}")
+
+
+def build_output(pattern: str) -> list[Path]:
+    """Files the real `pnpm -C web build` wrote, or nothing if it has not run."""
+
+    if not WHEEL_ASSETS.is_dir():
+        return []
+    return sorted(WHEEL_ASSETS.glob(pattern))
+
+
+async def test_no_bundled_font_is_inlined_as_a_data_url() -> None:
+    """The build obeys the policy the server sends with it.
+
+    `font-src 'self'` does not permit `data:`, so a font the bundler
+    inlined into the CSS is blocked in every browser: the policy holds
+    and the glyphs do not. 12 §Plugins says fonts are bundled and 10
+    §Design system says `font-src 'self'` holds, which is only true of
+    a build that emits every font as a file — `assetsInlineLimit: 0`.
+    """
+
+    sheets = build_output("*.css")
+    if not sheets:
+        pytest.skip("no build to read: run `pnpm -C web build`")
+
+    for sheet in sheets:
+        css = await asyncio.to_thread(sheet.read_text)
+        for face in FONT_FACE.findall(css):
+            assert "url(data:" not in face, f"{sheet.name} inlines a font"
+
+
+async def test_every_bundled_font_is_a_file_the_server_serves(serve) -> None:
+    """And each of those files is `'self'`: an asset the SPA's own server sends."""
+
+    fonts = build_output("*.woff2")
+    if not fonts:
+        pytest.skip("no build to read: run `pnpm -C web build`")
+    app = serve(WHEEL_ASSETS.parent)
+
+    for font in fonts:
+        response = await call(app, "GET", f"/assets/{font.name}")
+
+        assert response.status_code == 200, font.name
+        assert response.headers["content-security-policy"] == static.CSP

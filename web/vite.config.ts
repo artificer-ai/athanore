@@ -37,6 +37,17 @@ export default defineConfig({
   build: {
     outDir: OUT_DIR,
     emptyOutDir: true,
+    /**
+     * Every asset is a file under `/assets`, never a `data:` URL inlined
+     * into the CSS. The server serves the build under the policy of 12
+     * §Plugins, whose `font-src 'self'` does not permit `data:`: Vite's
+     * default 4096-byte limit inlines the smallest JetBrains Mono subset
+     * (cyrillic-ext), and the browser then refuses to load it. Inlining
+     * saves one request for the smallest of six subsets; 10 §Design
+     * system says the fonts are bundled and `font-src 'self'` holds, so
+     * the limit goes to zero rather than the policy gaining `data:`.
+     */
+    assetsInlineLimit: 0,
   },
   server: {
     // The SPA talks to the Athanore server and nothing else (02 §One wire

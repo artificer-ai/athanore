@@ -2247,7 +2247,11 @@ page naming `pnpm -C web build`, read per request, so a build under a
 running server needs no restart. `CORSMiddleware` is added only when
 `cors_origins` names an origin, with credentials off, and it wraps the
 body cap so a 413 still carries the headers a browser needs to read it.
-`mount_plugin_assets` is the seam T071 fills.
+`mount_plugin_assets` is the seam T071 fills. The build serves the
+policy rather than fighting it: `web/vite.config.ts` sets
+`assetsInlineLimit: 0`, so every font subset is a file under `/assets`
+instead of the `data:` URL Vite's default inlined the smallest of them
+as — which `font-src 'self'` blocked (D136).
 
 ### T048 — OpenAPI metadata and snapshot (A3.7)
 
