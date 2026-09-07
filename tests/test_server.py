@@ -13,6 +13,7 @@ collide with one and cannot read the developer's own token file.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import shutil
 import sqlite3
@@ -25,6 +26,7 @@ from typing import Any
 import httpx
 import pytest
 import structlog
+from sse_starlette.sse import AppStatus
 
 from athanore.api.deps import MissingOperatorToken
 from athanore.engine import Pool
@@ -189,6 +191,56 @@ async def test_start_and_stop_twice_in_one_loop(tmp_path: Path) -> None:
     # adopted into the settings, so a restart keeps the URL it published.
     assert ports[0] != 0
     assert ports[0] == ports[1]
+
+
+async def test_a_restarted_server_serves_the_event_stream_again(
+    tmp_path: Path,
+) -> None:
+    """`sse-starlette`'s shutdown flag is global, so a start has to clear it.
+
+    `AppStatus.should_exit` is a **class attribute**, and once it is true
+    every `EventSourceResponse` built afterwards ends the moment it
+    opens. The library sets it from a watcher it runs for the length of
+    each open stream, which polls the uvicorn server it finds on the
+    SIGTERM handler — and `Server._stop_http` sets that server's
+    `should_exit` to ask for the graceful shutdown of 04 §Shutdown. So a
+    server stopped with a stream open leaves the flag set and the *next*
+    server in the process has no event feed at all.
+
+    The flag is set here rather than raced for, because what is under
+    test is the clearing and not the library's polling interval: whatever
+    set it, a started server serves streams.
+    """
+
+    server = Server(make_settings(tmp_path))
+    server.register(build_workflow())
+    await server.start()
+    try:
+        await assert_stream_is_live(server)
+        await server.stop()
+        # What a stop with a stream open leaves behind.
+        AppStatus.should_exit = True
+        await server.start()
+        await assert_stream_is_live(server)
+    finally:
+        await server.stop()
+
+
+async def assert_stream_is_live(server: Server) -> None:
+    """Open `GET /api/events` and check it is still there a moment later.
+
+    A stream that ended early is not a failed request — it is a 200 with
+    nothing after the headers — so the assertion is that the endpoint
+    subscribed to the bus, which its generator does before it replays.
+    """
+
+    async with httpx.AsyncClient(base_url=server.url, timeout=30.0) as http:
+        async with http.stream("GET", "/api/events") as stream:
+            assert stream.status_code == 200
+            deadline = time.monotonic() + 10.0
+            while not server.bus.subscriptions:
+                assert time.monotonic() < deadline, "the event stream never subscribed"
+                await asyncio.sleep(0.02)
 
 
 async def test_starting_twice_is_refused(tmp_path: Path) -> None:
