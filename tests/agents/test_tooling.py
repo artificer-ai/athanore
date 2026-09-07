@@ -171,7 +171,12 @@ async def test_no_advertisement_means_the_http_tier(
         .replace("{base}", base)
         .replace("{token}", ctx.token)
     )
-    assert expected in prompts(logs)[0]
+    sent = prompts(logs)[0]
+    assert expected in sent
+    tools = block("### Tier block: `mcp` and `native`")
+    assert tools.split(", ask_operator")[0] not in sent, (
+        "one tier block, not two: an agent told to curl is not also told it has tools"
+    )
 
 
 async def test_a_declared_tier_is_not_negotiated(
@@ -196,6 +201,56 @@ async def test_a_declared_tier_is_not_negotiated(
         "the ask clause is dropped when the policy is off"
     )
     assert prompts(logs)[0].count("get_task (read it)") == 1
+
+
+async def test_a_declared_mcp_tier_needs_no_advertisement(
+    served_context: Make, agent_api: Any, logs: Path
+) -> None:
+    """``mcpCapabilities`` answers ``auto`` and nothing else (05 §Tooling tiers).
+
+    A class that says ``mcp`` is a class whose agent is known to speak
+    it — an adapter that under-reports its capabilities, or a harness the
+    negotiation predates — and the tier it declared is the tier it gets.
+    """
+
+    ctx = await served_context()
+    agent = Fake(command=scenario(submit={"verdict": "ship it"}, request_log=str(logs)))
+    agent.tooling = "mcp"
+    await run(agent, ctx)
+
+    session_new = [
+        entry["params"] for entry in received(logs) if entry["method"] == "session/new"
+    ][0]
+    assert session_new["mcpServers"] == [
+        {
+            "type": "http",
+            "name": MCP_SERVER_NAME,
+            "url": f"{ctx.api_base}/mcp/agent",
+            "headers": [{"name": "X-Athanore-Token", "value": ctx.token}],
+        }
+    ]
+    assert ctx.token not in prompts(logs)[0]
+
+
+async def test_a_declared_http_tier_is_not_upgraded(
+    served_context: Make, logs: Path
+) -> None:
+    """The other direction: an advertisement does not override a declaration."""
+
+    ctx = await served_context()
+    agent = Fake(
+        command=scenario(
+            advertise_mcp=True, submit={"verdict": "ship it"}, request_log=str(logs)
+        )
+    )
+    agent.tooling = "http"
+    await run(agent, ctx)
+
+    session_new = [
+        entry["params"] for entry in received(logs) if entry["method"] == "session/new"
+    ][0]
+    assert session_new["mcpServers"] == [], "no server was asked for"
+    assert f"-H 'X-Athanore-Token: {ctx.token}'" in prompts(logs)[0]
 
 
 async def test_http_is_forced_without_a_task_to_point_at(logs: Path) -> None:
