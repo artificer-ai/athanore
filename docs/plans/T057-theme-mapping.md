@@ -25,8 +25,11 @@ Extend `gen-theme.mjs`'s output with:
 
 1. Status colour utilities (`.text-status-ok` …) from 10's table.
 2. The type scale: `text-metric` 15/500, `text-body` 12, `text-row`
-   11.5, `text-secondary` 11, `text-kicker` 10.5 uppercase with
-   `.12em` tracking.
+   11.5, `text-meta` 11, `text-kicker` 10.5 uppercase with
+   `.12em` tracking. The 11 px step is `text-meta` and not
+   `text-secondary`: `secondary` is a shadcn colour role (10 §Tokens →
+   shadcn), Tailwind derives `.text-secondary { color: var(--secondary) }`
+   from it, and the two rules land on one class (D151).
 3. Surfaces: `bg-chrome` =
    `color-mix(in srgb, var(--color-surface) 45%, var(--color-bg))`,
    `bg-zebra` at 60 %.

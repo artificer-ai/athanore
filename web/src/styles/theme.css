@@ -4,10 +4,15 @@
  * `pnpm -C web gen:theme`; the gate fails while this file and the
  * source disagree (web/src/styles/theme.test.ts).
  *
- * Three layers, per docs/v1/10-frontend.md §Design system:
+ * Four layers, per docs/v1/10-frontend.md §Design system:
  *   1. the Nocturne tokens, copied verbatim from the source
  *   2. the shadcn/ui variables, mapped onto them (§Tokens → shadcn)
- *   3. the Tailwind `@theme inline` exposure and the app type scale
+ *   3. the Tailwind `@theme inline` exposure and the 12 px type base
+ *   4. the utilities the mock styles from: the status colours, the type
+ *      scale, the two mixed surfaces and the two animations
+ *
+ * Every utility here reads a token; none of them is a hex. `/__tokens`
+ * (dev only) renders all of it on one page.
  *
  * The Nocturne names `--color-neutral-*` and `--shadow-*` are also
  * Tailwind v4 theme namespaces. This file is imported after
@@ -152,22 +157,91 @@
   --font-mono: 'JetBrains Mono Variable', var(--ath-font-mono);
   --font-sans: 'JetBrains Mono Variable', var(--ath-font-mono);
   --font-heading: 'JetBrains Mono Variable', var(--ath-font-mono);
-
-  /* The mock's sizes, named for what they label. Line height is 1.5
-     throughout, set once on <html> below. */
-  --text-metric: 15px;
-  --text-body: 12px;
-  --text-row: 11.5px;
-  --text-secondary: 11px;
-  --text-kicker: 10.5px;
-  --text-hint: 10px;
 }
 
-/* --- App type scale (10 §Type and density) --- */
+/* --- App type base (10 §Type and density) --- */
 
 @layer base {
   html {
     font-size: var(--ath-font-size);
     line-height: 1.5;
+  }
+}
+
+/* --- Status colours (10 §Status colours) --- */
+
+/* completed / done */
+@utility text-status-ok { color: var(--ath-status-ok); }
+@utility border-status-ok { border-color: var(--ath-status-ok); }
+
+/* running / in_progress */
+@utility text-status-active { color: var(--ath-status-active); }
+@utility border-status-active { border-color: var(--ath-status-active); }
+
+/* waiting on a human */
+@utility text-status-gate { color: var(--ath-status-gate); }
+@utility border-status-gate { border-color: var(--ath-status-gate); }
+
+/* queued / ready */
+@utility text-status-queued { color: var(--ath-status-queued); }
+@utility border-status-queued { border-color: var(--ath-status-queued); }
+
+/* failed / dead_letter */
+@utility text-status-fail { color: var(--ath-status-fail); }
+@utility border-status-fail { border-color: var(--ath-status-fail); }
+
+/* cancelled */
+@utility text-status-muted { color: var(--ath-status-muted); }
+@utility border-status-muted { border-color: var(--ath-status-muted); }
+
+/* paused (10: nearest role) */
+@utility text-status-paused { color: var(--color-accent-2-400); }
+@utility border-status-paused { border-color: var(--color-accent-2-400); }
+
+/* --- Type scale (10 §Type and density) --- */
+
+/* metric values */
+@utility text-metric { font-size: 15px; font-weight: 500; }
+
+/* body copy, the 12 px base */
+@utility text-body { font-size: 12px; }
+
+/* table and list rows */
+@utility text-row { font-size: 11.5px; }
+
+/* 10's 11 px secondary text: ids, chrome, meta lines */
+@utility text-meta { font-size: 11px; }
+
+/* section kickers: STATS, NODES, EVENT LOG */
+@utility text-kicker { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.12em; }
+
+/* key hints and column headers */
+@utility text-hint { font-size: 10px; }
+
+/* --- Surfaces (10 §Type and density) --- */
+
+/* header, list header, pane bar, footer */
+@utility bg-chrome {
+  background-color: color-mix(in srgb, var(--color-surface) 45%, var(--color-bg));
+}
+
+/* alternating rows, tool blocks */
+@utility bg-zebra {
+  background-color: color-mix(in srgb, var(--color-surface) 60%, var(--color-bg));
+}
+
+/* --- Motion (D71; 10 §Accessibility and quality) --- */
+
+@keyframes ath-pulse { 0%,100% { opacity: 1 } 50% { opacity: .25 } }
+@keyframes ath-caret { 0%,49% { opacity: 1 } 50%,100% { opacity: 0 } }
+
+/* Running status (10 §Status colours) and the agent stream's caret. */
+@utility animate-ath-pulse { animation: ath-pulse 1.8s ease-in-out infinite; }
+@utility animate-ath-caret { animation: ath-caret 1s step-end infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ath-pulse,
+  .animate-ath-caret {
+    animation: none;
   }
 }

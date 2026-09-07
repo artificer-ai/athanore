@@ -6,16 +6,19 @@
  * by `pnpm gen:theme` turns the gate red.
  */
 import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { createRequire } from 'node:module'
+import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
+import { compile } from 'tailwindcss'
 import { describe, expect, it } from 'vitest'
 
 const WEB = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const GENERATOR = resolve(WEB, 'scripts/gen-theme.mjs')
 const SOURCE = resolve(WEB, '../docs/v1/design/nocturne.css')
 const THEME = resolve(WEB, 'src/styles/theme.css')
+const ENTRY = resolve(WEB, 'src/index.css')
 
 const nocturne = readFileSync(SOURCE, 'utf8')
 const theme = readFileSync(THEME, 'utf8')
@@ -28,6 +31,118 @@ function nocturneTokens(): [string, string][] {
     if (match?.[1] && match[2]) declarations.push([match[1], match[2]])
   }
   return declarations
+}
+
+/** Every `@utility NAME { ... }` the generated stylesheet declares. */
+function generatedUtilities(): Map<string, string[]> {
+  const utilities = new Map<string, string[]>()
+  for (const [, name, body] of theme.matchAll(/@utility ([a-z0-9-]+) \{([^}]*)\}/g)) {
+    utilities.set(name ?? '', properties(body ?? ''))
+  }
+  return utilities
+}
+
+/** The property names of a declaration block, `font-size: 11px;` → `font-size`. */
+function properties(block: string): string[] {
+  return block
+    .split(';')
+    .map((declaration) => declaration.slice(0, declaration.indexOf(':')).trim())
+    .filter((property) => property.length > 0)
+}
+
+/**
+ * Where a CSS `@import` points, with the `style` condition Tailwind
+ * resolves stylesheets under — `tailwindcss` and `tw-animate-css` both
+ * publish their CSS there and their JavaScript (or nothing) to
+ * `require`, so `require.resolve` alone lands on the wrong file.
+ */
+function resolveStylesheet(id: string, base: string): string {
+  if (id.startsWith('.')) return resolve(base, id)
+  const require_ = createRequire(join(base, 'entry.css'))
+  const parts = id.split('/')
+  const pkg = id.startsWith('@') ? parts.slice(0, 2).join('/') : (parts[0] ?? id)
+  if (id !== pkg) return require_.resolve(id)
+  for (const directory of require_.resolve.paths(pkg) ?? []) {
+    const manifest = join(directory, pkg, 'package.json')
+    if (!existsSync(manifest)) continue
+    const json: {
+      exports?: { '.'?: { style?: string } }
+      style?: string
+      main?: string
+    } = JSON.parse(readFileSync(manifest, 'utf8'))
+    const style = json.exports?.['.']?.style ?? json.style ?? json.main
+    if (typeof style === 'string' && style.endsWith('.css')) {
+      return join(directory, pkg, style)
+    }
+    break
+  }
+  return require_.resolve(id)
+}
+
+/**
+ * `class` → the properties Tailwind actually paints it with, compiled
+ * from `src/index.css` — the stylesheet the app ships, theme.css
+ * included, in its import order.
+ *
+ * theme.css on its own is only half the cascade: Tailwind derives a
+ * colour utility from every `--color-*` key of `@theme inline`, so a
+ * `@utility` whose name matches one lands in the same class with an
+ * extra `color`, and jsdom cannot see it (it does not resolve Tailwind
+ * at all). This compiles the sheet and reads the rules back out.
+ */
+async function compiledProperties(
+  candidates: string[],
+): Promise<Map<string, string[]>> {
+  const compiler = await compile(readFileSync(ENTRY, 'utf8'), {
+    base: dirname(ENTRY),
+    loadStylesheet: async (id, base) => {
+      const path = resolveStylesheet(id, base)
+      return { path, base: dirname(path), content: readFileSync(path, 'utf8') }
+    },
+    loadModule: async (id) => {
+      throw new Error(`${ENTRY} loads no plugin or config, but asked for ${id}`)
+    },
+  })
+  return selectorProperties(compiler.build(candidates))
+}
+
+/**
+ * Every `selector → property` pair of a compiled stylesheet, nesting
+ * included: a declaration inside an `@supports` or an `@media` belongs
+ * to the nearest selector above it, which is how `.bg-chrome`'s
+ * `color-mix` fallback and the reduced-motion guard are counted.
+ */
+function selectorProperties(css: string): Map<string, string[]> {
+  const found = new Map<string, string[]>()
+  const stack: string[] = []
+  let buffer = ''
+
+  const flush = () => {
+    const text = buffer.trim()
+    buffer = ''
+    if (!text.includes(':') || text.startsWith('@')) return
+    const property = text.slice(0, text.indexOf(':')).trim()
+    const owner = [...stack].reverse().find((prelude) => !prelude.startsWith('@'))
+    for (const selector of owner?.split(',') ?? []) {
+      const key = selector.trim()
+      found.set(key, [...(found.get(key) ?? []), property])
+    }
+  }
+
+  for (const character of css) {
+    if (character === '{') {
+      stack.push(buffer.trim())
+      buffer = ''
+    } else if (character === ';') {
+      flush()
+    } else if (character === '}') {
+      flush()
+      stack.pop()
+    } else {
+      buffer += character
+    }
+  }
+  return found
 }
 
 describe('theme.css', () => {
@@ -112,6 +227,137 @@ describe('theme.css', () => {
 
   it('sets the 12 px base of the app type scale', () => {
     expect(theme).toContain('font-size: var(--ath-font-size);')
-    expect(theme).toContain('--text-body: 12px;')
+    expect(theme).toContain('@utility text-body { font-size: 12px; }')
+  })
+
+  it('paints every status colour of 10 §Status colours', () => {
+    const statuses: [string, string][] = [
+      ['ok', 'var(--ath-status-ok)'], // completed / done
+      ['active', 'var(--ath-status-active)'], // running / in_progress
+      ['gate', 'var(--ath-status-gate)'], // waiting on a human
+      ['queued', 'var(--ath-status-queued)'], // queued / ready
+      ['fail', 'var(--ath-status-fail)'], // failed / dead_letter
+      ['muted', 'var(--ath-status-muted)'], // cancelled
+      ['paused', 'var(--color-accent-2-400)'], // 10's nearest role
+    ]
+    for (const [name, value] of statuses) {
+      expect(theme).toContain(`@utility text-status-${name} { color: ${value}; }`)
+      expect(theme).toContain(
+        `@utility border-status-${name} { border-color: ${value}; }`,
+      )
+    }
+    // Every --ath-status-* token has one; a new one must not slip through.
+    const painted = new Set(statuses.map(([name]) => `--ath-status-${name}`))
+    for (const [name] of nocturneTokens()) {
+      if (name.startsWith('--ath-status-')) expect(painted).toContain(name)
+    }
+  })
+
+  it('carries the type scale of 10 §Type and density', () => {
+    expect(theme).toContain('@utility text-metric { font-size: 15px; font-weight: 500; }')
+    expect(theme).toContain('@utility text-row { font-size: 11.5px; }')
+    // 11 px secondary text. The class is `text-meta`, not `text-secondary`:
+    // `secondary` is a shadcn colour role, Tailwind derives
+    // `.text-secondary { color: var(--secondary) }` from it, and one class
+    // cannot be a size and a colour at once (D151).
+    expect(theme).toContain('@utility text-meta { font-size: 11px; }')
+    expect(theme).not.toContain('@utility text-secondary')
+    expect(theme).toContain(
+      '@utility text-kicker { font-size: 10.5px; text-transform: uppercase; ' +
+        'letter-spacing: 0.12em; }',
+    )
+    expect(theme).toContain('@utility text-hint { font-size: 10px; }')
+    // The sizes are utilities, not `--text-*` theme entries: Tailwind would
+    // derive a second `text-kicker` from such an entry (see gen-theme.mjs).
+    expect(theme).not.toContain('--text-kicker:')
+  })
+
+  it('gives no utility a name Tailwind already derives from a role', () => {
+    // A `--color-NAME` key of `@theme inline` is a `text-NAME`, a
+    // `bg-NAME` and a `border-NAME`; a `@utility` of that name would
+    // share the class with it, and both rules would apply.
+    const roles = [
+      ...(/@theme inline \{([\s\S]*?)\n\}/.exec(theme)?.[1] ?? '').matchAll(
+        /^\s*--color-([a-z0-9-]+)\s*:/gm,
+      ),
+    ].map((match) => match[1])
+    expect(roles).toContain('secondary')
+    for (const utility of generatedUtilities().keys()) {
+      for (const role of roles) {
+        for (const prefix of ['text-', 'bg-', 'border-']) {
+          expect(utility, `${utility} collides with --color-${role}`).not.toBe(
+            `${prefix}${role}`,
+          )
+        }
+      }
+    }
+  })
+
+  it('compiles every utility to what it declares and nothing else', async () => {
+    // The check the unit tests above cannot make: theme.css says what a
+    // class should be, this says what Tailwind makes of it once the
+    // theme's own colour utilities are in the same sheet. `.text-secondary`
+    // was an 11 px size *and* `color: var(--secondary)` — invisible text
+    // on the page, and it beat a colour utility written beside it (D151).
+    const utilities = generatedUtilities()
+    expect(utilities.size).toBeGreaterThan(20)
+    const compiled = await compiledProperties([...utilities.keys()])
+    for (const [utility, declared] of utilities) {
+      const paints = compiled.get(`.${utility}`)
+      expect(paints, `.${utility} is not in the compiled stylesheet`).toBeDefined()
+      for (const property of new Set(paints)) {
+        expect(
+          declared,
+          `.${utility} also paints ${property}, which @utility ${utility} ` +
+            'does not declare — another rule shares the class name',
+        ).toContain(property)
+      }
+    }
+  })
+
+  it('mixes the chrome and zebra surfaces out of the tokens', () => {
+    expect(theme).toContain(
+      'background-color: color-mix(in srgb, var(--color-surface) 45%, var(--color-bg));',
+    )
+    expect(theme).toContain(
+      'background-color: color-mix(in srgb, var(--color-surface) 60%, var(--color-bg));',
+    )
+    expect(theme).toMatch(/@utility bg-chrome \{/)
+    expect(theme).toMatch(/@utility bg-zebra \{/)
+  })
+
+  it('keeps the two animations the mock kept and no others (D71)', () => {
+    for (const name of ['ath-pulse', 'ath-caret']) {
+      const declared = nocturne
+        .split('\n')
+        .find((line) => line.trimStart().startsWith(`@keyframes ${name} `))
+      expect(declared, `nocturne.css lost @keyframes ${name}`).toBeDefined()
+      const body = declared?.slice(declared.indexOf('{')).trim()
+      expect(theme).toContain(`@keyframes ${name} ${body}`)
+    }
+    // The CRT chrome went with D71; its keyframes must not come along.
+    expect(theme).not.toContain('ath-scan')
+    expect(theme).not.toContain('ath-flicker')
+  })
+
+  it('stops the pulse and the caret under reduced motion (10 §Accessibility)', () => {
+    expect(theme).toContain(
+      '@utility animate-ath-pulse { animation: ath-pulse 1.8s ease-in-out infinite; }',
+    )
+    expect(theme).toContain(
+      '@utility animate-ath-caret { animation: ath-caret 1s step-end infinite; }',
+    )
+    const guard = /@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}/.exec(
+      theme,
+    )?.[1]
+    expect(guard).toBeDefined()
+    expect(guard).toContain('.animate-ath-pulse')
+    expect(guard).toContain('.animate-ath-caret')
+    expect(guard).toContain('animation: none;')
+  })
+
+  it('adds no glow and no radius override (D71)', () => {
+    expect(theme).not.toContain('text-shadow')
+    expect(theme).not.toContain('glow-accent')
   })
 })
