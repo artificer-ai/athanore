@@ -149,6 +149,25 @@ async def test_an_option_that_was_not_offered_is_the_servers_refusal(
     assert "approve" in said
 
 
+async def test_answering_twice_is_the_servers_already_answered(
+    cli: Cli, api: Api
+) -> None:
+    """The `GET` succeeding is not the answer being accepted (06 §Errors).
+
+    `answer` reads the request before it writes, so this is the one 409
+    that arrives *after* a call that worked; a verb that reported the
+    read instead of the write would exit 0 here.
+    """
+
+    view = await api.one_request("ask_text")
+    assert (await cli.run("answer", str(view["id"]), "yes")).code == EXIT_OK
+
+    again = await cli.run("answer", str(view["id"]), "no, wait")
+    assert again.code == EXIT_API_ERROR
+    assert "already answered" in flat(again.err)
+    assert await answered_output(api, view["run_id"]) == "yes"
+
+
 # --------------------------------------------------------------------------
 # permit and deny
 # --------------------------------------------------------------------------
@@ -183,6 +202,25 @@ async def test_permit_with_an_option_id_uses_that_option(cli: Cli, api: Api) -> 
     result = await cli.run("permit", str(view["id"]), "yes-always")
     assert result.code == EXIT_OK
     assert await answered_output(api, view["run_id"]) == "yes-always"
+
+
+async def test_permit_with_an_option_id_that_was_not_offered_is_refused(
+    cli: Cli, api: Api
+) -> None:
+    """The server owns the list, so an id that is not on it is its refusal.
+
+    `permit` does not read the request when it is given an id, which is
+    only safe because `invalid_option` is the request service's and names
+    what *was* offered (D145).
+    """
+
+    view = await api.one_request("ask_options")
+    result = await cli.run("permit", str(view["id"]), "yes-sometimes")
+    assert result.code == EXIT_API_ERROR
+    said = flat(result.err)
+    assert "'yes-sometimes' is not an option" in said
+    assert "yes-always" in said
+    assert (await api.requests())[0]["pending"] is True
 
 
 async def test_permit_of_a_request_that_is_not_a_choice_says_so(
@@ -272,6 +310,17 @@ async def test_rm_deletes_the_run_with_yes(cli: Cli, api: Api) -> None:
     result = await cli.run("rm", run, "--yes")
     assert result.code == EXIT_OK
     assert run in result.out
+
+    with pytest.raises(httpx.HTTPStatusError) as refused:
+        await api.run(run)
+    assert refused.value.response.status_code == 404
+
+
+async def test_rm_json_names_what_was_deleted(cli: Cli, api: Api) -> None:
+    """A 204 has no body, so `--json` says what went (the one invented shape)."""
+
+    run = await api.completed("demo", "Build the thing")
+    assert await cli.json("rm", run, "--yes") == {"deleted": run}
 
     with pytest.raises(httpx.HTTPStatusError) as refused:
         await api.run(run)
@@ -408,6 +457,22 @@ async def test_edit_writes_the_fields_it_is_given(cli: Cli, api: Api) -> None:
     assert detail["description"] == "and then some"
 
 
+async def test_edit_that_names_no_field_changes_nothing(cli: Cli, api: Api) -> None:
+    """An edit is not the place to refuse a caller for being redundant.
+
+    A field the command line does not name is not in the body at all, and
+    `Ops.edit` leaves what the body does not name alone — so the verb has
+    nothing to check and does not check it.
+    """
+
+    run = await api.completed("demo", "Build the thing", "with care")
+
+    assert (await cli.run("edit", run)).code == EXIT_OK
+    detail = await api.run(run)
+    assert detail["title"] == "Build the thing"
+    assert detail["description"] == "with care"
+
+
 async def test_edit_json_is_the_run_detail_the_api_answered_with(
     cli: Cli, api: Api
 ) -> None:
@@ -437,6 +502,21 @@ async def test_position_swaps_with_a_neighbour_and_moves_to_an_index(
     moved = await cli.json("position", runs[0], "0")
     assert moved == {"position": 1}
     assert await _positions(api, runs) == [1, 3, 2]
+
+
+async def test_position_at_the_ends_is_a_no_op(cli: Cli, api: Api) -> None:
+    """D57: `up` at the top and `down` at the bottom have no neighbour.
+
+    The server answers with the position the run still has, so neither is
+    an error and neither disturbs the list.
+    """
+
+    runs = [await api.submit("parked", f"Held {n}") for n in range(3)]
+    assert await _positions(api, runs) == [1, 2, 3]
+
+    assert await cli.json("position", runs[0], "up") == {"position": 1}
+    assert await cli.json("position", runs[2], "down") == {"position": 3}
+    assert await _positions(api, runs) == [1, 2, 3]
 
 
 async def test_position_refuses_a_word_that_is_not_a_direction(cli: Cli) -> None:
