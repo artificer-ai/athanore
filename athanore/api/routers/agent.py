@@ -73,7 +73,7 @@ from athanore.store import rows
 from athanore.store.rows import TaskRow
 from athanore.store.uow import Store
 
-__all__ = ["MAX_WAIT", "router"]
+__all__ = ["MAX_WAIT", "maybe_live", "router"]
 
 router = APIRouter(prefix="/api/agent/tasks", tags=["agent"])
 
@@ -120,13 +120,18 @@ def _store(request: Request, task_id: int) -> Store:
     return store
 
 
-def _maybe_live(request: Request, task_id: int) -> TaskContext | None:
+def maybe_live(request: Request, task_id: int) -> TaskContext | None:
     """The context of the attempt running here, or ``None``.
 
     The cast is the registry's structural typing narrowed back: it stores
     anything carrying a ``task_id`` so that :mod:`athanore.engine.live`
     need not import the context, and the runner is the only thing that
     registers one.
+
+    Public because :mod:`athanore.api.mcp` asks the same question before
+    it lists a tool: ``submit_result``'s schema and whether
+    ``ask_operator`` is offered at all are read off this context (08
+    §MCP), and there is one answer to "is this attempt running here".
     """
 
     engine: Engine | None = request.app.state.engine
@@ -144,12 +149,12 @@ def _live(request: Request, task_id: int) -> TaskContext:
     would be read by nobody, because the body that would have routed on
     it is gone with the process that ran it.
 
-    The read is :func:`_maybe_live`; what this adds is the refusal, so
+    The read is :func:`maybe_live`; what this adds is the refusal, so
     that the three routes that write have one sentence between them for
     why they would not.
     """
 
-    ctx = _maybe_live(request, task_id)
+    ctx = maybe_live(request, task_id)
     if ctx is None:
         raise Conflict(
             f"task {task_id} is not being run by this server: no attempt of "
@@ -205,7 +210,7 @@ async def get_task(request: Request, task_id: TaskId, task: Authenticated) -> Ag
         entries = await reader.log.list(task.run_id, exclude_kinds=HIDDEN_LOG_KINDS)
     if run is None:  # pragma: no cover - a task without its run cannot be claimed
         raise NotFound(f"run {task.run_id} of task {task_id} no longer exists")
-    live = _maybe_live(request, task_id)
+    live = maybe_live(request, task_id)
     model = None if live is None else live.output_model
     return AgentTask(
         task_id=task.id,

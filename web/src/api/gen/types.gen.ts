@@ -3225,3 +3225,35 @@ export type GetSourceApiWorkflowsNameSourceGetResponses = {
 };
 
 export type GetSourceApiWorkflowsNameSourceGetResponse = GetSourceApiWorkflowsNameSourceGetResponses[keyof GetSourceApiWorkflowsNameSourceGetResponses];
+
+export type McpAgentData = {
+    body: unknown;
+    headers: {
+        /**
+         * The task token, from the claimed attempt.
+         */
+        'X-Athanore-Token': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/mcp/agent';
+};
+
+export type McpAgentErrors = {
+    /**
+     * The task token is not valid for a live attempt.
+     */
+    403: {
+        code: string;
+        error: string;
+    };
+};
+
+export type McpAgentError = McpAgentErrors[keyof McpAgentErrors];
+
+export type McpAgentResponses = {
+    /**
+     * One MCP response, as JSON or as an SSE stream.
+     */
+    200: unknown;
+};

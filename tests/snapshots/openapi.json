@@ -4210,6 +4210,72 @@
           "workflows"
         ]
       }
+    },
+    "/mcp/agent": {
+      "post": {
+        "description": "The agent surface as MCP tools: `get_task`, `append_log`, `submit_result`, and \u2014 when the attempt's `ask_policy` is `http` \u2014 `ask_operator` and `wait_answer`. Authenticated by the same `X-Athanore-Token` header as `/api/agent/`; the task is the token's, so no tool takes a task id. The request and response bodies are MCP's own JSON-RPC and are opaque to this document.",
+        "operationId": "mcp_agent",
+        "parameters": [
+          {
+            "description": "The task token, from the claimed attempt.",
+            "in": "header",
+            "name": "X-Athanore-Token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "One MCP response, as JSON or as an SSE stream."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "The task token is not valid for a live attempt."
+          }
+        },
+        "summary": "Model Context Protocol server (streamable HTTP)",
+        "tags": [
+          "agent"
+        ]
+      }
     }
   }
 }
