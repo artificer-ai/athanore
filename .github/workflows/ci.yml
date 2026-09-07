@@ -36,7 +36,7 @@ jobs:
           enable-cache: true
 
       - name: uv sync
-        run: uv sync --all-groups --all-extras
+        run: uv sync --all-packages --all-groups --all-extras
 
       # `--cov` measures the whole package; the step below gates the part
       # of it 13 §CI puts a threshold on. The rest of those thresholds
@@ -149,7 +149,7 @@ jobs:
       # has just prepared.
       - name: regenerate
         run: |
-          uv sync --all-groups --all-extras
+          uv sync --all-packages --all-groups --all-extras
           uv run --no-sync scripts/dump_openapi.py
           pnpm -C web install --frozen-lockfile
           pnpm -C web gen

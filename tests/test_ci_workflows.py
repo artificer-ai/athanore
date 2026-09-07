@@ -72,7 +72,7 @@ def test_python_matrix_covers_the_supported_floor(ci: Workflow) -> None:
 
 def test_python_job_runs_every_step_of_the_gate(ci: Workflow) -> None:
     ran = commands(ci["jobs"]["python"])
-    assert "uv sync --all-groups --all-extras" in ran
+    assert "uv sync --all-packages --all-groups --all-extras" in ran
     assert "pytest -q --cov=athanore" in ran
     assert "ruff check ." in ran
     assert "ruff format --check ." in ran

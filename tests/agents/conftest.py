@@ -72,10 +72,23 @@ def bus() -> EventBus:
 
 
 @pytest.fixture
-async def store(tmp_path: Path, bus: EventBus) -> AsyncIterator[Store]:
+def db_url(tmp_path: Path) -> str:
+    """This test's database, named once.
+
+    Exposed rather than inlined below because the suite that drives whole
+    runs through a real ``Engine`` (``test_stats_workflow.py``) has to
+    build an :class:`~athanore.settings.AthanoreSettings` pointing at the
+    same file the store is on.
+    """
+
+    return f"sqlite+aiosqlite:///{tmp_path / 'athanore.db'}"
+
+
+@pytest.fixture
+async def store(db_url: str, bus: EventBus) -> AsyncIterator[Store]:
     """A store on an empty SQLite file."""
 
-    engine = make_engine(f"sqlite+aiosqlite:///{tmp_path / 'athanore.db'}")
+    engine = make_engine(db_url)
     async with engine.begin() as conn:
         await conn.run_sync(metadata.create_all)
     try:

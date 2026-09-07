@@ -48,7 +48,7 @@ jobs:
 
       # `--all-extras` is what brings in asyncpg (the `postgres` extra).
       - name: uv sync
-        run: uv sync --all-groups --all-extras
+        run: uv sync --all-packages --all-groups --all-extras
 
       # The marker is registered in pyproject.toml; the tests it selects
       # arrive in T014. An empty selection is a pass, not exit 5 (D76).
