@@ -542,7 +542,10 @@ def test_an_api_error_is_one(capsys: pytest.CaptureFixture[str]) -> None:
 
 def test_a_usage_mistake_is_two(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["no-such-verb"]) == EXIT_USAGE
-    assert "No such command" in capsys.readouterr().err
+    # T054's bare-workflow alias reports the unknown first word, because
+    # it is the thing that knows a word can be a verb *or* a registered
+    # workflow; click's own "No such command" would name only one of them.
+    assert "is not an athanore verb" in " ".join(capsys.readouterr().err.split())
     assert main(["--url", "127.0.0.1:4002"]) == EXIT_USAGE
     assert "is not an http(s) URL" in capsys.readouterr().err
     # A bare `athanore` prints its help and is a usage error, as click's

@@ -2559,6 +2559,24 @@ bare-workflow alias (first positional not in `RESERVED` and present in
 verb once in table and JSON form; alias; `logs -f` sees a live event;
 exit code 3 when the server is down.
 **Done.** Tests pass.
+**Status.** Done. `cli/inspect.py` is the eight read verbs, each one or
+more `GET`s and a rendering of what came back. `--json` prints the value
+the API sent, whole; a table prints a *projection* of it, so `ls` joins
+`current_nodes` into one cell, marks a run whose workflow this server has
+not got as `demo (unregistered)`, and `requests` renders `age` as `12s`.
+`show --json` is the `RunDetail` with the run's work log added under
+`log` — two reads, every key the API's own. `logs` and `stream` page until
+a short page, so a history longer than one page is not quietly lost.
+Following is one iterator, `inspect.follow`: it advances a cursor on
+every frame that carried an id and reconnects from there when the stream
+ends, Ctrl-C ends it at 0, and a reconnect that finds nobody there is 11
+§Exit codes' 3. `logs -f` fills a `resync` hole over REST rather than
+printing a history with a gap in it; `stream -f` stops when the attempt
+stops being live. The bare-workflow alias is `WorkflowAliasGroup.
+resolve_command` on the typer application: a first word that is neither
+`RESERVED` nor a registered command is looked up in `GET /api/workflows`
+and, if it is there, becomes `submit` with the word left in `args`
+(D144).
 
 ### T054a — CLI steer verbs (A3.10)
 
@@ -2572,6 +2590,24 @@ otherwise), `permit [option]`, `deny`, `pause`, `resume`, `cancel`, `rm`
 API; `answer` picks the right body shape for each mode; exit code 1 with
 the API `error` message on a 409.
 **Done.** `tests/test_cli_entry.py` deleted.
+**Status.** Done. `cli/steer.py` is the thirteen write verbs, each one
+call to an endpoint the SPA calls too: no verb here has an endpoint of
+its own and none keeps state between calls, so every precondition is
+`Ops`' and reaches the operator as the sentence the server wrote. Only
+`answer`, `permit` and `deny` read before they write, and only because
+the request's `mode` and its offered options are facts the CLI cannot
+infer. `answer` resolves its one argument by that mode — `form` takes
+JSON and must parse as an object, `options` takes an option id, `text`
+takes the characters typed — which is the reading of this section's
+resolution order under which the operator answering `{"ok": true}` to a
+text question does *not* send a dict (D145). `permit`/`deny` choose by
+kind, `allow_once` before `allow_always`, over
+`athanore.agents.policies`' own lists, so the agent's ordering cannot
+turn an allow into a denial; given an option id explicitly they send it
+and let the server refuse one that was not offered. `rm` confirms unless
+`--yes`. The ledger row for `test_cli_entry.py` is ticked; the file is in
+the MVP checkout, which this repository never writes to (D65), so
+"deleted" is the ported row.
 
 ### T055 — Port the end-to-end API tests and retire the MVP server (A3.11)
 

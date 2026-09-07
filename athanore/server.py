@@ -50,6 +50,7 @@ from typing import Any
 import uvicorn
 from fastapi import FastAPI
 from sqlalchemy.engine import make_url
+from sse_starlette.sse import AppStatus
 
 from athanore.api.app import create_app
 from athanore.api.deps import MissingOperatorToken, check_operator_token
@@ -236,6 +237,7 @@ class Server:
         if self._serve_task is not None:
             raise RuntimeError("the server is already started")
 
+        _clear_sse_shutdown_flag()
         configure_logging(self.settings.log_format)
         # Before the database is touched, so a bind nobody could
         # authenticate against fails without having migrated a file.
@@ -600,6 +602,35 @@ class Server:
     def __repr__(self) -> str:
         state = "serving" if self._serve_task is not None else "stopped"
         return f"<Server {sorted(self._workflows)} {state} at {self.url}>"
+
+
+def _clear_sse_shutdown_flag() -> None:
+    """Undo the process-global "we are shutting down" `sse-starlette` sets.
+
+    ``sse_starlette.sse.AppStatus.should_exit`` is a **class attribute**,
+    not per-application state, and once it is true every
+    ``EventSourceResponse`` built afterwards ends immediately. It is set
+    by a watcher the library runs for the duration of each open stream,
+    which polls the uvicorn server it finds on the ``SIGTERM`` handler —
+    and :meth:`Server._stop_http` sets that server's ``should_exit`` to
+    ask for the graceful shutdown 04 §Shutdown wants.
+
+    So a server that was serving an event stream when it stopped leaves
+    the flag set, and the *next* server in the same process serves an
+    event stream that closes the moment it opens. :meth:`Server.start`
+    supports being called again after :meth:`Server.stop` — a
+    programmatic host restarting, a test suite reusing one server — and
+    an SSE feed that silently stops working after the first restart is
+    exactly the kind of "half started" this class exists to prevent.
+
+    Clearing it here is safe because it is scoped to a start: a shutdown
+    signal that arrives afterwards sets it again, and one that arrived
+    while this method was running would be reported by
+    :meth:`Server.request_stop`, which is what the signal handlers 04
+    §Shutdown installs actually call.
+    """
+
+    AppStatus.should_exit = False
 
 
 def _socket_port(sock: socket.socket) -> int | None:

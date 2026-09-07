@@ -77,8 +77,19 @@ of `submit` (first positional that is not a verb and matches a registered
 workflow), with the same "workflow names cannot shadow verbs" validation
 at registration.
 
+`answer` resolves its one argument against the request's **mode**, which
+is the only fact that is not a guess: a `form` request takes JSON and the
+argument must parse as an object, an `options` request takes an option id,
+and a `text` request takes the characters that were typed — so an answer
+that happens to look like an object still reaches a text question as the
+string it is (D145). `permit` and `deny` choose an option by kind
+(`allow_once` before `allow_always`, `reject_once` before
+`reject_always`), or send the option id they were given.
+
 `--watch` and `-f` use the SSE feed with the same client wrapper the
-tests use.
+tests use, keeping the last stored event id they saw so a stream that
+drops resumes with `after=` instead of replaying from zero. Ctrl-C ends a
+follow successfully; a server that cannot be reconnected to is exit 3.
 
 ## Exit codes
 
