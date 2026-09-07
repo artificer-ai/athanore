@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AnswerRequestApiRequestsRequestIdAnswerPostData, AnswerRequestApiRequestsRequestIdAnswerPostErrors, AnswerRequestApiRequestsRequestIdAnswerPostResponses, AppendLogApiAgentTasksTaskIdLogPostData, AppendLogApiAgentTasksTaskIdLogPostErrors, AppendLogApiAgentTasksTaskIdLogPostResponses, AppendLogApiRunsRunIdLogPostData, AppendLogApiRunsRunIdLogPostErrors, AppendLogApiRunsRunIdLogPostResponses, AskApiAgentTasksTaskIdAskPostData, AskApiAgentTasksTaskIdAskPostErrors, AskApiAgentTasksTaskIdAskPostResponses, CancelRunApiRunsRunIdCancelPostData, CancelRunApiRunsRunIdCancelPostErrors, CancelRunApiRunsRunIdCancelPostResponses, DeleteRunApiRunsRunIdDeleteData, DeleteRunApiRunsRunIdDeleteErrors, DeleteRunApiRunsRunIdDeleteResponses, EditRunApiRunsRunIdPatchData, EditRunApiRunsRunIdPatchErrors, EditRunApiRunsRunIdPatchResponses, GetEventsApiRunsRunIdEventsGetData, GetEventsApiRunsRunIdEventsGetErrors, GetEventsApiRunsRunIdEventsGetResponses, GetGraphApiRunsRunIdGraphGetData, GetGraphApiRunsRunIdGraphGetErrors, GetGraphApiRunsRunIdGraphGetResponses, GetLogApiRunsRunIdLogGetData, GetLogApiRunsRunIdLogGetErrors, GetLogApiRunsRunIdLogGetResponses, GetRequestApiRequestsRequestIdGetData, GetRequestApiRequestsRequestIdGetErrors, GetRequestApiRequestsRequestIdGetResponses, GetRequestsApiRunsRunIdRequestsGetData, GetRequestsApiRunsRunIdRequestsGetErrors, GetRequestsApiRunsRunIdRequestsGetResponses, GetRunApiRunsRunIdGetData, GetRunApiRunsRunIdGetErrors, GetRunApiRunsRunIdGetResponses, GetSourceApiWorkflowsNameSourceGetData, GetSourceApiWorkflowsNameSourceGetErrors, GetSourceApiWorkflowsNameSourceGetResponses, GetStreamApiTasksTaskIdStreamGetData, GetStreamApiTasksTaskIdStreamGetErrors, GetStreamApiTasksTaskIdStreamGetResponses, GetTaskApiAgentTasksTaskIdGetData, GetTaskApiAgentTasksTaskIdGetErrors, GetTaskApiAgentTasksTaskIdGetResponses, GetTaskApiTasksTaskIdGetData, GetTaskApiTasksTaskIdGetErrors, GetTaskApiTasksTaskIdGetResponses, GetWorkflowApiWorkflowsNameGetData, GetWorkflowApiWorkflowsNameGetErrors, GetWorkflowApiWorkflowsNameGetResponses, HealthApiHealthGetData, HealthApiHealthGetResponses, ListRequestsApiRequestsGetData, ListRequestsApiRequestsGetErrors, ListRequestsApiRequestsGetResponses, ListRunsApiRunsGetData, ListRunsApiRunsGetErrors, ListRunsApiRunsGetResponses, ListWorkflowsApiWorkflowsGetData, ListWorkflowsApiWorkflowsGetResponses, McpAgentData, McpAgentErrors, McpAgentResponses, MeApiMeGetData, MeApiMeGetResponses, MoveRunApiRunsRunIdPositionPostData, MoveRunApiRunsRunIdPositionPostErrors, MoveRunApiRunsRunIdPositionPostResponses, MoveTaskApiTasksTaskIdMovePostData, MoveTaskApiTasksTaskIdMovePostErrors, MoveTaskApiTasksTaskIdMovePostResponses, PauseRunApiRunsRunIdPausePostData, PauseRunApiRunsRunIdPausePostErrors, PauseRunApiRunsRunIdPausePostResponses, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetData, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetErrors, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetResponses, RerunNodeApiRunsRunIdRerunPostData, RerunNodeApiRunsRunIdRerunPostErrors, RerunNodeApiRunsRunIdRerunPostResponses, ResumeRunApiRunsRunIdResumePostData, ResumeRunApiRunsRunIdResumePostErrors, ResumeRunApiRunsRunIdResumePostResponses, RetryTaskApiTasksTaskIdRetryPostData, RetryTaskApiTasksTaskIdRetryPostErrors, RetryTaskApiTasksTaskIdRetryPostResponses, SetStatusApiTasksTaskIdStatusPostData, SetStatusApiTasksTaskIdStatusPostErrors, SetStatusApiTasksTaskIdStatusPostResponses, SubmitApiAgentTasksTaskIdSubmitPostData, SubmitApiAgentTasksTaskIdSubmitPostErrors, SubmitApiAgentTasksTaskIdSubmitPostResponses, SubmitRunApiWorkflowsNameRunsPostData, SubmitRunApiWorkflowsNameRunsPostErrors, SubmitRunApiWorkflowsNameRunsPostResponses } from './types.gen';
+import type { AnswerRequestApiRequestsRequestIdAnswerPostData, AnswerRequestApiRequestsRequestIdAnswerPostErrors, AnswerRequestApiRequestsRequestIdAnswerPostResponses, AppendLogApiAgentTasksTaskIdLogPostData, AppendLogApiAgentTasksTaskIdLogPostErrors, AppendLogApiAgentTasksTaskIdLogPostResponses, AppendLogApiRunsRunIdLogPostData, AppendLogApiRunsRunIdLogPostErrors, AppendLogApiRunsRunIdLogPostResponses, AskApiAgentTasksTaskIdAskPostData, AskApiAgentTasksTaskIdAskPostErrors, AskApiAgentTasksTaskIdAskPostResponses, CancelRunApiRunsRunIdCancelPostData, CancelRunApiRunsRunIdCancelPostErrors, CancelRunApiRunsRunIdCancelPostResponses, DeleteRunApiRunsRunIdDeleteData, DeleteRunApiRunsRunIdDeleteErrors, DeleteRunApiRunsRunIdDeleteResponses, EditRunApiRunsRunIdPatchData, EditRunApiRunsRunIdPatchErrors, EditRunApiRunsRunIdPatchResponses, GetEventsApiRunsRunIdEventsGetData, GetEventsApiRunsRunIdEventsGetErrors, GetEventsApiRunsRunIdEventsGetResponses, GetGraphApiRunsRunIdGraphGetData, GetGraphApiRunsRunIdGraphGetErrors, GetGraphApiRunsRunIdGraphGetResponses, GetLogApiRunsRunIdLogGetData, GetLogApiRunsRunIdLogGetErrors, GetLogApiRunsRunIdLogGetResponses, GetRequestApiRequestsRequestIdGetData, GetRequestApiRequestsRequestIdGetErrors, GetRequestApiRequestsRequestIdGetResponses, GetRequestsApiRunsRunIdRequestsGetData, GetRequestsApiRunsRunIdRequestsGetErrors, GetRequestsApiRunsRunIdRequestsGetResponses, GetRunApiRunsRunIdGetData, GetRunApiRunsRunIdGetErrors, GetRunApiRunsRunIdGetResponses, GetSourceApiWorkflowsNameSourceGetData, GetSourceApiWorkflowsNameSourceGetErrors, GetSourceApiWorkflowsNameSourceGetResponses, GetStreamApiTasksTaskIdStreamGetData, GetStreamApiTasksTaskIdStreamGetErrors, GetStreamApiTasksTaskIdStreamGetResponses, GetTaskApiAgentTasksTaskIdGetData, GetTaskApiAgentTasksTaskIdGetErrors, GetTaskApiAgentTasksTaskIdGetResponses, GetTaskApiTasksTaskIdGetData, GetTaskApiTasksTaskIdGetErrors, GetTaskApiTasksTaskIdGetResponses, GetWorkflowApiWorkflowsNameGetData, GetWorkflowApiWorkflowsNameGetErrors, GetWorkflowApiWorkflowsNameGetResponses, HealthApiHealthGetData, HealthApiHealthGetResponses, ListRequestsApiRequestsGetData, ListRequestsApiRequestsGetErrors, ListRequestsApiRequestsGetResponses, ListRunsApiRunsGetData, ListRunsApiRunsGetErrors, ListRunsApiRunsGetResponses, ListWorkflowsApiWorkflowsGetData, ListWorkflowsApiWorkflowsGetErrors, ListWorkflowsApiWorkflowsGetResponses, McpAgentData, McpAgentErrors, McpAgentResponses, MeApiMeGetData, MeApiMeGetResponses, MoveRunApiRunsRunIdPositionPostData, MoveRunApiRunsRunIdPositionPostErrors, MoveRunApiRunsRunIdPositionPostResponses, MoveTaskApiTasksTaskIdMovePostData, MoveTaskApiTasksTaskIdMovePostErrors, MoveTaskApiTasksTaskIdMovePostResponses, PauseRunApiRunsRunIdPausePostData, PauseRunApiRunsRunIdPausePostErrors, PauseRunApiRunsRunIdPausePostResponses, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetData, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetErrors, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetResponses, RerunNodeApiRunsRunIdRerunPostData, RerunNodeApiRunsRunIdRerunPostErrors, RerunNodeApiRunsRunIdRerunPostResponses, ResumeRunApiRunsRunIdResumePostData, ResumeRunApiRunsRunIdResumePostErrors, ResumeRunApiRunsRunIdResumePostResponses, RetryTaskApiTasksTaskIdRetryPostData, RetryTaskApiTasksTaskIdRetryPostErrors, RetryTaskApiTasksTaskIdRetryPostResponses, SetStatusApiTasksTaskIdStatusPostData, SetStatusApiTasksTaskIdStatusPostErrors, SetStatusApiTasksTaskIdStatusPostResponses, SubmitApiAgentTasksTaskIdSubmitPostData, SubmitApiAgentTasksTaskIdSubmitPostErrors, SubmitApiAgentTasksTaskIdSubmitPostResponses, SubmitRunApiWorkflowsNameRunsPostData, SubmitRunApiWorkflowsNameRunsPostErrors, SubmitRunApiWorkflowsNameRunsPostResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -37,7 +37,11 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
  * its ``submit_result`` tool (05 §Tooling tiers), and an agent with no
  * model declared is not required to submit anything.
  */
-export const getTaskApiAgentTasksTaskIdGet = <ThrowOnError extends boolean = false>(options: Options<GetTaskApiAgentTasksTaskIdGetData, ThrowOnError>): RequestResult<GetTaskApiAgentTasksTaskIdGetResponses, GetTaskApiAgentTasksTaskIdGetErrors, ThrowOnError> => (options.client ?? client).get<GetTaskApiAgentTasksTaskIdGetResponses, GetTaskApiAgentTasksTaskIdGetErrors, ThrowOnError>({ url: '/api/agent/tasks/{task_id}', ...options });
+export const getTaskApiAgentTasksTaskIdGet = <ThrowOnError extends boolean = false>(options: Options<GetTaskApiAgentTasksTaskIdGetData, ThrowOnError>): RequestResult<GetTaskApiAgentTasksTaskIdGetResponses, GetTaskApiAgentTasksTaskIdGetErrors, ThrowOnError> => (options.client ?? client).get<GetTaskApiAgentTasksTaskIdGetResponses, GetTaskApiAgentTasksTaskIdGetErrors, ThrowOnError>({
+    security: [{ name: 'X-Athanore-Token', type: 'apiKey' }],
+    url: '/api/agent/tasks/{task_id}',
+    ...options
+});
 
 /**
  * Ask the operator a question
@@ -64,6 +68,7 @@ export const getTaskApiAgentTasksTaskIdGet = <ThrowOnError extends boolean = fal
  * rather than holding this connection open.
  */
 export const askApiAgentTasksTaskIdAskPost = <ThrowOnError extends boolean = false>(options: Options<AskApiAgentTasksTaskIdAskPostData, ThrowOnError>): RequestResult<AskApiAgentTasksTaskIdAskPostResponses, AskApiAgentTasksTaskIdAskPostErrors, ThrowOnError> => (options.client ?? client).post<AskApiAgentTasksTaskIdAskPostResponses, AskApiAgentTasksTaskIdAskPostErrors, ThrowOnError>({
+    security: [{ name: 'X-Athanore-Token', type: 'apiKey' }],
     url: '/api/agent/tasks/{task_id}/ask',
     ...options,
     headers: {
@@ -84,6 +89,7 @@ export const askApiAgentTasksTaskIdAskPost = <ThrowOnError extends boolean = fal
  * on — the same call a node body makes, reached over HTTP.
  */
 export const appendLogApiAgentTasksTaskIdLogPost = <ThrowOnError extends boolean = false>(options: Options<AppendLogApiAgentTasksTaskIdLogPostData, ThrowOnError>): RequestResult<AppendLogApiAgentTasksTaskIdLogPostResponses, AppendLogApiAgentTasksTaskIdLogPostErrors, ThrowOnError> => (options.client ?? client).post<AppendLogApiAgentTasksTaskIdLogPostResponses, AppendLogApiAgentTasksTaskIdLogPostErrors, ThrowOnError>({
+    security: [{ name: 'X-Athanore-Token', type: 'apiKey' }],
     url: '/api/agent/tasks/{task_id}/log',
     ...options,
     headers: {
@@ -111,7 +117,11 @@ export const appendLogApiAgentTasksTaskIdLogPost = <ThrowOnError extends boolean
  * gets the same answer again, which is what makes a dropped connection
  * cost nothing (06 §Service).
  */
-export const pollRequestApiAgentTasksTaskIdRequestsRequestIdGet = <ThrowOnError extends boolean = false>(options: Options<PollRequestApiAgentTasksTaskIdRequestsRequestIdGetData, ThrowOnError>): RequestResult<PollRequestApiAgentTasksTaskIdRequestsRequestIdGetResponses, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetErrors, ThrowOnError> => (options.client ?? client).get<PollRequestApiAgentTasksTaskIdRequestsRequestIdGetResponses, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetErrors, ThrowOnError>({ url: '/api/agent/tasks/{task_id}/requests/{request_id}', ...options });
+export const pollRequestApiAgentTasksTaskIdRequestsRequestIdGet = <ThrowOnError extends boolean = false>(options: Options<PollRequestApiAgentTasksTaskIdRequestsRequestIdGetData, ThrowOnError>): RequestResult<PollRequestApiAgentTasksTaskIdRequestsRequestIdGetResponses, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetErrors, ThrowOnError> => (options.client ?? client).get<PollRequestApiAgentTasksTaskIdRequestsRequestIdGetResponses, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetErrors, ThrowOnError>({
+    security: [{ name: 'X-Athanore-Token', type: 'apiKey' }],
+    url: '/api/agent/tasks/{task_id}/requests/{request_id}',
+    ...options
+});
 
 /**
  * Submit this task's structured result
@@ -133,6 +143,7 @@ export const pollRequestApiAgentTasksTaskIdRequestsRequestIdGet = <ThrowOnError 
  * move its own task.
  */
 export const submitApiAgentTasksTaskIdSubmitPost = <ThrowOnError extends boolean = false>(options: Options<SubmitApiAgentTasksTaskIdSubmitPostData, ThrowOnError>): RequestResult<SubmitApiAgentTasksTaskIdSubmitPostResponses, SubmitApiAgentTasksTaskIdSubmitPostErrors, ThrowOnError> => (options.client ?? client).post<SubmitApiAgentTasksTaskIdSubmitPostResponses, SubmitApiAgentTasksTaskIdSubmitPostErrors, ThrowOnError>({
+    security: [{ name: 'X-Athanore-Token', type: 'apiKey' }],
     url: '/api/agent/tasks/{task_id}/submit',
     ...options,
     headers: {
@@ -177,14 +188,22 @@ export const meApiMeGet = <ThrowOnError extends boolean = false>(options?: Optio
  * empty list; a ``run`` that names no run is a filter that matches
  * nothing rather than a 404.
  */
-export const listRequestsApiRequestsGet = <ThrowOnError extends boolean = false>(options?: Options<ListRequestsApiRequestsGetData, ThrowOnError>): RequestResult<ListRequestsApiRequestsGetResponses, ListRequestsApiRequestsGetErrors, ThrowOnError> => (options?.client ?? client).get<ListRequestsApiRequestsGetResponses, ListRequestsApiRequestsGetErrors, ThrowOnError>({ url: '/api/requests', ...options });
+export const listRequestsApiRequestsGet = <ThrowOnError extends boolean = false>(options?: Options<ListRequestsApiRequestsGetData, ThrowOnError>): RequestResult<ListRequestsApiRequestsGetResponses, ListRequestsApiRequestsGetErrors, ThrowOnError> => (options?.client ?? client).get<ListRequestsApiRequestsGetResponses, ListRequestsApiRequestsGetErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/requests',
+    ...options
+});
 
 /**
  * One request and its answer
  *
  * One request, answered or not, with the node that asked.
  */
-export const getRequestApiRequestsRequestIdGet = <ThrowOnError extends boolean = false>(options: Options<GetRequestApiRequestsRequestIdGetData, ThrowOnError>): RequestResult<GetRequestApiRequestsRequestIdGetResponses, GetRequestApiRequestsRequestIdGetErrors, ThrowOnError> => (options.client ?? client).get<GetRequestApiRequestsRequestIdGetResponses, GetRequestApiRequestsRequestIdGetErrors, ThrowOnError>({ url: '/api/requests/{request_id}', ...options });
+export const getRequestApiRequestsRequestIdGet = <ThrowOnError extends boolean = false>(options: Options<GetRequestApiRequestsRequestIdGetData, ThrowOnError>): RequestResult<GetRequestApiRequestsRequestIdGetResponses, GetRequestApiRequestsRequestIdGetErrors, ThrowOnError> => (options.client ?? client).get<GetRequestApiRequestsRequestIdGetResponses, GetRequestApiRequestsRequestIdGetErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/requests/{request_id}',
+    ...options
+});
 
 /**
  * Answer a request
@@ -204,6 +223,7 @@ export const getRequestApiRequestsRequestIdGet = <ThrowOnError extends boolean =
  * record an answer without a person (06 §Timeouts).
  */
 export const answerRequestApiRequestsRequestIdAnswerPost = <ThrowOnError extends boolean = false>(options: Options<AnswerRequestApiRequestsRequestIdAnswerPostData, ThrowOnError>): RequestResult<AnswerRequestApiRequestsRequestIdAnswerPostResponses, AnswerRequestApiRequestsRequestIdAnswerPostErrors, ThrowOnError> => (options.client ?? client).post<AnswerRequestApiRequestsRequestIdAnswerPostResponses, AnswerRequestApiRequestsRequestIdAnswerPostErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/requests/{request_id}/answer',
     ...options,
     headers: {
@@ -225,7 +245,11 @@ export const answerRequestApiRequestsRequestIdAnswerPost = <ThrowOnError extends
  * list: "nothing to ask" and "nothing queued" are the same fact for a
  * server that holds no work, unlike ``/api/health``'s counts.
  */
-export const listRunsApiRunsGet = <ThrowOnError extends boolean = false>(options?: Options<ListRunsApiRunsGetData, ThrowOnError>): RequestResult<ListRunsApiRunsGetResponses, ListRunsApiRunsGetErrors, ThrowOnError> => (options?.client ?? client).get<ListRunsApiRunsGetResponses, ListRunsApiRunsGetErrors, ThrowOnError>({ url: '/api/runs', ...options });
+export const listRunsApiRunsGet = <ThrowOnError extends boolean = false>(options?: Options<ListRunsApiRunsGetData, ThrowOnError>): RequestResult<ListRunsApiRunsGetResponses, ListRunsApiRunsGetErrors, ThrowOnError> => (options?.client ?? client).get<ListRunsApiRunsGetResponses, ListRunsApiRunsGetErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/runs',
+    ...options
+});
 
 /**
  * Delete a run and everything under it
@@ -235,7 +259,11 @@ export const listRunsApiRunsGet = <ThrowOnError extends boolean = false>(options
  * Both halves are ``Ops.delete``'s, in that order and for its reason:
  * the attempts are killed against rows that still exist.
  */
-export const deleteRunApiRunsRunIdDelete = <ThrowOnError extends boolean = false>(options: Options<DeleteRunApiRunsRunIdDeleteData, ThrowOnError>): RequestResult<DeleteRunApiRunsRunIdDeleteResponses, DeleteRunApiRunsRunIdDeleteErrors, ThrowOnError> => (options.client ?? client).delete<DeleteRunApiRunsRunIdDeleteResponses, DeleteRunApiRunsRunIdDeleteErrors, ThrowOnError>({ url: '/api/runs/{run_id}', ...options });
+export const deleteRunApiRunsRunIdDelete = <ThrowOnError extends boolean = false>(options: Options<DeleteRunApiRunsRunIdDeleteData, ThrowOnError>): RequestResult<DeleteRunApiRunsRunIdDeleteResponses, DeleteRunApiRunsRunIdDeleteErrors, ThrowOnError> => (options.client ?? client).delete<DeleteRunApiRunsRunIdDeleteResponses, DeleteRunApiRunsRunIdDeleteErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/runs/{run_id}',
+    ...options
+});
 
 /**
  * One run, its attempts and its totals
@@ -247,7 +275,11 @@ export const deleteRunApiRunsRunIdDelete = <ThrowOnError extends boolean = false
  * in hand, so the in-flight nodes cost nothing, and the pending
  * requests are one indexed query over this run alone.
  */
-export const getRunApiRunsRunIdGet = <ThrowOnError extends boolean = false>(options: Options<GetRunApiRunsRunIdGetData, ThrowOnError>): RequestResult<GetRunApiRunsRunIdGetResponses, GetRunApiRunsRunIdGetErrors, ThrowOnError> => (options.client ?? client).get<GetRunApiRunsRunIdGetResponses, GetRunApiRunsRunIdGetErrors, ThrowOnError>({ url: '/api/runs/{run_id}', ...options });
+export const getRunApiRunsRunIdGet = <ThrowOnError extends boolean = false>(options: Options<GetRunApiRunsRunIdGetData, ThrowOnError>): RequestResult<GetRunApiRunsRunIdGetResponses, GetRunApiRunsRunIdGetErrors, ThrowOnError> => (options.client ?? client).get<GetRunApiRunsRunIdGetResponses, GetRunApiRunsRunIdGetErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/runs/{run_id}',
+    ...options
+});
 
 /**
  * Change a run's title or description
@@ -261,6 +293,7 @@ export const getRunApiRunsRunIdGet = <ThrowOnError extends boolean = false>(opti
  * attempts back would be a round trip for nothing.
  */
 export const editRunApiRunsRunIdPatch = <ThrowOnError extends boolean = false>(options: Options<EditRunApiRunsRunIdPatchData, ThrowOnError>): RequestResult<EditRunApiRunsRunIdPatchResponses, EditRunApiRunsRunIdPatchErrors, ThrowOnError> => (options.client ?? client).patch<EditRunApiRunsRunIdPatchResponses, EditRunApiRunsRunIdPatchErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/runs/{run_id}',
     ...options,
     headers: {
@@ -280,7 +313,11 @@ export const editRunApiRunsRunIdPatch = <ThrowOnError extends boolean = false>(o
  * call and very different events. It is omitted when there were none,
  * rather than sent as "0 attempts".
  */
-export const cancelRunApiRunsRunIdCancelPost = <ThrowOnError extends boolean = false>(options: Options<CancelRunApiRunsRunIdCancelPostData, ThrowOnError>): RequestResult<CancelRunApiRunsRunIdCancelPostResponses, CancelRunApiRunsRunIdCancelPostErrors, ThrowOnError> => (options.client ?? client).post<CancelRunApiRunsRunIdCancelPostResponses, CancelRunApiRunsRunIdCancelPostErrors, ThrowOnError>({ url: '/api/runs/{run_id}/cancel', ...options });
+export const cancelRunApiRunsRunIdCancelPost = <ThrowOnError extends boolean = false>(options: Options<CancelRunApiRunsRunIdCancelPostData, ThrowOnError>): RequestResult<CancelRunApiRunsRunIdCancelPostResponses, CancelRunApiRunsRunIdCancelPostErrors, ThrowOnError> => (options.client ?? client).post<CancelRunApiRunsRunIdCancelPostResponses, CancelRunApiRunsRunIdCancelPostErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/runs/{run_id}/cancel',
+    ...options
+});
 
 /**
  * A run's stored events
@@ -292,7 +329,11 @@ export const cancelRunApiRunsRunIdCancelPost = <ThrowOnError extends boolean = f
  * without switching shapes. `task.stream` is ephemeral and is never
  * stored, so it never appears in a page.
  */
-export const getEventsApiRunsRunIdEventsGet = <ThrowOnError extends boolean = false>(options: Options<GetEventsApiRunsRunIdEventsGetData, ThrowOnError>): RequestResult<GetEventsApiRunsRunIdEventsGetResponses, GetEventsApiRunsRunIdEventsGetErrors, ThrowOnError> => (options.client ?? client).get<GetEventsApiRunsRunIdEventsGetResponses, GetEventsApiRunsRunIdEventsGetErrors, ThrowOnError>({ url: '/api/runs/{run_id}/events', ...options });
+export const getEventsApiRunsRunIdEventsGet = <ThrowOnError extends boolean = false>(options: Options<GetEventsApiRunsRunIdEventsGetData, ThrowOnError>): RequestResult<GetEventsApiRunsRunIdEventsGetResponses, GetEventsApiRunsRunIdEventsGetErrors, ThrowOnError> => (options.client ?? client).get<GetEventsApiRunsRunIdEventsGetResponses, GetEventsApiRunsRunIdEventsGetErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/runs/{run_id}/events',
+    ...options
+});
 
 /**
  * The workflow's graph, for this run
@@ -304,7 +345,11 @@ export const getEventsApiRunsRunIdEventsGet = <ThrowOnError extends boolean = fa
  * list already says so with ``unregistered`` rather than pretending a
  * shape.
  */
-export const getGraphApiRunsRunIdGraphGet = <ThrowOnError extends boolean = false>(options: Options<GetGraphApiRunsRunIdGraphGetData, ThrowOnError>): RequestResult<GetGraphApiRunsRunIdGraphGetResponses, GetGraphApiRunsRunIdGraphGetErrors, ThrowOnError> => (options.client ?? client).get<GetGraphApiRunsRunIdGraphGetResponses, GetGraphApiRunsRunIdGraphGetErrors, ThrowOnError>({ url: '/api/runs/{run_id}/graph', ...options });
+export const getGraphApiRunsRunIdGraphGet = <ThrowOnError extends boolean = false>(options: Options<GetGraphApiRunsRunIdGraphGetData, ThrowOnError>): RequestResult<GetGraphApiRunsRunIdGraphGetResponses, GetGraphApiRunsRunIdGraphGetErrors, ThrowOnError> => (options.client ?? client).get<GetGraphApiRunsRunIdGraphGetResponses, GetGraphApiRunsRunIdGraphGetErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/runs/{run_id}/graph',
+    ...options
+});
 
 /**
  * A run's work log
@@ -316,7 +361,11 @@ export const getGraphApiRunsRunIdGraphGet = <ThrowOnError extends boolean = fals
  * an agent never sees are here — token counts are operator
  * information.
  */
-export const getLogApiRunsRunIdLogGet = <ThrowOnError extends boolean = false>(options: Options<GetLogApiRunsRunIdLogGetData, ThrowOnError>): RequestResult<GetLogApiRunsRunIdLogGetResponses, GetLogApiRunsRunIdLogGetErrors, ThrowOnError> => (options.client ?? client).get<GetLogApiRunsRunIdLogGetResponses, GetLogApiRunsRunIdLogGetErrors, ThrowOnError>({ url: '/api/runs/{run_id}/log', ...options });
+export const getLogApiRunsRunIdLogGet = <ThrowOnError extends boolean = false>(options: Options<GetLogApiRunsRunIdLogGetData, ThrowOnError>): RequestResult<GetLogApiRunsRunIdLogGetResponses, GetLogApiRunsRunIdLogGetErrors, ThrowOnError> => (options.client ?? client).get<GetLogApiRunsRunIdLogGetResponses, GetLogApiRunsRunIdLogGetErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/runs/{run_id}/log',
+    ...options
+});
 
 /**
  * Append an operator note to the work log
@@ -328,6 +377,7 @@ export const getLogApiRunsRunIdLogGet = <ThrowOnError extends boolean = false>(o
  * fan-out would claim a context it does not have (``Ops.append_log``).
  */
 export const appendLogApiRunsRunIdLogPost = <ThrowOnError extends boolean = false>(options: Options<AppendLogApiRunsRunIdLogPostData, ThrowOnError>): RequestResult<AppendLogApiRunsRunIdLogPostResponses, AppendLogApiRunsRunIdLogPostErrors, ThrowOnError> => (options.client ?? client).post<AppendLogApiRunsRunIdLogPostResponses, AppendLogApiRunsRunIdLogPostErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/runs/{run_id}/log',
     ...options,
     headers: {
@@ -345,7 +395,11 @@ export const appendLogApiRunsRunIdLogPost = <ThrowOnError extends boolean = fals
  * to its end and enqueues its successor, and that successor waits (04
  * §Operator operations). Killing running work is ``/cancel``.
  */
-export const pauseRunApiRunsRunIdPausePost = <ThrowOnError extends boolean = false>(options: Options<PauseRunApiRunsRunIdPausePostData, ThrowOnError>): RequestResult<PauseRunApiRunsRunIdPausePostResponses, PauseRunApiRunsRunIdPausePostErrors, ThrowOnError> => (options.client ?? client).post<PauseRunApiRunsRunIdPausePostResponses, PauseRunApiRunsRunIdPausePostErrors, ThrowOnError>({ url: '/api/runs/{run_id}/pause', ...options });
+export const pauseRunApiRunsRunIdPausePost = <ThrowOnError extends boolean = false>(options: Options<PauseRunApiRunsRunIdPausePostData, ThrowOnError>): RequestResult<PauseRunApiRunsRunIdPausePostResponses, PauseRunApiRunsRunIdPausePostErrors, ThrowOnError> => (options.client ?? client).post<PauseRunApiRunsRunIdPausePostResponses, PauseRunApiRunsRunIdPausePostErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/runs/{run_id}/pause',
+    ...options
+});
 
 /**
  * Move a run in the dispatch list
@@ -359,6 +413,7 @@ export const pauseRunApiRunsRunIdPausePost = <ThrowOnError extends boolean = fal
  * the two fields.
  */
 export const moveRunApiRunsRunIdPositionPost = <ThrowOnError extends boolean = false>(options: Options<MoveRunApiRunsRunIdPositionPostData, ThrowOnError>): RequestResult<MoveRunApiRunsRunIdPositionPostResponses, MoveRunApiRunsRunIdPositionPostErrors, ThrowOnError> => (options.client ?? client).post<MoveRunApiRunsRunIdPositionPostResponses, MoveRunApiRunsRunIdPositionPostErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/runs/{run_id}/position',
     ...options,
     headers: {
@@ -376,7 +431,11 @@ export const moveRunApiRunsRunIdPositionPost = <ThrowOnError extends boolean = f
  * attempt is gone — stays here and leaves ``/api/requests?pending=true``
  * (06 §Restart durability).
  */
-export const getRequestsApiRunsRunIdRequestsGet = <ThrowOnError extends boolean = false>(options: Options<GetRequestsApiRunsRunIdRequestsGetData, ThrowOnError>): RequestResult<GetRequestsApiRunsRunIdRequestsGetResponses, GetRequestsApiRunsRunIdRequestsGetErrors, ThrowOnError> => (options.client ?? client).get<GetRequestsApiRunsRunIdRequestsGetResponses, GetRequestsApiRunsRunIdRequestsGetErrors, ThrowOnError>({ url: '/api/runs/{run_id}/requests', ...options });
+export const getRequestsApiRunsRunIdRequestsGet = <ThrowOnError extends boolean = false>(options: Options<GetRequestsApiRunsRunIdRequestsGetData, ThrowOnError>): RequestResult<GetRequestsApiRunsRunIdRequestsGetResponses, GetRequestsApiRunsRunIdRequestsGetErrors, ThrowOnError> => (options.client ?? client).get<GetRequestsApiRunsRunIdRequestsGetResponses, GetRequestsApiRunsRunIdRequestsGetErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/runs/{run_id}/requests',
+    ...options
+});
 
 /**
  * Run a node again
@@ -388,6 +447,7 @@ export const getRequestsApiRunsRunIdRequestsGet = <ThrowOnError extends boolean 
  * branch that arrived late (04 §Failure and operator semantics).
  */
 export const rerunNodeApiRunsRunIdRerunPost = <ThrowOnError extends boolean = false>(options: Options<RerunNodeApiRunsRunIdRerunPostData, ThrowOnError>): RequestResult<RerunNodeApiRunsRunIdRerunPostResponses, RerunNodeApiRunsRunIdRerunPostErrors, ThrowOnError> => (options.client ?? client).post<RerunNodeApiRunsRunIdRerunPostResponses, RerunNodeApiRunsRunIdRerunPostErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/runs/{run_id}/rerun',
     ...options,
     headers: {
@@ -401,7 +461,11 @@ export const rerunNodeApiRunsRunIdRerunPost = <ThrowOnError extends boolean = fa
  *
  * Resume a `paused` run; 409 on anything else.
  */
-export const resumeRunApiRunsRunIdResumePost = <ThrowOnError extends boolean = false>(options: Options<ResumeRunApiRunsRunIdResumePostData, ThrowOnError>): RequestResult<ResumeRunApiRunsRunIdResumePostResponses, ResumeRunApiRunsRunIdResumePostErrors, ThrowOnError> => (options.client ?? client).post<ResumeRunApiRunsRunIdResumePostResponses, ResumeRunApiRunsRunIdResumePostErrors, ThrowOnError>({ url: '/api/runs/{run_id}/resume', ...options });
+export const resumeRunApiRunsRunIdResumePost = <ThrowOnError extends boolean = false>(options: Options<ResumeRunApiRunsRunIdResumePostData, ThrowOnError>): RequestResult<ResumeRunApiRunsRunIdResumePostResponses, ResumeRunApiRunsRunIdResumePostErrors, ThrowOnError> => (options.client ?? client).post<ResumeRunApiRunsRunIdResumePostResponses, ResumeRunApiRunsRunIdResumePostErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/runs/{run_id}/resume',
+    ...options
+});
 
 /**
  * One attempt and what was submitted for it
@@ -417,7 +481,11 @@ export const resumeRunApiRunsRunIdResumePost = <ThrowOnError extends boolean = f
  * header-only (12 §Task tokens), and ``TaskDetail`` has no field that
  * could carry one.
  */
-export const getTaskApiTasksTaskIdGet = <ThrowOnError extends boolean = false>(options: Options<GetTaskApiTasksTaskIdGetData, ThrowOnError>): RequestResult<GetTaskApiTasksTaskIdGetResponses, GetTaskApiTasksTaskIdGetErrors, ThrowOnError> => (options.client ?? client).get<GetTaskApiTasksTaskIdGetResponses, GetTaskApiTasksTaskIdGetErrors, ThrowOnError>({ url: '/api/tasks/{task_id}', ...options });
+export const getTaskApiTasksTaskIdGet = <ThrowOnError extends boolean = false>(options: Options<GetTaskApiTasksTaskIdGetData, ThrowOnError>): RequestResult<GetTaskApiTasksTaskIdGetResponses, GetTaskApiTasksTaskIdGetErrors, ThrowOnError> => (options.client ?? client).get<GetTaskApiTasksTaskIdGetResponses, GetTaskApiTasksTaskIdGetErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/tasks/{task_id}',
+    ...options
+});
 
 /**
  * Move a task's work to another node
@@ -431,6 +499,7 @@ export const getTaskApiTasksTaskIdGet = <ThrowOnError extends boolean = false>(o
  * branches that already landed.
  */
 export const moveTaskApiTasksTaskIdMovePost = <ThrowOnError extends boolean = false>(options: Options<MoveTaskApiTasksTaskIdMovePostData, ThrowOnError>): RequestResult<MoveTaskApiTasksTaskIdMovePostResponses, MoveTaskApiTasksTaskIdMovePostErrors, ThrowOnError> => (options.client ?? client).post<MoveTaskApiTasksTaskIdMovePostResponses, MoveTaskApiTasksTaskIdMovePostErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/tasks/{task_id}/move',
     ...options,
     headers: {
@@ -449,7 +518,11 @@ export const moveTaskApiTasksTaskIdMovePost = <ThrowOnError extends boolean = fa
  * with 409 ``conflict`` while the task is still going: a second attempt
  * of a task that already has one is two attempts of one task.
  */
-export const retryTaskApiTasksTaskIdRetryPost = <ThrowOnError extends boolean = false>(options: Options<RetryTaskApiTasksTaskIdRetryPostData, ThrowOnError>): RequestResult<RetryTaskApiTasksTaskIdRetryPostResponses, RetryTaskApiTasksTaskIdRetryPostErrors, ThrowOnError> => (options.client ?? client).post<RetryTaskApiTasksTaskIdRetryPostResponses, RetryTaskApiTasksTaskIdRetryPostErrors, ThrowOnError>({ url: '/api/tasks/{task_id}/retry', ...options });
+export const retryTaskApiTasksTaskIdRetryPost = <ThrowOnError extends boolean = false>(options: Options<RetryTaskApiTasksTaskIdRetryPostData, ThrowOnError>): RequestResult<RetryTaskApiTasksTaskIdRetryPostResponses, RetryTaskApiTasksTaskIdRetryPostErrors, ThrowOnError> => (options.client ?? client).post<RetryTaskApiTasksTaskIdRetryPostResponses, RetryTaskApiTasksTaskIdRetryPostErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/tasks/{task_id}/retry',
+    ...options
+});
 
 /**
  * Write a task's status
@@ -463,6 +536,7 @@ export const retryTaskApiTasksTaskIdRetryPost = <ThrowOnError extends boolean = 
  * ``Literal`` and a fourth value is a 422 before the engine is reached.
  */
 export const setStatusApiTasksTaskIdStatusPost = <ThrowOnError extends boolean = false>(options: Options<SetStatusApiTasksTaskIdStatusPostData, ThrowOnError>): RequestResult<SetStatusApiTasksTaskIdStatusPostResponses, SetStatusApiTasksTaskIdStatusPostErrors, ThrowOnError> => (options.client ?? client).post<SetStatusApiTasksTaskIdStatusPostResponses, SetStatusApiTasksTaskIdStatusPostErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/tasks/{task_id}/status',
     ...options,
     headers: {
@@ -481,7 +555,11 @@ export const setStatusApiTasksTaskIdStatusPost = <ThrowOnError extends boolean =
  * live one passes the ``seq_to`` of the ephemeral ``task.stream`` event
  * it just received (18) and appends what comes back.
  */
-export const getStreamApiTasksTaskIdStreamGet = <ThrowOnError extends boolean = false>(options: Options<GetStreamApiTasksTaskIdStreamGetData, ThrowOnError>): RequestResult<GetStreamApiTasksTaskIdStreamGetResponses, GetStreamApiTasksTaskIdStreamGetErrors, ThrowOnError> => (options.client ?? client).get<GetStreamApiTasksTaskIdStreamGetResponses, GetStreamApiTasksTaskIdStreamGetErrors, ThrowOnError>({ url: '/api/tasks/{task_id}/stream', ...options });
+export const getStreamApiTasksTaskIdStreamGet = <ThrowOnError extends boolean = false>(options: Options<GetStreamApiTasksTaskIdStreamGetData, ThrowOnError>): RequestResult<GetStreamApiTasksTaskIdStreamGetResponses, GetStreamApiTasksTaskIdStreamGetErrors, ThrowOnError> => (options.client ?? client).get<GetStreamApiTasksTaskIdStreamGetResponses, GetStreamApiTasksTaskIdStreamGetErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/tasks/{task_id}/stream',
+    ...options
+});
 
 /**
  * Every workflow this server can run
@@ -493,14 +571,22 @@ export const getStreamApiTasksTaskIdStreamGet = <ThrowOnError extends boolean = 
  * answers with an empty list: it runs no workflows, which is a fact
  * rather than a failure.
  */
-export const listWorkflowsApiWorkflowsGet = <ThrowOnError extends boolean = false>(options?: Options<ListWorkflowsApiWorkflowsGetData, ThrowOnError>): RequestResult<ListWorkflowsApiWorkflowsGetResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListWorkflowsApiWorkflowsGetResponses, unknown, ThrowOnError>({ url: '/api/workflows', ...options });
+export const listWorkflowsApiWorkflowsGet = <ThrowOnError extends boolean = false>(options?: Options<ListWorkflowsApiWorkflowsGetData, ThrowOnError>): RequestResult<ListWorkflowsApiWorkflowsGetResponses, ListWorkflowsApiWorkflowsGetErrors, ThrowOnError> => (options?.client ?? client).get<ListWorkflowsApiWorkflowsGetResponses, ListWorkflowsApiWorkflowsGetErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/workflows',
+    ...options
+});
 
 /**
  * One workflow
  *
  * One registered workflow, or 404 `unknown_workflow`.
  */
-export const getWorkflowApiWorkflowsNameGet = <ThrowOnError extends boolean = false>(options: Options<GetWorkflowApiWorkflowsNameGetData, ThrowOnError>): RequestResult<GetWorkflowApiWorkflowsNameGetResponses, GetWorkflowApiWorkflowsNameGetErrors, ThrowOnError> => (options.client ?? client).get<GetWorkflowApiWorkflowsNameGetResponses, GetWorkflowApiWorkflowsNameGetErrors, ThrowOnError>({ url: '/api/workflows/{name}', ...options });
+export const getWorkflowApiWorkflowsNameGet = <ThrowOnError extends boolean = false>(options: Options<GetWorkflowApiWorkflowsNameGetData, ThrowOnError>): RequestResult<GetWorkflowApiWorkflowsNameGetResponses, GetWorkflowApiWorkflowsNameGetErrors, ThrowOnError> => (options.client ?? client).get<GetWorkflowApiWorkflowsNameGetResponses, GetWorkflowApiWorkflowsNameGetErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/workflows/{name}',
+    ...options
+});
 
 /**
  * Submit a run
@@ -512,6 +598,7 @@ export const getWorkflowApiWorkflowsNameGet = <ThrowOnError extends boolean = fa
  * what flips it (03 §Run).
  */
 export const submitRunApiWorkflowsNameRunsPost = <ThrowOnError extends boolean = false>(options: Options<SubmitRunApiWorkflowsNameRunsPostData, ThrowOnError>): RequestResult<SubmitRunApiWorkflowsNameRunsPostResponses, SubmitRunApiWorkflowsNameRunsPostErrors, ThrowOnError> => (options.client ?? client).post<SubmitRunApiWorkflowsNameRunsPostResponses, SubmitRunApiWorkflowsNameRunsPostErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
     url: '/api/workflows/{name}/runs',
     ...options,
     headers: {
@@ -535,7 +622,11 @@ export const submitRunApiWorkflowsNameRunsPost = <ThrowOnError extends boolean =
  * ``exec``, or one whose file has been deleted since import — is a 404:
  * the workflow is registered, but this view of it does not exist.
  */
-export const getSourceApiWorkflowsNameSourceGet = <ThrowOnError extends boolean = false>(options: Options<GetSourceApiWorkflowsNameSourceGetData, ThrowOnError>): RequestResult<GetSourceApiWorkflowsNameSourceGetResponses, GetSourceApiWorkflowsNameSourceGetErrors, ThrowOnError> => (options.client ?? client).get<GetSourceApiWorkflowsNameSourceGetResponses, GetSourceApiWorkflowsNameSourceGetErrors, ThrowOnError>({ url: '/api/workflows/{name}/source', ...options });
+export const getSourceApiWorkflowsNameSourceGet = <ThrowOnError extends boolean = false>(options: Options<GetSourceApiWorkflowsNameSourceGetData, ThrowOnError>): RequestResult<GetSourceApiWorkflowsNameSourceGetResponses, GetSourceApiWorkflowsNameSourceGetErrors, ThrowOnError> => (options.client ?? client).get<GetSourceApiWorkflowsNameSourceGetResponses, GetSourceApiWorkflowsNameSourceGetErrors, ThrowOnError>({
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/api/workflows/{name}/source',
+    ...options
+});
 
 /**
  * Model Context Protocol server (streamable HTTP)
@@ -543,6 +634,7 @@ export const getSourceApiWorkflowsNameSourceGet = <ThrowOnError extends boolean 
  * The agent surface as MCP tools: `get_task`, `append_log`, `submit_result`, and — when the attempt's `ask_policy` is `http` — `ask_operator` and `wait_answer`. Authenticated by the same `X-Athanore-Token` header as `/api/agent/`; the task is the token's, so no tool takes a task id. The request and response bodies are MCP's own JSON-RPC and are opaque to this document.
  */
 export const mcpAgent = <ThrowOnError extends boolean = false>(options: Options<McpAgentData, ThrowOnError>): RequestResult<McpAgentResponses, McpAgentErrors, ThrowOnError> => (options.client ?? client).post<McpAgentResponses, McpAgentErrors, ThrowOnError>({
+    security: [{ name: 'X-Athanore-Token', type: 'apiKey' }],
     url: '/mcp/agent',
     ...options,
     headers: {
