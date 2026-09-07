@@ -342,7 +342,9 @@ async def test_a_timeout_kills_the_child_and_raises(
 
     assert agent.process is not None
     assert agent.process.returncode is not None, "no zombie"
-    assert "failed (timeout)" in (await stats_lines(ctx))[0]
+    lines = await stats_lines(ctx)
+    assert len(lines) == 1, "the timeout exit pays its bill once"
+    assert "failed (timeout)" in lines[0]
 
 
 async def test_a_command_that_does_not_exist_is_a_transport_failure(
@@ -399,7 +401,9 @@ async def test_a_shutdown_cancel_still_records(
             await task
 
     assert process.returncode is not None, "no zombie"
-    assert "failed (shutdown)" in (await stats_lines(ctx))[0]
+    lines = await stats_lines(ctx)
+    assert len(lines) == 1, "the cancelled exit pays its bill once, not twice"
+    assert "failed (shutdown)" in lines[0]
 
 
 # --------------------------------------------------------------------------
@@ -589,7 +593,13 @@ async def test_unknown_measurements_are_omitted_not_zeroed(
 async def test_one_entry_per_run_whatever_happened(
     served_context: Make, stats_lines: Read, script: dict[str, Any], raises: bool
 ) -> None:
-    """The ``finally`` records once, and only once, on every exit it has."""
+    """The ``finally`` records once, and only once, on every exit it has.
+
+    Three of T039a's five here; the other two need a child to look at
+    and a task to cancel, so the count is asserted beside the zombie in
+    ``test_a_timeout_kills_the_child_and_raises`` and
+    ``test_a_shutdown_cancel_still_records``.
+    """
 
     ctx = await served_context()
     agent = Fake(command=scenario(**script))

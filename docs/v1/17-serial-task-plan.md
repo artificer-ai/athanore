@@ -1709,6 +1709,14 @@ shutdown-cancel — and asserts one `[stats]` line each, with
 `returncode is not None` on the two that kill the child. Deleting the MVP
 files has nothing to delete (D65); their ledger rows are ticked.
 
+It landed **inside the T039 commit** (`6c3c772`, merged as `f596c2f`),
+which built T039, T039a and T039b in one pass — so `git log --grep
+"^T039a:"` finds nothing, and D124 is the sixteen choices the three of
+them made together. Re-verified on `feat/T039a`: the gate is green, and
+the timeout and shutdown-cancel exits now assert the *count* of `[stats]`
+lines rather than only the content of the first, which is what this
+task's **Tests** block asks for on all five.
+
 ### T039b — Tooling tiers in the façade (A2.10, D63)
 
 **Do.** `ACPAgent.tooling` attribute; in `run()` read `initialize`'s
