@@ -5,6 +5,44 @@ export type ClientOptions = {
 };
 
 /**
+ * ActionOut
+ *
+ * One action of the manifest, and the form the SPA renders for it.
+ */
+export type ActionOut = {
+    /**
+     * Confirm
+     *
+     * Whether the SPA asks for confirmation before calling it.
+     */
+    confirm: boolean;
+    /**
+     * Name
+     *
+     * The action's name, as its URL spells it.
+     */
+    name: string;
+    /**
+     * Schema
+     *
+     * JSON Schema of the input model — the form itself.
+     */
+    schema: {
+        [key: string]: unknown;
+    };
+    /**
+     * What has to be resolved before it can run.
+     */
+    scope: Slot;
+    /**
+     * Title
+     *
+     * What the button and the palette entry say.
+     */
+    title: string;
+};
+
+/**
  * AgentStats
  *
  * The stats entry of 05 §Stats entry verbatim.
@@ -1141,6 +1179,87 @@ export type Ok = {
 };
 
 /**
+ * PanelKind
+ *
+ * The renderer vocabulary of 09 §Panel kinds, one member per row.
+ *
+ * The kind fixes the shape ``source`` must return: ``markdown`` a
+ * string, ``kv`` an object, ``table`` ``{columns, rows}``, ``log`` a
+ * list of entries, ``chart`` ``{series, kind}``, ``dashboard``
+ * ``{note?, metrics, table?}``, ``form`` the name of an action, and
+ * ``custom`` nothing at all — the plugin's own web component reads what
+ * it needs through ``window.athanore``.
+ *
+ * A kind the SPA does not know renders a placeholder card rather than
+ * crashing the pane (09), so this enum is the server's vocabulary and
+ * not a promise about the browser's.
+ */
+export type PanelKind = 'markdown' | 'kv' | 'table' | 'log' | 'chart' | 'dashboard' | 'form' | 'custom';
+
+/**
+ * PanelOut
+ *
+ * One panel of the manifest (09 §Wire contract).
+ *
+ * ``source`` is the mounted URL of the route the panel's data comes
+ * from, or — for a ``form`` panel — the name of the action whose model
+ * is the form. ``node`` is present only on a panel that follows one;
+ * whether that node is *live* travels on the run's graph rather than
+ * here, because the manifest changes only on restart (08 §Graph
+ * semantics).
+ */
+export type PanelOut = {
+    /**
+     * Element
+     *
+     * The custom element tag a `custom` panel renders.
+     */
+    element?: string | null;
+    /**
+     * Which renderer draws it, and its data shape.
+     */
+    kind: PanelKind;
+    /**
+     * Name
+     *
+     * The panel's title, unique within its workflow.
+     */
+    name: string;
+    /**
+     * Node
+     *
+     * The node this panel follows, when it follows one.
+     */
+    node?: string | null;
+    /**
+     * Placement
+     *
+     * A pane of its own, or a card on the run overview.
+     */
+    placement: 'pane' | 'card';
+    /**
+     * Refresh On
+     *
+     * Event-name globs that invalidate this panel's data.
+     */
+    refresh_on?: Array<string>;
+    /**
+     * What has to be resolved before it can load.
+     */
+    scope: Slot;
+    /**
+     * Where the panel is shown (09 §Slots).
+     */
+    slot: Slot;
+    /**
+     * Source
+     *
+     * The URL its data comes from, or the action name for a form.
+     */
+    source?: string | null;
+};
+
+/**
  * PluginEvent
  *
  * ``plugin.<workflow>.<name>``: the vocabulary's open end.
@@ -1187,6 +1306,38 @@ export type PluginEvent = {
      * Task Id
      */
     task_id?: number | null;
+};
+
+/**
+ * PluginManifestEntry
+ *
+ * What one workflow contributes to the UI (09 §Wire contract).
+ */
+export type PluginManifestEntry = {
+    /**
+     * Actions
+     *
+     * Its actions, in declaration order.
+     */
+    actions?: Array<ActionOut>;
+    /**
+     * Assets
+     *
+     * URLs of the JavaScript modules the SPA injects for it.
+     */
+    assets?: Array<string>;
+    /**
+     * Panels
+     *
+     * Its panels, in declaration order.
+     */
+    panels?: Array<PanelOut>;
+    /**
+     * Workflow
+     *
+     * The workflow that declared these, or `_builtin` for the views the core ships.
+     */
+    workflow: string;
 };
 
 /**
@@ -2230,6 +2381,19 @@ export type SetStatus = {
      */
     status: 'ready' | 'cancelled' | 'dead_letter';
 };
+
+/**
+ * Slot
+ *
+ * Where a panel is shown — 09 §Slots, one member per row.
+ *
+ * ``run`` is a pane in the selected run's cycle or a card on its
+ * overview, ``task`` the task drawer, ``node`` a pane live only while
+ * the named node has a task in flight or has produced output,
+ * ``workflow`` the library's detail side, and ``global`` a pane shown
+ * when no run is selected.
+ */
+export type Slot = 'run' | 'task' | 'node' | 'workflow' | 'global';
 
 /**
  * SourceNode
@@ -3711,6 +3875,33 @@ export type MeApiMeGetResponses = {
 };
 
 export type MeApiMeGetResponse = MeApiMeGetResponses[keyof MeApiMeGetResponses];
+
+export type ManifestApiPluginsGetData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/plugins';
+};
+
+export type ManifestApiPluginsGetErrors = {
+    /**
+     * No operator token, on a bind that requires one.
+     */
+    401: ApiError;
+};
+
+export type ManifestApiPluginsGetError = ManifestApiPluginsGetErrors[keyof ManifestApiPluginsGetErrors];
+
+export type ManifestApiPluginsGetResponses = {
+    /**
+     * Response Manifest Api Plugins Get
+     *
+     * Successful Response
+     */
+    200: Array<PluginManifestEntry>;
+};
+
+export type ManifestApiPluginsGetResponse = ManifestApiPluginsGetResponses[keyof ManifestApiPluginsGetResponses];
 
 export type ListRequestsApiRequestsGetData = {
     body?: never;

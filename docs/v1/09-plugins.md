@@ -87,10 +87,15 @@ and the pane count changes accordingly (10 §Panes clamps the index).
 `task`) are resolved rows and every service is available. For `workflow`
 and `global` scopes `run_id`, `task_id`, `run`, `task` are `None`;
 `services.log`, `stream`, `submissions`, `requests` raise
-`PluginError(400, "no run in scope")` if called, while `services.run.list()`,
-`services.events.publish`, and `ops` (which take explicit run/task ids)
-work. Handlers never get a partially-resolved context: a `run_id` that
-exists but belongs to another workflow is a 404 before the handler runs.
+`PluginError(400, "no run in scope")` where they are reached for, while
+`services.run.list()`, `services.events.publish`, and `ops` (which take
+explicit run/task ids) work. The four run-scoped services belong to an
+*attempt*, so a run in scope without a task is
+`PluginError(400, "no task in scope")` — the same refusal one level in.
+`services.run.list()` lists the plugin's own workflow's runs and no
+others. Handlers never get a partially-resolved context: a `run_id` that
+exists but belongs to another workflow is a 404 before the handler runs,
+as is a `task_id` of another run and a `node` the workflow does not have.
 
 ### Escape hatch: web components
 
@@ -112,13 +117,25 @@ Nothing else. Any framework may be used inside the element.
 
 ## Registration and validation
 
-`server.register(wf)` collects declarations, then fails fast on: duplicate
-route/action/panel names within the workflow; an action or panel whose
-scope names a node that does not exist; a `custom` panel without an
-`element`; an `assets` directory that does not exist; an `on` naming an
-event outside the vocabulary (`plugin.*` excepted). Routers mount, the
-manifest entry is built. Errors at startup, never at runtime — the same
-contract the graph has.
+`server.register(wf)` collects declarations, then fails fast on six
+things:
+
+1. duplicate route/action/panel names within the workflow — routes clash
+   on a path *and* a method, actions and panels on their name;
+2. an action or panel whose scope names a node that does not exist, and a
+   panel in the `node` slot or scope that names none;
+3. a `custom` panel without an `element`;
+4. a `source` that names nothing this workflow declared — a route for the
+   data kinds, an action for `form`;
+5. an `assets` directory that does not exist;
+6. an `on` naming an event outside the vocabulary (`plugin.*` excepted,
+   and a `plugin.*` name must be the subscribing workflow's own
+   namespace).
+
+Routers mount, the manifest entry is built. Errors at startup, never at
+runtime — the same contract the graph has, and the refusal is a
+`PluginValidationError` (`PluginError` carries an HTTP status and belongs
+to a handler, not to registration).
 
 ## Wire contract
 
