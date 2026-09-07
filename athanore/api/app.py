@@ -37,6 +37,7 @@ from athanore.api.mcp import mount as mount_mcp
 from athanore.api.middleware import BodyLimitMiddleware
 from athanore.api.routers import agent, requests, runs, system, tasks, workflows
 from athanore.api.sse import router as sse_router
+from athanore.api.static import install_cors, mount_spa
 from athanore.engine import Engine
 from athanore.settings import AthanoreSettings
 from athanore.store.clock import now
@@ -99,9 +100,15 @@ def create_app(
     # refetches the plugin manifest whenever it changes (09).
     app.state.started_at = now()
 
-    # Outermost of the application's own middleware: the body cap has to
-    # run before anything reads a byte of the request (08 §Sizes).
+    # The body cap has to run before anything reads a byte of the
+    # request (08 §Sizes), so it is added first and everything the
+    # request passes through afterwards is inside it.
     app.add_middleware(BodyLimitMiddleware, limit=settings.body_limit)
+    # ...except CORS, which is added after and therefore wraps it: a
+    # preflight is answered without reaching the cap, and a 413 still
+    # carries the headers the browser needs to read it. Nothing at all
+    # when `cors_origins` is unset, which is the default (12).
+    install_cors(app, settings)
     install_error_handlers(app)
     app.include_router(system.router)
     app.include_router(workflows.router)
@@ -116,5 +123,10 @@ def create_app(
     # on a mounted ASGI application with its own auth at the door (08
     # §MCP). The manager it returns is what `lifespan` runs.
     app.state.mcp = mount_mcp(app, settings)
+    # The SPA at `/`, as the router's fallback rather than as a route:
+    # every route is matched first — including the ones a plugin
+    # registers after this call — and an unmatched path is the client
+    # router's (08 §Static).
+    mount_spa(app)
 
     return app
