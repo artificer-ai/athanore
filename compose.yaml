@@ -134,6 +134,10 @@ services:
       - athanore-pnpm-store:/home/agent/.local/share/pnpm/store
       - athanore-ms-playwright:/home/agent/ms-playwright
       - ${HOST_HOME}/.pi/agent/sessions:/home/agent/.pi/agent/sessions
+      # A workflow served from here spawns its agents in *this* container
+      # (`scripts/agent.sh`), so the `native` tier's extension has to be
+      # on pi's discovery path here too (D126).
+      - ${WORKSPACE}/examples/pi/extensions:/home/agent/.pi/agent/extensions:ro
       - ${MAIN_CHECKOUT}:${MAIN_CHECKOUT}
       - athanore-claude:/home/agent/.claude
       - ${HOST_HOME}/.gitconfig:/home/agent/.gitconfig:ro

@@ -19,6 +19,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import yaml
+
 from athanore.agents.acp import ACPAgent
 from pi import ATHANORE_EXTENSION, PI_ACP_VERSION, PiAgent, PiSessionStats
 
@@ -81,15 +83,32 @@ def test_the_sandbox_installs_the_extension() -> None:
     """`native` is only true where pi can find the extension.
 
     pi auto-discovers ``~/.pi/agent/extensions/*.ts``, and `compose.yaml`
-    puts this directory there for every service of the dev stack — which
-    is what makes an agent dispatched by `./scripts/agent.sh pi` a
-    ``native``-tier agent rather than one told about tools it has not got
-    (D126).
+    puts this directory there for every service built on the dev image
+    (D126): the agent services, which are dispatched *into*; `dev`, which
+    runs the gate and its `pi -e` smoke; and `app`, which serves a
+    workflow and — `scripts/agent.sh` in the container — spawns that
+    workflow's pi in its own container rather than a sibling. A service
+    on that image without the mount runs a pi that was told about five
+    tools it has not got, so the check is over the parsed file rather
+    than over a count of matching lines.
     """
 
-    compose = (ROOT / "compose.yaml").read_text(encoding="utf-8")
+    compose = yaml.safe_load((ROOT / "compose.yaml").read_text(encoding="utf-8"))
+    image = compose["x-build"]["image"]
+    sandboxes = {
+        name: service
+        for name, service in compose["services"].items()
+        if service.get("image") == image
+    }
+    assert {"dev", "app", "agent-pi"} <= set(sandboxes), sorted(sandboxes)
+
     mount = "${WORKSPACE}/examples/pi/extensions:/home/agent/.pi/agent/extensions:ro"
-    assert compose.count(mount) == 2, "the shared anchor and the dev service"
+    without = sorted(
+        name
+        for name, service in sandboxes.items()
+        if mount not in service.get("volumes", [])
+    )
+    assert without == [], f"pi runs there with no extension: {without}"
     assert ATHANORE_EXTENSION.parent == ROOT / "examples" / "pi" / "extensions"
 
 
