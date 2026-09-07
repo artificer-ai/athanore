@@ -2231,6 +2231,28 @@ fallback to `index.html` for non-`/api` paths), plugin assets mount hook
 HTML.
 **Done.** `tests/test_web_serve.py` deleted.
 
+**Status.** Done. `athanore/api/static.py` serves `athanore/web/dist` at
+`/` — a file when the path names one, `index.html` when it does not —
+carrying the content-security policy of 12 §Plugins on every document
+and asset it sends, a plugin's included. It is installed as
+`app.router.default` rather than as a `Mount` at `/`: a catch-all route
+matches every path, so it would shadow the plugin routes T070 registers
+after `create_app` and answer them with the SPA's document, where the
+router's fallback runs only once nothing matched and leaves the 405 and
+the slash redirect that come first alone (D136). `/api/…` and
+`/plugins/…` are the SPA's neither way: unmatched, they answer with the
+404 of 08 §Conventions, JSON with a `code`, so a typo'd endpoint is
+never a 200 of HTML. `dist/index.html` missing serves a "build the SPA"
+page naming `pnpm -C web build`, read per request, so a build under a
+running server needs no restart. `CORSMiddleware` is added only when
+`cors_origins` names an origin, with credentials off, and it wraps the
+body cap so a 413 still carries the headers a browser needs to read it.
+`mount_plugin_assets` is the seam T071 fills. The build serves the
+policy rather than fighting it: `web/vite.config.ts` sets
+`assetsInlineLimit: 0`, so every font subset is a file under `/assets`
+instead of the `data:` URL Vite's default inlined the smallest of them
+as — which `font-src 'self'` blocked (D136).
+
 ### T048 — OpenAPI metadata and snapshot (A3.7)
 
 **Do.** Tags per 08 §OpenAPI; `openapi_extra` security schemes `taskToken`

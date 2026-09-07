@@ -11,7 +11,7 @@ Nocturne tokens in [`design/nocturne.css`](design/nocturne.css).
 
 | Concern | Choice | Why |
 |---|---|---|
-| Build | Vite, TypeScript strict, pnpm | Output is copied to `athanore/web/dist` as package data |
+| Build | Vite, TypeScript strict, pnpm | Output is copied to `athanore/web/dist` as package data. `assetsInlineLimit: 0`: every asset is a file under `/assets`, never a `data:` URL, which is what keeps the Fonts row's `font-src 'self'` true of the build (12 §Plugins) |
 | UI | React 19 | |
 | Components | shadcn/ui (Radix primitives) on Tailwind v4 | Accessible primitives; the Nocturne tokens map onto its CSS variables |
 | Routing | TanStack Router | One route with search params (`?run=&pane=`) so the state is linkable; overlays are search params too |
