@@ -1811,6 +1811,30 @@ curl and no token.
 **Done.** Tests pass; smoke run in the sandbox shows `append_log` as a
 tool call in the transcript.
 
+**Status.** Done. `examples/pi/extensions/athanore.ts` registers the five
+tools of 08 §MCP with 19's wording, each one a call to the agent HTTP API
+with the token in the `X-Athanore-Token` header and nowhere else;
+`submit_result`'s input schema is fetched from `output_schema` on
+`GET {base}` at startup, and a task that declares none — or an athanore
+that cannot be reached — gets a permissive object plus a warning to the
+operator rather than a swallowed error. `examples/pi/agent.py` is the
+seat: `command = ["npx", "-y", "pi-acp@0.0.33"]`, `tooling = "native"`,
+`stats_provider = PiSessionStats()`. **The API half was already done and
+is still not buildable**: 08 has carried `output_schema?` on
+`GET /api/agent/tasks/{id}` since the initial commit, and
+`athanore/api/routers/` is empty until T045 — so the OpenAPI snapshot and
+the generated client are unchanged (the snapshot still has one path), and
+T045's **Do** above now names the field so it cannot be lost. The
+extension is installed by a **mount**, not an image copy (D126).
+`examples/tests/test_pi_extension.py` drives it three ways: `pi -e` in
+`--mode rpc` (which needs no model, and which a broken extension fails —
+asserted), a node harness that is the smallest possible `ExtensionAPI`,
+and a recording HTTP server the tools are actually called against.
+Smoke run observed in the sandbox on `openrouter/qwen/qwen3.8-27b`: the
+transcript carries `[tool_call] append_log`, the work log carries
+`smoke: the extension works`, and the `[stats]` line carries the cost and
+the model `PiSessionStats` read out of the session file.
+
 ### T041 — Phase 2 checkpoint
 
 **Do.** Full suite; `pyright` strict paths clean; 05 and 06 updated with
@@ -1914,6 +1938,8 @@ answer error code; inbox excludes stale.
 
 **Do.** `athanore/api/routers/agent.py` with `Depends(task_auth)`:
 `GET /tasks/{id}` (title, description from the run, `input = payload`,
+`output_schema` from `engine.live.context_for(id).output_model` when one
+is declared — 08 lists it and the `native` tier of T040a reads it — and
 the work log without `kind=stats` lines per D56), `POST /log`, `POST /submit` (read `ctx = engine.live.context_
 for(id)`; 409 if none; validate against `ctx.output_model` →
 `services.submissions.accept` or `reject` + 422 `{errors, schema}`, set

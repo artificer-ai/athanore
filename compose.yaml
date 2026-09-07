@@ -85,6 +85,12 @@ x-volumes: &volumes
   # pi writes its session JSONL here; athanore reads it for the token
   # counts in `[stats]` lines (05 §Stats).
   - ${HOST_HOME}/.pi/agent/sessions:/home/agent/.pi/agent/sessions
+  # The `native` tooling tier: pi auto-discovers extensions in
+  # ~/.pi/agent/extensions, and `examples/pi/extensions/athanore.ts` is
+  # the one that gives it athanore's five tools (05 §Tooling tiers, D63).
+  # Mounted rather than baked into the image so an edit to the extension
+  # is live in the next agent run, without a rebuild (D126).
+  - ${WORKSPACE}/examples/pi/extensions:/home/agent/.pi/agent/extensions:ro
   # The v0 checkout, at its own host path like everything else.
   - ${MAIN_CHECKOUT}:${MAIN_CHECKOUT}
   # Claude Code's credentials and settings live on a volume, not on a
@@ -105,6 +111,7 @@ services:
       - athanore-pnpm-store:/home/agent/.local/share/pnpm/store
       - athanore-ms-playwright:/home/agent/ms-playwright
       - ${HOST_HOME}/.pi/agent/sessions:/home/agent/.pi/agent/sessions
+      - ${WORKSPACE}/examples/pi/extensions:/home/agent/.pi/agent/extensions:ro
       - ${MAIN_CHECKOUT}:${MAIN_CHECKOUT}
       - athanore-claude:/home/agent/.claude
       - ${HOST_HOME}/.gitconfig:/home/agent/.gitconfig:ro
