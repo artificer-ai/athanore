@@ -216,7 +216,13 @@ nothing else so that one key is a prefix of every page of that resource
 (D155). Invalidations are coalesced per query key in a 250 ms window;
 the stream query appends from `after=seq` instead of refetching. Plugin
 panels register their `refresh_on` names in the same table at manifest
-load, and a name that is already a row joins it. The header's active
+load, and a name that is already a row joins it; a panel's names are
+**globs** (09 §Wire contract), so a panel that registered `task.*`
+refreshes on `task.done`, and `task.stream` is the one name no glob
+reaches — a panel wanting the stream's rate registers it exactly. A
+panel's key is `['panel', <source>]`, the prefix of every scoped copy of
+that panel's data, so one registration made before a run is selected
+reaches whichever run is (D158). The header's active
 count and the run list come from `GET /api/runs`, refetched on
 `run.*`/`task.*`. Server down: the header
 counts grey out, a banner shows a reconnect countdown, the last data stays

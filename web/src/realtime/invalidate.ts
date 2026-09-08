@@ -150,6 +150,12 @@ const refreshOnListeners = new Set<(names: readonly string[]) => void>()
  * The manifest is replaced wholesale — at boot and again whenever the
  * server's `started_at` changes (09) — so {@link clearRefreshOn} is how
  * a reload starts from a clean table.
+ *
+ * A name may be a glob. {@link panelsRefreshingOn} matches it as one;
+ * the feed, which has no wildcard to subscribe with, registers a
+ * listener for the literal name and never hears a frame by it — which
+ * costs nothing, because every glob a builtin or a plugin writes is over
+ * the vocabulary the feed already listens to in full (`sse.ts`).
  */
 export function registerRefreshOn(
   names: readonly string[],
@@ -167,9 +173,35 @@ export function clearRefreshOn(): void {
   refreshOn.clear()
 }
 
-/** The keys registered against `name`, in registration order. */
-export function panelsRefreshingOn(name: string): QueryKey[] {
+/**
+ * The keys registered against `name` exactly, ignoring the globs.
+ *
+ * What {@link Invalidator.handle} uses for `task.stream`, and the only
+ * place the distinction matters: a panel refreshing on `task.*` must not
+ * be refetched two or three times a second per streaming task, which is
+ * the same reason the table's own `task.*` row is never reached for that
+ * name (10 §Realtime and caching). A panel that genuinely wants the
+ * stream's rate says `task.stream` and gets it.
+ */
+function exactlyRefreshingOn(name: string): QueryKey[] {
   return refreshOn.get(name) ?? []
+}
+
+/**
+ * The keys the panels watching `name` want refetched.
+ *
+ * `refresh_on` is a list of event-name **globs** (09 §Wire contract), so
+ * a panel that registered `task.*` is matched by `task.done` — the same
+ * first-exact-then-glob matching the table itself uses, over the panels'
+ * registrations rather than over its own rows. An exact registration is
+ * not exclusive here as a table row is: two panels may watch one event
+ * by different spellings, and both of them meant it.
+ */
+export function panelsRefreshingOn(name: string): QueryKey[] {
+  const globbed = [...refreshOn.entries()]
+    .filter(([pattern]) => pattern.includes('*') && globMatches(pattern, name))
+    .flatMap(([, keys]) => keys)
+  return dedupeKeys([...exactlyRefreshingOn(name), ...globbed])
 }
 
 /**
@@ -302,8 +334,10 @@ export class Invalidator {
         void this.appendStream(event.task_id, event.data.seq_from)
       }
       // The transcript appends; anything else watching the name is a
-      // plugin panel, and it still gets its refetch.
-      for (const key of panelsRefreshingOn(event.name)) this.enqueue(key)
+      // plugin panel that named `task.stream` outright, and it still
+      // gets its refetch. A panel's `task.*` deliberately does not
+      // match here — see `exactlyRefreshingOn`.
+      for (const key of exactlyRefreshingOn(event.name)) this.enqueue(key)
       return
     }
 

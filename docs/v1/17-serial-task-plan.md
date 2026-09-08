@@ -2890,6 +2890,7 @@ node` params; `refresh_on` registered in the invalidation table.
 kind renders the placeholder without throwing; `refresh_on` registers
 the right query key; a `source` 500 renders an error card.
 **Done.** Overview and log panes render from the builtin sources.
+**Status.** Done.
 
 ### T063a — Overview renderer (A4.5)
 

@@ -119,3 +119,117 @@ export function graph(live: readonly string[]): GraphOut {
     })),
   }
 }
+
+/**
+ * One sample per data kind, in the shape 09 §Panel kinds gives it.
+ *
+ * The values are the design mock's own `PLUGINS.gamedev.playtest`
+ * (`docs/v1/design/Athanore.dc.html`) — the pane 10 §Panes item 6
+ * describes — so the renderers are tested against the data the design
+ * was drawn for rather than against something invented here.
+ */
+export const SAMPLES = {
+  /** `markdown`: `string`. */
+  markdown: [
+    '# playtest',
+    '',
+    'Runs the build headless and reports **frame timing** plus crash traces.',
+    '',
+    '| session | outcome |',
+    '| --- | --- |',
+    '| s-01 | clear |',
+    '| s-03 | crash |',
+    '',
+    '```python',
+    'assert fps > 55',
+    '```',
+  ].join('\n'),
+
+  /** `kv`: `dict`. */
+  kv: {
+    IMAGE: 'py312',
+    UPTIME: '14m',
+    MOUNTS: 3,
+    CRASHES: null,
+  },
+
+  /** `table`: `{columns: [{key, label, kind?}], rows: [{…}]}`. */
+  table: {
+    columns: [
+      { key: 'session', label: 'SESSION' },
+      { key: 'outcome', label: 'OUTCOME' },
+      { key: 'fps', label: 'FPS', kind: 'number' },
+    ],
+    rows: [
+      { session: 's-01', outcome: 'clear', fps: 61 },
+      { session: 's-02', outcome: 'clear', fps: 59.8 },
+      { session: 's-03', outcome: 'crash', fps: null },
+      { session: 's-04', outcome: 'clear', fps: 57.2 },
+    ],
+  },
+
+  /** `log`: `[{ts, text, level?}]`, with the `source` the builtin adds. */
+  log: [
+    {
+      ts: '2026-09-08T09:00:01Z',
+      source: 'engineering/engine',
+      text: 'engineering queued',
+      level: 'dim',
+    },
+    {
+      ts: '2026-09-08T09:00:02Z',
+      source: 'engineering/agent',
+      text: 'wrote the pane host',
+      level: 'default',
+    },
+    {
+      ts: '2026-09-08T09:00:03Z',
+      source: 'engineering/agent',
+      text: '[stats] 12480 tokens',
+      level: 'accent',
+    },
+    {
+      ts: '2026-09-08T09:00:04Z',
+      source: 'engineering/engine',
+      text: 'engineering → qa',
+      level: 'dim',
+    },
+  ],
+
+  /** `chart`: `{series: [{name, points: [[x, y]]}], kind: line|bar}`. */
+  chart: {
+    series: [
+      {
+        name: 'fps',
+        points: [
+          [1, 61],
+          [2, 59.8],
+          [3, 57.2],
+          [4, 58.9],
+        ],
+      },
+    ],
+    kind: 'line',
+  },
+
+  /** `dashboard`: `{note?, metrics: [{label, value}], table?}`. */
+  dashboard: {
+    note: 'Runs the build headless and reports frame timing plus crash traces.',
+    metrics: [
+      { label: 'SESSIONS', value: 12 },
+      { label: 'AVG FPS', value: 58.4 },
+      { label: 'CRASHES', value: 1 },
+    ],
+    table: {
+      columns: [
+        { key: 'session', label: 'SESSION' },
+        { key: 'outcome', label: 'OUTCOME' },
+        { key: 'fps', label: 'FPS', kind: 'number' },
+      ],
+      rows: [
+        { session: 's-01', outcome: 'clear', fps: 61 },
+        { session: 's-03', outcome: 'crash', fps: null },
+      ],
+    },
+  },
+} as const
