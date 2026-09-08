@@ -2826,6 +2826,7 @@ via a `data-down` attribute.
 **Tests.** Vitest: matcher precedence; coalescing merges duplicate keys;
 reconnect uses `after=lastId`; `resync` clears the cache.
 **Done.** Tests pass.
+**Status.** Done.
 
 ### T061 — Run list (A4.3)
 
