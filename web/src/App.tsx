@@ -9,11 +9,15 @@
  * shell owns no selection state of its own. The data does not arrive
  * until T059, so the counts on screen are the counts of what is on
  * screen, which is nothing.
+ *
+ * `ServerDownBanner` sits directly under the header and renders nothing
+ * while the event feed is up (10 §Realtime and caching).
  */
 import { Detail } from './components/Detail'
 import { Footer } from './components/Footer'
 import { Header } from './components/Header'
 import { RunList } from './components/RunList'
+import { ServerDownBanner } from './components/ServerDownBanner'
 import { Splitter } from './components/Splitter'
 import type { AppSearch } from './routes/search'
 
@@ -35,6 +39,7 @@ export default function App({
   return (
     <div className="text-body flex h-dvh flex-col overflow-hidden bg-background text-foreground">
       <Header />
+      <ServerDownBanner />
 
       <Splitter
         count={runCount}

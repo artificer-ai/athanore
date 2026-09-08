@@ -20,6 +20,38 @@ class NoLayoutResizeObserver implements ResizeObserver {
 
 globalThis.ResizeObserver ??= NoLayoutResizeObserver
 
+/**
+ * jsdom implements no `EventSource`, and `Providers` opens one for the
+ * event feed on mount (`src/realtime/sse.ts`) — without this, rendering
+ * anything inside the providers throws.
+ *
+ * It connects to nothing and dispatches nothing, which is the truth of
+ * the environment: jsdom has no network here. A test that wants to drive
+ * a feed passes `EventFeed` its own `open`, as `realtime/sse.test.ts`
+ * does, rather than reaching for this.
+ */
+class InertEventSource implements Partial<EventSource> {
+  static readonly CONNECTING = 0
+  static readonly OPEN = 1
+  static readonly CLOSED = 2
+
+  readonly readyState = InertEventSource.CONNECTING
+  readonly url: string
+
+  constructor(url: string) {
+    this.url = url
+  }
+
+  addEventListener(): void {}
+  removeEventListener(): void {}
+  dispatchEvent(): boolean {
+    return false
+  }
+  close(): void {}
+}
+
+globalThis.EventSource ??= InertEventSource as unknown as typeof EventSource
+
 afterEach(cleanup)
 
 /**

@@ -11,11 +11,16 @@
  * one the generated fetch client reads its credential from, so there is
  * exactly one query client per mounted app and nothing that can drift
  * from it.
+ *
+ * The event feed is opened here for the same reason: it keeps that one
+ * cache fresh (10 §Realtime and caching), it is one stream per tab, and
+ * a mount is exactly as long as it should live.
  */
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query'
 
 import { createAppQueryClient } from '../api/client'
+import { createAppEventFeed } from '../realtime/sse'
 
 /**
  * Wrap `children` in the app's providers.
@@ -32,6 +37,17 @@ export function Providers({
   children: ReactNode
 }) {
   const [queryClient] = useState(() => client ?? createAppQueryClient())
+
+  // Made inside the effect rather than in state: `StrictMode` invokes a
+  // state initialiser twice and keeps one of the two results, which
+  // would leave the tab's feed and the started feed as different
+  // objects. An effect is mounted, torn down and mounted again, so the
+  // one that survives is the one that ran last.
+  useEffect(() => {
+    const feed = createAppEventFeed(queryClient)
+    feed.start()
+    return () => feed.stop()
+  }, [queryClient])
 
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
 }

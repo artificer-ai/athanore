@@ -200,7 +200,7 @@ from the last seen id on reconnect. Invalidation table:
 const invalidations: Record<string, (e: Event) => QueryKey[]> = {
   "task.stream":  e => [["stream", e.task_id]],      // exact match wins; fetch after=seq, append
   "run.*":        e => [["runs"], ["run", e.run_id], ["graph", e.run_id]],
-  "task.*":       e => [["run", e.run_id], ["graph", e.run_id], ["task", e.task_id]],
+  "task.*":       e => [["runs"], ["run", e.run_id], ["graph", e.run_id], ["task", e.task_id]],
   "log.appended": e => [["log", e.run_id]],
   "request.*":    e => [["requests", e.run_id], ["inbox"]],
   "agent.stats":  e => [["run", e.run_id]],
@@ -209,11 +209,16 @@ const invalidations: Record<string, (e: Event) => QueryKey[]> = {
 ```
 
 Matching is first-exact-then-glob, so `task.stream` (2–3 per second per
-streaming task) never triggers the `task.*` refetches. Invalidations are
-coalesced per query key in a 250 ms window; the stream query appends
-from `after=seq` instead of refetching. Plugin panels register their
-`refresh_on` names in the same table at manifest load. The header's active count and the run list come from
-`GET /api/runs`, refetched on `run.*`/`task.*`. Server down: the header
+streaming task) never triggers the `task.*` refetches. The keys above
+name resources, not literal arrays: the implementation uses the
+generated query keys, each built from its query's path parameters and
+nothing else so that one key is a prefix of every page of that resource
+(D155). Invalidations are coalesced per query key in a 250 ms window;
+the stream query appends from `after=seq` instead of refetching. Plugin
+panels register their `refresh_on` names in the same table at manifest
+load, and a name that is already a row joins it. The header's active
+count and the run list come from `GET /api/runs`, refetched on
+`run.*`/`task.*`. Server down: the header
 counts grey out, a banner shows a reconnect countdown, the last data stays
 visible (the mock's `server-down placeholder` behaviour).
 
