@@ -54,12 +54,18 @@ function PaneFooter({ workflow }: { workflow: string }) {
 export function PaneRenderer({
   pane,
   scope,
+  node,
   onOpenTask,
+  onFilterNode,
 }: {
   pane: Pane
   scope: PanelScope
+  /** `?node=`: the node the event log is filtered to (10 §Panes). */
+  node?: string | undefined
   /** Open an attempt in the task drawer; the overview's rows use it. */
   onOpenTask?: ((taskId: number) => void) | undefined
+  /** Write `?node=`; the log pane's filter clears itself with it. */
+  onFilterNode?: ((node: string | undefined) => void) | undefined
 }) {
   const params = panelParams(pane.panel, scope)
   const query = usePanelSource(pane.panel, params)
@@ -69,7 +75,9 @@ export function PaneRenderer({
   // and an element nothing mounts costs nothing.
   const content = paneContent(pane, params, query, {
     scope,
+    node,
     onOpenTask,
+    onFilterNode,
     cards: <PanelCards scope={scope} onOpenTask={onOpenTask} />,
   })
 

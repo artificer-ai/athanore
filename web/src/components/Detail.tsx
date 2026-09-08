@@ -27,13 +27,19 @@ import { useUi } from '../store/ui'
 export function Detail({
   panes,
   taskId,
+  node,
   onOpenTask,
+  onFilterNode,
 }: {
   panes: PaneModel
   /** The focused attempt, from `?task=`: a `task`-scoped panel's id. */
   taskId?: number | undefined
+  /** `?node=`: the node the event log is filtered to (10 §Panes). */
+  node?: string | undefined
   /** Open an attempt in the task drawer: the overview's NODES rows. */
   onOpenTask?: ((taskId: number) => void) | undefined
+  /** Write `?node=`: the graph pane sets it, the log pane clears it. */
+  onFilterNode?: ((node: string | undefined) => void) | undefined
 }) {
   const focused = useUi((s) => s.focus === 'detail')
   const setFocus = useUi((s) => s.setFocus)
@@ -72,7 +78,9 @@ export function Detail({
             key={panes.current.id}
             pane={panes.current}
             scope={{ runId: panes.runId, taskId }}
+            node={node}
             onOpenTask={onOpenTask}
+            onFilterNode={onFilterNode}
           />
         )}
       </div>

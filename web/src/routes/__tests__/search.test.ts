@@ -5,8 +5,20 @@ import { OVERLAYS, validateAppSearch } from '../search'
 describe('validateAppSearch', () => {
   it('keeps every key it recognises', () => {
     expect(
-      validateAppSearch({ run: '01JD5', pane: 2, overlay: 'palette', task: 7 }),
-    ).toEqual({ run: '01JD5', pane: 2, overlay: 'palette', task: 7 })
+      validateAppSearch({
+        run: '01JD5',
+        pane: 2,
+        overlay: 'palette',
+        task: 7,
+        node: 'engineering',
+      }),
+    ).toEqual({
+      run: '01JD5',
+      pane: 2,
+      overlay: 'palette',
+      task: 7,
+      node: 'engineering',
+    })
   })
 
   it('accepts every overlay of 10 §Overlays', () => {
@@ -44,8 +56,14 @@ describe('validateAppSearch', () => {
     expect(validateAppSearch({ run: 42 })).toEqual({})
   })
 
+  it('drops a node filter that is not a non-empty string', () => {
+    expect(validateAppSearch({ node: '' })).toEqual({})
+    expect(validateAppSearch({ node: '   ' })).toEqual({})
+    expect(validateAppSearch({ node: 3 })).toEqual({})
+  })
+
   it('ignores keys it does not know', () => {
-    expect(validateAppSearch({ crt: true, node: 'gate' })).toEqual({})
+    expect(validateAppSearch({ crt: true, priority: 4 })).toEqual({})
   })
 
   it('drops nothing when the search is empty', () => {

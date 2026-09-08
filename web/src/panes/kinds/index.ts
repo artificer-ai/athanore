@@ -2,7 +2,9 @@
 export { ChartPane } from './ChartPane'
 export { DashboardPane } from './DashboardPane'
 export { KvPane } from './KvPane'
+export { Log } from './Log'
 export { LogPane } from './LogPane'
+export { LogRows } from './LogRows'
 export { MarkdownPane } from './MarkdownPane'
 export { MetricGrid } from './MetricGrid'
 export { Overview } from './Overview'
@@ -17,6 +19,15 @@ export {
   type Direction,
   type Sort,
 } from './format'
+export {
+  LOG_TONES,
+  appendError,
+  isProse,
+  isTailing,
+  logAuthor,
+  logLines,
+  logTone,
+} from './log'
 export {
   MIN_BAR_PERCENT,
   PREVIEW_LENGTH,

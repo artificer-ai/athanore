@@ -21,7 +21,10 @@ export function AppRoute() {
       onSelectRun={(runId) => {
         // Selection is the URL (10 §Layout): the run list holds none of
         // its own, so a click and a pasted link end in the same state.
-        void navigate({ search: (prev) => ({ ...prev, run: runId }) })
+        // `?node=` goes with it: a node filter is one run's graph, and
+        // carrying it to the next run would filter that run's log to a
+        // node it may not have.
+        void navigate({ search: (prev) => ({ ...prev, run: runId, node: undefined }) })
       }}
       onSelectPane={(index) => {
         // The pane index is a search parameter like the selection (10
@@ -33,6 +36,13 @@ export function AppRoute() {
         // The palette itself is T066a; the state it opens from is this
         // task's, and it is a search parameter like every other overlay.
         void navigate({ search: (prev) => ({ ...prev, overlay: 'palette' }) })
+      }}
+      onFilterNode={(node) => {
+        // `?node=` filters the event log (10 §Panes item 2). The graph
+        // pane writes it and the pane's own control clears it, both
+        // through here, so a filtered log is a link like every other
+        // view of this app.
+        void navigate({ search: (prev) => ({ ...prev, node }) })
       }}
       onOpenTask={(taskId) => {
         // The task drawer is `?overlay=task&task=`, the pair 10 §Layout

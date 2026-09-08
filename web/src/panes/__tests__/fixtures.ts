@@ -7,9 +7,10 @@
  * the cycle has a rule for — a run pane, a card, a node pane, a global
  * pane, and a second workflow to exclude by ownership.
  *
- * Below them, one sample per panel kind (`SAMPLES`) and the overview
- * pane's own two sides: what `GET /api/plugins/_builtin/overview`
- * answers with, and the `RunDetail` the pane reads beside it.
+ * Below them, one sample per panel kind (`SAMPLES`), the overview pane's
+ * own two sides — what `GET /api/plugins/_builtin/overview` answers
+ * with, and the `RunDetail` the pane reads beside it — and the event
+ * log's, which is its route's merged list and the run it belongs to.
  */
 import type {
   GraphOut,
@@ -17,6 +18,8 @@ import type {
   PluginManifestEntry,
   RunDetail,
   RunOutput,
+  RunStatus,
+  RunSummary,
   TaskView,
 } from '../../api/gen/types.gen'
 import type { TableColumn } from '../kinds'
@@ -401,3 +404,77 @@ export const FANNED_OUT: RunOutput[] = [
     value: 'beta ran clean',
   },
 ]
+
+/* -------------------------------------------------------------------- */
+/* The event log pane                                                    */
+/* -------------------------------------------------------------------- */
+
+/** The run the event-log fixtures below are about. */
+export const LOG_RUN = '01JD5XEVENTLOG0000000000'
+
+/**
+ * `GET /api/plugins/_builtin/log` for a run mid-flight.
+ *
+ * One list from two sources, as `athanore/plugins/builtin/log.py` sends
+ * it: work-log entries (`node/author`, the tone of what wrote them) and
+ * lifecycle events (`node/engine`, or bare `engine` where the payload
+ * named no node, each one sentence). Every field this pane reads is
+ * here — the three tones of 10 §Panes, an agent entry written in
+ * markdown, and the `node` the `?node=` filter narrows by.
+ *
+ * The `run.created` line is **last in the array and first in time**. The
+ * route sends the list merged, so nothing in the SPA depends on that
+ * being out of order — which is exactly why the fixture is: a pane that
+ * drew rows in the order they arrived would draw this one in the wrong
+ * place.
+ */
+export const EVENT_LOG = [
+  {
+    ts: '2026-09-08T09:00:01Z',
+    source: 'engineering/engine',
+    node: 'engineering',
+    text: 'architecture \u2192 engineering',
+    level: 'dim',
+  },
+  {
+    ts: '2026-09-08T09:00:02Z',
+    source: 'engineering/agent',
+    node: 'engineering',
+    text: '## report\n\nwrote the **pane host**',
+    level: 'default',
+  },
+  {
+    ts: '2026-09-08T09:00:03Z',
+    source: 'engineering/engine',
+    node: 'engineering',
+    text: '[stats] 12,480 tokens \u00b7 $0.03 \u00b7 41.2s',
+    level: 'accent',
+  },
+  {
+    ts: '2026-09-08T09:00:04Z',
+    source: 'qa/user',
+    node: 'qa',
+    text: 'looks *right* to me',
+    level: 'default',
+  },
+  {
+    ts: '2026-09-08T09:00:00Z',
+    source: 'engine',
+    text: 'run created in feature_build at position 1',
+    level: 'dim',
+  },
+]
+
+/** The run {@link EVENT_LOG} belongs to, in whatever status. */
+export function logRun(status: RunStatus = 'running'): RunSummary {
+  return {
+    id: LOG_RUN,
+    workflow: 'feature_build',
+    title: 'Rebuild run detail as a web pane set',
+    status,
+    position: 1,
+    current_nodes: status === 'running' ? ['engineering'] : [],
+    created: '2026-09-08T08:56:00Z',
+    updated: '2026-09-08T09:00:06Z',
+  }
+}
