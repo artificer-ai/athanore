@@ -23,6 +23,12 @@ export function AppRoute() {
         // its own, so a click and a pasted link end in the same state.
         void navigate({ search: (prev) => ({ ...prev, run: runId }) })
       }}
+      onSelectPane={(index) => {
+        // The pane index is a search parameter like the selection (10
+        // §Layout: `?run=&pane=`), so a link carries which pane was
+        // open, and the pane host clamps whatever it is given.
+        void navigate({ search: (prev) => ({ ...prev, pane: index }) })
+      }}
       onOpenPalette={() => {
         // The palette itself is T066a; the state it opens from is this
         // task's, and it is a search parameter like every other overlay.

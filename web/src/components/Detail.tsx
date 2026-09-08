@@ -2,25 +2,24 @@
  * The detail region on the right: the pane bar and the pane's scrolling
  * body (`docs/v1/10-frontend.md` §Layout).
  *
- * The panes themselves are the pane host's (T062) and come from the
- * plugin manifest, so the bar here carries only what the shell owns: the
- * cycle controls and the selected run's id from `?run=`. `◀`/`▶` are
- * disabled while there is no pane list to cycle — the shell will not
- * pretend to a pane count it does not have.
+ * It owns neither the bar nor the cycle. The bar is `panes/PaneBar` and
+ * which panes there are comes from the manifest through `usePanes`, so
+ * this file is the bar over a body, plus what to show when the cycle is
+ * empty. Drawing a pane's contents is `PaneRenderer`'s (T062a).
  *
- * The bar opens with the mock's `❮`, which collapses the run list to the
- * rail `Splitter` draws in its place; collapsed, the rail's own `❯` is
- * the way back, so the two are never on screen together.
+ * An empty cycle is a real state, not an error: a server with no
+ * workflows registered still carries the builtins (09 §Mounting), but a
+ * selection with no run and a build whose only `global` pane is the
+ * inbox will have one pane, and the manifest is a request that can still
+ * be in flight. Each of those reads differently and says so.
  */
-import type { AppSearch } from '../routes/search'
-import { usePrefs } from '../store/prefs'
+import { PaneBar } from '../panes/PaneBar'
+import type { PaneModel } from '../panes/usePanes'
 import { useUi } from '../store/ui'
 
-export function Detail({ search }: { search: AppSearch }) {
+export function Detail({ panes }: { panes: PaneModel }) {
   const focused = useUi((s) => s.focus === 'detail')
   const setFocus = useUi((s) => s.setFocus)
-  const listCollapsed = usePrefs((s) => s.listCollapsed)
-  const setListCollapsed = usePrefs((s) => s.setListCollapsed)
 
   return (
     <section
@@ -31,59 +30,26 @@ export function Detail({ search }: { search: AppSearch }) {
       onFocusCapture={() => setFocus('detail')}
       className="flex h-full min-h-0 min-w-0 flex-1 flex-col"
     >
-      <div className="bg-chrome flex flex-none flex-wrap items-center gap-x-[10px] gap-y-[6px] border-b border-border px-[12px] py-[6px]">
-        {!listCollapsed && (
-          <button
-            type="button"
-            onClick={() => setListCollapsed(true)}
-            aria-label="hide run list"
-            title="hide run list (b)"
-            className="text-hint rounded-lg border border-border px-[6px] py-px text-muted-foreground hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)]"
-          >
-            ❮
-          </button>
-        )}
+      <PaneBar panes={panes} />
 
-        <button
-          type="button"
-          disabled
-          aria-label="previous pane"
-          className="text-body px-[4px] text-[var(--color-accent-400)] disabled:text-[var(--color-neutral-700)]"
-        >
-          ◀
-        </button>
-        <span
-          data-testid="pane-label"
-          className="text-meta font-medium whitespace-nowrap tracking-[0.08em] text-[var(--color-accent-300)]"
-        >
-          {/* The pane cycle is read from the manifest in T062. */}—
-        </span>
-        <button
-          type="button"
-          disabled
-          aria-label="next pane"
-          className="text-body px-[4px] text-[var(--color-accent-400)] disabled:text-[var(--color-neutral-700)]"
-        >
-          ▶
-        </button>
-
-        <div className="flex-1" />
-
-        {search.run !== undefined && (
-          <>
-            <span className="text-hint text-muted-foreground">run</span>
-            <span
-              data-testid="selected-run"
-              className="text-meta text-[var(--color-neutral-400)]"
-            >
-              {search.run}
-            </span>
-          </>
+      {/* The panel itself is drawn by `PaneRenderer` in T062a; what the
+          host owns is the three states in which there is no panel to
+          draw. */}
+      <div
+        data-testid="pane-body"
+        data-pane={panes.current?.id}
+        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
+      >
+        {panes.current === undefined && (
+          <p className="text-row p-[12px_14px] text-muted-foreground" role="status">
+            {panes.isPending
+              ? 'loading panes…'
+              : panes.runId === undefined
+                ? 'no run selected'
+                : 'this run has no panes'}
+          </p>
         )}
       </div>
-
-      {/* Pane content arrives with the pane host in T062. */}
-      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto" />
     </section>
   )
 }
