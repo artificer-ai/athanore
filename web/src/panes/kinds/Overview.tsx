@@ -25,10 +25,8 @@
  * with no stats entry gets no bar, and a span nobody measured is `—`.
  * The formatting rules are `./overview.ts`.
  */
-import { useQuery } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 
-import { getRunApiRunsRunIdGetOptions } from '../../api/gen/@tanstack/react-query.gen'
 import type { RunDetail } from '../../api/gen/types.gen'
 import { taskTone, toneClass, tonePulses } from '../../components/RunList'
 import { cn } from '../../lib/utils'
@@ -45,6 +43,7 @@ import {
   tokenBars,
   type TokenBar,
 } from './overview'
+import { useRunDetail } from './run'
 import type { OverviewData, TableColumn, TableRow } from './shape'
 
 /**
@@ -260,29 +259,6 @@ function NodesTable({
       </div>
     </>
   )
-}
-
-/**
- * `GET /api/runs/{id}`, for the three facts the pane's own route does
- * not carry.
- *
- * The generated query, so its key is the one the invalidation table
- * refreshes on `run.*`, `task.*` and `agent.stats` (10 §Realtime and
- * caching) — the same three names the overview panel declares — and the
- * pane and its cards move together. `queryFn` is put back explicitly for
- * the reason `useRuns` does it: the generator declares it optional and
- * `exactOptionalPropertyTypes` will not assign it onto a required one.
- */
-function useRunDetail(runId: string | undefined): RunDetail | undefined {
-  const { queryFn, ...options } = getRunApiRunsRunIdGetOptions({
-    path: { run_id: runId ?? '' },
-  })
-  const { data } = useQuery({
-    ...options,
-    queryFn: queryFn!,
-    enabled: runId !== undefined,
-  })
-  return data
 }
 
 export function Overview({

@@ -82,9 +82,13 @@ describe('Detail', () => {
       </QueryClientProvider>,
     )
 
-    // What the pane draws is `PaneRenderer`'s; what the host owns is
-    // that the body stops standing in for a missing pane.
-    expect(screen.queryByRole('status')).toBeNull()
+    // What the pane draws is `PaneRenderer`'s — the agent stream says
+    // `loading the run…` here, and that status is the pane's own — so
+    // what the host owns is that the body stops standing in for a
+    // missing pane with one of its own three lines.
+    expect(screen.queryByText('this run has no panes')).toBeNull()
+    expect(screen.queryByText('loading panes…')).toBeNull()
+    expect(screen.queryByText('no run selected')).toBeNull()
     expect(screen.getByTestId('pane-body')).toHaveAttribute('data-pane', '_builtin:agent')
     expect(screen.getByTestId('pane-renderer')).toHaveAttribute('data-kind', 'custom')
   })

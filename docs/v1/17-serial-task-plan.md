@@ -2931,6 +2931,7 @@ tool_result → tool`); blinking caret while `live`; appends from
 event fetches `after=` and does not refetch the whole transcript; caret
 only while live.
 **Done.** Tests pass.
+**Status.** Done.
 
 ### T063d — Requests pane renderer (A4.5)
 

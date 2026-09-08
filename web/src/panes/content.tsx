@@ -41,11 +41,16 @@
  *   (`meta`, 15 D140), and the log pane is asked for a composer, a
  *   filter and markdown that a plugin's list of lines is not (10 §Panes
  *   item 2). {@link BUILTIN_RENDERERS} is the whole of that, and it is
- *   keyed by the panel's name on `_builtin` alone.
+ *   keyed by the panel's name on `_builtin` alone. The `custom` panels
+ *   the core ships — the agent stream, the requests pane, the graph rail
+ *   — go through {@link ELEMENT_RENDERERS} instead, keyed by their tag
+ *   and not by their workflow, because an element is a tag this build
+ *   knows how to draw and a plugin declaring the same one means it.
  */
 import type { ReactNode } from 'react'
 
 import {
+  AgentStream,
   ChartPane,
   DashboardPane,
   ErrorCard,
@@ -197,6 +202,30 @@ const BUILTIN_RENDERERS: Record<
 }
 
 /**
+ * The custom-element table: the tags this build renders itself.
+ *
+ * 09 §Builtins are plugins ships the operator views as `custom` panels
+ * — `<ath-agent-stream>`, `<ath-requests>`, `<ath-run-graph>` — and the
+ * SPA carries their renderers in its own bundle. What comes through the
+ * manifest is their *placement and liveness*, which is the whole point:
+ * the host has no hard-coded list of panes, only a list of tags it
+ * happens to know how to draw.
+ *
+ * A tag that is not in here is a plugin's own element, and it draws the
+ * placeholder below until T071 mounts one from the manifest's assets.
+ * That is the same degradation an unknown `kind` gets: an element this
+ * build cannot draw is never a crash.
+ */
+const ELEMENT_RENDERERS: Record<string, (ctx: RenderContext) => Content> = {
+  'ath-agent-stream': (ctx) => ({
+    // It virtualises, so it needs a viewport with a height rather than
+    // one that grows with its content — the same reason the log does.
+    scrolls: true,
+    node: <AgentStream runId={ctx.scope.runId} taskId={ctx.scope.taskId} />,
+  }),
+}
+
+/**
  * The renderer for `pane`'s kind over `data`, or the card that says why
  * there is none.
  *
@@ -271,20 +300,24 @@ export function renderKind(pane: Pane, data: unknown, ctx: RenderContext): Conte
           />
         ),
       }
-    case 'custom':
+    case 'custom': {
+      const element = pane.panel.element ?? undefined
+      const renderer = element === undefined ? undefined : ELEMENT_RENDERERS[element]
+      if (renderer !== undefined) return renderer(ctx)
       return {
         scrolls: false,
         node: (
           <PlaceholderCard
             title="this panel is a plugin element"
             detail={
-              pane.panel.element == null
+              element === undefined
                 ? 'plugin elements are not mounted yet'
-                : `<${pane.panel.element}> · plugin elements are not mounted yet`
+                : `<${element}> · plugin elements are not mounted yet`
             }
           />
         ),
       }
+    }
     default:
       return {
         scrolls: false,
