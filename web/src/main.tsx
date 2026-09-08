@@ -4,6 +4,8 @@ import { createRoot } from 'react-dom/client'
 import { RouterProvider } from '@tanstack/react-router'
 
 import './index.css'
+import { AppGate } from './app/AppGate'
+import { Providers } from './app/providers'
 import { router } from './routes/router'
 
 const container = document.getElementById('root')
@@ -23,5 +25,11 @@ const mount = (node: ReactNode) => root.render(<StrictMode>{node}</StrictMode>)
 if (import.meta.env.DEV && window.location.pathname === '/__tokens') {
   void import('./dev/Tokens.tsx').then(({ Tokens }) => mount(<Tokens />))
 } else {
-  mount(<RouterProvider router={router} />)
+  mount(
+    <Providers>
+      <AppGate>
+        <RouterProvider router={router} />
+      </AppGate>
+    </Providers>,
+  )
 }

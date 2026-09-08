@@ -258,6 +258,13 @@ overlay style), stores the token in `localStorage`, sends it as a bearer
 header, appends it as `access_token` on the SSE URL (08), and returns to
 the token screen on 401.
 
+The header is withheld from a server that has reported `auth: "off"`, and
+from no other request: `authenticated` describes the request that asked,
+so the `/api/me` a page boots with carries whatever token this browser
+holds — otherwise a good token would meet the token screen on every
+reload (D154). A stored token is therefore sent exactly once to a
+loopback server, which ignores it entirely (12), and never again.
+
 ## Design system (normative)
 
 Source: `design/nocturne.css` (tokens) and `design/Athanore.dc.html`

@@ -7,6 +7,11 @@
  * (`docs/v1/10-frontend.md` §Keyboard — `tab` moves it, `⏎` sends it to
  * the detail pane). It starts on the run list, which is where a fresh
  * page's first `↑`/`↓` should land.
+ *
+ * Whether the operator has to produce a token belongs here for the same
+ * reason: it is a fact about this tab's conversation with the server,
+ * true until the next answer from it, and a reload asks again rather
+ * than remembering (`docs/v1/10-frontend.md` §Auth in the browser).
  */
 import { create } from 'zustand'
 
@@ -18,6 +23,18 @@ export type Ui = {
   setFocus: (focus: FocusRegion) => void
   /** `tab`: move focus to the other region. */
   toggleFocus: () => void
+
+  /**
+   * Whether the operator token screen is what the app should be showing.
+   *
+   * The API client's 401 interceptor raises it (`src/api/client.ts`):
+   * any operator request the server refused means the token this browser
+   * holds is missing or no longer good, whichever endpoint found out.
+   * `AppGate` also raises it from `/api/me` alone, without a refusal,
+   * when the server says it wants a token and this caller has none.
+   */
+  needsToken: boolean
+  setNeedsToken: (needsToken: boolean) => void
 }
 
 export const useUi = create<Ui>()((set) => ({
@@ -25,4 +42,7 @@ export const useUi = create<Ui>()((set) => ({
   setFocus: (focus) => set({ focus }),
   toggleFocus: () =>
     set((state) => ({ focus: state.focus === 'list' ? 'detail' : 'list' })),
+
+  needsToken: false,
+  setNeedsToken: (needsToken) => set({ needsToken }),
 }))

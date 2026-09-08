@@ -21,3 +21,25 @@ class NoLayoutResizeObserver implements ResizeObserver {
 globalThis.ResizeObserver ??= NoLayoutResizeObserver
 
 afterEach(cleanup)
+
+/**
+ * jsdom implements no `fetch`, so the `Request` a test meets is node's,
+ * and node's has no document to resolve a relative URL against: the API
+ * client is configured with `baseUrl: ""` (`src/api/client.ts`), which
+ * is exactly what a browser resolves against the page and node rejects
+ * as `ERR_INVALID_URL`.
+ *
+ * Resolving against `window.location` here is what the browser does,
+ * which keeps the tests on the client's real configuration rather than
+ * on an absolute base no deployment uses.
+ */
+class DocumentRelativeRequest extends Request {
+  constructor(input: RequestInfo | URL, init?: RequestInit) {
+    super(
+      typeof input === 'string' ? new URL(input, window.location.href) : input,
+      init,
+    )
+  }
+}
+
+globalThis.Request = DocumentRelativeRequest

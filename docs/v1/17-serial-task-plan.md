@@ -2806,6 +2806,7 @@ prefs when `/api/me.auth === "token"`, and a 401 interceptor setting
 `retry: 1`. `useMe()` query; `AppGate` renders the token screen (T065)
 when needed, else the shell.
 **Done.** Loopback dev server shows data-free shell without prompting.
+**Status.** Done.
 
 ### T060 — SSE wrapper and invalidation table (A4.2)
 
