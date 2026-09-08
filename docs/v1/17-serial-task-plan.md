@@ -3182,6 +3182,47 @@ status) with the resulting `POST`.
 **Tests.** Vitest: each picker posts the right endpoint and body; move
 hides join nodes in the target list.
 **Done.** Tests pass.
+**Status.** Done. `overlays/EditRun.tsx` is the two fields 10 §Overlays
+allows and no third: `edit run` over `⌘⏎ save · esc cancel`, TITLE and
+DESCRIPTION prefilled from `GET /api/runs/{id}`, `cancel` and `save`,
+and one `PATCH /api/runs/{id}`. The mock's third word — priority —
+stays struck: a run's place in the dispatch list is the New Run
+overlay's POSITION and `POST /api/runs/{id}/position` (D34, D57), and a
+second way to do it here could disagree with the first. **Both fields
+travel on every save**, because an absent one means "leave it alone" on
+the wire (`EditRun` in `athanore/api/schemas/bodies.py`) and a panel
+that sent only what changed could never blank a description. The title
+is trimmed and refused empty here as `Ops.edit` refuses it there — the
+one precondition 04 §Operator operations gives the op — and the server
+stays the authority for everything else.
+
+`overlays/Pickers.tsx` is the four pickers as one overlay, because they
+are one thing: a palette-style list, a choice, and the `POST` that
+choice names. `t` lists the attempts that have **stopped** and posts
+`/api/tasks/{id}/retry`; `x` lists the ones still **going** and posts
+`/api/tasks/{id}/status {"status": "cancelled"}`; `m` lists every
+attempt, then the nodes, and posts `/api/tasks/{id}/move {node}`; `r`
+lists the nodes and posts `/api/runs/{id}/rerun {node}`. Rows are the
+`node · attempt n · #id · status` of 10 §Overlays, coloured by the app's
+one status table, newest first — a picker is not a timeline, and the
+attempt an operator reaches for is the one that just stopped.
+
+**Every list is what the op would accept.** `overlays/pickers.ts` holds
+the rules without a DOM: `retry` refuses a `ready`, `in_progress` or
+`waiting` task, so those are not offered; `cancel task` is its mirror,
+because cancelling an attempt that already finished would overwrite the
+status it earned; **`move` never offers a join**, which 04 §Fan-in
+refuses with a `409`; and `rerun` offers every node, joins included,
+since a join replays the arrivals the store holds. A picker with nothing
+eligible says which precondition left it empty rather than drawing an
+input over an empty box.
+
+**A refusal keeps the panel up and a success closes it.** A `409` is
+corrected by picking another row, so it is drawn on the panel; a call
+that landed has changed the run and reports on the toast surface. One
+action at a time, latched synchronously, for the reason D171 (1) gives:
+cmdk's `onSelect` fires on `⏎` as well as on a click, and none of these
+four can be un-done. D174 records the five decisions.
 
 ### T066e — Task drawer and keys overlay (A4.7)
 
