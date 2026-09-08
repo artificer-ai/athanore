@@ -54,6 +54,7 @@ import {
   ChartPane,
   DashboardPane,
   ErrorCard,
+  GraphRail,
   KvPane,
   Log,
   LogPane,
@@ -108,6 +109,18 @@ export type RenderContext = {
   node?: string | undefined
   /** Write `?node=`; the log pane's filter clears itself with it. */
   onFilterNode?: ((node: string | undefined) => void) | undefined
+  /**
+   * Open the event log on one node: `?node=`, and the log pane itself.
+   *
+   * Distinct from {@link RenderContext.onFilterNode}, which only writes
+   * the filter: 10 §Graph pane says clicking a graph row "jumps to the
+   * log pane filtered to that node", so the pane cycle moves too — and
+   * the pane host is where both halves are known, so it is one
+   * navigation rather than two racing ones.
+   */
+  onOpenNode?: ((node: string) => void) | undefined
+  /** `open definition`: the workflow library overlay (10 §Overlays). */
+  onOpenLibrary?: (() => void) | undefined
   /**
    * The `placement="card"` panels of the run in scope, ready to mount
    * (`./PanelCards.tsx`).
@@ -234,6 +247,22 @@ const ELEMENT_RENDERERS: Record<string, (ctx: RenderContext) => Content> = {
     // agent pane do, so the pane must not wrap it in a second one.
     scrolls: true,
     node: <Requests runId={ctx.scope.runId} />,
+  }),
+
+  // The rail list of 10 §Graph pane. Its own header and its own
+  // scroller, like the two above, because the EDGES column beside the
+  // rail is part of the pane's body rather than of a section poured
+  // into the host's scroller.
+  'ath-run-graph': (ctx) => ({
+    scrolls: true,
+    node: (
+      <GraphRail
+        runId={ctx.scope.runId}
+        taskId={ctx.scope.taskId}
+        onOpenNode={ctx.onOpenNode}
+        onOpenLibrary={ctx.onOpenLibrary}
+      />
+    ),
   }),
 }
 

@@ -57,6 +57,8 @@ export function PaneRenderer({
   node,
   onOpenTask,
   onFilterNode,
+  onOpenNode,
+  onOpenLibrary,
 }: {
   pane: Pane
   scope: PanelScope
@@ -66,6 +68,10 @@ export function PaneRenderer({
   onOpenTask?: ((taskId: number) => void) | undefined
   /** Write `?node=`; the log pane's filter clears itself with it. */
   onFilterNode?: ((node: string | undefined) => void) | undefined
+  /** Jump to the log pane filtered to a node; the graph's rows use it. */
+  onOpenNode?: ((node: string) => void) | undefined
+  /** Open the workflow library; the graph's `open definition` uses it. */
+  onOpenLibrary?: (() => void) | undefined
 }) {
   const params = panelParams(pane.panel, scope)
   const query = usePanelSource(pane.panel, params)
@@ -78,6 +84,8 @@ export function PaneRenderer({
     node,
     onOpenTask,
     onFilterNode,
+    onOpenNode,
+    onOpenLibrary,
     cards: <PanelCards scope={scope} onOpenTask={onOpenTask} />,
   })
 
