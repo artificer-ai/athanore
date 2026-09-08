@@ -3035,6 +3035,23 @@ or after any 401; SSE URL gains `access_token`.
 **Tests.** Vitest: 401 → screen; token stored and sent.
 **Done.** Works against `athanore serve --host 0.0.0.0` with a rotated
 token.
+**Status.** Done. `TokenScreen` is the overlay `AppGate` shows instead of
+the app: a password field, `save token`, and — once this browser holds
+one — `forget it`. Saving stores the token in `usePrefs`, marks
+everything this tab fetched without it stale, and asks `/api/me` again,
+which is the only answer that ends the screen; the field clears either
+way and the token is never rendered back. A token this browser holds
+while the screen is up is one the server refused, so the panel says so
+rather than repeating the invitation (D169). Clearing the stored token
+returns to the screen at once, without waiting for the next refusal.
+The backdrop, panel, code and button chrome of 10 §Overlays moved into
+`components/Curtain.tsx`, which `AppGate`'s two notices draw from too.
+The 401 interceptor is T059's and the stream's `access_token` is T060's;
+this task is what makes both reachable. Verified against `athanore serve
+--host 0.0.0.0` with a rotated token, in Chromium: the screen with no
+credential, `refused` with a wrong one, `forget it` back to the first,
+and the app with the right one — `GET /api/events?access_token=` 401,
+401, then 200, and the token itself in no log line.
 
 ### T066a — Command palette (A4.7)
 

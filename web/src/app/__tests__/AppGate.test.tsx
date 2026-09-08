@@ -31,6 +31,22 @@ function serve(me: Me) {
   return fetchMock
 }
 
+/**
+ * Answer `GET /api/me` as a server that accepts exactly `good`, which is
+ * what makes a token typed into the screen mean anything.
+ */
+function serveGuarded(good: string) {
+  const fetchMock = vi.fn(async (request: Request) => {
+    const authenticated = request.headers.get('Authorization') === `Bearer ${good}`
+    return new Response(
+      JSON.stringify({ ...LOOPBACK, auth: 'token', authenticated }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    )
+  })
+  vi.stubGlobal('fetch', fetchMock)
+  return fetchMock
+}
+
 function gate(queryClient: QueryClient = createAppQueryClient()) {
   return render(
     <Providers client={queryClient}>
@@ -72,11 +88,13 @@ describe('AppGate', () => {
     gate()
 
     expect(await screen.findByRole('dialog', { name: 'token required' })).toBeInTheDocument()
+    expect(screen.getByLabelText('operator token')).toBeInTheDocument()
     expect(screen.queryByTestId('shell')).toBeNull()
   })
 
   it('shows the shell when the server wants a token and this caller has it', async () => {
     serve({ ...LOOPBACK, auth: 'token', authenticated: true })
+    usePrefs.setState({ token: 's3cret' })
     gate()
 
     expect(await screen.findByTestId('shell')).toBeInTheDocument()
@@ -92,18 +110,32 @@ describe('AppGate', () => {
     expect(await screen.findByRole('dialog', { name: 'token required' })).toBeInTheDocument()
   })
 
-  it('asks the server again, from a clean slate', async () => {
-    serve({ ...LOOPBACK, auth: 'token', authenticated: false })
-    const queryClient = createAppQueryClient()
-    gate(queryClient)
+  it('shows the shell once the operator produces a token the server accepts', async () => {
+    const fetchMock = serveGuarded('s3cret')
+    gate()
     await screen.findByRole('dialog', { name: 'token required' })
 
-    const fetchMock = serve(LOOPBACK)
-    await userEvent.click(screen.getByRole('button', { name: 'try again' }))
+    await userEvent.type(screen.getByLabelText('operator token'), 's3cret')
+    await userEvent.click(screen.getByRole('button', { name: 'save token' }))
 
     expect(await screen.findByTestId('shell')).toBeInTheDocument()
-    expect(fetchMock).toHaveBeenCalled()
+    expect(usePrefs.getState().token).toBe('s3cret')
     expect(useUi.getState().needsToken).toBe(false)
+    expect(fetchMock.mock.calls.at(-1)?.[0].headers.get('Authorization')).toBe(
+      'Bearer s3cret',
+    )
+  })
+
+  it('returns to the token screen when the stored token is cleared', async () => {
+    serveGuarded('s3cret')
+    usePrefs.setState({ token: 's3cret' })
+    gate()
+    expect(await screen.findByTestId('shell')).toBeInTheDocument()
+
+    usePrefs.getState().setToken(null)
+
+    expect(await screen.findByRole('dialog', { name: 'token required' })).toBeInTheDocument()
+    expect(screen.queryByTestId('shell')).toBeNull()
   })
 
   it('reports a server that is not there, and retries on the operator’s word', async () => {
