@@ -2843,6 +2843,23 @@ by `run.*`/`task.*`.
 class per status.
 **Done.** Live list updates when a run is submitted from the CLI.
 
+**Status.** Done. `web/src/components/RunList/` is the whole left half:
+`useRunListModel` reads `GET /api/runs` through the generated query
+options — one cached copy behind the header's counts, the chips, the rows
+and the collapsed rail, so the four cannot disagree and all four move when
+T060's table invalidates `listRunsApiRunsGet` on `run.*`/`task.*`. The grid
+is the mock's six columns to the pixel: an 8-character run id, the
+workflow in accent-2-400, the title, an outlined status pill in the colour
+10 §Status colours gives its state, the current nodes joined by ` · ` with
+`⚠` after them while a request is unanswered, and a humanised age. Rows
+zebra-stripe, and the selected one — the run `?run=` names, never a
+selection the list holds itself — takes the flat
+`color-mix(accent 12%, surface)` tint and the 2 px accent left border.
+Filtering is client-side over the whole list the server returned, on the
+title and the id, behind a Radix `ToggleGroup` of workflow chips and the
+`/` input, both of which the header strip renders. D156 records the seven
+choices.
+
 ### T062 — Pane host: `usePanes`, `PaneBar`, index rules (A4.4)
 
 **Do.** `usePanes(runId)`: manifest (`/api/plugins`) → builtins first,

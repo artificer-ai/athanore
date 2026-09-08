@@ -23,6 +23,28 @@ import { create } from 'zustand'
 /** The two regions that take focus: the run list and the detail pane. */
 export type FocusRegion = 'list' | 'detail'
 
+/** The workflow chip that means "do not filter by workflow" (10 §Layout). */
+export const ALL_WORKFLOWS = 'all'
+
+/**
+ * What the run list is filtered to: the header's chip and its `/` input.
+ *
+ * Both are client-side (T061): `GET /api/runs` takes `?status` and
+ * `?workflow`, but a run list is small and returns whole (08
+ * §Conventions), so narrowing it in the browser costs one array pass and
+ * keeps the one cached copy of the resource that the invalidation table
+ * refreshes. They are not search parameters either: 10 §Layout's list of
+ * what makes a view *that view* is `run`, `pane`, `overlay` and `task`,
+ * and `src/routes/search.ts` drops everything else.
+ *
+ * `workflow` is {@link ALL_WORKFLOWS} or a workflow name; `query` is the
+ * raw text, matched against a row's title and id.
+ */
+export type RunFilter = {
+  workflow: string
+  query: string
+}
+
 /**
  * Whether this tab is hearing from the server (`src/realtime/sse.ts`).
  *
@@ -66,6 +88,11 @@ export type Ui = {
    */
   feed: Feed
   setFeed: (feed: Feed) => void
+
+  /** The run list's chip and `/` input (T061). */
+  runFilter: RunFilter
+  setRunWorkflow: (workflow: string) => void
+  setRunQuery: (query: string) => void
 }
 
 export const useUi = create<Ui>()((set) => ({
@@ -79,4 +106,9 @@ export const useUi = create<Ui>()((set) => ({
 
   feed: { status: 'reconnecting', retryAt: null },
   setFeed: (feed) => set({ feed }),
+
+  runFilter: { workflow: ALL_WORKFLOWS, query: '' },
+  setRunWorkflow: (workflow) =>
+    set((state) => ({ runFilter: { ...state.runFilter, workflow } })),
+  setRunQuery: (query) => set((state) => ({ runFilter: { ...state.runFilter, query } })),
 }))
