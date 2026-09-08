@@ -88,6 +88,15 @@ class ImplementerAgent(SandboxAgent):
         "pattern names the gate command matches the polling loop's own "
         "command line, so the loop never exits and the task hangs "
         "forever.\n"
+        "- When the task touches the SPA, open it in a real browser before "
+        "you submit. jsdom resolves neither the cascade nor layout, so a "
+        "green vitest suite proves nothing about invisible text, wrong "
+        "colours or collapsed panes. Chromium is in the image at "
+        "`$PLAYWRIGHT_BROWSERS_PATH/chromium-*/chrome-linux64/chrome` "
+        "(Playwright's npm package only arrives at T068a): "
+        "`--headless --no-sandbox --dump-dom <url>` gives the post-JS "
+        "DOM, `--screenshot=<path>` a frame, and "
+        "`--remote-debugging-port=9222` the computed styles.\n"
         "- Append your deliverable to the work log, then submit a TaskReport."
     )
 
