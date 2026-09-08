@@ -2710,7 +2710,9 @@ was found to report.
 
 **Do.** Finish `gen-theme.mjs` output: status colour utilities
 (`.text-status-ok` … from the 10 table), type scale classes (`text-metric`
-15/500, `text-body` 12, `text-row` 11.5, `text-secondary` 11,
+15/500, `text-body` 12, `text-row` 11.5, `text-meta` 11 — the 11 px
+secondary step, named `meta` because `secondary` is a shadcn colour role
+and Tailwind derives `.text-secondary` from it (D151) —
 `text-kicker` 10.5 uppercase tracking `.12em`), surfaces (`bg-chrome` =
 `color-mix(in srgb, var(--color-surface) 45%, var(--color-bg))`,
 `bg-zebra` 60 %), `ath-pulse` and `ath-caret` keyframes with a
@@ -2720,6 +2722,19 @@ Storybook is not used; instead `web/src/dev/Tokens.tsx` renders every
 token and component primitive at `/__tokens` in dev only.
 **Done.** `pnpm gen:theme` idempotent; `/__tokens` matches the mock's
 palette by eye against `Athanore.dc.html`.
+
+**Status.** Done. `gen-theme.mjs` now emits the seven status colours
+as `text-`/`border-` utilities, the six type-scale classes, `bg-chrome`
+and `bg-zebra`, and the two keyframes copied out of `nocturne.css`
+behind a `prefers-reduced-motion` guard — no glow, no scan or flicker,
+no `--radius` override. It writes `src/styles/tokens.gen.ts` beside the
+stylesheet, and `src/dev/Tokens.tsx` renders every token and utility at
+`/__tokens`, reached by a dev-only dynamic import in `main.tsx`. D150
+records the six choices; 10 §Type and density is corrected to D71. The
+11 px step is `text-meta`: `text-secondary` shared its class with the
+colour utility Tailwind derives from the shadcn `secondary` role, so the
+generator now refuses such a name and the theme suite compiles the
+stylesheet and reads the rules back out (D151).
 
 ### T058 — App shell: router, client state, layout regions (A4.1)
 

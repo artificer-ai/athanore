@@ -305,7 +305,9 @@ Source: `design/nocturne.css` (tokens) and `design/Athanore.dc.html`
   headers `6px 14px`, rows `4px 12px`, tiles `8px 10px`, 1 px gaps
   between tiles on a neutral-900 ground). The Nocturne `--space-*`
   scale is available for anything the mock does not size.
-- Radius 2 px on everything; 1 px on keycaps.
+- Radius: Nocturne's 8 px (`--radius`) throughout. The mock's old 2 px
+  override went with the CRT chrome, so the app does not declare one
+  (D71); `--ath-radius` is copied into the theme and left unused.
 - Surfaces: `--color-bg` page; `--color-surface` cards, tiles, overlays;
   `color-mix(surface 45%, bg)` chrome strips (header, list header, pane
   bar, footer); `color-mix(surface 60%, bg)` zebra rows and tool blocks.
@@ -313,8 +315,9 @@ Source: `design/nocturne.css` (tokens) and `design/Athanore.dc.html`
   dividers and table frames; the header carries a faded accent rule
   (transparent → accent 75 % → transparent, 48 px inset each side) as
   the one Nocturne "fading rule" in the app.
-- Glow: accent labels (brand, pane label, keycaps, running status) carry
-  `text-shadow: 0 0 8–12px color-mix(accent 50–70%, transparent)`.
+- No glow: the mock carries no `text-shadow` on accent labels, and the
+  theme generates no glow utility (D71). Accent labels are
+  `--color-accent-300` text and nothing more.
 
 ### Components (mock → shadcn)
 
