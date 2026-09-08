@@ -14,7 +14,14 @@
  * cannot correct goes to the toast surface, not how that surface looks.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -81,6 +88,28 @@ function stubServer(
         status: reply.status,
         headers: { 'Content-Type': 'application/json' },
       })
+    }),
+  )
+
+  return sent
+}
+
+/**
+ * A server that records the request and never answers it.
+ *
+ * The workflows are already cached by the time a test wants this, so the
+ * only request it ever takes is the submission — held open, which is the
+ * only way to ask what a second press does while the first is still out.
+ */
+function hangingServer(): Sent[] {
+  const sent: Sent[] = []
+
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (request: Request) => {
+      const body = request.body === null ? undefined : await request.clone().json()
+      sent.push({ url: request.url, method: request.method, body })
+      return new Promise<Response>(() => {})
     }),
   )
 
@@ -259,6 +288,70 @@ describe('NewRun', () => {
       expect(onClose).toHaveBeenCalledTimes(1)
     })
     expect(posts(sent)[0]?.body).toEqual({ title: 'a run', description: 'a note' })
+  })
+
+  it('takes one submission at a time, ⌘⏎ included (D171 (1))', async () => {
+    const { user, onClose } = await open()
+    // A server that takes the POST and never answers, so the first
+    // submission is still out when the second ⌘⏎ arrives — which is the
+    // whole test: a run cannot be un-queued, and `submit run` going
+    // `disabled` does nothing about a keystroke that never touches it.
+    const sent = hangingServer()
+
+    await user.type(screen.getByLabelText('TITLE'), 'a run')
+    await user.keyboard('{Meta>}{Enter}{/Meta}')
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'submit run' })).toBeDisabled()
+    })
+    expect(posts(sent)).toHaveLength(1)
+
+    // Once with the pending state on screen, and once more in the same
+    // tick as the render that put it there.
+    await user.keyboard('{Meta>}{Enter}{/Meta}')
+    fireEvent.keyDown(screen.getByTestId('new-run-form'), {
+      key: 'Enter',
+      metaKey: true,
+    })
+    // Long enough for a submission that was going to happen to have
+    // happened: validation resolves in a microtask and `mutate` calls
+    // `fetch` in the next one.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(posts(sent)).toHaveLength(1)
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('submits again after either refusal: the latch is not a one-shot', async () => {
+    const { user, onClose } = await open()
+    const refused = stubServer({
+      submit: { status: 409, body: { error: 'unknown workflow' } },
+    })
+
+    // Refused by the form, so nothing went out...
+    await user.click(screen.getByLabelText('TITLE'))
+    await user.keyboard('{Meta>}{Enter}{/Meta}')
+    await screen.findByTestId('new-run-title-error')
+    expect(posts(refused)).toHaveLength(0)
+
+    // ...refused by the server, which is the failure the form stands
+    // up under (D171 (1))...
+    await user.type(screen.getByLabelText('TITLE'), 'a run')
+    await user.keyboard('{Meta>}{Enter}{/Meta}')
+    await screen.findByTestId('new-run-error')
+    expect(posts(refused)).toHaveLength(1)
+
+    // ...and taken, once the operator has changed what was wrong.
+    const sent = stubServer()
+    await user.click(screen.getByRole('radio', { name: 'gamedev' }))
+    await user.keyboard('{Meta>}{Enter}{/Meta}')
+
+    await waitFor(() => {
+      expect(onClose).toHaveBeenCalledTimes(1)
+    })
+    expect(posts(sent)).toHaveLength(1)
   })
 
   it('blocks an empty title without asking the server', async () => {

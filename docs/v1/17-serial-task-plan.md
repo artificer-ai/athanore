@@ -3110,7 +3110,12 @@ calls of D57: `POST /api/workflows/{name}/runs`, then, for `top` only,
 second's refusal is carried out rather than swallowed: a failed submit
 leaves the form standing with the message under it, a failed *move*
 closes the overlay and toasts, because the run exists by then and
-pressing the button again would queue a second one. The header's
+pressing the button again would queue a second one. For that same
+reason the panel takes one submission at a time: `submit run` goes
+`disabled` while one is out, and ⌘⏎ — which never consults the button —
+goes through the same latch, taken synchronously, because the pending
+state arrives a render later and validation a microtask later still.
+The header's
 `＋ new run` is on the strip with this task, since `?overlay=new` is now
 something to open. Verified in Chromium against `./scripts/run.sh`:
 `＋ new run` opens the panel with the caret in TITLE and `prepare` in

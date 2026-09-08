@@ -32,6 +32,14 @@
  * on it and says in a toast that the run is at the bottom. Pressing the
  * button again there would submit a second run.
  *
+ * **One submission at a time**, for that same reason and before it: a
+ * queued run cannot be un-queued, so the panel takes one `submit` and
+ * refuses the rest until it lands. `submit run` goes `disabled`, but
+ * that is only what the operator sees — ⌘⏎ reaches the form whatever the
+ * button looks like, and both of them go through one latch that is taken
+ * synchronously, because the pending state arrives a render later and
+ * validation resolves a microtask later still.
+ *
  * The focus round trip is the palette's, for the palette's reason
  * (`./Palette.tsx`): this dialog opens from a search parameter and has
  * no `Dialog.Trigger`, so Radix would hand focus back to `<body>`. The
@@ -261,6 +269,15 @@ function NewRunForm({
   const queryClient = useQueryClient()
   const setRunWorkflow = useUi((state) => state.setRunWorkflow)
   const setRunQuery = useUi((state) => state.setRunQuery)
+  // Whether a submission is under way. A ref and not
+  // `submission.isPending`, because it has to be true the instant the
+  // operator asks for one: ⌘⏎ can arrive again before React has
+  // re-rendered with the pending state, and a second submission is a
+  // second queued run — the duplicate D171 (1) exists to avoid, and the
+  // one thing on this panel that cannot be undone. `submit run` goes
+  // `disabled` off the rendered state for what a button owes the
+  // operator: looking unavailable. This is what makes it unavailable.
+  const sending = useRef(false)
 
   const { control, formState, handleSubmit, register } = useForm<NewRunValues>({
     resolver: zodResolver(newRunSchema),
@@ -309,6 +326,11 @@ function NewRunForm({
       toast(error.message)
       settle()
     },
+    // Both landings, so a refused submit — the one failure the form
+    // stays up for — can be corrected and sent again.
+    onSettled: () => {
+      sending.current = false
+    },
   })
 
   // `useWatch` and not `watch`: the subscribing form of it is the one
@@ -323,9 +345,28 @@ function NewRunForm({
   const chosen = useWatch({ control, name: 'workflow' })
   const entryNode = workflows.find((workflow) => workflow.name === chosen)?.start
   const busy = submission.isPending
-  const send = handleSubmit((values) => {
-    submission.mutate(values)
-  })
+
+  /**
+   * Submit, once. Every way in goes through here — the button, ⌘⏎, and
+   * a browser's implicit submit — and the latch is taken before
+   * validation, not after it, because validation is async: two presses
+   * in one tick would otherwise both find nothing in flight.
+   *
+   * It is released either when nothing went out, so the operator can
+   * fix the title and try again, or in `onSettled` when the run has
+   * landed.
+   */
+  const send = () => {
+    if (sending.current) return
+    sending.current = true
+    let sent = false
+    void handleSubmit((values) => {
+      sent = true
+      submission.mutate(values)
+    })().then(() => {
+      if (!sent) sending.current = false
+    })
+  }
   // A refusal of the first call, which is the one the operator can do
   // something about; the second closes the overlay from `onError`.
   const refusal =
@@ -337,14 +378,16 @@ function NewRunForm({
       aria-busy={busy}
       onSubmit={(event) => {
         event.preventDefault()
-        void send()
+        send()
       }}
       onKeyDown={(event) => {
         // ⌘⏎ / ^⏎ submits from anywhere in the panel, including the
-        // description, where ⏎ alone is a newline (10 §Overlays).
+        // description, where ⏎ alone is a newline (10 §Overlays). It
+        // goes through `send`, so it is refused while a submission is
+        // out exactly as the disabled button is.
         if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
           event.preventDefault()
-          void send()
+          send()
         }
       }}
     >
