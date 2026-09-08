@@ -6,15 +6,21 @@
  * plugin manifest, so the bar here carries only what the shell owns: the
  * cycle controls and the selected run's id from `?run=`. `◀`/`▶` are
  * disabled while there is no pane list to cycle — the shell will not
- * pretend to a pane count it does not have. The run-list collapse toggle
- * joins the bar in T058a.
+ * pretend to a pane count it does not have.
+ *
+ * The bar opens with the mock's `❮`, which collapses the run list to the
+ * rail `Splitter` draws in its place; collapsed, the rail's own `❯` is
+ * the way back, so the two are never on screen together.
  */
 import type { AppSearch } from '../routes/search'
+import { usePrefs } from '../store/prefs'
 import { useUi } from '../store/ui'
 
 export function Detail({ search }: { search: AppSearch }) {
   const focused = useUi((s) => s.focus === 'detail')
   const setFocus = useUi((s) => s.setFocus)
+  const listCollapsed = usePrefs((s) => s.listCollapsed)
+  const setListCollapsed = usePrefs((s) => s.setListCollapsed)
 
   return (
     <section
@@ -26,6 +32,18 @@ export function Detail({ search }: { search: AppSearch }) {
       className="flex h-full min-h-0 min-w-0 flex-1 flex-col"
     >
       <div className="bg-chrome flex flex-none flex-wrap items-center gap-x-[10px] gap-y-[6px] border-b border-border px-[12px] py-[6px]">
+        {!listCollapsed && (
+          <button
+            type="button"
+            onClick={() => setListCollapsed(true)}
+            aria-label="hide run list"
+            title="hide run list (b)"
+            className="text-hint rounded-lg border border-border px-[6px] py-px text-muted-foreground hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)]"
+          >
+            ❮
+          </button>
+        )}
+
         <button
           type="button"
           disabled

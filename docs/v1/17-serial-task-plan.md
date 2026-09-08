@@ -2782,6 +2782,21 @@ choices.
 count; width clamps.
 **Done.** Tests pass.
 
+**Status.** Done. `Splitter` is `react-resizable-panels`' group, two
+panels and the mock's 5 px handle, and it owns the whole width between
+the list and the detail pane: the list carries the 260 px minimum and the
+stored width, the detail pane carries the 340 px one, and it is the
+detail pane's minimum — not a maximum computed on the list — that makes
+the list's widest `window − 340`, on a drag, a resize key and a window
+resize alike. Only a resize the operator performed is written to prefs,
+and it is read from the group's layout rather than the panel's
+`offsetWidth`, which lags a keystroke by a render. Collapsed, the list
+and the handle give way to the mock's 30 px rail, reading `RUNS n`
+sideways; the `❮` that collapses it is the first thing in the pane bar
+and the rail's `❯` is the way back, so exactly one of them is ever on
+screen. No `CrtChrome`, no `crt` preference (D71). D153 records the six
+choices.
+
 ### T059 — API client bootstrap, `/api/me`, query provider (A4.1, A4.9 prelude)
 
 **Do.** `web/src/api/client.ts`: configure the generated fetch client

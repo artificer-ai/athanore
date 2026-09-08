@@ -12,7 +12,7 @@ function shell(search = {}) {
 
 describe('App', () => {
   beforeEach(() => {
-    usePrefs.setState({ listWidth: DEFAULT_LIST_WIDTH })
+    usePrefs.setState({ listWidth: DEFAULT_LIST_WIDTH, listCollapsed: false })
     useUi.setState({ focus: 'list' })
   })
 
@@ -25,14 +25,27 @@ describe('App', () => {
     expect(screen.getByRole('contentinfo')).toBeInTheDocument()
   })
 
-  it('lays the run list out at the width prefs holds', () => {
-    usePrefs.setState({ listWidth: 400 })
+  it('hangs the list and the detail pane off the splitter', () => {
     shell()
 
-    // The splitter that lets the operator drag this width is T058a's;
-    // the shell reads it either way.
-    const list = screen.getByRole('region', { name: 'runs' }).parentElement
-    expect(list).toHaveStyle({ width: '400px' })
+    // The width between them is the splitter's, and so is the rail; the
+    // shell only says which side each region goes.
+    expect(screen.getByTestId('list-panel')).toContainElement(
+      screen.getByRole('region', { name: 'runs' }),
+    )
+    expect(screen.getByTestId('detail-panel')).toContainElement(
+      screen.getByRole('region', { name: 'detail' }),
+    )
+    expect(screen.getByRole('separator', { name: 'resize run list' })).toBeInTheDocument()
+  })
+
+  it('shows the rail in place of the list when it is collapsed', () => {
+    usePrefs.setState({ listCollapsed: true })
+    shell()
+
+    expect(screen.queryByRole('region', { name: 'runs' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'show run list' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'detail' })).toBeInTheDocument()
   })
 
   it('passes the selected run through to the pane bar', () => {
