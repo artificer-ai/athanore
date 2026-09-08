@@ -78,4 +78,3 @@ export async function highlight(code: string, lang: string): Promise<string | nu
   }
 }
 
-/** The prose styles, which are the mock's type scale rather than a theme. */

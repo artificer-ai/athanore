@@ -8,10 +8,12 @@
  * own.
  *
  * The overview builtin sends a fourth key, `meta`, and this renderer
- * ignores it — deliberately. 09 is explicit: "A renderer that knows only
- * the `dashboard` kind draws the first three and ignores the fourth; the
- * SPA's own overview renderer draws all of it" (T063a). Drawing it here
- * would make `meta` part of the kind, which it is not.
+ * ignores it — deliberately. Its own module says so: "A renderer that
+ * knows only the `dashboard` kind draws the first three and ignores the
+ * fourth; the SPA's own overview renderer draws all of it"
+ * (`athanore/plugins/builtin/overview.py`; 15, D140 (3)). That other
+ * renderer is T063a's. Drawing `meta` here would make it part of the
+ * kind, which it is not.
  */
 import { MetricGrid } from './MetricGrid'
 import { TablePane } from './TablePane'

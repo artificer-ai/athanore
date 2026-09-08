@@ -232,6 +232,12 @@ assets are served under `/plugins/{wf}/static/` (§Escape hatch).
   Fetched at boot and again whenever the SSE stream reconnects and
   `/api/me` reports a new `started_at` (the manifest only changes on
   restart, so no event is needed for it).
+- A panel's `refresh_on` names are matched against an event's name as
+  **globs**, which is what lets the `log` builtin below say `task.*` and
+  be refreshed by `task.done`. `task.stream` — 2–3 of which arrive per
+  second per streaming task — is the one name no glob reaches: a panel
+  that wants that rate declares it exactly (10 §Realtime and caching;
+  15, D159).
 - `POST /api/plugins/{wf}/actions/{name}` → validates `input` against the
   model (422), resolves `ctx`, calls the handler, returns its JSON.
   Handlers may raise `PluginError(status, message)`.
