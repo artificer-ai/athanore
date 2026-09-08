@@ -1,0 +1,91 @@
+/**
+ * The app's search parameters: every piece of UI state worth sharing.
+ *
+ * `docs/v1/10-frontend.md` §Layout keeps the whole SPA on one route, so a
+ * view is linkable only if the things that make it that view live in the
+ * query string: which run is selected, which pane is showing, which
+ * overlay is open, and which task the overlay is about. Widths and
+ * preferences are personal and belong to `usePrefs` instead.
+ *
+ * Validation **drops** what it does not recognise rather than throwing. A
+ * stale bookmark carrying `?overlay=crt` from an older build must open the
+ * app, not white-screen it, so every field is parsed independently and a
+ * field that fails is simply absent from the result.
+ */
+
+/** The overlays of 10 §Overlays, in the order that section lists them. */
+export const OVERLAYS = [
+  'palette',
+  'new',
+  'library',
+  'edit',
+  'keys',
+  'task',
+  'pick-retry',
+  'pick-move',
+  'pick-cancel',
+  'pick-rerun',
+] as const
+
+export type Overlay = (typeof OVERLAYS)[number]
+
+/**
+ * The validated search of route `/`.
+ *
+ * - `run` — the selected run's ULID.
+ * - `pane` — the zero-based index into the pane cycle. The pane host
+ *   clamps it to the selected run's pane count (T062); here it only has
+ *   to be an index.
+ * - `overlay` — the open overlay, one of {@link OVERLAYS}.
+ * - `task` — the task an overlay is about; task ids are positive
+ *   integers (`docs/v1/03-data-model.md`).
+ */
+export type AppSearch = {
+  run?: string
+  pane?: number
+  overlay?: Overlay
+  task?: number
+}
+
+const OVERLAY_SET: ReadonlySet<string> = new Set(OVERLAYS)
+
+function isOverlay(value: unknown): value is Overlay {
+  return typeof value === 'string' && OVERLAY_SET.has(value)
+}
+
+/** A non-empty string, trimmed of nothing: run ids are opaque. */
+function asId(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim() !== '' ? value : undefined
+}
+
+/**
+ * An integer at or above `min`. The router parses `?pane=2` to a number
+ * already; a hand-typed `?pane=two` arrives as a string and fails here.
+ */
+function asInteger(value: unknown, min: number): number | undefined {
+  const n =
+    typeof value === 'number'
+      ? value
+      : typeof value === 'string' && value.trim() !== ''
+        ? Number(value)
+        : Number.NaN
+  return Number.isInteger(n) && n >= min ? n : undefined
+}
+
+/**
+ * Parse the raw search object into {@link AppSearch}, dropping anything
+ * that does not validate. Never throws.
+ */
+export function validateAppSearch(search: Record<string, unknown>): AppSearch {
+  const run = asId(search['run'])
+  const pane = asInteger(search['pane'], 0)
+  const overlay = search['overlay']
+  const task = asInteger(search['task'], 1)
+
+  return {
+    ...(run === undefined ? {} : { run }),
+    ...(pane === undefined ? {} : { pane }),
+    ...(isOverlay(overlay) ? { overlay } : {}),
+    ...(task === undefined ? {} : { task }),
+  }
+}
