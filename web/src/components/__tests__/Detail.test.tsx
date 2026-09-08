@@ -1,7 +1,9 @@
+import { QueryClientProvider } from '@tanstack/react-query'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { createAppQueryClient } from '../../api/client'
 import type { PaneModel } from '../../panes/usePanes'
 import { usePrefs } from '../../store/prefs'
 import { useUi } from '../../store/ui'
@@ -58,27 +60,33 @@ describe('Detail', () => {
 
   it('stops saying there are none once the cycle has a pane', () => {
     const pane = {
-      id: '_builtin:overview',
+      id: '_builtin:agent',
       workflow: '_builtin',
-      name: 'overview',
+      name: 'agent',
       builtin: true,
       panel: {
-        name: 'overview',
+        name: 'agent',
         slot: 'run' as const,
         scope: 'run' as const,
         placement: 'pane' as const,
-        kind: 'dashboard' as const,
+        kind: 'custom' as const,
+        element: 'ath-agent-stream',
       },
     }
-    render(<Detail panes={model({ runId: '01JD5X', panes: [pane], current: pane })} />)
-
-    // What the pane draws is `PaneRenderer`'s (T062a); what the host
-    // owns is that the body stops standing in for a missing pane.
-    expect(screen.queryByRole('status')).toBeNull()
-    expect(screen.getByTestId('pane-body')).toHaveAttribute(
-      'data-pane',
-      '_builtin:overview',
+    render(
+      // `PaneRenderer` reads its panel's `source` through the query
+      // cache, so the body needs one even for a pane that fetches
+      // nothing (T062a).
+      <QueryClientProvider client={createAppQueryClient()}>
+        <Detail panes={model({ runId: '01JD5X', panes: [pane], current: pane })} />
+      </QueryClientProvider>,
     )
+
+    // What the pane draws is `PaneRenderer`'s; what the host owns is
+    // that the body stops standing in for a missing pane.
+    expect(screen.queryByRole('status')).toBeNull()
+    expect(screen.getByTestId('pane-body')).toHaveAttribute('data-pane', '_builtin:agent')
+    expect(screen.getByTestId('pane-renderer')).toHaveAttribute('data-kind', 'custom')
   })
 
   it('takes focus when it is clicked', async () => {

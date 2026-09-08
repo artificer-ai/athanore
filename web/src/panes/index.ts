@@ -1,6 +1,15 @@
-/** The pane host: which panes exist, and the bar over them. */
+/**
+ * The pane host: which panes exist, the bar over them, and what one
+ * draws (`docs/v1/10-frontend.md` §Panes, §Plugin renderers).
+ *
+ * What the shell reaches for. The pieces inside — a panel's source, the
+ * kind renderers — are imported by path from within this directory;
+ * nothing outside it needs them.
+ */
 export { PaneBar } from './PaneBar'
+export { PaneRenderer } from './PaneRenderer'
 export { BUILTIN_WORKFLOW, useManifest } from './manifest'
+export { type PanelParams, type PanelScope } from './source'
 export {
   paneLabel,
   panesOf,

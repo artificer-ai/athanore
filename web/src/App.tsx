@@ -55,7 +55,7 @@ export default function App({
         list={
           <RunList model={runs} selected={search.run} onSelect={onSelectRun} />
         }
-        detail={<Detail panes={panes} />}
+        detail={<Detail panes={panes} taskId={search.task} />}
       />
 
       <Footer onOpenPalette={onOpenPalette} />

@@ -8,14 +8,28 @@
  * process with a new `started_at`: the manifest only changes on restart,
  * so there is no event for it, and `src/realtime/sse.ts` is what
  * refetches it.
+ *
+ * Reading it is also what registers the panels' `refresh_on` names in
+ * the invalidation table — "at manifest load" (10 §Realtime and
+ * caching), which is here and nowhere else, so a manifest that is
+ * replaced replaces the registrations with it.
  */
 import { useQuery } from '@tanstack/react-query'
+import { useMemo } from 'react'
 
 import { manifestApiPluginsGetOptions } from '../api/gen/@tanstack/react-query.gen'
 import type { PluginManifestEntry } from '../api/gen/types.gen'
+import { usePanelRefreshRegistry } from './source'
 
 /** The manifest entry the core's own panes are declared on (09). */
 export const BUILTIN_WORKFLOW = '_builtin'
+
+/**
+ * The manifest before one has arrived — one array, not a fresh `[]` per
+ * render, so the registration effect below fires on a manifest that
+ * changed rather than on every render that has none.
+ */
+const EMPTY: PluginManifestEntry[] = []
 
 /**
  * `GET /api/plugins`, cached.
@@ -37,10 +51,12 @@ export function useManifest(): {
   isError: boolean
 } {
   const { data, isPending, isError } = useManifestQuery()
+  const manifest = useMemo(() => (Array.isArray(data) ? data : EMPTY), [data])
+  usePanelRefreshRegistry(manifest)
 
   // `Array.isArray` rather than `?? []`: the manifest is the one
   // resource whose absence has to be told from a server that answered
   // with something else entirely (a proxy's error page, say), and a pane
   // host that trusted the shape would throw where 09 wants a degradation.
-  return { manifest: Array.isArray(data) ? data : [], isPending, isError }
+  return { manifest, isPending, isError }
 }
