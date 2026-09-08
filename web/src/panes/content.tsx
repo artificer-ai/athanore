@@ -60,6 +60,7 @@ import {
   MarkdownPane,
   Overview,
   PlaceholderCard,
+  Requests,
   TablePane,
   asChart,
   asDashboard,
@@ -222,6 +223,17 @@ const ELEMENT_RENDERERS: Record<string, (ctx: RenderContext) => Content> = {
     // one that grows with its content — the same reason the log does.
     scrolls: true,
     node: <AgentStream runId={ctx.scope.runId} taskId={ctx.scope.taskId} />,
+  }),
+
+  // The same tag is both the run's requests pane and its `global` inbox
+  // twin (`athanore/plugins/builtin/requests.py`), because the element
+  // table is keyed by tag: what differs between the two is the scope
+  // they are drawn in, and the renderer reads it.
+  'ath-requests': (ctx) => ({
+    // It brings its own header and its own scroller, as the log and the
+    // agent pane do, so the pane must not wrap it in a second one.
+    scrolls: true,
+    node: <Requests runId={ctx.scope.runId} />,
   }),
 }
 

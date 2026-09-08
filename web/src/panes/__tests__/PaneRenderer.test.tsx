@@ -50,6 +50,7 @@ const LOG = paneOf(BUILTIN_ENTRY.panels?.[1] as PanelOut)
 const AGENT = paneOf(BUILTIN_ENTRY.panels?.[2] as PanelOut)
 const REQUESTS = paneOf(BUILTIN_ENTRY.panels?.[3] as PanelOut)
 const WORDS = paneOf(GAMEDEV_ENTRY.panels?.[0] as PanelOut, 'gamedev')
+const PLAYFIELD = paneOf(GAMEDEV_ENTRY.panels?.[3] as PanelOut, 'gamedev')
 
 let queryClient: QueryClient
 
@@ -248,13 +249,25 @@ describe('what it cannot draw', () => {
   it('renders a placeholder for an element this build cannot draw', () => {
     const urls = stubFetch({})
 
-    // `<ath-requests>` is a builtin tag whose renderer is T063d's; until
-    // it is in the element table it degrades like a plugin's own tag
-    // would, which is the behaviour under test.
+    // `<gd-playfield>` is a plugin's own tag: it is not in the element
+    // table, so it degrades to the card naming it rather than to a
+    // crash, which is what T071 replaces with the manifest's assets.
+    draw(PLAYFIELD)
+
+    expect(screen.getByTestId('pane-placeholder')).toHaveTextContent('<gd-playfield>')
+    expect(urls).toEqual([])
+  })
+
+  it('draws the requests pane for <ath-requests>', async () => {
+    stubFetch([])
+
     draw(REQUESTS)
 
-    expect(screen.getByTestId('pane-placeholder')).toHaveTextContent('<ath-requests>')
-    expect(urls).toEqual([])
+    // The run pane and its `global` inbox twin are the same tag, and a
+    // tag in the element table is a pane this build draws itself (09
+    // §Builtins are plugins).
+    expect(await screen.findByTestId('pane-requests')).toBeInTheDocument()
+    expect(screen.queryByTestId('pane-placeholder')).not.toBeInTheDocument()
   })
 
   it('draws the agent stream for <ath-agent-stream>', async () => {

@@ -11,13 +11,15 @@
  * own two sides — what `GET /api/plugins/_builtin/overview` answers
  * with, and the `RunDetail` the pane reads beside it — and the event
  * log's, which is its route's merged list and the run it belongs to,
- * and the agent pane's, which is one attempt's transcript and the run
- * detail the pane picks that attempt out of.
+ * the agent pane's, which is one attempt's transcript and the run
+ * detail the pane picks that attempt out of, and the requests pane's,
+ * which is one run's whole human-in-the-loop history.
  */
 import type {
   GraphOut,
   PanelOut,
   PluginManifestEntry,
+  RequestView,
   RunDetail,
   RunOutput,
   RunStatus,
@@ -598,3 +600,127 @@ export function streamRun(over: Partial<RunDetail> = {}): RunDetail {
     ...over,
   }
 }
+
+/* -------------------------------------------------------------------- */
+/* The requests pane                                                     */
+/* -------------------------------------------------------------------- */
+
+/** The run the request fixtures below are about. */
+export const REQUESTS_RUN = '01JD5XREQUESTS0000000000'
+
+/** A request with the fields every view carries filled in. */
+export function request(over: Partial<RequestView> & { id: number }): RequestView {
+  return {
+    run_id: REQUESTS_RUN,
+    task_id: 404,
+    node: 'engineering',
+    prompt: 'may I?',
+    mode: 'text',
+    source: 'node',
+    kind: 'question',
+    pending: false,
+    stale: false,
+    created: '2026-09-08T09:00:00Z',
+    age: 60,
+    ...over,
+  }
+}
+
+/**
+ * `GET /api/runs/{id}/requests` for a run that has asked four things.
+ *
+ * In the order the route sends them, which is the order they were asked
+ * (`athanore/store/repos/requests.py`): **the two pending ones are third
+ * and fourth**, so a pane that drew the list as it arrived would draw
+ * them last. One of each state and one of each mode, and the answered
+ * permission is the one the clock answered — `permission_timeout_action`
+ * records an `engine`-authored answer (06 §Timeouts), which is the case
+ * the card's author line exists for.
+ */
+export const REQUEST_LIST: RequestView[] = [
+  request({
+    id: 11,
+    task_id: 404,
+    node: 'engineering',
+    source: 'node',
+    kind: 'question',
+    mode: 'text',
+    prompt: 'Which package manager should the scaffold use?',
+    answer: 'pnpm, as 02 §Library choices fixes it',
+    answered_by: 'user',
+    created: '2026-09-08T09:00:01Z',
+    age: 305,
+  }),
+  request({
+    id: 12,
+    task_id: 404,
+    node: 'engineering',
+    source: 'agent',
+    kind: 'permission',
+    mode: 'options',
+    prompt: 'permission: write web/src/panes/kinds/Requests.tsx',
+    options: [
+      { option_id: 'allow_once', name: 'Allow once', kind: 'allow_once' },
+      { option_id: 'reject_once', name: 'Reject', kind: 'reject_once' },
+    ],
+    tool_call: {
+      title: 'write web/src/panes/kinds/Requests.tsx',
+      kind: 'edit',
+      raw_input: '{"path": "web/src/panes/kinds/Requests.tsx", "mode": "create"}',
+    },
+    answer: 'reject_once',
+    answered_by: 'engine',
+    created: '2026-09-08T09:00:02Z',
+    age: 244,
+  }),
+  request({
+    id: 13,
+    task_id: 405,
+    node: 'engineering',
+    source: 'agent',
+    kind: 'permission',
+    mode: 'options',
+    prompt: 'permission: run the gate',
+    options: [
+      { option_id: 'allow_once', name: 'Allow once', kind: 'allow_once' },
+      { option_id: 'allow_always', name: 'Allow for this session', kind: 'allow_always' },
+      { option_id: 'reject_once', name: 'Reject', kind: 'reject_once' },
+    ],
+    tool_call: {
+      title: './scripts/test.sh',
+      kind: 'execute',
+      raw_input: '{"command": "./scripts/test.sh", "cwd": "/home/agent/athanore"}',
+    },
+    pending: true,
+    created: '2026-09-08T09:00:03Z',
+    age: 12,
+  }),
+  request({
+    id: 14,
+    task_id: 405,
+    node: 'engineering',
+    source: 'agent',
+    kind: 'elicitation',
+    mode: 'form',
+    prompt: 'Which branch should the work land on?',
+    schema: {
+      type: 'object',
+      properties: { branch: { type: 'string' } },
+      required: ['branch'],
+    },
+    pending: true,
+    created: '2026-09-08T09:00:04Z',
+    age: 4,
+  }),
+]
+
+/** A question whose attempt has ended: in history, no longer answerable. */
+export const STALE_REQUEST: RequestView = request({
+  id: 15,
+  task_id: 403,
+  node: 'architecture',
+  prompt: 'Should the graph rail draw joins inline?',
+  stale: true,
+  created: '2026-09-08T08:58:00Z',
+  age: 420,
+})
