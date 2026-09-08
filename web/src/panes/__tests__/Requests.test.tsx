@@ -19,9 +19,10 @@
  *   `athanore/agents/policies.py` applies when it writes one is not the
  *   bound that protects the pane from what it reads.
  *
- * There are no controls here to click: T064 adds them and this task
- * renders the slot, so what is asserted is that the slot exists, says
- * what shape of answer is wanted, and lists the choices on offer.
+ * The controls themselves are `components/RequestPanel.tsx` and have
+ * their own suite; what is asserted here is that the pane puts them in
+ * the slot a pending card has and in no other, and that the pane's
+ * `global` twin is the inbox rather than this list of nothing.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, within } from '@testing-library/react'
@@ -270,41 +271,41 @@ describe('an answered card', () => {
 /* -------------------------------------------------------------------- */
 
 describe('the controls slot', () => {
-  it('names the shape of answer wanted, and lists an options request’s choices', () => {
+  it('gives a pending card the answer controls, drawn by their mode', () => {
     draw()
 
     const slot = within(card(13)).getByTestId('request-controls')
-    expect(slot).toHaveTextContent('awaiting one of')
+    const panel = within(slot).getByTestId('request-panel')
+    expect(panel).toHaveAttribute('data-mode', 'options')
+    expect(panel).toHaveAccessibleName('awaiting one of')
 
-    const options = within(slot).getAllByTestId('request-option')
+    // The options are buttons now, in the order and under the labels the
+    // agent offered (05 §Policies).
+    const options = within(panel).getAllByRole('button')
     expect(options.map((option) => option.textContent)).toEqual([
       'Allow once',
       'Allow for this session',
       'Reject',
     ])
-    // The ACP kinds travel verbatim, and are what T064 styles the
-    // buttons by (06 §SPA).
     expect(options[2]).toHaveAttribute('data-kind', 'reject_once')
-
-    // T064 adds the controls; this task renders the slot, so nothing in
-    // it is clickable yet.
-    expect(within(slot).queryAllByRole('button')).toEqual([])
   })
 
-  it('names a form answer without offering options', () => {
+  it('draws a form request as a form and a text one as an input', () => {
     draw()
 
-    const form = within(card(14)).getByTestId('request-controls')
-    expect(form).toHaveTextContent('awaiting a form answer')
-    expect(within(form).queryAllByTestId('request-option')).toEqual([])
+    expect(
+      within(card(14)).getByTestId('request-panel'),
+    ).toHaveAttribute('data-mode', 'form')
+    expect(within(card(14)).getByTestId('action-form')).toBeInTheDocument()
+
+    draw([request({ id: 24, mode: 'text', pending: true })])
+    expect(screen.getAllByTestId('request-text').at(-1)).toBeInTheDocument()
   })
 
-  it('names a text answer', () => {
-    draw([request({ id: 24, mode: 'text', pending: true })])
+  it('gives an answered card no controls, because it has been answered', () => {
+    draw()
 
-    expect(screen.getByTestId('request-controls')).toHaveTextContent(
-      'awaiting a text answer',
-    )
+    expect(within(card(11)).queryByTestId('request-controls')).not.toBeInTheDocument()
   })
 
   it('gives a stale request no slot, because it can no longer be answered', () => {
@@ -394,18 +395,17 @@ describe('a permission card', () => {
 /* -------------------------------------------------------------------- */
 
 describe('the pane with nothing to draw', () => {
-  it('asks for a selection rather than fetching without a run', () => {
+  it('draws the inbox instead of a run’s list when nothing is selected', async () => {
+    // The same tag is the `global` inbox twin (06 §SPA): the element is
+    // one and the scope is what tells the two lists apart, so with no
+    // run the pane asks `/api/requests` rather than a run's history.
     const urls = stubFetch([])
 
     draw(null, { runId: undefined })
 
-    // The same tag is the `global` inbox twin, whose own list — every
-    // open request across runs — is T064's, so the pane names what it is
-    // not drawing rather than showing an empty one (06 §SPA).
-    const card = screen.getByTestId('pane-placeholder')
-    expect(card).toHaveTextContent('select a run to see the requests it has raised')
-    expect(card).toHaveTextContent('the inbox across every run is not built yet')
-    expect(urls).toEqual([])
+    expect(await screen.findByTestId('pane-inbox')).toBeInTheDocument()
+    expect(screen.queryByTestId('pane-requests')).not.toBeInTheDocument()
+    expect(urls).toEqual([expect.stringContaining('/api/requests')])
   })
 
   it('says the list is loading before it claims the run asked nothing', async () => {

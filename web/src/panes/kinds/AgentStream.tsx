@@ -39,6 +39,17 @@
  * the wire contract: `GET /api/runs/{id}` for which attempt is running,
  * `GET /api/tasks/{id}/stream` for what that attempt said.
  *
+ * **The request panel docks under it.** 10 §Panes item 3: "the request
+ * panel docks under the stream when the focused task has open requests
+ * … this is where permissions get answered". The dock is the same card
+ * the requests pane draws, over the same cache entry
+ * (`GET /api/runs/{id}/requests`, `./requests.ts`), narrowed to the
+ * attempt on screen: a question raised by an earlier attempt is history
+ * and belongs to that pane, not to the turn the operator is watching.
+ * It sits outside the transcript's scroller so that scrolling back
+ * through what the agent said never takes the answer controls off
+ * screen.
+ *
  * **Nothing is invented.** The state word is `StreamOut.live`, so a
  * transcript that has not arrived is called neither streaming nor
  * finished, and the body says it is loading rather than that the attempt
@@ -55,8 +66,10 @@ import { useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { getStreamApiTasksTaskIdStreamGetOptions } from '../../api/gen/@tanstack/react-query.gen'
 import { getStreamApiTasksTaskIdStreamGet } from '../../api/gen/sdk.gen'
 import type { StreamChunk, StreamOut, TaskView } from '../../api/gen/types.gen'
+import { RequestCard } from '../../components/RequestCard'
 import { cn } from '../../lib/utils'
 import { ErrorCard } from './cards'
+import { openRequestsOf, useRunRequests } from './requests'
 import { useRunDetail } from './run'
 import {
   focusedTask,
@@ -353,6 +366,8 @@ export function AgentStream({
   const detail = useRunDetail(runId)
   const task = focusedTask(detail?.tasks, taskId)
   const { data: stream, isError, error } = useStream(task?.id)
+  const { data: requests } = useRunRequests(runId)
+  const open = openRequestsOf(requests, task?.id)
 
   const blocks = useMemo(() => streamBlocks(stream?.chunks ?? []), [stream])
   const live = stream?.live ?? false
@@ -408,6 +423,23 @@ export function AgentStream({
         </p>
       ) : (
         <Blocks blocks={blocks} live={live} />
+      )}
+
+      {open.length > 0 && (
+        <div
+          data-testid="stream-request-dock"
+          className="bg-chrome flex max-h-[45%] flex-none flex-col gap-[8px] overflow-x-hidden overflow-y-auto border-t border-[var(--color-neutral-800)] px-[14px] py-[10px]"
+        >
+          <p className="text-hint tracking-[0.1em] text-status-gate">
+            <span aria-hidden="true">⚠ </span>
+            {open.length === 1
+              ? 'WAITING ON YOU'
+              : `WAITING ON YOU · ${String(open.length)} REQUESTS`}
+          </p>
+          {open.map((request) => (
+            <RequestCard key={request.id} request={request} />
+          ))}
+        </div>
       )}
     </div>
   )

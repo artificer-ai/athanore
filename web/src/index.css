@@ -13,6 +13,16 @@
 @import "@fontsource-variable/jetbrains-mono";
 @import "./styles/theme.css";
 
+/* Tailwind scans this project's own sources and no dependency's, so the
+ * utility classes @rjsf/shadcn's templates are written with would not be
+ * generated and a `form` request would draw as unstyled HTML. The theme
+ * is a dependency the app renders rather than one it only calls (D49),
+ * so its compiled components are a source of classes like any file under
+ * src/. Its own CSS variables are shadcn's, which theme.css already maps
+ * onto the Nocturne tokens — nothing here overrides anything.
+ */
+@source "../node_modules/@rjsf/shadcn/lib";
+
 /* Nocturne is a dark theme and the app has no light one, so the tokens
  * in theme.css are unconditional and <html> carries `dark` permanently
  * — that is what makes shadcn's `dark:` branches take the dark side.

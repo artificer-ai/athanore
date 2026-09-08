@@ -20,19 +20,28 @@
  * `ChunkKind` (03 §StreamChunk) in the order the façade writes them.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createAppQueryClient } from '../../api/client'
-import { getRunApiRunsRunIdGetQueryKey } from '../../api/gen/@tanstack/react-query.gen'
-import type { RunDetail, StreamChunk, StreamOut } from '../../api/gen/types.gen'
+import {
+  getRequestsApiRunsRunIdRequestsGetQueryKey,
+  getRunApiRunsRunIdGetQueryKey,
+} from '../../api/gen/@tanstack/react-query.gen'
+import type {
+  RequestView,
+  RunDetail,
+  StreamChunk,
+  StreamOut,
+} from '../../api/gen/types.gen'
 import { Invalidator, queryKeys } from '../../realtime/invalidate'
 import { AgentStream, blockKind, chunkLabel, focusedTask, streamBlocks } from '../kinds'
 import {
   STREAM_RUN,
   STREAM_TASK,
   TRANSCRIPT,
+  request,
   streamPage,
   streamRun,
 } from './fixtures'
@@ -66,12 +75,22 @@ function stubFetch(answer: unknown, status = 200) {
   return urls
 }
 
-/** The pane over a seeded run detail, so only the transcript is fetched. */
+/**
+ * The pane over a seeded run detail and a seeded request list, so only
+ * the transcript is fetched.
+ *
+ * The requests are seeded and not stubbed for the same reason the detail
+ * is: the docked request panel reads `GET /api/runs/{id}/requests` (10
+ * §Panes item 3), and every assertion below about *what went out on the
+ * wire* is about the transcript. A run with no open requests is the
+ * default, which is the state every case but the dock's is in.
+ */
 function draw(
   options: {
     detail?: RunDetail | null
     taskId?: number
     runId?: string | undefined
+    requests?: RequestView[]
   } = {},
 ) {
   const detail = options.detail === undefined ? streamRun() : options.detail
@@ -81,6 +100,10 @@ function draw(
       detail,
     )
   }
+  queryClient.setQueryData(
+    getRequestsApiRunsRunIdRequestsGetQueryKey({ path: { run_id: STREAM_RUN } }),
+    options.requests ?? [],
+  )
   return render(
     <QueryClientProvider client={queryClient}>
       <AgentStream
@@ -117,6 +140,72 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
+})
+
+/* -------------------------------------------------------------------- */
+/* The docked request panel                                              */
+/* -------------------------------------------------------------------- */
+
+describe('the docked request panel', () => {
+  /** An open question raised by the attempt the pane is following. */
+  function openOn(taskId: number, over: Partial<RequestView> = {}) {
+    return request({
+      id: 71,
+      run_id: STREAM_RUN,
+      task_id: taskId,
+      node: 'engineering',
+      source: 'agent',
+      kind: 'permission',
+      mode: 'options',
+      prompt: 'permission: run the gate',
+      options: [
+        { option_id: 'allow_once', name: 'Allow once', kind: 'allow_once' },
+        { option_id: 'reject_once', name: 'Reject', kind: 'reject_once' },
+      ],
+      pending: true,
+      ...over,
+    })
+  }
+
+  it('docks under the stream when the focused task has an open request', async () => {
+    stubFetch(streamPage())
+
+    draw({ requests: [openOn(STREAM_TASK)] })
+
+    const dock = await screen.findByTestId('stream-request-dock')
+    expect(dock).toHaveTextContent('WAITING ON YOU')
+    expect(within(dock).getByTestId('request-prompt')).toHaveTextContent(
+      'permission: run the gate',
+    )
+    // The controls are the same panel the requests pane draws.
+    expect(within(dock).getAllByTestId('request-option')).toHaveLength(2)
+  })
+
+  it('draws no dock for a request of another attempt, or an answered one', async () => {
+    stubFetch(streamPage())
+
+    draw({
+      requests: [
+        openOn(406),
+        openOn(STREAM_TASK, { id: 72, answer: 'allow_once', answered_by: 'user' }),
+      ],
+    })
+
+    await screen.findByTestId('stream-scroller')
+    expect(screen.queryByTestId('stream-request-dock')).not.toBeInTheDocument()
+  })
+
+  it('counts them when one turn asked more than once', async () => {
+    stubFetch(streamPage())
+
+    draw({
+      requests: [openOn(STREAM_TASK), openOn(STREAM_TASK, { id: 72 })],
+    })
+
+    const dock = await screen.findByTestId('stream-request-dock')
+    expect(dock).toHaveTextContent('WAITING ON YOU · 2 REQUESTS')
+    expect(within(dock).getAllByTestId('request-card')).toHaveLength(2)
+  })
 })
 
 /* -------------------------------------------------------------------- */
