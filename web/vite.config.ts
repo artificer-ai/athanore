@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -10,6 +10,27 @@ const here = dirname(fileURLToPath(import.meta.url))
 
 /** Where `pnpm build` writes, and what the wheel ships as package data. */
 const OUT_DIR = resolve(here, '../athanore/web/dist')
+
+/**
+ * The distribution's version, read out of `pyproject.toml` at build time
+ * and substituted for `__APP_VERSION__` (10 §Layout, `src/globals.d.ts`).
+ *
+ * The header shows the version of the server it was built for, so the
+ * one place it may come from is the one place that declares it. There is
+ * no TOML parser in node 22 and adding one to read a single line would
+ * be the larger dependency: this reads `[project]`'s table and takes the
+ * `version` key out of it, and throws if either is missing rather than
+ * shipping a build whose header lies.
+ */
+function appVersion(): string {
+  const path = resolve(here, '../pyproject.toml')
+  const toml = readFileSync(path, 'utf8')
+  const project = /^\[project\]\s*$([\s\S]*?)(?=^\[|$(?![\s\S]))/m.exec(toml)
+  if (!project?.[1]) throw new Error(`${path} has no [project] table`)
+  const version = /^version\s*=\s*["'](.+?)["']\s*$/m.exec(project[1])
+  if (!version?.[1]) throw new Error(`${path} [project] has no version`)
+  return version[1]
+}
 
 /**
  * `emptyOutDir` deletes everything in the output directory except `.git`,
@@ -31,6 +52,7 @@ function keepOutDirTracked(): Plugin {
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), keepOutDirTracked()],
+  define: { __APP_VERSION__: JSON.stringify(appVersion()) },
   resolve: {
     alias: { '@': resolve(here, 'src') },
   },

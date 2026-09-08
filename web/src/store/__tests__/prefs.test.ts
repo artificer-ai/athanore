@@ -1,0 +1,138 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import {
+  DEFAULT_LIST_WIDTH,
+  MIN_DETAIL_WIDTH,
+  MIN_LIST_WIDTH,
+  PREFS_STORAGE_KEY,
+  clampListWidth,
+  usePrefs,
+} from '../prefs'
+
+/** Whatever jsdom's window is; the clamp is derived from it. */
+const VIEWPORT = window.innerWidth
+
+function stored(): Record<string, unknown> {
+  const raw = localStorage.getItem(PREFS_STORAGE_KEY)
+  expect(raw).not.toBeNull()
+  return (JSON.parse(raw as string) as { state: Record<string, unknown> }).state
+}
+
+describe('clampListWidth', () => {
+  it('holds the mock defaults untouched', () => {
+    expect(clampListWidth(DEFAULT_LIST_WIDTH, 1600)).toBe(DEFAULT_LIST_WIDTH)
+  })
+
+  it('clamps at the narrow end', () => {
+    expect(clampListWidth(0, 1600)).toBe(MIN_LIST_WIDTH)
+    expect(clampListWidth(-500, 1600)).toBe(MIN_LIST_WIDTH)
+    expect(clampListWidth(MIN_LIST_WIDTH - 1, 1600)).toBe(MIN_LIST_WIDTH)
+  })
+
+  it('clamps at the wide end, leaving the detail pane its minimum', () => {
+    expect(clampListWidth(9999, 1600)).toBe(1600 - MIN_DETAIL_WIDTH)
+    expect(clampListWidth(1600, 1600)).toBe(1600 - MIN_DETAIL_WIDTH)
+  })
+
+  it('keeps the minimum when the viewport is too narrow for both bounds', () => {
+    expect(clampListWidth(400, 500)).toBe(MIN_LIST_WIDTH)
+    expect(clampListWidth(100, 300)).toBe(MIN_LIST_WIDTH)
+  })
+
+  it('rounds to whole pixels and refuses a non-number', () => {
+    expect(clampListWidth(540.4, 1600)).toBe(540)
+    expect(clampListWidth(Number.NaN, 1600)).toBe(DEFAULT_LIST_WIDTH)
+  })
+})
+
+describe('usePrefs', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    usePrefs.setState({
+      listWidth: DEFAULT_LIST_WIDTH,
+      listCollapsed: false,
+      autoSwitchOnRequest: true,
+      notifications: false,
+      token: null,
+    })
+  })
+
+  it('starts on the defaults of the mock and 10 §Attention', () => {
+    const state = usePrefs.getState()
+    expect(state.listWidth).toBe(DEFAULT_LIST_WIDTH)
+    expect(state.listCollapsed).toBe(false)
+    // 10 §Attention: the pane switch is on by default and notifications
+    // are opt-in.
+    expect(state.autoSwitchOnRequest).toBe(true)
+    expect(state.notifications).toBe(false)
+    expect(state.token).toBeNull()
+  })
+
+  it('clamps the width it is given', () => {
+    usePrefs.getState().setListWidth(10)
+    expect(usePrefs.getState().listWidth).toBe(MIN_LIST_WIDTH)
+
+    usePrefs.getState().setListWidth(99999)
+    expect(usePrefs.getState().listWidth).toBe(
+      Math.max(MIN_LIST_WIDTH, VIEWPORT - MIN_DETAIL_WIDTH),
+    )
+  })
+
+  it('persists every one of the five keys to localStorage', () => {
+    const state = usePrefs.getState()
+    state.setListWidth(400)
+    state.toggleListCollapsed()
+    state.setAutoSwitchOnRequest(false)
+    state.setNotifications(true)
+    state.setToken('op-token')
+
+    expect(stored()).toEqual({
+      listWidth: 400,
+      listCollapsed: true,
+      autoSwitchOnRequest: false,
+      notifications: true,
+      token: 'op-token',
+    })
+  })
+
+  it('does not persist the actions', () => {
+    usePrefs.getState().setNotifications(true)
+    expect(Object.keys(stored()).sort()).toEqual([
+      'autoSwitchOnRequest',
+      'listCollapsed',
+      'listWidth',
+      'notifications',
+      'token',
+    ])
+  })
+})
+
+describe('a reload', () => {
+  it('rehydrates the store from localStorage', async () => {
+    localStorage.setItem(
+      PREFS_STORAGE_KEY,
+      JSON.stringify({
+        state: {
+          listWidth: 320,
+          listCollapsed: true,
+          autoSwitchOnRequest: false,
+          notifications: true,
+          token: 'kept',
+        },
+        version: 0,
+      }),
+    )
+
+    // A fresh module registry is what a reload is: the store is built
+    // again, and `persist` reads the browser's storage on the way up.
+    vi.resetModules()
+    const fresh = await import('../prefs')
+    const state = fresh.usePrefs.getState()
+
+    expect(state.listWidth).toBe(320)
+    expect(state.listCollapsed).toBe(true)
+    expect(state.autoSwitchOnRequest).toBe(false)
+    expect(state.notifications).toBe(true)
+    expect(state.token).toBe('kept')
+  })
+})

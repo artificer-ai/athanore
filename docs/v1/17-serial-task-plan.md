@@ -2755,6 +2755,23 @@ reload on `:5173`, proxying `/api` to the v1 server started with
 `docker compose run --rm dev "uv run athanore serve ..."`.
 **Done.** `pnpm build` output served by `athanore serve` shows the shell.
 
+**Status.** Done. One route `/`, whose search is validated per field and
+never throws: `run` any non-empty string, `pane` a zero-based index,
+`task` a positive integer, `overlay` one of the ten of 10 §Overlays, and
+anything else dropped — the validator runs in the router's `parseSearch`,
+before the search is merged down the match tree, so a dropped key is
+absent from everything the app reads and `?overlay=crt` from an older
+build opens the app instead of white-screening it. A path that is not `/`
+is replaced with `/`.
+`usePrefs` persists the five keys to `localStorage` and rehydrates on
+reload; `useUi` holds the focus region and nothing else. `Header` shows
+the brand mark and `__APP_VERSION__`, which `vite.config.ts` reads out of
+`pyproject.toml`, with the counts written `—` rather than zero-filled
+(02 §Real data only); `RunList`, `Detail` and `Footer` are the mock's
+other three strips, the list laid out at the width `usePrefs` holds
+until T058a's splitter lets it be dragged. D152 records the six
+choices.
+
 ### T058a — Splitter and list collapse (A4.1, D71)
 
 **Do.** `Splitter` (`react-resizable-panels`, min 260, max `window − 340`,
