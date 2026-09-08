@@ -9,6 +9,7 @@ export { LogRows } from './LogRows'
 export { MarkdownPane } from './MarkdownPane'
 export { MetricGrid } from './MetricGrid'
 export { Overview } from './Overview'
+export { Requests } from './Requests'
 export { TablePane } from './TablePane'
 export { ErrorCard, PaneSection, PlaceholderCard } from './cards'
 export { extent, padExtent, seriesColour } from './chart'
@@ -45,6 +46,18 @@ export {
   type OutputLine,
   type TokenBar,
 } from './overview'
+export {
+  TOOL_CALL_CHARS,
+  answerText,
+  awaiting,
+  orderRequests,
+  pendingCount,
+  requestState,
+  requestsError,
+  toolCallSummary,
+  type RequestState,
+  type ToolCallSummary,
+} from './requests'
 export { useRunDetail } from './run'
 export {
   asChart,

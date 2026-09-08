@@ -2942,6 +2942,22 @@ summary.
 **Tests.** Vitest: ordering; answered card shows author and value;
 tool-call summary rendered.
 **Done.** Tests pass.
+**Status.** Done. The pane reads `GET /api/runs/{id}/requests` itself —
+it is a `custom` panel with no `source`, reached through the element
+table `ath-requests`, which is also the `global` inbox twin's tag — and
+puts the pending cards first by a stable partition, so the history below
+them keeps the order the route sent. A card is one of three states read
+from the wire (`answered_by`, `stale`), and the third of them is the one
+10 does not name: a stale request gets no controls slot, because it is
+unanswered and no longer answerable. The slot itself is rendered and the
+controls are not (T064): it names the shape of answer wanted and draws an
+`options` request's choices as labels, `allow_*` accent and `reject_*`
+destructive. The tool-call summary is bounded again here, at the 500
+characters `agents/policies.py` writes it under, because `tool_call` is
+an open JSON object on the wire; a field it does not know about is folded
+into the rendering rather than dropped. With no run selected the pane
+draws a placeholder naming the inbox as unbuilt rather than an empty list
+of it (D166).
 
 ### T063e — Graph rail renderer (A4.5, D32, D62)
 
