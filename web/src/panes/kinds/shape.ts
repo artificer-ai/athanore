@@ -40,6 +40,17 @@ export type ChartData = { series: ChartSeries[]; kind: 'line' | 'bar' }
 export type Metric = { label: string; value: unknown }
 export type DashboardData = { note?: string; metrics: Metric[]; table?: TableData }
 
+/**
+ * The overview builtin's answer: a `dashboard` with a fourth key.
+ *
+ * `meta` is the two-column `kv` grid 10 §Panes puts between the tiles
+ * and the NODES table, and `athanore/plugins/builtin/overview.py` sends
+ * it alongside the three keys the kind declares — "a renderer that knows
+ * only the `dashboard` kind draws the first three and ignores the
+ * fourth; the SPA's own overview renderer draws all of it" (15, D140).
+ */
+export type OverviewData = DashboardData & { meta: Record<string, unknown> }
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
@@ -130,6 +141,23 @@ export function asChart(data: unknown): ChartData | null {
   // `kind` is `line | bar`; anything else — including a kind a later
   // version adds — draws as a line rather than as nothing.
   return { series, kind: data['kind'] === 'bar' ? 'bar' : 'line' }
+}
+
+/**
+ * The overview's own shape: the `dashboard` one, plus `meta`.
+ *
+ * A `meta` that is absent narrows to an empty grid rather than to
+ * `null`. A server that stopped sending it is still sending a run's
+ * tiles and its nodes, and drawing those is better than an error card
+ * over the whole pane; a `meta` that is present but is *not* an object
+ * is a shape this renderer cannot read, and refuses like any other.
+ */
+export function asOverview(data: unknown): OverviewData | null {
+  const dashboard = asDashboard(data)
+  if (dashboard === null || !isRecord(data)) return null
+  const meta = data['meta']
+  if (meta !== undefined && !isRecord(meta)) return null
+  return { ...dashboard, meta: meta ?? {} }
 }
 
 function asMetric(value: unknown): Metric | null {

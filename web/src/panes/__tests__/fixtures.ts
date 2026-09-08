@@ -6,8 +6,20 @@
  * plugins tables them, and two workflows whose panels cover every case
  * the cycle has a rule for — a run pane, a card, a node pane, a global
  * pane, and a second workflow to exclude by ownership.
+ *
+ * Below them, one sample per panel kind (`SAMPLES`) and the overview
+ * pane's own two sides: what `GET /api/plugins/_builtin/overview`
+ * answers with, and the `RunDetail` the pane reads beside it.
  */
-import type { GraphOut, PanelOut, PluginManifestEntry } from '../../api/gen/types.gen'
+import type {
+  GraphOut,
+  PanelOut,
+  PluginManifestEntry,
+  RunDetail,
+  RunOutput,
+  TaskView,
+} from '../../api/gen/types.gen'
+import type { TableColumn } from '../kinds'
 
 /** A panel with the manifest's defaults filled in. */
 export function panel(over: Partial<PanelOut> & { name: string }): PanelOut {
@@ -233,3 +245,159 @@ export const SAMPLES = {
     },
   },
 } as const
+
+/* -------------------------------------------------------------------- */
+/* The overview pane                                                     */
+/* -------------------------------------------------------------------- */
+
+/** The run every overview fixture below is about. */
+export const OVERVIEW_RUN = '01JD5XOVERVIEW0000000000'
+
+/**
+ * The NODES columns `athanore/plugins/builtin/overview.py` declares, in
+ * the order 10 §Panes draws them.
+ */
+export const NODE_COLUMNS: TableColumn[] = [
+  { key: 'node', label: 'NODE', kind: 'text' },
+  { key: 'attempts', label: 'ATT', kind: 'number' },
+  { key: 'status', label: 'STATUS', kind: 'status' },
+  { key: 'tokens', label: 'TOKENS', kind: 'number' },
+  { key: 'duration_s', label: 'DUR', kind: 'duration' },
+]
+
+/**
+ * `GET /api/plugins/_builtin/overview` for a run mid-flight.
+ *
+ * The numbers are the mock's own first run (`docs/v1/design/
+ * Athanore.dc.html`, `a4c81f20b91e`) in the shape the route sends them:
+ * raw counts and seconds, `meta` beside the three `dashboard` keys, and
+ * **nothing zero-filled** — `review` has entered no agent, so its row
+ * carries neither `tokens` nor `duration_s`.
+ */
+export const OVERVIEW_SOURCE = {
+  note: 'Port the TUI pane cycle to the web app.',
+  metrics: [
+    { label: 'TOKENS', value: 612884 },
+    { label: 'COST', value: 0.2914 },
+    { label: 'DURATION', value: 246.4 },
+    { label: 'POSITION', value: '1 of 34' },
+  ],
+  table: {
+    columns: NODE_COLUMNS,
+    rows: [
+      { node: 'prompt', attempts: 1, status: 'done', tokens: 18204, duration_s: 9.2 },
+      { node: 'product', attempts: 1, status: 'done', tokens: 61933, duration_s: 58 },
+      {
+        node: 'architecture',
+        attempts: 1,
+        status: 'done',
+        tokens: 119447,
+        duration_s: 74,
+      },
+      {
+        node: 'engineering',
+        attempts: 2,
+        status: 'in_progress',
+        tokens: 413300,
+        duration_s: 105,
+      },
+      { node: 'review', attempts: 1, status: 'ready' },
+    ],
+  },
+  meta: {
+    RUN: OVERVIEW_RUN,
+    WORKFLOW: 'feature_build',
+    TITLE: 'Rebuild run detail as a web pane set',
+    STATUS: 'running · engineering',
+    AGE: 246.4,
+    SESSION: '01a02310f5c74b1e9a',
+    AGENTS: 4,
+    DESCRIPTION: 'Port the TUI pane cycle to the web app.',
+  },
+}
+
+/**
+ * The same route for a run no agent has touched: a queued run, one
+ * minute old.
+ *
+ * TOKENS, COST, SESSION and AGENTS are **absent** rather than zero — the
+ * route omits what nothing measured (01 §Real data only) — which is the
+ * case this pane must render without inventing a `0` for any of them.
+ */
+export const IDLE_OVERVIEW_SOURCE = {
+  metrics: [
+    { label: 'DURATION', value: 61.5 },
+    { label: 'POSITION', value: '3 of 34' },
+  ],
+  table: { columns: NODE_COLUMNS, rows: [{ node: 'prompt', attempts: 1, status: 'ready' }] },
+  meta: {
+    RUN: OVERVIEW_RUN,
+    WORKFLOW: 'feature_build',
+    TITLE: 'append log',
+    STATUS: 'queued',
+    AGE: 61.5,
+  },
+}
+
+/** One attempt of {@link runDetail}, with the fields the pane reads. */
+function attempt(id: number, node: string, over: Partial<TaskView> = {}): TaskView {
+  return {
+    id,
+    run_id: OVERVIEW_RUN,
+    node,
+    attempt: 1,
+    status: 'done',
+    priority: 0,
+    explicit: false,
+    terminal: false,
+    created: '2026-09-08T08:56:00Z',
+    ...over,
+  }
+}
+
+/**
+ * `GET /api/runs/{id}` for {@link OVERVIEW_SOURCE}'s run.
+ *
+ * The attempts are the ones behind its NODES rows, oldest first (08
+ * §Runs), so `engineering` has the two the ATT column counts and the
+ * drawer opens on the later of them.
+ */
+export function runDetail(over: Partial<RunDetail> = {}): RunDetail {
+  return {
+    id: OVERVIEW_RUN,
+    workflow: 'feature_build',
+    title: 'Rebuild run detail as a web pane set',
+    description: 'Port the TUI pane cycle to the web app.',
+    status: 'running',
+    position: 1,
+    current_nodes: ['engineering'],
+    created: '2026-09-08T08:56:00Z',
+    updated: '2026-09-08T09:00:06Z',
+    outputs: [],
+    tasks: [
+      attempt(401, 'prompt'),
+      attempt(402, 'product'),
+      attempt(403, 'architecture'),
+      attempt(404, 'engineering', { status: 'failed', attempt: 1 }),
+      attempt(405, 'engineering', { status: 'in_progress', attempt: 2 }),
+      attempt(406, 'review', { status: 'ready' }),
+    ],
+    ...over,
+  }
+}
+
+/** Two branches that terminated independently (04 §Routing edge cases). */
+export const FANNED_OUT: RunOutput[] = [
+  {
+    task_id: 501,
+    node: 'render',
+    branch: [{ index: 0, key: 'alpha' }],
+    value: { frames: 240, crashes: 0 },
+  },
+  {
+    task_id: 502,
+    node: 'render',
+    branch: [{ index: 1, key: 'beta' }],
+    value: 'beta ran clean',
+  },
+]

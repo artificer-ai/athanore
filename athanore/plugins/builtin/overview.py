@@ -140,7 +140,10 @@ def _meta(run: RunRow, tasks: list[TaskRow]) -> dict[str, Any]:
     attempt that reported one, whole rather than shortened — how many
     characters of it to show is the renderer's decision. AGENTS counts
     the attempts that carry a stats entry. Both are absent until an agent
-    has run, and DESCRIPTION until the operator has written one.
+    has run, and DESCRIPTION until the operator has written one — which
+    is not the same absence: 10 §Panes drops SESSION and AGENTS from the
+    grid and draws "DESCRIPTION is the run's, or `—`", so the renderer
+    supplies the dash for the key this omits (15, D161).
     """
 
     meta: dict[str, Any] = {

@@ -2904,6 +2904,7 @@ more than one terminal branch, `placement=card` panels appended.
 including SESSION omitted when no agent ran, OUTPUTS shown only for
 multi-branch runs.
 **Done.** Tests pass.
+**Status.** Done.
 
 ### T063b — Log renderer (A4.5)
 

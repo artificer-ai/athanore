@@ -21,19 +21,29 @@ const HOUR_MS = 60 * MINUTE_MS
 const DAY_MS = 24 * HOUR_MS
 
 /**
- * `now − created`, in the mock's shorthand.
+ * An elapsed span, in the mock's shorthand.
  *
- * A timestamp in the future is reported as `0s` rather than negative: a
+ * A negative span is reported as `0s` rather than with a minus sign: a
  * clock a second or two ahead of the server's is ordinary, and a row
  * reading `-1s` would say something about the data that is not true.
+ *
+ * The overview pane's AGE field is the same shorthand over a span the
+ * server already measured in seconds (10 §Panes), which is why the
+ * formatting lives here rather than inside {@link humaniseAge}: one
+ * definition of `15.8d`, two callers.
  */
-export function humaniseAge(created: string, now: number = Date.now()): string {
-  const started = Date.parse(created)
-  if (Number.isNaN(started)) return UNKNOWN_AGE
-
-  const elapsed = Math.max(0, now - started)
+export function humaniseElapsed(elapsedMs: number): string {
+  const elapsed = Math.max(0, elapsedMs)
   if (elapsed < MINUTE_MS) return `${Math.floor(elapsed / SECOND_MS)}s`
   if (elapsed < HOUR_MS) return `${Math.floor(elapsed / MINUTE_MS)}m`
   if (elapsed < DAY_MS) return `${(elapsed / HOUR_MS).toFixed(1)}h`
   return `${(elapsed / DAY_MS).toFixed(1)}d`
+}
+
+/** `now − created`, in the mock's shorthand. */
+export function humaniseAge(created: string, now: number = Date.now()): string {
+  const started = Date.parse(created)
+  if (Number.isNaN(started)) return UNKNOWN_AGE
+
+  return humaniseElapsed(now - started)
 }

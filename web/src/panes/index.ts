@@ -11,8 +11,10 @@ export { PaneRenderer } from './PaneRenderer'
 export { BUILTIN_WORKFLOW, useManifest } from './manifest'
 export { type PanelParams, type PanelScope } from './source'
 export {
+  cardsOf,
   paneLabel,
   panesOf,
+  useCards,
   usePanes,
   JUMP_KEYS,
   type Pane,
