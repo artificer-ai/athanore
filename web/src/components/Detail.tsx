@@ -30,6 +30,8 @@ export function Detail({
   node,
   onOpenTask,
   onFilterNode,
+  onOpenNode,
+  onOpenLibrary,
 }: {
   panes: PaneModel
   /** The focused attempt, from `?task=`: a `task`-scoped panel's id. */
@@ -40,6 +42,10 @@ export function Detail({
   onOpenTask?: ((taskId: number) => void) | undefined
   /** Write `?node=`: the graph pane sets it, the log pane clears it. */
   onFilterNode?: ((node: string | undefined) => void) | undefined
+  /** Jump to the log pane filtered to a node: the graph pane's rows. */
+  onOpenNode?: ((node: string) => void) | undefined
+  /** Open the workflow library: the graph pane's `open definition`. */
+  onOpenLibrary?: (() => void) | undefined
 }) {
   const focused = useUi((s) => s.focus === 'detail')
   const setFocus = useUi((s) => s.setFocus)
@@ -81,6 +87,8 @@ export function Detail({
             node={node}
             onOpenTask={onOpenTask}
             onFilterNode={onFilterNode}
+            onOpenNode={onOpenNode}
+            onOpenLibrary={onOpenLibrary}
           />
         )}
       </div>

@@ -12,10 +12,13 @@
  * with, and the `RunDetail` the pane reads beside it — and the event
  * log's, which is its route's merged list and the run it belongs to,
  * the agent pane's, which is one attempt's transcript and the run
- * detail the pane picks that attempt out of, and the requests pane's,
- * which is one run's whole human-in-the-loop history.
+ * detail the pane picks that attempt out of, the requests pane's, which
+ * is one run's whole human-in-the-loop history, and the graph pane's
+ * three shapes — linear with a loop-back, a fan-out that never closes,
+ * and the same fan-out closed by a join.
  */
 import type {
+  GraphNode,
   GraphOut,
   PanelOut,
   PluginManifestEntry,
@@ -724,3 +727,262 @@ export const STALE_REQUEST: RequestView = request({
   created: '2026-09-08T08:58:00Z',
   age: 420,
 })
+
+/* -------------------------------------------------------------------- */
+/* The graph pane                                                        */
+/* -------------------------------------------------------------------- */
+
+/** The run the three graph fixtures below are about. */
+export const GRAPH_RUN = '01JD5XGRAPHRAIL000000000'
+
+/** A node with the graph route's defaults filled in. */
+export function graphNode(
+  over: Partial<GraphNode> & { name: string; generation: number },
+): GraphNode {
+  return {
+    join: false,
+    state: 'idle',
+    live: false,
+    attempts: 0,
+    branches: [],
+    ...over,
+  }
+}
+
+/**
+ * The mock's own pipeline, cut to five nodes and with its two loops:
+ * `review → engineering` and `qa → engineering` (the mock's `EDGES`).
+ *
+ * `engineering` is the node in flight and the node both loops point back
+ * at, so this one fixture carries the `attempt n · elapsed` detail, the
+ * `●` glyph with its pulse, the `◀` arrow, the rail that spans three
+ * rows and the single `loop` label at the middle of it.
+ */
+export const LINEAR_GRAPH: GraphOut = {
+  nodes: [
+    graphNode({
+      name: 'prompt',
+      generation: 0,
+      state: 'done',
+      live: true,
+      attempts: 1,
+      last_task_id: 701,
+      branches: [{ from_task: null, tasks: [701] }],
+    }),
+    graphNode({
+      name: 'engineering',
+      generation: 1,
+      state: 'in_progress',
+      live: true,
+      attempts: 2,
+      last_task_id: 703,
+      branches: [{ from_task: null, tasks: [702, 703] }],
+    }),
+    graphNode({
+      name: 'review',
+      generation: 2,
+      state: 'waiting',
+      live: true,
+      attempts: 1,
+      last_task_id: 704,
+      branches: [{ from_task: null, tasks: [704] }],
+    }),
+    graphNode({ name: 'qa', generation: 3 }),
+    graphNode({ name: 'git', generation: 4 }),
+  ],
+  edges: [
+    { from: 'prompt', to: 'engineering', kind: 'forward', traversed: 1 },
+    { from: 'engineering', to: 'review', kind: 'forward', traversed: 1 },
+    { from: 'review', to: 'qa', kind: 'forward', traversed: 0 },
+    { from: 'qa', to: 'git', kind: 'forward', traversed: 0 },
+    { from: 'review', to: 'engineering', kind: 'back', traversed: 1 },
+    { from: 'qa', to: 'engineering', kind: 'back', traversed: 0 },
+  ],
+}
+
+/** `GET /api/runs/{id}` for {@link LINEAR_GRAPH}: the attempts behind it. */
+export function linearRun(over: Partial<RunDetail> = {}): RunDetail {
+  return {
+    id: GRAPH_RUN,
+    workflow: 'feature_build',
+    title: 'Rebuild run detail as a web pane set',
+    status: 'running',
+    position: 1,
+    current_nodes: ['engineering'],
+    created: '2026-09-08T08:56:00Z',
+    updated: '2026-09-08T09:00:06Z',
+    outputs: [],
+    tasks: [
+      {
+        ...attempt(701, 'prompt', {
+          started: '2026-09-08T08:56:00Z',
+          finished: '2026-09-08T08:56:09Z',
+          stats: { total_tokens: 18204 },
+        }),
+        run_id: GRAPH_RUN,
+      },
+      {
+        ...attempt(702, 'engineering', {
+          status: 'failed',
+          attempt: 1,
+          started: '2026-09-08T08:57:00Z',
+          finished: '2026-09-08T08:58:00Z',
+        }),
+        run_id: GRAPH_RUN,
+      },
+      {
+        ...attempt(703, 'engineering', {
+          status: 'in_progress',
+          attempt: 2,
+          started: '2026-09-08T09:00:00Z',
+        }),
+        run_id: GRAPH_RUN,
+      },
+      {
+        ...attempt(704, 'review', { status: 'waiting' }),
+        run_id: GRAPH_RUN,
+      },
+    ],
+    ...over,
+  }
+}
+
+/**
+ * A fan-out of two branches that never closes: `plan` opened them at
+ * task 601 and each branch ran `render` and then `report`.
+ *
+ * Both branches carry the **same** `from_task`, which is what 08 §Graph
+ * semantics says two branches of one fan-out do — so a renderer that
+ * grouped by `from_task` alone would draw one sub-list here instead of
+ * two.
+ */
+export const FANOUT_GRAPH: GraphOut = {
+  nodes: [
+    graphNode({
+      name: 'plan',
+      generation: 0,
+      state: 'done',
+      live: true,
+      attempts: 1,
+      last_task_id: 601,
+      branches: [{ from_task: null, tasks: [601] }],
+    }),
+    graphNode({
+      name: 'render',
+      generation: 1,
+      state: 'done',
+      live: true,
+      attempts: 2,
+      last_task_id: 603,
+      branches: [
+        { from_task: 601, tasks: [602] },
+        { from_task: 601, tasks: [603] },
+      ],
+    }),
+    graphNode({
+      name: 'report',
+      generation: 2,
+      state: 'done',
+      live: true,
+      attempts: 2,
+      last_task_id: 605,
+      // **Branch 2's report is first.** The route groups a node's
+      // attempts in the order they were enqueued, and branch 2's render
+      // finished first, so `report`'s entries are in the opposite order
+      // to `render`'s — which is exactly the case a renderer that paired
+      // the entries by position would get wrong (08 §Graph semantics).
+      branches: [
+        { from_task: 601, tasks: [605] },
+        { from_task: 601, tasks: [604] },
+      ],
+    }),
+  ],
+  edges: [
+    { from: 'plan', to: 'render', kind: 'forward', traversed: 2 },
+    { from: 'render', to: 'report', kind: 'forward', traversed: 2 },
+  ],
+}
+
+/**
+ * The same fan-out, closed by a join that one of the two branches has
+ * reached: `merge` carries `arrivals` and is what the `1 of 2 arrived`
+ * detail is read off (08 §Graph semantics).
+ */
+export const JOINED_GRAPH: GraphOut = {
+  nodes: [
+    ...FANOUT_GRAPH.nodes,
+    graphNode({
+      name: 'merge',
+      generation: 3,
+      join: true,
+      arrivals: { arrived: 1, count: 2 },
+    }),
+  ],
+  edges: [
+    ...FANOUT_GRAPH.edges,
+    { from: 'report', to: 'merge', kind: 'join', traversed: 1 },
+  ],
+}
+
+/** `GET /api/runs/{id}` for the two fan-out graphs above. */
+export function fannedRun(over: Partial<RunDetail> = {}): RunDetail {
+  const branch = (index: number) => [
+    { fanout: 601, index, count: 2, key: index === 0 ? 'alpha' : 'beta' },
+  ]
+  return {
+    id: GRAPH_RUN,
+    workflow: 'gamedev',
+    title: 'Render both variants',
+    status: 'running',
+    position: 2,
+    current_nodes: [],
+    created: '2026-09-08T08:56:00Z',
+    updated: '2026-09-08T09:00:06Z',
+    outputs: [],
+    tasks: [
+      { ...attempt(601, 'plan'), run_id: GRAPH_RUN },
+      {
+        ...attempt(602, 'render', {
+          branch: branch(0),
+          started: '2026-09-08T08:57:00Z',
+          finished: '2026-09-08T08:57:20Z',
+          stats: { total_tokens: 4000 },
+        }),
+        run_id: GRAPH_RUN,
+      },
+      {
+        ...attempt(603, 'render', {
+          branch: branch(1),
+          started: '2026-09-08T08:57:00Z',
+          finished: '2026-09-08T08:57:40Z',
+          stats: { total_tokens: 9000 },
+        }),
+        run_id: GRAPH_RUN,
+      },
+      {
+        ...attempt(604, 'report', {
+          branch: branch(0),
+          started: '2026-09-08T08:58:00Z',
+          finished: '2026-09-08T08:58:05Z',
+        }),
+        run_id: GRAPH_RUN,
+      },
+      {
+        ...attempt(605, 'report', {
+          branch: branch(1),
+          started: '2026-09-08T08:57:41Z',
+          finished: '2026-09-08T08:57:44Z',
+        }),
+        run_id: GRAPH_RUN,
+      },
+    ],
+    ...over,
+  }
+}
+
+/** `GET /api/workflows/{name}/source`, as the SOURCE line reads it. */
+export const WORKFLOW_SOURCE = {
+  file: '/srv/athanore/examples/feature_build.py',
+  source: 'wf = Workflow("feature_build")\n',
+  nodes: { engineering: { line: 12 } },
+}

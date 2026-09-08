@@ -28,8 +28,11 @@ import { Header } from './components/Header'
 import { RunList, useRunListModel } from './components/RunList'
 import { ServerDownBanner } from './components/ServerDownBanner'
 import { Splitter } from './components/Splitter'
-import { usePanes } from './panes'
-import type { AppSearch } from './routes/search'
+import { BUILTIN_WORKFLOW, usePanes } from './panes'
+import type { AppSearch, Overlay } from './routes/search'
+
+/** The builtin pane a graph row jumps to (10 §Graph pane, 09 §Builtins). */
+const LOG_PANE = 'log'
 
 export default function App({
   search,
@@ -38,6 +41,8 @@ export default function App({
   onOpenPalette,
   onOpenTask,
   onFilterNode,
+  onOpenNode,
+  onOpenOverlay,
 }: {
   search: AppSearch
   onSelectRun: (runId: string) => void
@@ -45,9 +50,25 @@ export default function App({
   onOpenPalette: () => void
   onOpenTask?: ((taskId: number) => void) | undefined
   onFilterNode?: ((node: string | undefined) => void) | undefined
+  /**
+   * `?node=` and `?pane=` in one navigation: a graph row "jumps to the
+   * log pane filtered to that node" (10 §Graph pane), and the shell is
+   * where the log pane's index is known.
+   */
+  onOpenNode?: ((node: string, pane: number | undefined) => void) | undefined
+  /** Open an overlay by name; the graph's `open definition` opens one. */
+  onOpenOverlay?: ((overlay: Overlay) => void) | undefined
 }) {
   const runs = useRunListModel()
   const panes = usePanes(search.run, { index: search.pane, onChange: onSelectPane })
+
+  // Which pane the log is, in *this* selection's cycle: the manifest
+  // decides how many panes there are and a plugin's `log` panel is not
+  // this one, so the index is looked up rather than assumed (09
+  // §Builtins are plugins).
+  const logPane = panes.panes.findIndex(
+    (pane) => pane.workflow === BUILTIN_WORKFLOW && pane.name === LOG_PANE,
+  )
 
   return (
     <div className="text-body flex h-dvh flex-col overflow-hidden bg-background text-foreground">
@@ -66,6 +87,20 @@ export default function App({
             node={search.node}
             onOpenTask={onOpenTask}
             onFilterNode={onFilterNode}
+            onOpenNode={
+              onOpenNode === undefined
+                ? undefined
+                : (node) => {
+                    onOpenNode(node, logPane < 0 ? undefined : logPane)
+                  }
+            }
+            onOpenLibrary={
+              onOpenOverlay === undefined
+                ? undefined
+                : () => {
+                    onOpenOverlay('library')
+                  }
+            }
           />
         }
       />

@@ -44,6 +44,26 @@ export function AppRoute() {
         // view of this app.
         void navigate({ search: (prev) => ({ ...prev, node }) })
       }}
+      onOpenNode={(node, pane) => {
+        // One navigation and not two: 10 §Graph pane's "jumps to the log
+        // pane filtered to that node" is `?node=` and `?pane=` together,
+        // and writing them in two calls would leave the second updating
+        // a search the first had already replaced.
+        void navigate({
+          search: (prev) => ({
+            ...prev,
+            node,
+            ...(pane === undefined ? {} : { pane }),
+          }),
+        })
+      }}
+      onOpenOverlay={(overlay) => {
+        // Every overlay is `?overlay=` (10 §Layout); the graph pane's
+        // `open definition` opens the library on the selected run's
+        // workflow, which `?run=` already names. The overlays themselves
+        // are T066a–T066e.
+        void navigate({ search: (prev) => ({ ...prev, overlay }) })
+      }}
       onOpenTask={(taskId) => {
         // The task drawer is `?overlay=task&task=`, the pair 10 §Layout
         // names: the overview's NODES rows and the graph's rows open it

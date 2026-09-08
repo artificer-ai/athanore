@@ -2,6 +2,7 @@
 export { AgentStream } from './AgentStream'
 export { ChartPane } from './ChartPane'
 export { DashboardPane } from './DashboardPane'
+export { GraphRail } from './GraphRail'
 export { KvPane } from './KvPane'
 export { Log } from './Log'
 export { LogPane } from './LogPane'
@@ -21,6 +22,25 @@ export {
   type Direction,
   type Sort,
 } from './format'
+export {
+  BRANCH_KEY_CHARS,
+  GLYPHS,
+  LEGEND_GLOSS,
+  actionError,
+  branchLabel,
+  branchState,
+  branchTag,
+  legendRows,
+  moveRefusal,
+  nodeDetail,
+  nodeGlyph,
+  railRows,
+  type BranchKey,
+  type LegendKind,
+  type LegendRow,
+  type Rail,
+  type RailRow,
+} from './graph'
 export {
   LOG_TONES,
   appendError,

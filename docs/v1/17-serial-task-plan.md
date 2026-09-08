@@ -2975,6 +2975,23 @@ without a join, fan-out closed by a join; row order, rails, sub-list
 nesting, and the `k of n` text.
 **Done.** All five panes render `feature_build` and `gamedev` runs
 produced on `FakeACPAgent`.
+**Status.** Done. The rail is rows and 1 px spans, no canvas (D32): the
+route already sends the nodes in generation order, so the renderer only
+groups them. A fan-out's sub-lists are keyed by the **branch-frame stack
+on the attempts** (`RunDetail.tasks[].branch`), not by `branches[].
+from_task` alone — two branches of one fan-out carry the same
+`from_task` (D131), so pairing one node's entries with the next node's
+by position mis-files a branch that finishes out of order, which a
+fan-out on one pool slot does routinely; a graph read before the run
+detail falls back to the entry's position. A row inside a sub-list
+therefore carries that **branch's** own state and its own detail, and
+only a parent-indent row carries `node.state` (D167). The EDGES block is
+the graph's own arrows grouped `edge` / `loop` / `join` with a `gate`
+line per waiting node, the SOURCE path is `GET /api/workflows/{name}/
+source`'s `file`, and `open definition` writes `?overlay=library`.
+Clicking a row writes `?node=` **and** the log pane's index in one
+navigation; the right-click menu posts `rerun` and `move`, with `move`
+disabled and its refusal printed on a join, matching T024c's `Conflict`.
 
 ### T064 — Docked request panel, `ActionForm`, inbox (A4.6, D49)
 
