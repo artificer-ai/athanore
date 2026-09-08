@@ -33,8 +33,9 @@
  * because `?overlay=` is one piece of state and the thing it names is
  * over the whole app (10 §Overlays). They portal out of this tree, so
  * where they sit in it says nothing about where they draw. The header's
- * `＋ new run` is one more way of writing `?overlay=new`, beside the
- * palette's row and (T067) the `n` key.
+ * `＋ new run` is one more way of writing `?overlay=new`, and its
+ * `workflows` is one more way of writing `?overlay=library`, beside the
+ * palette's rows and (T067) the `n` and `w` keys.
  */
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -45,7 +46,7 @@ import { RunList, useRunListModel } from './components/RunList'
 import { ServerDownBanner } from './components/ServerDownBanner'
 import { Splitter } from './components/Splitter'
 import { useAttention } from './components/attention'
-import { NewRun, Palette, buildPaletteActions } from './overlays'
+import { Library, NewRun, Palette, buildPaletteActions } from './overlays'
 import { BUILTIN_WORKFLOW, usePanes } from './panes'
 import type { AppSearch, Overlay } from './routes/search'
 import { usePrefs } from './store/prefs'
@@ -134,6 +135,9 @@ export default function App({
         onNewRun={() => {
           onOpenOverlay?.('new')
         }}
+        onOpenLibrary={() => {
+          onOpenOverlay?.('library')
+        }}
       />
       <ServerDownBanner />
 
@@ -176,6 +180,17 @@ export default function App({
       />
 
       <NewRun open={search.overlay === 'new'} onClose={onCloseOverlay ?? NOTHING} />
+
+      {/* `?run=` says which workflow the library opens on and `?node=`
+          which line it lands on, so the graph pane's `open definition`
+          hands nothing over that the search does not already carry
+          (`overlays/Library.tsx`). */}
+      <Library
+        open={search.overlay === 'library'}
+        runId={search.run}
+        node={search.node}
+        onClose={onCloseOverlay ?? NOTHING}
+      />
     </div>
   )
 }

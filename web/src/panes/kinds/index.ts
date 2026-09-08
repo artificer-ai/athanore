@@ -26,7 +26,6 @@ export {
   BRANCH_KEY_CHARS,
   GLYPHS,
   LEGEND_GLOSS,
-  actionError,
   branchLabel,
   branchState,
   branchTag,

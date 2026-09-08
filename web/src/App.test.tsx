@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
 import {
+  getSourceApiWorkflowsNameSourceGetQueryKey,
   listRunsApiRunsGetQueryKey,
   listWorkflowsApiWorkflowsGetQueryKey,
   manifestApiPluginsGetQueryKey,
@@ -52,6 +53,21 @@ const MANIFEST: PluginManifestEntry[] = [
   },
 ]
 
+// The library overlay highlights its source with shiki, which is a
+// chunk this suite has no reason to load: the overlay draws its lines
+// plain until the tokens arrive, and that is the state asserted here.
+vi.mock('./lib/highlight', () => ({
+  highlight: () => Promise.resolve(null),
+  tokenize: () => Promise.resolve(null),
+}))
+
+/** The module the one registered workflow is defined in. */
+const SOURCE = {
+  file: '/srv/workflows/feature_build.py',
+  source: '@wf.node(entry=True)\ndef prepare(ctx):\n    pass\n',
+  nodes: { prepare: { line: 1 } },
+}
+
 /** The registered workflows the New Run overlay's chips are built from. */
 const WORKFLOWS: WorkflowOut[] = [
   {
@@ -89,6 +105,10 @@ function shell(
   queryClient.setQueryData(listRunsApiRunsGetQueryKey(), over.runs ?? RUNS)
   queryClient.setQueryData(manifestApiPluginsGetQueryKey(), MANIFEST)
   queryClient.setQueryData(listWorkflowsApiWorkflowsGetQueryKey(), WORKFLOWS)
+  queryClient.setQueryData(
+    getSourceApiWorkflowsNameSourceGetQueryKey({ path: { name: 'feature_build' } }),
+    SOURCE,
+  )
 
   const rendered = render(
     <QueryClientProvider client={queryClient}>
@@ -123,12 +143,32 @@ function rows() {
 
 describe('App', () => {
   beforeEach(() => {
+    // The cache is seeded, so nothing here needs the network — except
+    // `refresh`, which invalidates every entry this tab holds and so
+    // refetches all of them. Answering those keeps a rejected request
+    // from surfacing as an unhandled error in whichever test happens to
+    // be running when it lands.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((request: Request) =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify(request.url.includes('/source') ? SOURCE : []),
+            { status: 200, headers: { 'Content-Type': 'application/json' } },
+          ),
+        ),
+      ),
+    )
     usePrefs.setState({ listWidth: DEFAULT_LIST_WIDTH, listCollapsed: false })
     useUi.setState({
       focus: 'list',
       runFilter: { workflow: ALL_WORKFLOWS, query: '' },
       logComposerFor: null,
     })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('renders the four regions of 10 §Layout', () => {
@@ -269,6 +309,34 @@ describe('App', () => {
     expect(screen.getByTestId('new-run')).toBeInTheDocument()
     // Over the cached workflows, so it is the form and not the notice.
     expect(await screen.findByTestId('new-run-form')).toBeInTheDocument()
+  })
+
+  it('draws the workflow library only when `?overlay=library` says so', async () => {
+    shell()
+    expect(screen.queryByTestId('library')).toBeNull()
+
+    cleanup()
+    shell({ overlay: 'library', run: 'aaaa1111bbbb', node: 'prepare' })
+    expect(screen.getByTestId('library')).toBeInTheDocument()
+
+    // Over the cached workflows and sources, so it is the viewer and not
+    // a notice — and `?node=` is the line it landed on, which is what
+    // makes the graph pane's `open definition` land on a definition.
+    const viewer = await screen.findByTestId('library-source')
+    expect(viewer).toHaveTextContent('def prepare(ctx):')
+    expect(viewer.querySelector('[data-anchor="true"]')).toHaveAttribute(
+      'data-line',
+      '1',
+    )
+  })
+
+  it('opens the workflow library from the header’s workflows button', async () => {
+    const onOpenOverlay = vi.fn()
+    shell({}, { onOpenOverlay })
+
+    await userEvent.click(screen.getByRole('button', { name: 'workflows' }))
+
+    expect(onOpenOverlay).toHaveBeenCalledExactlyOnceWith('library')
   })
 
   it('opens the new run overlay from the header’s ＋ new run', async () => {

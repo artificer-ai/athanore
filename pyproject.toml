@@ -104,7 +104,12 @@ strict = ["athanore/graph", "athanore/engine", "athanore/store"]
 # driver/ is athanore **v0** (D67): it imports the sibling v0 distribution
 # whose symbols do not exist in v1 yet, so type-checking it against v1's
 # package can only produce false positives (D73).
-exclude = ["driver"]
+# Pyright *replaces* its default exclude list when this key is set, so
+# the defaults are restored alongside `driver`. Without `**/.*` a host
+# `.venv` — which the stack invites you to keep for your editor — is
+# walked as source, and the pyright step goes from seconds to over an
+# hour (D173).
+exclude = ["driver", "**/node_modules", "**/__pycache__", "**/.*"]
 
 [tool.importlinter]
 root_package = "athanore"

@@ -721,21 +721,3 @@ export function moveRefusal(
   if (taskId === undefined) return 'this run has no attempt to move'
   return undefined
 }
-
-/**
- * What a refused action said, as the menu prints it.
- *
- * The generated client throws the parsed error body — `{error, code}`,
- * the API's one error shape (08 §Conventions) — rather than an `Error`,
- * so both are read and neither is assumed, exactly as `./log.ts` reads
- * the composer's.
- */
-export function actionError(error: unknown, fallback: string): string {
-  if (typeof error === 'object' && error !== null) {
-    const message = (error as { error?: unknown }).error
-    if (typeof message === 'string' && message !== '') return message
-    if (error instanceof Error && error.message !== '') return error.message
-  }
-  if (typeof error === 'string' && error.trim() !== '') return error
-  return fallback
-}
