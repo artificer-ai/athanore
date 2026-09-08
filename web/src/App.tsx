@@ -32,7 +32,9 @@
  * The overlays hang off the shell rather than off whatever opened them,
  * because `?overlay=` is one piece of state and the thing it names is
  * over the whole app (10 §Overlays). They portal out of this tree, so
- * where they sit in it says nothing about where they draw.
+ * where they sit in it says nothing about where they draw. The header's
+ * `＋ new run` is one more way of writing `?overlay=new`, beside the
+ * palette's row and (T067) the `n` key.
  */
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -43,7 +45,7 @@ import { RunList, useRunListModel } from './components/RunList'
 import { ServerDownBanner } from './components/ServerDownBanner'
 import { Splitter } from './components/Splitter'
 import { useAttention } from './components/attention'
-import { Palette, buildPaletteActions } from './overlays'
+import { NewRun, Palette, buildPaletteActions } from './overlays'
 import { BUILTIN_WORKFLOW, usePanes } from './panes'
 import type { AppSearch, Overlay } from './routes/search'
 import { usePrefs } from './store/prefs'
@@ -127,7 +129,12 @@ export default function App({
 
   return (
     <div className="text-body flex h-dvh flex-col overflow-hidden bg-background text-foreground">
-      <Header runs={runs} />
+      <Header
+        runs={runs}
+        onNewRun={() => {
+          onOpenOverlay?.('new')
+        }}
+      />
       <ServerDownBanner />
 
       <Splitter
@@ -167,6 +174,8 @@ export default function App({
         actions={paletteActions}
         onClose={onCloseOverlay ?? NOTHING}
       />
+
+      <NewRun open={search.overlay === 'new'} onClose={onCloseOverlay ?? NOTHING} />
     </div>
   )
 }

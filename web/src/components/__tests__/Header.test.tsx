@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ALL_WORKFLOWS, useUi } from '../../store/ui'
 import type { RunListModel } from '../RunList'
@@ -15,8 +16,10 @@ const UNANSWERED: RunListModel = {
   isError: false,
 }
 
+/** The strip, and the handler its one primary button calls. */
 function header(over: Partial<RunListModel> = {}) {
-  return render(<Header runs={{ ...UNANSWERED, ...over }} />)
+  const onNewRun = vi.fn()
+  return { onNewRun, ...render(<Header runs={{ ...UNANSWERED, ...over }} onNewRun={onNewRun} />) }
 }
 
 describe('Header', () => {
@@ -96,5 +99,16 @@ describe('Header', () => {
     header()
 
     expect(screen.getByTestId('header-counts')).toHaveAttribute('data-down', 'false')
+  })
+
+  it('opens the new run overlay from the mock’s ＋ new run button', async () => {
+    const user = userEvent.setup()
+    const { onNewRun } = header()
+
+    // The `＋` is decorative and `aria-hidden`, so the accessible name
+    // is the two words a screen reader should read.
+    await user.click(screen.getByRole('button', { name: 'new run' }))
+
+    expect(onNewRun).toHaveBeenCalledTimes(1)
   })
 })
