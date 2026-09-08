@@ -269,6 +269,13 @@ overlay style), stores the token in `localStorage`, sends it as a bearer
 header, appends it as `access_token` on the SSE URL (08), and returns to
 the token screen on 401.
 
+The screen is a password field, `save token`, and — once this browser
+holds a token — `forget it`, which is how a token kept for another
+deployment stops being sent. A token this browser holds while the screen
+is up is one the server refused, and the screen says so; a stored token
+that goes away returns the app to the screen without waiting for the
+next refusal (D169).
+
 The header is withheld from a server that has reported `auth: "off"`, and
 from no other request: `authenticated` describes the request that asked,
 so the `/api/me` a page boots with carries whatever token this browser
