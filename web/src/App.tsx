@@ -6,9 +6,13 @@
  * the width between them and the rail the list collapses to.
  *
  * Everything that makes this view *this view* comes in on `search`: the
- * shell owns no selection state of its own. The data does not arrive
- * until T059, so the counts on screen are the counts of what is on
- * screen, which is nothing.
+ * shell owns no selection state of its own, and `onSelectRun` hands a
+ * click back to the route, which writes `?run=`.
+ *
+ * `GET /api/runs` is read once, here, and shared: the header's counts,
+ * the chips, the rows and the collapsed rail's `RUNS n` are four views of
+ * one cached resource, so they cannot disagree and they refresh together
+ * when `run.*` or `task.*` invalidates it (10 §Realtime and caching).
  *
  * `ServerDownBanner` sits directly under the header and renders nothing
  * while the event feed is up (10 §Realtime and caching).
@@ -16,34 +20,32 @@
 import { Detail } from './components/Detail'
 import { Footer } from './components/Footer'
 import { Header } from './components/Header'
-import { RunList } from './components/RunList'
+import { RunList, useRunListModel } from './components/RunList'
 import { ServerDownBanner } from './components/ServerDownBanner'
 import { Splitter } from './components/Splitter'
 import type { AppSearch } from './routes/search'
 
 export default function App({
   search,
+  onSelectRun,
   onOpenPalette,
 }: {
   search: AppSearch
+  onSelectRun: (runId: string) => void
   onOpenPalette: () => void
 }) {
-  /**
-   * The number of run rows on screen. T061 renders the rows of
-   * `GET /api/runs` here and this becomes their count; until then the
-   * list renders none, and `0` is the honest report of that rather than
-   * a placeholder standing in for a number nobody has.
-   */
-  const runCount = 0
+  const runs = useRunListModel()
 
   return (
     <div className="text-body flex h-dvh flex-col overflow-hidden bg-background text-foreground">
-      <Header />
+      <Header runs={runs} />
       <ServerDownBanner />
 
       <Splitter
-        count={runCount}
-        list={<RunList count={runCount} />}
+        count={runs.rows.length}
+        list={
+          <RunList model={runs} selected={search.run} onSelect={onSelectRun} />
+        }
         detail={<Detail search={search} />}
       />
 

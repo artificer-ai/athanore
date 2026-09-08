@@ -1,17 +1,33 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider, createMemoryHistory } from '@tanstack/react-router'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import type { AppSearch } from '../search'
+import { listRunsApiRunsGetQueryKey } from '../../api/gen/@tanstack/react-query.gen'
 import { PREFS_STORAGE_KEY, usePrefs } from '../../store/prefs'
 import { createAppRouter } from '../router'
 
 type Router = ReturnType<typeof createAppRouter>
 
+/**
+ * The router, over a cache holding an empty run list.
+ *
+ * The shell reads `GET /api/runs` (T061), so it needs a query client;
+ * seeding it keeps these tests about the route and off the network.
+ */
 function mount(url: string): Router {
   const router = createAppRouter(createMemoryHistory({ initialEntries: [url] }))
-  render(<RouterProvider router={router} />)
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { staleTime: 5000, retry: false } },
+  })
+  queryClient.setQueryData(listRunsApiRunsGetQueryKey(), [])
+  render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  )
   return router
 }
 

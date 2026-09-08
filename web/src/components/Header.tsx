@@ -1,11 +1,13 @@
 /**
- * The header strip: brand mark, version, and the two counts
- * (`docs/v1/10-frontend.md` §Layout).
+ * The header strip: brand mark, version, the two counts, and the run
+ * list's filters (`docs/v1/10-frontend.md` §Layout).
  *
- * The counts are placeholders until T059 fetches `GET /api/runs`. They
- * read `—` rather than `0`, because 02 §Real data only says an unknown
- * number is omitted, never zero-filled — and the active dot only pulses
- * while something is in progress, which nothing yet is.
+ * The counts are `GET /api/runs`, which is also what the list draws, so
+ * the number in the strip and the number of rows under it can never
+ * disagree. Before the server has answered they read `—` rather than
+ * `0`: 02 §Real data only says an unknown number is omitted, never
+ * zero-filled. The active dot pulses only while `k > 0` — "only while
+ * something is in progress" (10 §Attention) — and is neutral otherwise.
  *
  * The one "fading rule" of 10 §Borders sits under the strip: transparent
  * to accent 75 % to transparent, inset 48 px at each end.
@@ -14,14 +16,23 @@
  * pulsing (10 §Realtime and caching): the numbers are still the last
  * ones the server gave, and greying them is how the strip says nobody is
  * standing behind them any more. `ServerDownBanner` says why, underneath.
+ *
+ * `＋ new run` and `workflows` are the overlays' (T066b, T066c) and are
+ * not on the strip yet.
  */
+import { RunFilters } from './RunList'
+import type { RunListModel } from './RunList'
 import { useUi } from '../store/ui'
 
 /** Injected by `vite.config.ts` from `pyproject.toml`'s `[project] version`. */
 const VERSION = __APP_VERSION__
 
-export function Header() {
+/** A count the server has not given yet (02 §Real data only). */
+const UNKNOWN = '—'
+
+export function Header({ runs }: { runs: RunListModel }) {
   const down = useUi((state) => state.feed.status === 'down')
+  const active = runs.active ?? 0
 
   return (
     <header className="bg-chrome relative flex flex-none flex-wrap items-center gap-x-[14px] gap-y-2 border-b border-border px-[14px] py-[8px]">
@@ -37,19 +48,23 @@ export function Header() {
         data-down={down}
         className="text-meta group flex items-center gap-[10px] whitespace-nowrap text-muted-foreground data-[down=true]:text-[var(--color-neutral-700)]"
       >
-        <span data-testid="run-count">— runs</span>
+        <span data-testid="run-count">{runs.total ?? UNKNOWN} runs</span>
         <span aria-hidden className="text-[var(--color-neutral-800)]">
           │
         </span>
         <span className="inline-flex items-center gap-[5px]" data-testid="active-count">
           <span
             aria-hidden
-            data-active="false"
+            data-active={active > 0}
             className="h-[6px] w-[6px] flex-none rounded-full bg-[var(--color-neutral-700)] data-[active=true]:bg-[var(--color-accent)] data-[active=true]:animate-ath-pulse group-data-[down=true]:animate-none group-data-[down=true]:bg-[var(--color-neutral-800)]"
           />
-          — active
+          {runs.active ?? UNKNOWN} active
         </span>
       </div>
+
+      <div className="flex-1" />
+
+      <RunFilters workflows={runs.workflows} />
 
       <span
         aria-hidden

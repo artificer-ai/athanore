@@ -18,6 +18,11 @@ export function AppRoute() {
   return (
     <App
       search={search}
+      onSelectRun={(runId) => {
+        // Selection is the URL (10 §Layout): the run list holds none of
+        // its own, so a click and a pasted link end in the same state.
+        void navigate({ search: (prev) => ({ ...prev, run: runId }) })
+      }}
       onOpenPalette={() => {
         // The palette itself is T066a; the state it opens from is this
         // task's, and it is a search parameter like every other overlay.
