@@ -5,18 +5,32 @@
  * The two builtin data panes are the ones that matter here — the
  * overview is a `dashboard` and the log is a `log`, declared on
  * `_builtin` like any plugin's (09 §Builtins are plugins) — so this
- * suite renders them from the shapes their routes answer with.
+ * suite renders them from the shapes their routes answer with. What the
+ * overview *draws* is `./Overview.test.tsx`; what is under test here is
+ * that the host reaches it through the manifest, and appends the
+ * `placement="card"` panels below it (09 §Slots).
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createAppQueryClient } from '../../api/client'
-import type { PanelOut } from '../../api/gen/types.gen'
+import {
+  listRunsApiRunsGetQueryKey,
+  manifestApiPluginsGetQueryKey,
+} from '../../api/gen/@tanstack/react-query.gen'
+import type { PanelOut, RunSummary } from '../../api/gen/types.gen'
 import { PaneRenderer } from '../PaneRenderer'
 import type { PanelScope } from '../source'
 import type { Pane } from '../usePanes'
-import { BUILTIN_ENTRY, GAMEDEV_ENTRY, SAMPLES, panel } from './fixtures'
+import {
+  BUILTIN_ENTRY,
+  GAMEDEV_ENTRY,
+  MANIFEST,
+  OVERVIEW_SOURCE,
+  SAMPLES,
+  panel,
+} from './fixtures'
 
 const RUN = '01JD5XPANERENDERER'
 
@@ -85,17 +99,29 @@ afterEach(() => {
 })
 
 describe('the builtin panes', () => {
-  it('renders the overview from its dashboard source', async () => {
-    const urls = stubFetch(SAMPLES.dashboard)
+  it('renders the overview from its source, with its own renderer', async () => {
+    const urls = stubFetch(OVERVIEW_SOURCE)
 
     draw(OVERVIEW)
 
-    expect(await screen.findByTestId('pane-dashboard')).toBeInTheDocument()
+    // The panel is a `dashboard` in the manifest and reaches its
+    // renderer through the same dispatch a plugin's would; the overview
+    // has one of its own because its route sends `meta` too (15, D140).
+    expect(await screen.findByTestId('pane-overview')).toBeInTheDocument()
     expect(urls[0]).toBe(
       `${window.location.origin}/api/plugins/_builtin/overview?run_id=${RUN}`,
     )
-    expect(screen.getByText('SESSIONS')).toBeInTheDocument()
+    expect(screen.getByText('612,884')).toBeInTheDocument()
     expect(screen.getByTestId('pane-renderer')).toHaveAttribute('data-kind', 'dashboard')
+  })
+
+  it('draws a plugin’s dashboard with the kind’s own renderer', async () => {
+    stubFetch(SAMPLES.dashboard)
+
+    draw(paneOf(panel({ name: 'playtest', kind: 'dashboard', source: '/x' }), 'gamedev'))
+
+    expect(await screen.findByTestId('pane-dashboard')).toBeInTheDocument()
+    expect(screen.getByText('SESSIONS')).toBeInTheDocument()
   })
 
   it('renders the log from its log source', async () => {
@@ -109,12 +135,74 @@ describe('the builtin panes', () => {
   })
 
   it('draws no footer on a builtin: nobody registered it', async () => {
-    stubFetch(SAMPLES.dashboard)
+    stubFetch(OVERVIEW_SOURCE)
 
     draw(OVERVIEW)
-    await screen.findByTestId('pane-dashboard')
+    await screen.findByTestId('pane-overview')
 
     expect(screen.queryByText(/registered by/)).toBeNull()
+  })
+})
+
+describe('the cards under the overview', () => {
+  /** The gamedev run whose workflow owns the `budget` card. */
+  const RUNS: RunSummary[] = [
+    {
+      id: RUN,
+      workflow: 'gamedev',
+      title: 'squirrels vs chipmunks',
+      status: 'running',
+      position: 1,
+      created: '2026-09-08T08:56:00Z',
+      updated: '2026-09-08T09:00:00Z',
+    },
+  ]
+
+  /** Answer per route, since the pane and its card ask for different data. */
+  function stubRoutes(routes: Record<string, unknown>) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (request: Request) => {
+        const match = Object.entries(routes).find(([path]) => request.url.includes(path))
+        return new Response(JSON.stringify(match?.[1] ?? {}), {
+          status: match === undefined ? 404 : 200,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }),
+    )
+  }
+
+  beforeEach(() => {
+    queryClient.setQueryData(manifestApiPluginsGetQueryKey(), MANIFEST)
+    queryClient.setQueryData(listRunsApiRunsGetQueryKey(), RUNS)
+  })
+
+  it('appends the run’s `placement=card` panels below it', async () => {
+    stubRoutes({
+      '_builtin/overview': OVERVIEW_SOURCE,
+      'gamedev/budget': SAMPLES.kv,
+    })
+
+    draw(OVERVIEW)
+
+    const card = await screen.findByTestId('panel-card')
+    expect(card).toHaveAttribute('data-panel', 'gamedev:budget')
+    // The card is a `kv` panel and draws as one; it is not a pane, so
+    // the cycle is unchanged and it carries no pane footer.
+    expect(await within(card).findByText('py312')).toBeInTheDocument()
+    expect(screen.queryByText(/registered by/)).toBeNull()
+  })
+
+  it('draws none on a run whose workflow contributed none', async () => {
+    queryClient.setQueryData(listRunsApiRunsGetQueryKey(), [
+      { ...(RUNS[0] as RunSummary), workflow: 'feature_build' },
+    ])
+    stubRoutes({ '_builtin/overview': OVERVIEW_SOURCE })
+
+    draw(OVERVIEW)
+    await screen.findByTestId('pane-overview')
+
+    expect(screen.queryByTestId('overview-cards')).toBeNull()
   })
 })
 

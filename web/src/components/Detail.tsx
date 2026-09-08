@@ -27,10 +27,13 @@ import { useUi } from '../store/ui'
 export function Detail({
   panes,
   taskId,
+  onOpenTask,
 }: {
   panes: PaneModel
   /** The focused attempt, from `?task=`: a `task`-scoped panel's id. */
   taskId?: number | undefined
+  /** Open an attempt in the task drawer: the overview's NODES rows. */
+  onOpenTask?: ((taskId: number) => void) | undefined
 }) {
   const focused = useUi((s) => s.focus === 'detail')
   const setFocus = useUi((s) => s.setFocus)
@@ -69,6 +72,7 @@ export function Detail({
             key={panes.current.id}
             pane={panes.current}
             scope={{ runId: panes.runId, taskId }}
+            onOpenTask={onOpenTask}
           />
         )}
       </div>

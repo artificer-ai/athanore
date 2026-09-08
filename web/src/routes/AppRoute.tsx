@@ -34,6 +34,14 @@ export function AppRoute() {
         // task's, and it is a search parameter like every other overlay.
         void navigate({ search: (prev) => ({ ...prev, overlay: 'palette' }) })
       }}
+      onOpenTask={(taskId) => {
+        // The task drawer is `?overlay=task&task=`, the pair 10 §Layout
+        // names: the overview's NODES rows and the graph's rows open it
+        // by writing the search, and the drawer itself is T066e.
+        void navigate({
+          search: (prev) => ({ ...prev, overlay: 'task', task: taskId }),
+        })
+      }}
     />
   )
 }

@@ -106,8 +106,8 @@ export function paneLabel(panes: readonly Pane[], index: number): string {
  * Whether `panel` is a pane of this scope.
  *
  * `placement` decides pane from card before anything else: a
- * `placement="card"` panel is appended to the overview (T063a) and is
- * never a pane of its own, whatever its slot.
+ * `placement="card"` panel is appended to the overview
+ * ({@link cardsOf}) and is never a pane of its own, whatever its slot.
  */
 function isPaneOf(
   panel: PanelOut,
@@ -119,6 +119,71 @@ function isPaneOf(
   if (panel.slot === 'run') return true
   if (panel.slot !== 'node') return false
   return panel.node != null && liveNodes.has(panel.node)
+}
+
+/**
+ * The manifest's panels in this scope that satisfy `keep`, as panes.
+ *
+ * Ownership is the same rule for a pane and for a card, and it is the
+ * rule of 09 §Context and scopes: the builtins apply to every run, and a
+ * workflow's panels apply to its own runs and to no others.
+ */
+function select(
+  manifest: readonly PluginManifestEntry[],
+  scope: PaneScope,
+  keep: (panel: PanelOut) => boolean,
+): Pane[] {
+  const panes: Pane[] = []
+
+  for (const entry of manifest) {
+    const builtin = entry.workflow === BUILTIN_WORKFLOW
+    if (scope.runId !== undefined && !builtin && entry.workflow !== scope.workflow) {
+      continue
+    }
+
+    for (const panel of entry.panels ?? []) {
+      if (!keep(panel)) continue
+      panes.push({
+        id: `${entry.workflow}:${panel.name}`,
+        workflow: entry.workflow,
+        name: panel.name,
+        builtin,
+        panel,
+      })
+    }
+  }
+
+  return panes
+}
+
+/**
+ * The cards appended to the overview pane: `slot="run"`, `placement=
+ * "card"` (09 §Slots).
+ *
+ * They are not part of the cycle and have no index — a card is a panel
+ * of the overview, so a build with three of them still cycles the same
+ * panes — and with no run selected there is no overview to append to and
+ * therefore no cards.
+ */
+export function cardsOf(
+  manifest: readonly PluginManifestEntry[],
+  scope: PaneScope,
+): Pane[] {
+  if (scope.runId === undefined) return []
+  return select(
+    manifest,
+    scope,
+    (panel) => panel.placement === 'card' && panel.slot === 'run',
+  )
+}
+
+/** {@link cardsOf} over the live manifest and the selected run. */
+export function useCards(runId: string | undefined): Pane[] {
+  const { manifest } = useManifest()
+  const { data: runs } = useRuns()
+  const run = runId === undefined ? undefined : runs?.find((row) => row.id === runId)
+
+  return cardsOf(manifest, { runId, workflow: run?.workflow })
 }
 
 /**
@@ -143,25 +208,7 @@ export function panesOf(
   liveNodes: ReadonlySet<string>,
 ): Pane[] {
   const hasRun = scope.runId !== undefined
-  const panes: Pane[] = []
-
-  for (const entry of manifest) {
-    const builtin = entry.workflow === BUILTIN_WORKFLOW
-    if (hasRun && !builtin && entry.workflow !== scope.workflow) continue
-
-    for (const panel of entry.panels ?? []) {
-      if (!isPaneOf(panel, hasRun, liveNodes)) continue
-      panes.push({
-        id: `${entry.workflow}:${panel.name}`,
-        workflow: entry.workflow,
-        name: panel.name,
-        builtin,
-        panel,
-      })
-    }
-  }
-
-  return panes
+  return select(manifest, scope, (panel) => isPaneOf(panel, hasRun, liveNodes))
 }
 
 /** Whether any panel in scope follows a node, and so needs the graph. */

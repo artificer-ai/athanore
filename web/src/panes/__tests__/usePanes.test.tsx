@@ -9,7 +9,7 @@ import {
   manifestApiPluginsGetQueryKey,
 } from '../../api/gen/@tanstack/react-query.gen'
 import type { GraphOut, PluginManifestEntry, RunSummary } from '../../api/gen/types.gen'
-import { panesOf, usePanes } from '../usePanes'
+import { cardsOf, panesOf, usePanes } from '../usePanes'
 import {
   BUILTIN_ENTRY,
   GAMEDEV_ENTRY,
@@ -110,6 +110,24 @@ describe('panesOf', () => {
       'requests',
       'graph',
     ])
+  })
+})
+
+describe('cardsOf', () => {
+  it('is the `placement="card"` panels of the run’s own workflow', () => {
+    const cards = cardsOf(MANIFEST, { runId: RUN.id, workflow: 'gamedev' })
+
+    expect(cards.map((card) => card.id)).toEqual(['gamedev:budget'])
+  })
+
+  it('leaves out a card of a workflow this run is not of', () => {
+    expect(cardsOf(MANIFEST, { runId: OTHER_RUN.id, workflow: 'feature_build' })).toEqual(
+      [],
+    )
+  })
+
+  it('is empty with no run: there is no overview to append to', () => {
+    expect(cardsOf(MANIFEST, { runId: undefined, workflow: undefined })).toEqual([])
   })
 })
 

@@ -1,6 +1,10 @@
 /**
- * The status colours of `docs/v1/10-frontend.md` §Status colours, as the
- * run list uses them.
+ * The status colours of `docs/v1/10-frontend.md` §Status colours.
+ *
+ * The table lives beside the run list because that is what first drew a
+ * status, but it is the app's and not the list's: the overview's NODES
+ * column colours an *attempt's* status from the same rows (10 §Panes),
+ * and a second copy of the table is how the two would come to disagree.
  *
  * The table maps a *state* to a token and a treatment, and the run
  * statuses of 03 are six of the states it names. One reading is worth
@@ -15,7 +19,7 @@
  * source (`src/styles/theme.css` declares them; a template literal would
  * leave every one of them out of the bundle).
  */
-import type { RunStatus } from '../../api/gen/types.gen'
+import type { RunStatus, TaskStatus } from '../../api/gen/types.gen'
 
 /** A row of 10 §Status colours. */
 export type StatusTone = 'ok' | 'active' | 'gate' | 'queued' | 'fail' | 'muted' | 'paused'
@@ -27,6 +31,23 @@ const TONES: Record<RunStatus, StatusTone> = {
   paused: 'paused',
   completed: 'ok',
   failed: 'fail',
+  cancelled: 'muted',
+}
+
+/**
+ * Every task status of 03, against the same table's states.
+ *
+ * `waiting` is the gate row — an attempt parked on a request is waiting
+ * on a person — and `dead_letter` is the failed one: an attempt that ran
+ * out of retries failed, and 10 §Status colours puts the two on one row.
+ */
+const TASK_TONES: Record<TaskStatus, StatusTone> = {
+  ready: 'queued',
+  in_progress: 'active',
+  waiting: 'gate',
+  done: 'ok',
+  failed: 'fail',
+  dead_letter: 'fail',
   cancelled: 'muted',
 }
 
@@ -49,6 +70,15 @@ const TONE_CLASSES: Record<StatusTone, string> = {
  */
 export function statusTone(status: RunStatus, pendingRequests: number): StatusTone {
   return pendingRequests > 0 ? 'gate' : TONES[status]
+}
+
+/**
+ * The tone an attempt's status carries, or `muted` for a status this
+ * build has no row for — a server one version ahead colours its unknown
+ * status neutrally rather than rendering it invisible.
+ */
+export function taskTone(status: string): StatusTone {
+  return TASK_TONES[status as TaskStatus] ?? 'muted'
 }
 
 /** The colour utility for a tone. */
