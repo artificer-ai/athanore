@@ -31,11 +31,12 @@
  *   status that has not arrived draws neither word: unknown is omitted.
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { appendLogApiRunsRunIdLogPostMutation } from '../../api/gen/@tanstack/react-query.gen'
 import { useRuns } from '../../components/RunList'
 import { cn } from '../../lib/utils'
+import { useUi } from '../../store/ui'
 import { panelQueryKey } from '../source'
 import { LogRows } from './LogRows'
 import { appendError, isTailing, logLines } from './log'
@@ -62,10 +63,26 @@ function Bar() {
  * will say the same thing a moment later (`log.appended` is one of the
  * names this panel registered `refresh_on`), but an operator's own note
  * must appear whether or not this tab's stream is up.
+ *
+ * It is also where `append log` (`l`, and the palette row of the same
+ * name) lands: the shell moves the pane cycle here and asks `useUi` for
+ * the caret, and this box takes the request the moment it is on screen —
+ * which is a render later than the command, because the pane draws once
+ * its panel has answered. A request naming another run is not this box's
+ * and is left where it is.
  */
 function Composer({ runId, source }: { runId: string; source?: string | undefined }) {
   const [text, setText] = useState('')
   const queryClient = useQueryClient()
+  const box = useRef<HTMLTextAreaElement | null>(null)
+  const askedFor = useUi((state) => state.logComposerFor)
+  const clearRequest = useUi((state) => state.clearLogComposer)
+
+  useEffect(() => {
+    if (askedFor !== runId) return
+    clearRequest()
+    box.current?.focus()
+  }, [askedFor, runId, clearRequest])
 
   const mutation = useMutation({
     ...appendLogApiRunsRunIdLogPostMutation(),
@@ -94,6 +111,7 @@ function Composer({ runId, source }: { runId: string; source?: string | undefine
       className="flex flex-none flex-col gap-[6px] border-t border-[var(--color-neutral-900)] px-[14px] py-[8px]"
     >
       <textarea
+        ref={box}
         id="log-composer-text"
         rows={2}
         value={text}

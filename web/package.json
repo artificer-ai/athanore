@@ -26,6 +26,7 @@
     "@tanstack/react-router": "^1.170.33",
     "@tanstack/react-virtual": "^3.14.11",
     "class-variance-authority": "^0.7.1",
+    "cmdk": "^1.1.1",
     "cn": "^0.2.5",
     "radix-ui": "^1.6.7",
     "react": "^19.2.8",
