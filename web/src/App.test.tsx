@@ -4,8 +4,11 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
-import { listRunsApiRunsGetQueryKey } from './api/gen/@tanstack/react-query.gen'
-import type { RunSummary } from './api/gen/types.gen'
+import {
+  listRunsApiRunsGetQueryKey,
+  manifestApiPluginsGetQueryKey,
+} from './api/gen/@tanstack/react-query.gen'
+import type { PluginManifestEntry, RunSummary } from './api/gen/types.gen'
 import type { AppSearch } from './routes/search'
 import { DEFAULT_LIST_WIDTH, usePrefs } from './store/prefs'
 import { ALL_WORKFLOWS, useUi } from './store/ui'
@@ -32,12 +35,24 @@ const RUNS: RunSummary[] = [
   },
 ]
 
+/** The two builtin panes a pane bar has something to cycle with. */
+const MANIFEST: PluginManifestEntry[] = [
+  {
+    workflow: '_builtin',
+    panels: [
+      { name: 'overview', slot: 'run', placement: 'pane', scope: 'run', kind: 'custom' },
+      { name: 'log', slot: 'run', placement: 'pane', scope: 'run', kind: 'custom' },
+    ],
+  },
+]
+
 /**
  * The shell over a seeded cache.
  *
- * `staleTime` keeps the seeded entry fresh, so nothing here reaches for
- * the network: the fetch behind `GET /api/runs` is the generated
- * client's and is exercised where it belongs (`api/__tests__`).
+ * `staleTime` keeps the seeded entries fresh, so nothing here reaches
+ * for the network: the fetches behind `GET /api/runs` and
+ * `GET /api/plugins` are the generated client's and are exercised where
+ * they belong (`api/__tests__`, `panes/__tests__`).
  */
 function shell(
   search: AppSearch = {},
@@ -47,12 +62,14 @@ function shell(
     defaultOptions: { queries: { staleTime: 5000, retry: false } },
   })
   queryClient.setQueryData(listRunsApiRunsGetQueryKey(), over.runs ?? RUNS)
+  queryClient.setQueryData(manifestApiPluginsGetQueryKey(), MANIFEST)
 
   return render(
     <QueryClientProvider client={queryClient}>
       <App
         search={search}
         onSelectRun={over.onSelectRun ?? (() => {})}
+        onSelectPane={() => {}}
         onOpenPalette={() => {}}
       />
     </QueryClientProvider>,
@@ -177,9 +194,15 @@ describe('App', () => {
       defaultOptions: { queries: { staleTime: 5000, retry: false } },
     })
     queryClient.setQueryData(listRunsApiRunsGetQueryKey(), RUNS)
+    queryClient.setQueryData(manifestApiPluginsGetQueryKey(), MANIFEST)
     render(
       <QueryClientProvider client={queryClient}>
-        <App search={{}} onSelectRun={() => {}} onOpenPalette={onOpenPalette} />
+        <App
+          search={{}}
+          onSelectRun={() => {}}
+          onSelectPane={() => {}}
+          onOpenPalette={onOpenPalette}
+        />
       </QueryClientProvider>,
     )
 

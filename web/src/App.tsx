@@ -16,6 +16,11 @@
  *
  * `ServerDownBanner` sits directly under the header and renders nothing
  * while the event feed is up (10 §Realtime and caching).
+ *
+ * `usePanes` is read here rather than inside `Detail` for the same
+ * reason `GET /api/runs` is: the pane cycle's actions are the keyboard's
+ * too (`←`, `→`, `1`–`9`, T067), and a shell that holds the model can
+ * hand it to both without either owning the other.
  */
 import { Detail } from './components/Detail'
 import { Footer } from './components/Footer'
@@ -23,18 +28,22 @@ import { Header } from './components/Header'
 import { RunList, useRunListModel } from './components/RunList'
 import { ServerDownBanner } from './components/ServerDownBanner'
 import { Splitter } from './components/Splitter'
+import { usePanes } from './panes'
 import type { AppSearch } from './routes/search'
 
 export default function App({
   search,
   onSelectRun,
+  onSelectPane,
   onOpenPalette,
 }: {
   search: AppSearch
   onSelectRun: (runId: string) => void
+  onSelectPane: (index: number) => void
   onOpenPalette: () => void
 }) {
   const runs = useRunListModel()
+  const panes = usePanes(search.run, { index: search.pane, onChange: onSelectPane })
 
   return (
     <div className="text-body flex h-dvh flex-col overflow-hidden bg-background text-foreground">
@@ -46,7 +55,7 @@ export default function App({
         list={
           <RunList model={runs} selected={search.run} onSelect={onSelectRun} />
         }
-        detail={<Detail search={search} />}
+        detail={<Detail panes={panes} />}
       />
 
       <Footer onOpenPalette={onOpenPalette} />

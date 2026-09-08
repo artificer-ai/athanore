@@ -11,6 +11,12 @@
  * `?run=`, and the row that draws itself as selected is the one the
  * search parameter names. The list holds no selection of its own, so a
  * link into the app and a click inside it end in the same state.
+ *
+ * The 11.5 px row scale sits on the scrolling container and is inherited
+ * rather than merged into a row's own classes: `cn` is tailwind-merge,
+ * and it reads `text-row` as conflicting with the row's
+ * `text-[var(--color-neutral-300)]` in the same call, keeping only the
+ * last of the two (D157).
  */
 import { cn } from '../../lib/utils'
 import { useUi } from '../../store/ui'
@@ -47,7 +53,7 @@ function Row({
       onClick={() => onSelect(row.id)}
       style={{ gridTemplateColumns: COLUMNS }}
       className={cn(
-        'text-row grid w-full items-center gap-[8px] overflow-hidden border-l-2 border-l-transparent px-[12px] py-[4px] text-left text-[var(--color-neutral-300)] hover:bg-[var(--color-neutral-900)]',
+        'grid w-full items-center gap-[8px] overflow-hidden border-l-2 border-l-transparent px-[12px] py-[4px] text-left text-[var(--color-neutral-300)] hover:bg-[var(--color-neutral-900)]',
         zebra && 'bg-zebra',
         selected &&
           'border-l-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface))]',
@@ -138,7 +144,7 @@ export function RunList({
       <div
         role="listbox"
         aria-label="run rows"
-        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
+        className="text-row min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
       >
         {model.rows.length === 0 ? (
           <Empty model={model} />

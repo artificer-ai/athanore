@@ -2874,6 +2874,7 @@ Index persists across selection changes and clamps to the pane count;
 node-slot pane appears only when live; clamp on selection change; cycle
 wraps; the global panes show with no run.
 **Done.** Tests pass.
+**Status.** Done.
 
 ### T062a — `PaneRenderer` kinds (A4.4, 09 §Panel kinds)
 
