@@ -27,7 +27,8 @@
  * - **`● tailing` / `○ complete`**, which is the run's status and not
  *   the scroller's: a running run is still producing lines. Whether the
  *   view is *following* the end is the scroller's own business, and
- *   scrolling up to read something does not make the run complete.
+ *   scrolling up to read something does not make the run complete. A
+ *   status that has not arrived draws neither word: unknown is omitted.
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
@@ -168,7 +169,11 @@ export function Log({
 
   const run = runId === undefined ? undefined : runs?.find((row) => row.id === runId)
   const lines = logLines(data, node)
-  const live = isTailing(run?.status)
+  // Real data only: until the run's status has arrived, the log is
+  // neither claimed to be live nor claimed to be finished (AGENTS.md,
+  // "Unknown is omitted"), so the indicator is not drawn at all.
+  const status = run?.status
+  const live = isTailing(status)
 
   return (
     <div data-testid="pane-log" className="flex min-h-0 flex-1 flex-col">
@@ -195,17 +200,19 @@ export function Log({
         )}
 
         <div className="flex-1" />
-        <span
-          data-testid="log-state"
-          className={cn(
-            'whitespace-nowrap',
-            live
-              ? 'animate-ath-pulse text-[var(--color-accent-300)]'
-              : 'text-[var(--color-neutral-500)]',
-          )}
-        >
-          {live ? '● tailing' : '○ complete'}
-        </span>
+        {status !== undefined && (
+          <span
+            data-testid="log-state"
+            className={cn(
+              'whitespace-nowrap',
+              live
+                ? 'animate-ath-pulse text-[var(--color-accent-300)]'
+                : 'text-[var(--color-neutral-500)]',
+            )}
+          >
+            {live ? '● tailing' : '○ complete'}
+          </span>
+        )}
       </div>
 
       <LogRows

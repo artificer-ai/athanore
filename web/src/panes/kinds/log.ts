@@ -90,23 +90,42 @@ function instant(ts: string): number | null {
  * whose payload names none — belong to no node and are filtered out with
  * the rest.
  *
- * The order is by time, and the sort is stable in both directions: rows
- * of the same instant keep the order their source gave them, and so does
- * a row whose `ts` is not a time at all, which is drawn where it arrived
- * rather than swept to one end.
+ * The order is by time, and the sort is stable: rows of the same instant
+ * keep the order their source gave them.
+ *
+ * A row whose `ts` is not a time at all is drawn where it arrived rather
+ * than swept to one end, and it holds only its own place: the rows it
+ * sits between are ordered among themselves as if it were not there.
+ * That is why the timed rows are sorted on their own and put back into
+ * the positions they occupied, instead of being compared through a
+ * comparator that would have to answer "before or after?" about a row
+ * that has no instant — such a comparator is intransitive, and what
+ * `Array.prototype.sort` then returns is implementation-defined.
  */
 export function logLines(
   rows: readonly LogRow[],
   node?: string | undefined,
 ): LogRow[] {
   const kept = node === undefined ? [...rows] : rows.filter((row) => row.node === node)
-  return kept
-    .map((row, index) => ({ row, index, at: instant(row.ts) }))
-    .sort((a, b) => {
-      if (a.at === null || b.at === null) return a.index - b.index
-      return a.at - b.at || a.index - b.index
-    })
-    .map((entry) => entry.row)
+
+  // The positions holding a row that has an instant, and those rows.
+  const slots: number[] = []
+  const timed: { row: LogRow; index: number; at: number }[] = []
+  kept.forEach((row, index) => {
+    const at = instant(row.ts)
+    if (at === null) return
+    slots.push(index)
+    timed.push({ row, index, at })
+  })
+
+  timed.sort((a, b) => a.at - b.at || a.index - b.index)
+
+  const ordered = [...kept]
+  timed.forEach((entry, position) => {
+    const slot = slots[position]
+    if (slot !== undefined) ordered[slot] = entry.row
+  })
+  return ordered
 }
 
 /**

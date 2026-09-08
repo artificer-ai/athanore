@@ -86,6 +86,15 @@ function draw(
   )
 }
 
+/** The pane over the fixture, with whatever run list the test seeded. */
+function drawWithoutSeeding() {
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <Log data={rows()} runId={LOG_RUN} source={SOURCE} />
+    </QueryClientProvider>,
+  )
+}
+
 /** The message cells, in the order they are drawn. */
 function messages() {
   return screen.getAllByTestId('log-message')
@@ -131,6 +140,27 @@ describe('the header', () => {
     expect(screen.getByTestId('log-state')).toHaveTextContent('○ complete')
   })
 
+  it('says nothing about tailing while the run’s status has not arrived', () => {
+    // The run list is still in flight. Neither word is true yet, and
+    // AGENTS.md's "unknown is omitted" makes ○ complete the wrong
+    // default: a deep link to a running run would read as finished.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => new Promise<Response>(() => {})),
+    )
+    drawWithoutSeeding()
+
+    expect(screen.getByText('EVENT LOG')).toBeInTheDocument()
+    expect(screen.queryByTestId('log-state')).not.toBeInTheDocument()
+  })
+
+  it('says nothing about tailing for a run the list does not carry', () => {
+    queryClient.setQueryData(listRunsApiRunsGetQueryKey(), [])
+    drawWithoutSeeding()
+
+    expect(screen.queryByTestId('log-state')).not.toBeInTheDocument()
+  })
+
   it('counts the lines it is showing, not the ones it was given', () => {
     draw({ node: 'qa' })
 
@@ -154,16 +184,62 @@ describe('the rows', () => {
   })
 
   it('keeps a row whose ts is not a time where its source put it', () => {
+    // The unparseable row holds its own position — second of five — and
+    // holds nothing else: the four timed rows fill the four remaining
+    // positions in time order, across it.
     const broken: LogRow[] = [
+      { ts: '2026-09-08T09:00:05Z', text: 'fifth' },
+      { ts: 'not a time', text: 'unparseable' },
+      { ts: '2026-09-08T09:00:01Z', text: 'first' },
+      { ts: '2026-09-08T09:00:03Z', text: 'third' },
+      { ts: '2026-09-08T09:00:02Z', text: 'second' },
+    ]
+
+    expect(logLines(broken).map((row) => row.text)).toEqual([
+      'first',
+      'unparseable',
+      'second',
+      'third',
+      'fifth',
+    ])
+  })
+
+  it('orders the same rows the same way however many surround them', () => {
+    // The comparator is consistent, so a bad row cannot make the answer
+    // depend on the array's length (an inconsistent one leaves
+    // `Array.prototype.sort` implementation-defined, and V8 switches
+    // algorithm at 22 elements).
+    const pad = (n: number): LogRow => ({
+      ts: `2026-09-08T10:00:${String(n).padStart(2, '0')}Z`,
+      text: `pad ${n}`,
+    })
+    const three: LogRow[] = [
       { ts: '2026-09-08T09:00:02Z', text: 'second' },
       { ts: 'not a time', text: 'unparseable' },
       { ts: '2026-09-08T09:00:01Z', text: 'first' },
     ]
 
-    expect(logLines(broken).map((row) => row.text)).toEqual([
-      'second',
-      'unparseable',
+    expect(logLines(three).map((row) => row.text)).toEqual([
       'first',
+      'unparseable',
+      'second',
+    ])
+    expect(
+      logLines([...three, ...Array.from({ length: 30 }, (_, i) => pad(i))])
+        .map((row) => row.text)
+        .slice(0, 3),
+    ).toEqual(['first', 'unparseable', 'second'])
+  })
+
+  it('keeps rows of the same instant in the order their source sent them', () => {
+    const tied: LogRow[] = [
+      { ts: '2026-09-08T09:00:01Z', text: 'the entry' },
+      { ts: '2026-09-08T09:00:01Z', text: 'the event announcing it' },
+    ]
+
+    expect(logLines(tied).map((row) => row.text)).toEqual([
+      'the entry',
+      'the event announcing it',
     ])
   })
 
