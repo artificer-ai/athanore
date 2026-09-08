@@ -5,17 +5,21 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import type { AppSearch } from '../search'
-import { listRunsApiRunsGetQueryKey } from '../../api/gen/@tanstack/react-query.gen'
+import {
+  listRunsApiRunsGetQueryKey,
+  listWorkflowsApiWorkflowsGetQueryKey,
+} from '../../api/gen/@tanstack/react-query.gen'
 import { PREFS_STORAGE_KEY, usePrefs } from '../../store/prefs'
 import { createAppRouter } from '../router'
 
 type Router = ReturnType<typeof createAppRouter>
 
 /**
- * The router, over a cache holding an empty run list.
+ * The router, over a cache holding an empty run list and no workflows.
  *
- * The shell reads `GET /api/runs` (T061), so it needs a query client;
- * seeding it keeps these tests about the route and off the network.
+ * The shell reads `GET /api/runs` (T061) and `?overlay=library` reads
+ * `GET /api/workflows` (T066c), so it needs a query client; seeding both
+ * keeps these tests about the route and off the network.
  */
 function mount(url: string): Router {
   const router = createAppRouter(createMemoryHistory({ initialEntries: [url] }))
@@ -23,6 +27,7 @@ function mount(url: string): Router {
     defaultOptions: { queries: { staleTime: 5000, retry: false } },
   })
   queryClient.setQueryData(listRunsApiRunsGetQueryKey(), [])
+  queryClient.setQueryData(listWorkflowsApiWorkflowsGetQueryKey(), [])
   render(
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
@@ -53,7 +58,11 @@ describe('the one route', () => {
   it('round-trips every search key through the URL', async () => {
     const router = mount('/?run=01JD5X&pane=3&overlay=library&task=12')
 
-    await screen.findByRole('banner')
+    // `hidden`, because `?overlay=library` opens a modal dialog and a
+    // modal marks the rest of the document `aria-hidden` (T066c): the
+    // shell is drawn, and this test is about the search it was drawn
+    // from rather than about what a screen reader can reach.
+    await screen.findByRole('banner', { hidden: true })
     expect(appSearch(router)).toEqual({
       run: '01JD5X',
       pane: 3,

@@ -16,10 +16,21 @@ const UNANSWERED: RunListModel = {
   isError: false,
 }
 
-/** The strip, and the handler its one primary button calls. */
+/** The strip, and the handlers its two buttons call. */
 function header(over: Partial<RunListModel> = {}) {
   const onNewRun = vi.fn()
-  return { onNewRun, ...render(<Header runs={{ ...UNANSWERED, ...over }} onNewRun={onNewRun} />) }
+  const onOpenLibrary = vi.fn()
+  return {
+    onNewRun,
+    onOpenLibrary,
+    ...render(
+      <Header
+        runs={{ ...UNANSWERED, ...over }}
+        onNewRun={onNewRun}
+        onOpenLibrary={onOpenLibrary}
+      />,
+    ),
+  }
 }
 
 describe('Header', () => {
@@ -110,5 +121,14 @@ describe('Header', () => {
     await user.click(screen.getByRole('button', { name: 'new run' }))
 
     expect(onNewRun).toHaveBeenCalledTimes(1)
+  })
+
+  it('opens the workflow library from the mock’s workflows button', async () => {
+    const user = userEvent.setup()
+    const { onOpenLibrary } = header()
+
+    await user.click(screen.getByRole('button', { name: 'workflows' }))
+
+    expect(onOpenLibrary).toHaveBeenCalledTimes(1)
   })
 })

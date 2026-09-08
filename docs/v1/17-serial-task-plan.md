@@ -3136,6 +3136,42 @@ viewer from `/api/workflows/{name}/source` with shiki and node line
 anchors; `open definition` from the graph pane lands on the node's line.
 **Tests.** Vitest: selection loads source; anchor scrolls.
 **Done.** Tests pass.
+**Status.** Done. `overlays/Library.tsx` is the mock's panel in a Radix
+`Dialog` — `WORKFLOW LIBRARY · defined in python` over `esc close`, a
+230 px left list of `name · n nodes` and `k runs · file`, and a source
+viewer beside it — without the mock's "hot-reloaded from `workflows/`",
+which v1 does not claim (D35). The rows are `GET /api/workflows` for the
+names and node counts, the run list the app already shares for the
+counts, and one `GET /api/workflows/{name}/source` per workflow for the
+file, asked for together with `useQueries` because the wire carries a
+workflow's file nowhere else; a count or a file nobody answered for is
+omitted rather than zero-filled. The viewer draws **one element per
+line**, each carrying its number and the node whose body starts on it,
+and colours them from shiki's *tokens* rather than inserting shiki's
+HTML — an anchor has to be an element this file made, and the lines are
+the same elements before and after the highlighter arrives, so the
+source and its anchors never wait on a chunk. `overlays/library.ts` is
+all of it without a DOM: the rows, what the overlay opens on, the file
+split into anchored lines, and the scroll that lands on one.
+
+**The anchor is `?node=`.** The app's search already carries the node it
+has in focus — the graph pane writes it when a row is clicked — so the
+graph pane's `open definition` hands nothing extra over: the overlay
+opens on `?run=`'s workflow and scrolls that node's `def` to the middle
+of the viewer, and picking another workflow drops the anchor with the
+graph it was about. A node the file does not define has no line and the
+viewer opens at the top rather than inventing one. The header's
+`workflows` button is on the strip with this task, for the reason
+`＋ new run` landed with T066b: `?overlay=library` is now something to
+open. Verified in Chromium against `./scripts/run.sh` over two real
+workflows: `workflows` opens the panel on the first workflow at the top
+of its module, `?run=` opens it on that run's workflow, and `open
+definition` from the graph pane lands on `review`'s decorator line with
+the accent rail beside it. The file path moved out of the scroller and
+into a strip above it, which the mock does not have and the browser
+asked for: the mock never scrolls anywhere but the top, and an anchor
+halfway down a module took the one line naming the module off screen
+with it.
 
 ### T066d — Edit run and pickers (A4.7)
 

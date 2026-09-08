@@ -18,8 +18,10 @@
  * standing behind them any more. `ServerDownBanner` says why, underneath.
  *
  * `＋ new run` is the mock's one primary control and writes
- * `?overlay=new` through the shell (T066b); `workflows` is the library
- * overlay's (T066c) and is not on the strip yet.
+ * `?overlay=new` through the shell (T066b); `workflows` beside it is the
+ * same gesture for `?overlay=library` (T066c), in the mock's neutral
+ * outline rather than the accent one, because there is one primary
+ * button in the app (10 §Components).
  */
 import { RunFilters } from './RunList'
 import type { RunListModel } from './RunList'
@@ -34,10 +36,13 @@ const UNKNOWN = '—'
 export function Header({
   runs,
   onNewRun,
+  onOpenLibrary,
 }: {
   runs: RunListModel
   /** Open the New Run overlay: `?overlay=new` (10 §Overlays). */
   onNewRun: () => void
+  /** Open the workflow library: `?overlay=library` (10 §Overlays). */
+  onOpenLibrary: () => void
 }) {
   const down = useUi((state) => state.feed.status === 'down')
   const active = runs.active ?? 0
@@ -82,6 +87,16 @@ export function Header({
         className="text-meta cursor-pointer rounded-lg border border-[var(--color-accent-700)] px-[10px] py-[4px] text-[var(--color-accent-200)] hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-900)]"
       >
         <span aria-hidden>＋ </span>new run
+      </button>
+
+      {/* The mock's neutral outline beside it: `w`, the palette's row and
+          this button are three ways of writing the same parameter. */}
+      <button
+        type="button"
+        onClick={onOpenLibrary}
+        className="text-meta cursor-pointer rounded-lg border border-border px-[10px] py-[4px] text-[var(--color-neutral-400)] hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)]"
+      >
+        workflows
       </button>
 
       <span

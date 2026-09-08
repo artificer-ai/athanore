@@ -56,11 +56,11 @@ import {
 } from '../../api/gen/@tanstack/react-query.gen'
 import type { GraphNode } from '../../api/gen/types.gen'
 import { toneClass, tonePulses, useNow } from '../../components/RunList'
+import { actionError } from '../../lib/errors'
 import { cn } from '../../lib/utils'
 import { PlaceholderCard } from './cards'
 import {
   LEGEND_GLOSS,
-  actionError,
   branchLabel,
   branchTag,
   legendRows,
