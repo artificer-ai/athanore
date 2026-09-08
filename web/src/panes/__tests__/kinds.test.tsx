@@ -267,8 +267,9 @@ describe('dashboard', () => {
   })
 
   it('ignores the overview’s `meta`, which is not part of the kind', () => {
-    // 09 §Builtins: a renderer that knows only `dashboard` draws the
-    // first three keys; the overview renderer (T063a) draws the fourth.
+    // `athanore/plugins/builtin/overview.py` (15, D140 (3)): a renderer
+    // that knows only the `dashboard` kind draws the first three keys;
+    // the SPA's own overview renderer (T063a) draws the fourth.
     const data = narrowed(
       'dashboard',
       asDashboard({ metrics: [{ label: 'TOKENS', value: 12 }], meta: { RUN: '01JD' } }),
