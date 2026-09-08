@@ -12,8 +12,36 @@
  * where the pane's two rules that are worth testing without a DOM live —
  * the ordering, and the bound.
  */
+import { useQuery } from '@tanstack/react-query'
+
+import { getRequestsApiRunsRunIdRequestsGetOptions } from '../../api/gen/@tanstack/react-query.gen'
 import type { RequestOption, RequestView } from '../../api/gen/types.gen'
 import { formatValue } from './format'
+
+/**
+ * `GET /api/runs/{id}/requests`: every request of the run, with its
+ * answer.
+ *
+ * One query for two readers — the requests pane and the panel docked
+ * under the agent stream — so both draw the same list from one cache
+ * entry, which is the entry `request.*` invalidates (10 §Realtime and
+ * caching).
+ *
+ * `queryFn` is put back explicitly for the reason `./run.ts` gives: the
+ * generator declares it optional and `exactOptionalPropertyTypes` will
+ * not assign an optional-and-absent property onto `useQuery`'s required
+ * one.
+ */
+export function useRunRequests(runId: string | undefined) {
+  const { queryFn, ...options } = getRequestsApiRunsRunIdRequestsGetOptions({
+    path: { run_id: runId ?? '' },
+  })
+  return useQuery({
+    ...options,
+    queryFn: queryFn!,
+    enabled: runId !== undefined,
+  })
+}
 
 /**
  * The three states a request card is drawn in.
@@ -206,4 +234,30 @@ export function awaiting(mode: RequestView['mode']): string {
     case 'form':
       return 'awaiting a form answer'
   }
+}
+
+/**
+ * The requests of `taskId` a person can still act on, oldest first.
+ *
+ * What the docked panel draws: "docked under the agent stream when the
+ * focused task has open requests" (10 §Panes item 3) is *that attempt's*
+ * open questions and no others — a permission raised by the attempt
+ * before it belongs to the requests pane's history, not to the turn the
+ * operator is watching.
+ *
+ * The order is the route's, which is the order they were asked. A turn
+ * that asked twice before anyone answered gets both, in the order the
+ * agent raised them, because that is the order it is waiting in.
+ */
+export function openRequestsOf(
+  requests: readonly RequestView[] | undefined,
+  taskId: number | undefined,
+): RequestView[] {
+  // `Array.isArray` and not a null check: the docked panel is drawn
+  // beside a transcript, so a server that answered this route with
+  // something else entirely must cost the agent pane nothing.
+  if (!Array.isArray(requests) || taskId === undefined) return []
+  return requests.filter(
+    (request) => request.task_id === taskId && requestState(request) === 'pending',
+  )
 }

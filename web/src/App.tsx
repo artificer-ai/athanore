@@ -17,6 +17,11 @@
  * `ServerDownBanner` sits directly under the header and renders nothing
  * while the event feed is up (10 §Realtime and caching).
  *
+ * `useAttention` is read here for a third form of the same reason: the
+ * tab title and the desktop notifications are one fact about the whole
+ * app (10 §Attention), and the shell is the one component mounted for
+ * exactly as long as the app is.
+ *
  * `usePanes` is read here rather than inside `Detail` for the same
  * reason `GET /api/runs` is: the pane cycle's actions are the keyboard's
  * too (`←`, `→`, `1`–`9`, T067), and a shell that holds the model can
@@ -28,6 +33,7 @@ import { Header } from './components/Header'
 import { RunList, useRunListModel } from './components/RunList'
 import { ServerDownBanner } from './components/ServerDownBanner'
 import { Splitter } from './components/Splitter'
+import { useAttention } from './components/attention'
 import { BUILTIN_WORKFLOW, usePanes } from './panes'
 import type { AppSearch, Overlay } from './routes/search'
 
@@ -60,6 +66,7 @@ export default function App({
   onOpenOverlay?: ((overlay: Overlay) => void) | undefined
 }) {
   const runs = useRunListModel()
+  useAttention()
   const panes = usePanes(search.run, { index: search.pane, onChange: onSelectPane })
 
   // Which pane the log is, in *this* selection's cycle: the manifest

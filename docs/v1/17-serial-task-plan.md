@@ -3008,6 +3008,24 @@ notification opt-in.
 **Tests.** Vitest: nested schema round-trip; 422 maps onto the field;
 option kind classes.
 **Done.** A permission from `FakeACPAgent` can be allowed from the UI.
+**Status.** Done. `ActionForm` is `@rjsf/shadcn` 6 mounted rather than
+restyled — its components are shadcn's and shadcn's variables are the
+Nocturne tokens, so the only integration step is `@source` in
+`index.css`, without which Tailwind emits none of the theme's utilities
+and a `form` request draws as unstyled HTML (D168). A 422's `loc` maps
+verbatim onto `extraErrors`, array indices included, with the refusal's
+own sentence above the form so a `loc` the schema does not draw is not
+lost; the first edit clears it, by object identity. `RequestPanel` is
+one component in three places — the requests pane's cards, the inbox,
+and the dock under the agent stream, which is narrowed to the *focused
+attempt's* open requests and sits outside the transcript's scroller.
+A 409 is a toast (Sonner, themed through its own `--normal-*`
+variables, because its `[data-sonner-toast]` rule outweighs a utility
+class) followed by a refetch, never an overwrite; every other refusal is
+inline. The inbox is the same element in the `global` scope, newest
+first, and the tab title and the opt-in notifications read its one
+cache entry — the first answer seeds what the tab has seen and raises
+nothing.
 
 ### T065 — Token screen and 401 handling (A4.9)
 

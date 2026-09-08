@@ -5,6 +5,7 @@ export { StatusPill } from './StatusPill'
 export { humaniseAge, humaniseElapsed } from './age'
 export { statusTone, taskTone, toneClass, tonePulses, type StatusTone } from './status'
 export {
+  SHORT_ID_LENGTH,
   useNow,
   useRunListModel,
   useRuns,

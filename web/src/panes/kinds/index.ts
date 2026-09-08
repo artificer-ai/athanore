@@ -70,11 +70,13 @@ export {
   TOOL_CALL_CHARS,
   answerText,
   awaiting,
+  openRequestsOf,
   orderRequests,
   pendingCount,
   requestState,
   requestsError,
   toolCallSummary,
+  useRunRequests,
   type RequestState,
   type ToolCallSummary,
 } from './requests'

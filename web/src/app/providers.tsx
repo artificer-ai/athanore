@@ -15,11 +15,16 @@
  * The event feed is opened here for the same reason: it keeps that one
  * cache fresh (10 §Realtime and caching), it is one stream per tab, and
  * a mount is exactly as long as it should live.
+ *
+ * `Toaster` is here for a third form of the same reason: 10 §Components
+ * gives the app one toast surface, and a component that raises a toast
+ * has to find it wherever it is mounted (`components/ui/sonner.tsx`).
  */
 import { useEffect, useState, type ReactNode } from 'react'
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query'
 
 import { createAppQueryClient } from '../api/client'
+import { Toaster } from '../components/ui/sonner'
 import { createAppEventFeed } from '../realtime/sse'
 
 /**
@@ -49,5 +54,10 @@ export function Providers({
     return () => feed.stop()
   }, [queryClient])
 
-  return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  return (
+    <QueryClientProvider client={queryClient}>
+      {children}
+      <Toaster />
+    </QueryClientProvider>
+  )
 }
