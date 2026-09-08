@@ -5,13 +5,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
 import {
+  getGraphApiRunsRunIdGraphGetQueryKey,
+  getRunApiRunsRunIdGetQueryKey,
   getSourceApiWorkflowsNameSourceGetQueryKey,
   listRunsApiRunsGetQueryKey,
   listWorkflowsApiWorkflowsGetQueryKey,
   manifestApiPluginsGetQueryKey,
 } from './api/gen/@tanstack/react-query.gen'
 import type {
+  GraphOut,
   PluginManifestEntry,
+  RunDetail,
   RunSummary,
   WorkflowOut,
 } from './api/gen/types.gen'
@@ -68,6 +72,46 @@ const SOURCE = {
   nodes: { prepare: { line: 1 } },
 }
 
+/** The selected run, as the edit overlay and the pickers read it. */
+const RUN_DETAIL: RunDetail = {
+  id: 'aaaa1111bbbb',
+  workflow: 'feature_build',
+  title: 'rebuild run detail',
+  description: 'the detail pane, from the top',
+  status: 'running',
+  position: 1,
+  created: '2026-09-08T08:56:00Z',
+  updated: '2026-09-08T08:59:00Z',
+  tasks: [
+    {
+      id: 7,
+      run_id: 'aaaa1111bbbb',
+      node: 'prepare',
+      attempt: 1,
+      status: 'failed',
+      priority: 0,
+      explicit: false,
+      terminal: false,
+      created: '2026-09-08T08:56:00Z',
+    },
+  ],
+}
+
+/** ...and its graph, which is where the pickers read `join` from. */
+const RUN_GRAPH: GraphOut = {
+  nodes: [
+    {
+      name: 'prepare',
+      generation: 0,
+      join: false,
+      live: false,
+      attempts: 1,
+      state: 'failed',
+    },
+  ],
+  edges: [],
+}
+
 /** The registered workflows the New Run overlay's chips are built from. */
 const WORKFLOWS: WorkflowOut[] = [
   {
@@ -108,6 +152,14 @@ function shell(
   queryClient.setQueryData(
     getSourceApiWorkflowsNameSourceGetQueryKey({ path: { name: 'feature_build' } }),
     SOURCE,
+  )
+  queryClient.setQueryData(
+    getRunApiRunsRunIdGetQueryKey({ path: { run_id: 'aaaa1111bbbb' } }),
+    RUN_DETAIL,
+  )
+  queryClient.setQueryData(
+    getGraphApiRunsRunIdGraphGetQueryKey({ path: { run_id: 'aaaa1111bbbb' } }),
+    RUN_GRAPH,
   )
 
   const rendered = render(
@@ -328,6 +380,32 @@ describe('App', () => {
       'data-line',
       '1',
     )
+  })
+
+  it('draws the edit overlay only when `?overlay=edit` says so', async () => {
+    shell()
+    expect(screen.queryByTestId('edit-run')).toBeNull()
+
+    cleanup()
+    shell({ overlay: 'edit', run: 'aaaa1111bbbb' })
+    expect(screen.getByTestId('edit-run')).toBeInTheDocument()
+    // Over the cached run, so it is the form and not the notice, opened
+    // on the title and description the run already has.
+    expect(await screen.findByTestId('edit-run-form')).toBeInTheDocument()
+    expect(screen.getByLabelText('TITLE')).toHaveValue('rebuild run detail')
+  })
+
+  it('draws a picker only when one of the four `?overlay=` names it', async () => {
+    shell({ overlay: 'edit', run: 'aaaa1111bbbb' })
+    expect(screen.queryByTestId('picker')).toBeNull()
+
+    cleanup()
+    shell({ overlay: 'pick-retry', run: 'aaaa1111bbbb' })
+    const picker = screen.getByTestId('picker')
+    // Over the cached run detail, so it is the attempt list: `prepare`
+    // failed, which is an attempt that has stopped.
+    expect(await within(picker).findByText('prepare')).toBeInTheDocument()
+    expect(picker.querySelector('[data-task="7"]')).not.toBeNull()
   })
 
   it('opens the workflow library from the header’s workflows button', async () => {

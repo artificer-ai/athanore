@@ -46,7 +46,14 @@ import { RunList, useRunListModel } from './components/RunList'
 import { ServerDownBanner } from './components/ServerDownBanner'
 import { Splitter } from './components/Splitter'
 import { useAttention } from './components/attention'
-import { Library, NewRun, Palette, buildPaletteActions } from './overlays'
+import {
+  EditRun,
+  Library,
+  NewRun,
+  Palette,
+  Pickers,
+  buildPaletteActions,
+} from './overlays'
 import { BUILTIN_WORKFLOW, usePanes } from './panes'
 import type { AppSearch, Overlay } from './routes/search'
 import { usePrefs } from './store/prefs'
@@ -189,6 +196,21 @@ export default function App({
         open={search.overlay === 'library'}
         runId={search.run}
         node={search.node}
+        onClose={onCloseOverlay ?? NOTHING}
+      />
+
+      <EditRun
+        open={search.overlay === 'edit'}
+        runId={search.run}
+        onClose={onCloseOverlay ?? NOTHING}
+      />
+
+      {/* The four pickers are one overlay: `?overlay=` says which of them
+          is up, and each is a list of `?run=`'s attempts or nodes plus
+          the one `POST` that list names (`overlays/Pickers.tsx`). */}
+      <Pickers
+        overlay={search.overlay}
+        runId={search.run}
         onClose={onCloseOverlay ?? NOTHING}
       />
     </div>
