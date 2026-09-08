@@ -48,6 +48,7 @@ function paneOf(entry: PanelOut, workflow = '_builtin'): Pane {
 const OVERVIEW = paneOf(BUILTIN_ENTRY.panels?.[0] as PanelOut)
 const LOG = paneOf(BUILTIN_ENTRY.panels?.[1] as PanelOut)
 const AGENT = paneOf(BUILTIN_ENTRY.panels?.[2] as PanelOut)
+const REQUESTS = paneOf(BUILTIN_ENTRY.panels?.[3] as PanelOut)
 const WORDS = paneOf(GAMEDEV_ENTRY.panels?.[0] as PanelOut, 'gamedev')
 
 let queryClient: QueryClient
@@ -244,15 +245,27 @@ describe('what it cannot draw', () => {
     expect(urls).toEqual([])
   })
 
-  it('renders a placeholder for a custom element, and asks for nothing', () => {
+  it('renders a placeholder for an element this build cannot draw', () => {
     const urls = stubFetch({})
+
+    // `<ath-requests>` is a builtin tag whose renderer is T063d's; until
+    // it is in the element table it degrades like a plugin's own tag
+    // would, which is the behaviour under test.
+    draw(REQUESTS)
+
+    expect(screen.getByTestId('pane-placeholder')).toHaveTextContent('<ath-requests>')
+    expect(urls).toEqual([])
+  })
+
+  it('draws the agent stream for <ath-agent-stream>', async () => {
+    stubFetch({ chunks: [], last_seq: 0, live: false })
 
     draw(AGENT)
 
-    expect(screen.getByTestId('pane-placeholder')).toHaveTextContent(
-      '<ath-agent-stream>',
-    )
-    expect(urls).toEqual([])
+    // The tag is in the element table, so the pane is the transcript and
+    // not the placeholder (09 §Builtins are plugins).
+    expect(await screen.findByTestId('pane-agent')).toBeInTheDocument()
+    expect(screen.queryByTestId('pane-placeholder')).not.toBeInTheDocument()
   })
 
   it('renders a placeholder for a form, naming the action', () => {

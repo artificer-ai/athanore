@@ -1,4 +1,5 @@
 /** The renderers of 09 §Panel kinds, and the shapes they read. */
+export { AgentStream } from './AgentStream'
 export { ChartPane } from './ChartPane'
 export { DashboardPane } from './DashboardPane'
 export { KvPane } from './KvPane'
@@ -44,6 +45,7 @@ export {
   type OutputLine,
   type TokenBar,
 } from './overview'
+export { useRunDetail } from './run'
 export {
   asChart,
   asDashboard,
@@ -63,3 +65,11 @@ export {
   type TableData,
   type TableRow,
 } from './shape'
+export {
+  blockKind,
+  chunkLabel,
+  focusedTask,
+  streamBlocks,
+  type StreamBlock,
+  type StreamBlockKind,
+} from './stream'

@@ -10,7 +10,9 @@
  * Below them, one sample per panel kind (`SAMPLES`), the overview pane's
  * own two sides — what `GET /api/plugins/_builtin/overview` answers
  * with, and the `RunDetail` the pane reads beside it — and the event
- * log's, which is its route's merged list and the run it belongs to.
+ * log's, which is its route's merged list and the run it belongs to,
+ * and the agent pane's, which is one attempt's transcript and the run
+ * detail the pane picks that attempt out of.
  */
 import type {
   GraphOut,
@@ -20,6 +22,8 @@ import type {
   RunOutput,
   RunStatus,
   RunSummary,
+  StreamChunk,
+  StreamOut,
   TaskView,
 } from '../../api/gen/types.gen'
 import type { TableColumn } from '../kinds'
@@ -476,5 +480,121 @@ export function logRun(status: RunStatus = 'running'): RunSummary {
     current_nodes: status === 'running' ? ['engineering'] : [],
     created: '2026-09-08T08:56:00Z',
     updated: '2026-09-08T09:00:06Z',
+  }
+}
+
+/* -------------------------------------------------------------------- */
+/* The agent pane                                                        */
+/* -------------------------------------------------------------------- */
+
+/** The run the transcript fixtures below are about. */
+export const STREAM_RUN = '01JD5XAGENTSTREAM0000000'
+
+/** The attempt whose transcript {@link TRANSCRIPT} is. */
+export const STREAM_TASK = 405
+
+/**
+ * `GET /api/tasks/{id}/stream` for an attempt mid-turn.
+ *
+ * One chunk of every kind of `ChunkKind` (03 §StreamChunk), in the order
+ * the façade writes them (`athanore/agents/acp.py`): a notice, thinking,
+ * a tool call and what it returned, then the answer — with the answer
+ * arriving in the two fragments an `agent_message_chunk` really comes
+ * in, so the pane is tested against a stream and not against a
+ * transcript somebody tidied up first.
+ */
+export const TRANSCRIPT: StreamChunk[] = [
+  {
+    seq: 1,
+    kind: 'notice',
+    text:
+      "thought_level could not be set to 'max': unknown option. " +
+      'The agent is answering on its own default.',
+    created: '2026-09-08T09:00:01Z',
+  },
+  {
+    seq: 2,
+    kind: 'thought',
+    text: 'The pane cycle is an index; the keymap should drive the same reducer.',
+    created: '2026-09-08T09:00:02Z',
+  },
+  {
+    seq: 3,
+    kind: 'tool_call',
+    text: 'read · artificer/tui.py',
+    created: '2026-09-08T09:00:03Z',
+  },
+  {
+    seq: 4,
+    kind: 'tool_result',
+    text: 'PANES = ("overview", "log", "agent", "graph", "messages")',
+    created: '2026-09-08T09:00:04Z',
+  },
+  {
+    seq: 5,
+    kind: 'text',
+    text: 'Tests pass (14 passed). ',
+    created: '2026-09-08T09:00:05Z',
+  },
+  {
+    seq: 6,
+    kind: 'text',
+    text: 'Pane state is now a single index.',
+    created: '2026-09-08T09:00:06Z',
+  },
+]
+
+/** A page of the transcript, as `GET /api/tasks/{id}/stream` sends it. */
+export function streamPage(
+  chunks: readonly StreamChunk[] = TRANSCRIPT,
+  live = true,
+): StreamOut {
+  return {
+    chunks: [...chunks],
+    last_seq: chunks.reduce((highest, chunk) => Math.max(highest, chunk.seq), 0),
+    live,
+  }
+}
+
+/**
+ * `GET /api/runs/{id}` for {@link TRANSCRIPT}'s run.
+ *
+ * `engineering` attempt 2 is the one in flight, and the failed attempt
+ * before it carries the stats entry the header's `node → model` comes
+ * from — so the fixture covers both halves of the focus rule and the
+ * field that is omitted until an agent has reported one.
+ */
+export function streamRun(over: Partial<RunDetail> = {}): RunDetail {
+  return {
+    id: STREAM_RUN,
+    workflow: 'feature_build',
+    title: 'Rebuild run detail as a web pane set',
+    status: 'running',
+    position: 1,
+    current_nodes: ['engineering'],
+    created: '2026-09-08T08:56:00Z',
+    updated: '2026-09-08T09:00:06Z',
+    outputs: [],
+    tasks: [
+      { ...attempt(403, 'architecture'), run_id: STREAM_RUN },
+      {
+        ...attempt(404, 'engineering', {
+          status: 'failed',
+          attempt: 1,
+          stats: { model: 'claude-opus-5', total_tokens: 41200 },
+        }),
+        run_id: STREAM_RUN,
+      },
+      {
+        ...attempt(STREAM_TASK, 'engineering', {
+          status: 'in_progress',
+          attempt: 2,
+          stats: { model: 'claude-opus-5' },
+        }),
+        run_id: STREAM_RUN,
+      },
+      { ...attempt(406, 'review', { status: 'ready' }), run_id: STREAM_RUN },
+    ],
+    ...over,
   }
 }
