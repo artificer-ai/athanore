@@ -6,9 +6,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import {
   listRunsApiRunsGetQueryKey,
+  listWorkflowsApiWorkflowsGetQueryKey,
   manifestApiPluginsGetQueryKey,
 } from './api/gen/@tanstack/react-query.gen'
-import type { PluginManifestEntry, RunSummary } from './api/gen/types.gen'
+import type {
+  PluginManifestEntry,
+  RunSummary,
+  WorkflowOut,
+} from './api/gen/types.gen'
 import type { AppSearch, Overlay } from './routes/search'
 import { PALETTE_COMMANDS } from './overlays'
 import { DEFAULT_LIST_WIDTH, usePrefs } from './store/prefs'
@@ -47,6 +52,19 @@ const MANIFEST: PluginManifestEntry[] = [
   },
 ]
 
+/** The registered workflows the New Run overlay's chips are built from. */
+const WORKFLOWS: WorkflowOut[] = [
+  {
+    name: 'feature_build',
+    start: 'prepare',
+    capacity: 1,
+    in_flight: 0,
+    nodes: {},
+    plugin: { panels: [], actions: [] },
+    pool: 'default',
+  },
+]
+
 /**
  * The shell over a seeded cache.
  *
@@ -70,6 +88,7 @@ function shell(
   })
   queryClient.setQueryData(listRunsApiRunsGetQueryKey(), over.runs ?? RUNS)
   queryClient.setQueryData(manifestApiPluginsGetQueryKey(), MANIFEST)
+  queryClient.setQueryData(listWorkflowsApiWorkflowsGetQueryKey(), WORKFLOWS)
 
   const rendered = render(
     <QueryClientProvider client={queryClient}>
@@ -216,6 +235,7 @@ describe('App', () => {
     })
     queryClient.setQueryData(listRunsApiRunsGetQueryKey(), RUNS)
     queryClient.setQueryData(manifestApiPluginsGetQueryKey(), MANIFEST)
+  queryClient.setQueryData(listWorkflowsApiWorkflowsGetQueryKey(), WORKFLOWS)
     render(
       <QueryClientProvider client={queryClient}>
         <App
@@ -238,6 +258,26 @@ describe('App', () => {
     cleanup()
     shell({ overlay: 'palette' })
     expect(screen.getByTestId('palette')).toBeInTheDocument()
+  })
+
+  it('draws the new run overlay only when `?overlay=new` says so', async () => {
+    shell()
+    expect(screen.queryByTestId('new-run')).toBeNull()
+
+    cleanup()
+    shell({ overlay: 'new' })
+    expect(screen.getByTestId('new-run')).toBeInTheDocument()
+    // Over the cached workflows, so it is the form and not the notice.
+    expect(await screen.findByTestId('new-run-form')).toBeInTheDocument()
+  })
+
+  it('opens the new run overlay from the header’s ＋ new run', async () => {
+    const onOpenOverlay = vi.fn()
+    shell({}, { onOpenOverlay })
+
+    await userEvent.click(screen.getByRole('button', { name: 'new run' }))
+
+    expect(onOpenOverlay).toHaveBeenCalledExactlyOnceWith('new')
   })
 
   it('lists every command of the catalogue, with its key', () => {

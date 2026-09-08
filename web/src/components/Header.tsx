@@ -17,8 +17,9 @@
  * ones the server gave, and greying them is how the strip says nobody is
  * standing behind them any more. `ServerDownBanner` says why, underneath.
  *
- * `＋ new run` and `workflows` are the overlays' (T066b, T066c) and are
- * not on the strip yet.
+ * `＋ new run` is the mock's one primary control and writes
+ * `?overlay=new` through the shell (T066b); `workflows` is the library
+ * overlay's (T066c) and is not on the strip yet.
  */
 import { RunFilters } from './RunList'
 import type { RunListModel } from './RunList'
@@ -30,7 +31,14 @@ const VERSION = __APP_VERSION__
 /** A count the server has not given yet (02 §Real data only). */
 const UNKNOWN = '—'
 
-export function Header({ runs }: { runs: RunListModel }) {
+export function Header({
+  runs,
+  onNewRun,
+}: {
+  runs: RunListModel
+  /** Open the New Run overlay: `?overlay=new` (10 §Overlays). */
+  onNewRun: () => void
+}) {
   const down = useUi((state) => state.feed.status === 'down')
   const active = runs.active ?? 0
 
@@ -65,6 +73,16 @@ export function Header({ runs }: { runs: RunListModel }) {
       <div className="flex-1" />
 
       <RunFilters workflows={runs.workflows} />
+
+      {/* The one primary button in the app: outlined with the accent as
+          border and text, never as a fill (10 §Components, §Tokens). */}
+      <button
+        type="button"
+        onClick={onNewRun}
+        className="text-meta cursor-pointer rounded-lg border border-[var(--color-accent-700)] px-[10px] py-[4px] text-[var(--color-accent-200)] hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-900)]"
+      >
+        <span aria-hidden>＋ </span>new run
+      </button>
 
       <span
         aria-hidden

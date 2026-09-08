@@ -3094,6 +3094,40 @@ NODE from the graph, `⌘⏎` submit, cancel; react-hook-form + zod.
 **Tests.** Vitest: posts the right bodies for top and bottom; empty title
 blocked; the entry node updates with the chip.
 **Done.** Tests pass.
+**Status.** Done. `overlays/NewRun.tsx` is the mock's panel in a Radix
+`Dialog` — `NEW RUN` over `⌘⏎ submit · esc cancel`, a WORKFLOW chip
+group, TITLE, DESCRIPTION, then POSITION and a read-only ENTRY NODE side
+by side, then `cancel` and `submit run` — with the mock's 1–10 priority
+slider replaced by the top/bottom choice of D34. The chips are
+`GET /api/workflows` and the entry node is that workflow's `start`, so
+it is read from the graph the run will walk and follows the chip; the
+form is mounted once the list has arrived, which is what lets
+react-hook-form take its default workflow from it rather than correcting
+itself an effect later. `overlays/newRun.ts` is the zod schema — the
+title stripped and non-empty, as `Text` is server-side — and the two
+calls of D57: `POST /api/workflows/{name}/runs`, then, for `top` only,
+`POST /api/runs/{id}/position {"index": 0}`. Both must succeed, so the
+second's refusal is carried out rather than swallowed: a failed submit
+leaves the form standing with the message under it, a failed *move*
+closes the overlay and toasts, because the run exists by then and
+pressing the button again would queue a second one. For that same
+reason the panel takes one submission at a time: `submit run` goes
+`disabled` while one is out, and ⌘⏎ — which never consults the button —
+goes through the same latch, taken synchronously, because the pending
+state arrives a render later and validation a microtask later still.
+The header's
+`＋ new run` is on the strip with this task, since `?overlay=new` is now
+something to open. Verified in Chromium against `./scripts/run.sh`:
+`＋ new run` opens the panel with the caret in TITLE and `prepare` in
+ENTRY NODE, the `gamedev` chip moves it to `design`, an empty title is
+refused without a request, `submit run` at the bottom posts once and the
+run appears last in the list, `top` posts twice and it appears first,
+and `esc` puts focus back on the button that opened it. That last one
+is what the browser was for: with `autoFocus` on TITLE it held only on
+the first open, because Radix dispatches no open-focus event while the
+panel already has the focus, and a cached workflow list mounts the form
+in the same commit as the panel (D171 (5)). The suite now covers the
+second open too.
 
 ### T066c — Workflow library overlay (A4.7, D35)
 
