@@ -52,6 +52,17 @@ class InertEventSource implements Partial<EventSource> {
 
 globalThis.EventSource ??= InertEventSource as unknown as typeof EventSource
 
+/**
+ * jsdom implements no `Element.scrollIntoView`, and cmdk calls it on
+ * every selection change to keep the highlighted row in view
+ * (`overlays/Palette.tsx`) — without this, an arrow key in the palette
+ * throws.
+ *
+ * It scrolls nothing, which is the truth of the environment: jsdom
+ * performs no layout, so nothing here is ever out of view.
+ */
+Element.prototype.scrollIntoView ??= function scrollIntoView() {}
+
 afterEach(cleanup)
 
 /**

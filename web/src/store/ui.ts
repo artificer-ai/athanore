@@ -17,6 +17,12 @@
  * of fact and reaches the store the same way — the feed writes it, as
  * the API client's 401 interceptor writes `needsToken`, and the header
  * and the banner read it (`src/realtime/sse.ts`).
+ *
+ * And so does `logComposerFor`, for the first reason rather than the
+ * second: `append log` moves the caret, which is where the next
+ * keystroke goes, and the palette command that asks for it and the
+ * composer that takes it are the shell and a pane inside a pane, with no
+ * prop between them that is about focus.
  */
 import { create } from 'zustand'
 
@@ -93,6 +99,26 @@ export type Ui = {
   runFilter: RunFilter
   setRunWorkflow: (workflow: string) => void
   setRunQuery: (query: string) => void
+
+  /**
+   * The run whose log composer has been asked for the caret, or `null`.
+   *
+   * `append log` is a palette command and a key (`l`, 10 §Keyboard), and
+   * what it does is put the operator in the box the log pane already
+   * has: the shell moves the pane cycle to the log and asks for the
+   * caret, and the composer — which is mounted by the pane, one level
+   * below anything the shell holds — takes it and clears the request.
+   *
+   * It is one request and not a flag, and it names the run it was made
+   * for: a composer belonging to another run leaves it alone, so a
+   * request that was never served cannot steal the caret from a pane the
+   * operator opened for something else.
+   */
+  logComposerFor: string | null
+  /** `l`: ask this run's composer for the caret. */
+  focusLogComposer: (runId: string) => void
+  /** The composer has taken it; there is nothing left to serve. */
+  clearLogComposer: () => void
 }
 
 export const useUi = create<Ui>()((set) => ({
@@ -111,4 +137,8 @@ export const useUi = create<Ui>()((set) => ({
   setRunWorkflow: (workflow) =>
     set((state) => ({ runFilter: { ...state.runFilter, workflow } })),
   setRunQuery: (query) => set((state) => ({ runFilter: { ...state.runFilter, query } })),
+
+  logComposerFor: null,
+  focusLogComposer: (runId) => set({ logComposerFor: runId }),
+  clearLogComposer: () => set({ logComposerFor: null }),
 }))

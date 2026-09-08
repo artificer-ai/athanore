@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -9,7 +9,8 @@ import {
   manifestApiPluginsGetQueryKey,
 } from './api/gen/@tanstack/react-query.gen'
 import type { PluginManifestEntry, RunSummary } from './api/gen/types.gen'
-import type { AppSearch } from './routes/search'
+import type { AppSearch, Overlay } from './routes/search'
+import { PALETTE_COMMANDS } from './overlays'
 import { DEFAULT_LIST_WIDTH, usePrefs } from './store/prefs'
 import { ALL_WORKFLOWS, useUi } from './store/ui'
 
@@ -56,7 +57,13 @@ const MANIFEST: PluginManifestEntry[] = [
  */
 function shell(
   search: AppSearch = {},
-  over: { runs?: RunSummary[]; onSelectRun?: (runId: string) => void } = {},
+  over: {
+    runs?: RunSummary[]
+    onSelectRun?: (runId: string) => void
+    onSelectPane?: (index: number) => void
+    onOpenOverlay?: (overlay: Overlay) => void
+    onCloseOverlay?: () => void
+  } = {},
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { staleTime: 5000, retry: false } },
@@ -64,16 +71,29 @@ function shell(
   queryClient.setQueryData(listRunsApiRunsGetQueryKey(), over.runs ?? RUNS)
   queryClient.setQueryData(manifestApiPluginsGetQueryKey(), MANIFEST)
 
-  return render(
+  const rendered = render(
     <QueryClientProvider client={queryClient}>
       <App
         search={search}
         onSelectRun={over.onSelectRun ?? (() => {})}
-        onSelectPane={() => {}}
+        onSelectPane={over.onSelectPane ?? (() => {})}
         onOpenPalette={() => {}}
+        {...(over.onOpenOverlay === undefined
+          ? {}
+          : { onOpenOverlay: over.onOpenOverlay })}
+        {...(over.onCloseOverlay === undefined
+          ? {}
+          : { onCloseOverlay: over.onCloseOverlay })}
       />
     </QueryClientProvider>,
   )
+
+  return { ...rendered, queryClient }
+}
+
+/** The palette row whose left column reads `name`. */
+function command(name: string) {
+  return screen.getByRole('option', { name: new RegExp(`^${name}`) })
 }
 
 function rows() {
@@ -88,6 +108,7 @@ describe('App', () => {
     useUi.setState({
       focus: 'list',
       runFilter: { workflow: ALL_WORKFLOWS, query: '' },
+      logComposerFor: null,
     })
   })
 
@@ -208,5 +229,104 @@ describe('App', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /palette/ }))
     expect(onOpenPalette).toHaveBeenCalledOnce()
+  })
+
+  it('draws the palette only when `?overlay=palette` says so', () => {
+    shell()
+    expect(screen.queryByTestId('palette')).toBeNull()
+
+    cleanup()
+    shell({ overlay: 'palette' })
+    expect(screen.getByTestId('palette')).toBeInTheDocument()
+  })
+
+  it('lists every command of the catalogue, with its key', () => {
+    shell({ overlay: 'palette' })
+
+    expect(screen.getAllByRole('option')).toHaveLength(PALETTE_COMMANDS.length)
+    for (const { name, hint, key } of PALETTE_COMMANDS) {
+      const row = command(name)
+      expect(within(row).getByText(hint)).toBeInTheDocument()
+      expect(within(row).getByText(key)).toBeInTheDocument()
+    }
+  })
+
+  it('opens another overlay from the palette, without closing it first', async () => {
+    const onOpenOverlay = vi.fn()
+    const onCloseOverlay = vi.fn()
+    shell({ overlay: 'palette' }, { onOpenOverlay, onCloseOverlay })
+
+    await userEvent.click(command('open workflow library'))
+
+    expect(onOpenOverlay).toHaveBeenCalledExactlyOnceWith('library')
+    expect(onCloseOverlay).not.toHaveBeenCalled()
+  })
+
+  it('refetches everything this tab holds, and closes', async () => {
+    const onCloseOverlay = vi.fn()
+    const { queryClient } = shell({ overlay: 'palette' }, { onCloseOverlay })
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+
+    await userEvent.click(command('refresh'))
+
+    expect(invalidate).toHaveBeenCalledOnce()
+    expect(onCloseOverlay).toHaveBeenCalledOnce()
+  })
+
+  it('collapses the run list to its rail, and closes', async () => {
+    const onCloseOverlay = vi.fn()
+    shell({ overlay: 'palette' }, { onCloseOverlay })
+
+    await userEvent.click(command('toggle list'))
+
+    expect(usePrefs.getState().listCollapsed).toBe(true)
+    expect(onCloseOverlay).toHaveBeenCalledOnce()
+  })
+
+  it('shows the log pane and asks for its composer, and closes', async () => {
+    const onCloseOverlay = vi.fn()
+    const onSelectPane = vi.fn()
+    shell(
+      { overlay: 'palette', run: 'aaaa1111bbbb' },
+      { onCloseOverlay, onSelectPane },
+    )
+
+    await userEvent.click(command('append log'))
+
+    // The log is the second builtin run pane of the manifest above, and
+    // the index is looked up rather than assumed: `append log` writes no
+    // note itself, it puts the operator in the box that does.
+    expect(onSelectPane).toHaveBeenCalledExactlyOnceWith(1)
+    expect(useUi.getState().logComposerFor).toBe('aaaa1111bbbb')
+    expect(onCloseOverlay).toHaveBeenCalledOnce()
+  })
+
+  it('asks for no composer when append log has no run', async () => {
+    shell({ overlay: 'palette' })
+
+    await userEvent.click(command('append log'))
+
+    expect(useUi.getState().logComposerFor).toBeNull()
+  })
+
+  it('disables the run-scoped commands until a run is selected', () => {
+    shell({ overlay: 'palette' })
+
+    expect(command('retry task')).toHaveAttribute('aria-disabled', 'true')
+    expect(command('new run')).not.toHaveAttribute('aria-disabled', 'true')
+
+    cleanup()
+    shell({ overlay: 'palette', run: 'aaaa1111bbbb' })
+
+    expect(command('retry task')).not.toHaveAttribute('aria-disabled', 'true')
+  })
+
+  it('opens a picker on the selected run', async () => {
+    const onOpenOverlay = vi.fn()
+    shell({ overlay: 'palette', run: 'aaaa1111bbbb' }, { onOpenOverlay })
+
+    await userEvent.click(command('retry task'))
+
+    expect(onOpenOverlay).toHaveBeenCalledExactlyOnceWith('pick-retry')
   })
 })

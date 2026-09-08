@@ -3060,6 +3060,31 @@ operator action and every overlay listed with its key; plugin actions
 appended under `plugin: <title>` (from T070).
 **Tests.** Vitest: filter narrows; enter runs the action; `esc` closes.
 **Done.** Tests pass.
+**Status.** Done. `overlays/Palette.tsx` is cmdk's `Command` inside a
+Radix `Dialog`, drawn as the mock draws it: `›`, `run a command`, `esc`,
+and rows of `name · hint · key` over a `rgba(10,11,18,.72)` backdrop.
+`overlays/actions.ts` is the catalogue the shell binds to one app state
+and the palette only presents — the mock's `COMMANDS`, with `edit run`
+narrowed to title and description (D34) and with `toggle list` and `keys`
+added from 10 §Keyboard. It lists what the app can do and nothing else:
+the eight overlays, which it opens by writing `?overlay=`, and `refresh`,
+`toggle list` and `append log`, which it performs and then dismisses
+itself for — `append log` by showing the log pane and putting the caret
+in the composer that already posts the note (T063c). The three rows of
+the mock the SPA cannot yet perform — `p`, `c`, `D` — join it with the
+tasks that build them (D170). A row the selection
+cannot support is listed and disabled rather than hidden, so the palette
+stays the shortcut list it doubles as. Rows carry a group and
+consecutive rows sharing one are drawn under it, which is where T070's
+`plugin: <title>` sections land. The focus round trip is the palette's
+own, because a modal Radix dialog restores to a `Dialog.Trigger` and
+this one opens from a search parameter. Verified in Chromium against
+`./scripts/run.sh`: `^p` from the footer opens it with focus in the
+input, `library` narrows to one row, `⏎` lands on `?overlay=library`,
+`esc` clears `?overlay=` and puts focus back on the footer button, a
+disabled `retry task` does nothing when clicked, `toggle list` collapses
+the run list to its rail, and `append log` lands on the log pane with the
+caret in its composer.
 
 ### T066b — New run overlay (A4.7, D34, D57)
 

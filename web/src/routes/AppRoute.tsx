@@ -64,6 +64,12 @@ export function AppRoute() {
         // are T066a–T066e.
         void navigate({ search: (prev) => ({ ...prev, overlay }) })
       }}
+      onCloseOverlay={() => {
+        // Closing is the same one parameter, written away: `esc` and a
+        // click on the backdrop both end here, so the URL is what says
+        // whether an overlay is up and the back button works on it.
+        void navigate({ search: (prev) => ({ ...prev, overlay: undefined }) })
+      }}
       onOpenTask={(taskId) => {
         // The task drawer is `?overlay=task&task=`, the pair 10 §Layout
         // names: the overview's NODES rows and the graph's rows open it

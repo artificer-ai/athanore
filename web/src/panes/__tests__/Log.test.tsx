@@ -16,13 +16,14 @@
  * operator wrote it and this is the only copy.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createAppQueryClient } from '../../api/client'
 import { listRunsApiRunsGetQueryKey } from '../../api/gen/@tanstack/react-query.gen'
 import type { RunStatus } from '../../api/gen/types.gen'
+import { useUi } from '../../store/ui'
 import { Log, asLog, isProse, logAuthor, logLines, type LogRow } from '../kinds'
 import { panelQueryKey } from '../source'
 import { EVENT_LOG, LOG_RUN, logRun } from './fixtures'
@@ -118,6 +119,7 @@ beforeEach(() => {
     value: vi.fn(),
   })
   stubFetch({ log_id: 91 })
+  useUi.setState({ logComposerFor: null })
 })
 
 afterEach(() => {
@@ -385,6 +387,47 @@ describe('the composer', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('that run is gone')
     expect(box).toHaveValue('still here')
+  })
+
+  it('takes the caret when append log asks for this run', async () => {
+    draw()
+    const box = screen.getByLabelText('append a note to the work log')
+    expect(box).not.toHaveFocus()
+
+    // The palette's `append log` (`overlays/actions.ts`), reaching the
+    // box the pane owns: the shell shows the log pane and asks, and the
+    // composer is what puts the caret in itself.
+    act(() => {
+      useUi.getState().focusLogComposer(LOG_RUN)
+    })
+
+    await waitFor(() => {
+      expect(box).toHaveFocus()
+    })
+    // Served once: the request is gone, so a later remount of this pane
+    // does not take the caret again.
+    expect(useUi.getState().logComposerFor).toBeNull()
+  })
+
+  it('takes a request made before the pane was drawn', async () => {
+    // Which is the ordinary case: the command moves the pane cycle, and
+    // the pane draws its composer a render later, once its panel has
+    // answered.
+    useUi.setState({ logComposerFor: LOG_RUN })
+    draw()
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('append a note to the work log')).toHaveFocus()
+    })
+    expect(useUi.getState().logComposerFor).toBeNull()
+  })
+
+  it('leaves a request made for another run alone', () => {
+    useUi.setState({ logComposerFor: 'ffff9999eeee' })
+    draw()
+
+    expect(screen.getByLabelText('append a note to the work log')).not.toHaveFocus()
+    expect(useUi.getState().logComposerFor).toBe('ffff9999eeee')
   })
 
   it('will not post an empty note', async () => {

@@ -125,6 +125,32 @@ describe('the one route', () => {
     expect(appSearch(router)).toEqual({ run: 'a4c8', overlay: 'palette' })
   })
 
+  it('opens the palette on `?overlay=palette` and writes it away on esc', async () => {
+    const router = mount('/?run=a4c8&overlay=palette')
+
+    await screen.findByTestId('palette')
+    await userEvent.keyboard('{Escape}')
+
+    await waitFor(() => {
+      expect(router.state.location.searchStr).toBe('?run=a4c8')
+    })
+    expect(appSearch(router)).toEqual({ run: 'a4c8' })
+    expect(screen.queryByTestId('palette')).toBeNull()
+  })
+
+  it('replaces the palette with the overlay a command opens', async () => {
+    const router = mount('/?overlay=palette')
+
+    await screen.findByTestId('palette')
+    await userEvent.click(
+      screen.getByRole('option', { name: /^open workflow library/ }),
+    )
+
+    await waitFor(() => {
+      expect(router.state.location.searchStr).toBe('?overlay=library')
+    })
+  })
+
   it('sends a path that is not / back to /', async () => {
     const router = mount('/runs/a4c8')
 

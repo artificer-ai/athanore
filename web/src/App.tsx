@@ -24,9 +24,18 @@
  *
  * `usePanes` is read here rather than inside `Detail` for the same
  * reason `GET /api/runs` is: the pane cycle's actions are the keyboard's
- * too (`←`, `→`, `1`–`9`, T067), and a shell that holds the model can
- * hand it to both without either owning the other.
+ * too (`←`, `→`, `1`–`9`, T067) and the palette's as well — `append log`
+ * is "the log pane, with the caret in its composer" — and a shell that
+ * holds the model can hand it to all of them without any of them owning
+ * the others.
+ *
+ * The overlays hang off the shell rather than off whatever opened them,
+ * because `?overlay=` is one piece of state and the thing it names is
+ * over the whole app (10 §Overlays). They portal out of this tree, so
+ * where they sit in it says nothing about where they draw.
  */
+import { useQueryClient } from '@tanstack/react-query'
+
 import { Detail } from './components/Detail'
 import { Footer } from './components/Footer'
 import { Header } from './components/Header'
@@ -34,8 +43,14 @@ import { RunList, useRunListModel } from './components/RunList'
 import { ServerDownBanner } from './components/ServerDownBanner'
 import { Splitter } from './components/Splitter'
 import { useAttention } from './components/attention'
+import { Palette, buildPaletteActions } from './overlays'
 import { BUILTIN_WORKFLOW, usePanes } from './panes'
 import type { AppSearch, Overlay } from './routes/search'
+import { usePrefs } from './store/prefs'
+import { useUi } from './store/ui'
+
+/** What a handler the shell was not given does. */
+const NOTHING = () => {}
 
 /** The builtin pane a graph row jumps to (10 §Graph pane, 09 §Builtins). */
 const LOG_PANE = 'log'
@@ -49,6 +64,7 @@ export default function App({
   onFilterNode,
   onOpenNode,
   onOpenOverlay,
+  onCloseOverlay,
 }: {
   search: AppSearch
   onSelectRun: (runId: string) => void
@@ -64,10 +80,15 @@ export default function App({
   onOpenNode?: ((node: string, pane: number | undefined) => void) | undefined
   /** Open an overlay by name; the graph's `open definition` opens one. */
   onOpenOverlay?: ((overlay: Overlay) => void) | undefined
+  /** Close whichever overlay is up: `?overlay=` away (10 §Overlays). */
+  onCloseOverlay?: (() => void) | undefined
 }) {
   const runs = useRunListModel()
   useAttention()
   const panes = usePanes(search.run, { index: search.pane, onChange: onSelectPane })
+  const queryClient = useQueryClient()
+  const toggleListCollapsed = usePrefs((state) => state.toggleListCollapsed)
+  const focusLogComposer = useUi((state) => state.focusLogComposer)
 
   // Which pane the log is, in *this* selection's cycle: the manifest
   // decides how many panes there are and a plugin's `log` panel is not
@@ -76,6 +97,33 @@ export default function App({
   const logPane = panes.panes.findIndex(
     (pane) => pane.workflow === BUILTIN_WORKFLOW && pane.name === LOG_PANE,
   )
+
+  // The palette's rows are the app's own actions, so they are built here
+  // rather than inside it: `refresh` is this tab's whole cache,
+  // `toggle list` is the splitter's rail, and `append log` is the pane
+  // cycle plus the caret — the shell is where all three are already in
+  // hand (`overlays/actions.ts`).
+  const paletteActions = buildPaletteActions({
+    runId: search.run,
+    openOverlay: onOpenOverlay ?? NOTHING,
+    close: onCloseOverlay ?? NOTHING,
+    refresh: () => {
+      void queryClient.invalidateQueries()
+    },
+    toggleList: toggleListCollapsed,
+    // `append log` writes nothing itself: the note is the log pane's
+    // composer, which already posts it (`panes/kinds/Log.tsx`), so the
+    // command is "show me that box and put me in it". The caret is asked
+    // for through `useUi` because the composer is mounted by the pane
+    // once its panel has answered, which is after this call returns; a
+    // cycle with no log pane in it — a manifest still in flight — asks
+    // for nothing rather than leaving a request nothing will serve.
+    appendLog: () => {
+      if (logPane < 0 || search.run === undefined) return
+      panes.jump(logPane)
+      focusLogComposer(search.run)
+    },
+  })
 
   return (
     <div className="text-body flex h-dvh flex-col overflow-hidden bg-background text-foreground">
@@ -113,6 +161,12 @@ export default function App({
       />
 
       <Footer onOpenPalette={onOpenPalette} />
+
+      <Palette
+        open={search.overlay === 'palette'}
+        actions={paletteActions}
+        onClose={onCloseOverlay ?? NOTHING}
+      />
     </div>
   )
 }
