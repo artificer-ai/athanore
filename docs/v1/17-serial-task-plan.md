@@ -2916,6 +2916,7 @@ entries.
 **Tests.** Vitest: merge order by time; tone classes per kind; the
 composer posts and clears; `?node=` filters.
 **Done.** Tests pass.
+**Status.** Done.
 
 ### T063c — Agent stream renderer (A4.5)
 

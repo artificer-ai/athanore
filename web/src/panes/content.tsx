@@ -36,10 +36,12 @@
  *   are `dashboard` and `log` panels of the `_builtin` workflow and
  *   reach their renderers through exactly the path a plugin's would,
  *   which is what 09 §Builtins are plugins means by "the proof the API
- *   is sufficient". The overview has a renderer of its own only because
- *   its route sends a fourth key the `dashboard` kind does not declare
- *   (`meta`, 15 D140); {@link BUILTIN_RENDERERS} is that one exception,
- *   and it is keyed by the panel's name on `_builtin` alone.
+ *   is sufficient". Each has a renderer of its own only for what 09's
+ *   kind does not cover — the overview's route sends a fourth key
+ *   (`meta`, 15 D140), and the log pane is asked for a composer, a
+ *   filter and markdown that a plugin's list of lines is not (10 §Panes
+ *   item 2). {@link BUILTIN_RENDERERS} is the whole of that, and it is
+ *   keyed by the panel's name on `_builtin` alone.
  */
 import type { ReactNode } from 'react'
 
@@ -48,6 +50,7 @@ import {
   DashboardPane,
   ErrorCard,
   KvPane,
+  Log,
   LogPane,
   MarkdownPane,
   Overview,
@@ -89,6 +92,17 @@ export type RenderContext = {
   /** Open an attempt in the task drawer (10 §Overlays). */
   onOpenTask?: ((taskId: number) => void) | undefined
   /**
+   * `?node=`: the node the event log is filtered to (10 §Panes item 2).
+   *
+   * A filter and not a scope: it narrows what one pane *draws* and is
+   * deliberately not in {@link PanelScope}, which is what a panel's
+   * route is asked with. Filtering server-side would be a second cache
+   * entry per node of a resource the pane already has whole.
+   */
+  node?: string | undefined
+  /** Write `?node=`; the log pane's filter clears itself with it. */
+  onFilterNode?: ((node: string | undefined) => void) | undefined
+  /**
    * The `placement="card"` panels of the run in scope, ready to mount
    * (`./PanelCards.tsx`).
    *
@@ -124,21 +138,31 @@ function statusLine(text: ReactNode): ReactNode {
 }
 
 /**
- * The builtin panels whose data the `kind` alone does not describe.
+ * The builtin panels the `kind` alone does not describe, keyed by their
+ * name *on `_builtin`*: another server's panel of the same name is not
+ * this one, and reaches its kind's renderer like any plugin's.
  *
- * One entry: `overview`, whose route answers with a `dashboard` plus the
- * `meta` grid 10 §Panes puts between the tiles and the NODES table. Any
- * other server's panel named `overview` is not this one — the key is the
- * name *on `_builtin`* — and a build talking to a server that dropped
- * `meta` still draws the three keys the kind declares, because
- * {@link asOverview} narrows a missing `meta` to an empty grid rather
- * than to a mismatch.
+ * Two of them, and neither is a special case of the host — both are
+ * declared through the plugin API and fetched through it (09 §Builtins
+ * are plugins). What they add is what their route sends beyond the kind,
+ * or what 10 §Panes asks of that one pane and of no other:
+ *
+ * - **`overview`** answers with a `dashboard` plus the `meta` grid 10
+ *   puts between the tiles and the NODES table. A build talking to a
+ *   server that dropped `meta` still draws the three keys the kind
+ *   declares, because {@link asOverview} narrows a missing `meta` to an
+ *   empty grid rather than to a mismatch.
+ * - **`log`** answers with the `log` kind's own rows, and 10 §Panes item
+ *   2 gives that pane a header, a `?node=` filter, markdown for what an
+ *   agent or a person wrote, and the composer an operator appends a note
+ *   with. A plugin's `log` panel has none of those: it is a list of
+ *   lines, which is what the kind promises.
  */
 const BUILTIN_RENDERERS: Record<
   string,
-  (data: unknown, ctx: RenderContext) => Content | null
+  (pane: Pane, data: unknown, ctx: RenderContext) => Content | null
 > = {
-  overview: (data, ctx) => {
+  overview: (_pane, data, ctx) => {
     const overview = asOverview(data)
     if (overview === null) return null
     return {
@@ -149,6 +173,23 @@ const BUILTIN_RENDERERS: Record<
           runId={ctx.scope.runId}
           onOpenTask={ctx.onOpenTask}
           cards={ctx.cards}
+        />
+      ),
+    }
+  },
+
+  log: (pane, data, ctx) => {
+    const rows = asLog(data)
+    if (rows === null) return null
+    return {
+      scrolls: true,
+      node: (
+        <Log
+          data={rows}
+          runId={ctx.scope.runId}
+          {...(pane.panel.source == null ? {} : { source: pane.panel.source })}
+          {...(ctx.node === undefined ? {} : { node: ctx.node })}
+          {...(ctx.onFilterNode === undefined ? {} : { onFilterNode: ctx.onFilterNode })}
         />
       ),
     }
@@ -180,7 +221,7 @@ export function renderKind(pane: Pane, data: unknown, ctx: RenderContext): Conte
 
   if (pane.workflow === BUILTIN_WORKFLOW) {
     const builtin = BUILTIN_RENDERERS[pane.name]
-    if (builtin !== undefined) return builtin(data, ctx) ?? mismatch
+    if (builtin !== undefined) return builtin(pane, data, ctx) ?? mismatch
   }
 
   switch (kind) {

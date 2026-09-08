@@ -39,12 +39,17 @@ export type Overlay = (typeof OVERLAYS)[number]
  * - `overlay` — the open overlay, one of {@link OVERLAYS}.
  * - `task` — the task an overlay is about; task ids are positive
  *   integers (`docs/v1/03-data-model.md`).
+ * - `node` — the node the event log is filtered to. The graph pane
+ *   writes it ("clicking a graph node opens this pane with `?node=`
+ *   filtering to that node's entries and events", 10 §Panes), which is
+ *   what makes a filtered log a link somebody can send.
  */
 export type AppSearch = {
   run?: string
   pane?: number
   overlay?: Overlay
   task?: number
+  node?: string
 }
 
 const OVERLAY_SET: ReadonlySet<string> = new Set(OVERLAYS)
@@ -81,11 +86,16 @@ export function validateAppSearch(search: Record<string, unknown>): AppSearch {
   const pane = asInteger(search['pane'], 0)
   const overlay = search['overlay']
   const task = asInteger(search['task'], 1)
+  // A node name is a workflow's, so it is opaque here for the same
+  // reason a run id is: this build cannot know which names the selected
+  // run's graph has, and the log pane draws no rows for one it has not.
+  const node = asId(search['node'])
 
   return {
     ...(run === undefined ? {} : { run }),
     ...(pane === undefined ? {} : { pane }),
     ...(isOverlay(overlay) ? { overlay } : {}),
     ...(task === undefined ? {} : { task }),
+    ...(node === undefined ? {} : { node }),
   }
 }

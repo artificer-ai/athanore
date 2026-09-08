@@ -37,12 +37,14 @@ export default function App({
   onSelectPane,
   onOpenPalette,
   onOpenTask,
+  onFilterNode,
 }: {
   search: AppSearch
   onSelectRun: (runId: string) => void
   onSelectPane: (index: number) => void
   onOpenPalette: () => void
   onOpenTask?: ((taskId: number) => void) | undefined
+  onFilterNode?: ((node: string | undefined) => void) | undefined
 }) {
   const runs = useRunListModel()
   const panes = usePanes(search.run, { index: search.pane, onChange: onSelectPane })
@@ -58,7 +60,13 @@ export default function App({
           <RunList model={runs} selected={search.run} onSelect={onSelectRun} />
         }
         detail={
-          <Detail panes={panes} taskId={search.task} onOpenTask={onOpenTask} />
+          <Detail
+            panes={panes}
+            taskId={search.task}
+            node={search.node}
+            onOpenTask={onOpenTask}
+            onFilterNode={onFilterNode}
+          />
         }
       />
 
