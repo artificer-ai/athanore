@@ -7,7 +7,8 @@
  * Four layers, per docs/v1/10-frontend.md §Design system:
  *   1. the Nocturne tokens, copied verbatim from the source
  *   2. the shadcn/ui variables, mapped onto them (§Tokens → shadcn)
- *   3. the Tailwind `@theme inline` exposure and the 12 px type base
+ *   3. the Tailwind `@theme inline` exposure, the type base and the
+ *      four sizes the font-size chooser picks between
  *   4. the utilities the mock styles from: the status colours, the type
  *      scale, the two mixed surfaces and the two animations
  *
@@ -144,6 +145,13 @@
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
 
+  /* Type scales, density does not (D195, 21 §Type scale). Tailwind's
+     own spacing scale is 0.25rem a step, which would grow with the base
+     the chooser sets and take every padding and gap in the app with it;
+     3 px is what that step already resolves to at the mock's 12 px base,
+     so this pins the density where it is without moving a pixel. */
+  --spacing: 3px;
+
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -159,12 +167,22 @@
   --font-heading: 'JetBrains Mono Variable', var(--ath-font-mono);
 }
 
-/* --- App type base (10 §Type and density) --- */
+/* --- App type base and the chooser's steps (10 §Type and density) --- */
 
 @layer base {
   html {
     font-size: var(--ath-font-size);
     line-height: 1.5;
+  }
+
+  html[data-font-size='small'] {
+    font-size: calc(var(--ath-font-size) * 11 / 12);
+  }
+  html[data-font-size='large'] {
+    font-size: calc(var(--ath-font-size) * 13.5 / 12);
+  }
+  html[data-font-size='xlarge'] {
+    font-size: calc(var(--ath-font-size) * 15 / 12);
   }
 }
 
@@ -201,22 +219,22 @@
 /* --- Type scale (10 §Type and density) --- */
 
 /* metric values */
-@utility text-metric { font-size: 15px; font-weight: 500; }
+@utility text-metric { font-size: calc(15rem / 12); font-weight: 500; }
 
-/* body copy, the 12 px base */
-@utility text-body { font-size: 12px; }
+/* body copy, the base itself */
+@utility text-body { font-size: 1rem; }
 
 /* table and list rows */
-@utility text-row { font-size: 11.5px; }
+@utility text-row { font-size: calc(11.5rem / 12); }
 
 /* 10's 11 px secondary text: ids, chrome, meta lines */
-@utility text-meta { font-size: 11px; }
+@utility text-meta { font-size: calc(11rem / 12); }
 
 /* section kickers: STATS, NODES, EVENT LOG */
-@utility text-kicker { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.12em; }
+@utility text-kicker { font-size: calc(10.5rem / 12); text-transform: uppercase; letter-spacing: 0.12em; }
 
 /* key hints and column headers */
-@utility text-hint { font-size: 10px; }
+@utility text-hint { font-size: calc(10rem / 12); }
 
 /* --- Surfaces (10 §Type and density) --- */
 

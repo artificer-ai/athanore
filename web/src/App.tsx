@@ -144,6 +144,7 @@ export default function App({
   const panes = usePanes(search.run, { index: search.pane, onChange: onSelectPane })
   const queryClient = useQueryClient()
   const toggleListCollapsed = usePrefs((state) => state.toggleListCollapsed)
+  const setFontSize = usePrefs((state) => state.setFontSize)
   const focusLogComposer = useUi((state) => state.focusLogComposer)
   const setFocus = useUi((state) => state.setFocus)
   const detail = useRef<HTMLElement | null>(null)
@@ -216,6 +217,9 @@ export default function App({
       if (search.run === undefined) return
       runOps.reorder(search.run, direction)
     },
+    // The header's chooser writes the same pref (21 §Type scale); the
+    // rows exist so the choice is reachable without a pointer (D196).
+    setFontSize,
   }).concat(
     pluginPaletteActions(
       actionsOf(manifest, { runId: search.run, workflow: selected?.workflow }),

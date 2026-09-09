@@ -16,7 +16,8 @@
 //      (docs/v1/10-frontend.md §Tokens → shadcn — normative)
 //   2. the `@theme inline` block that exposes those variables to
 //      Tailwind v4 as colour, radius and font utilities
-//   3. the app type base (12 px, line-height 1.5; 10 §Type and density)
+//   3. the app type base and the font-size steps the chooser picks
+//      between (10 §Type and density, 21 §Type scale)
 //   4. the status colour utilities of 10 §Status colours
 //   5. the type scale utilities of 10 §Type and density
 //   6. the chrome and zebra surfaces of 10 §Type and density
@@ -195,6 +196,35 @@ function assertStatusColours(tokens) {
 }
 
 /**
+ * The mock's base, in pixels: the denominator of the whole ramp.
+ *
+ * It is a constant of the scale and not a read of `--ath-font-size`
+ * (21 §Type scale). The token is what `<html>` is *set* to and what the
+ * chooser's steps multiply; this is what every step of the ramp was
+ * measured against when the mock was drawn, so `text-row` is 11.5/12 of
+ * whatever the base becomes, for ever.
+ */
+const BASE_PX = 12
+
+/**
+ * One `font-size` declaration of the ramp, as an exact fraction of the
+ * base (21 §Type scale's table).
+ *
+ * `calc(11.5rem / 12)` rather than `0.9583rem`: the form is exact, and a
+ * reader can see the mock's pixel value in it. The base itself is `1rem`
+ * rather than `calc(12rem / 12)` for the same reason — that is what the
+ * fraction says.
+ *
+ * @param {number} px the size the mock draws at the default base
+ * @returns {string}
+ */
+function size(px) {
+  return px === BASE_PX
+    ? 'font-size: 1rem;'
+    : `font-size: calc(${px}rem / ${BASE_PX});`
+}
+
+/**
  * The type scale of 10 §Type and density: `[suffix, declarations]`.
  *
  * These are `@utility` rules rather than `--text-*` entries in
@@ -211,16 +241,16 @@ function assertStatusColours(tokens) {
  * `assertNoRoleCollision` is what keeps that from coming back.
  */
 const TYPE_SCALE = [
-  ['metric', ['font-size: 15px;', 'font-weight: 500;'], 'metric values'],
-  ['body', ['font-size: 12px;'], 'body copy, the 12 px base'],
-  ['row', ['font-size: 11.5px;'], 'table and list rows'],
-  ['meta', ['font-size: 11px;'], "10's 11 px secondary text: ids, chrome, meta lines"],
+  ['metric', [size(15), 'font-weight: 500;'], 'metric values'],
+  ['body', [size(12)], 'body copy, the base itself'],
+  ['row', [size(11.5)], 'table and list rows'],
+  ['meta', [size(11)], "10's 11 px secondary text: ids, chrome, meta lines"],
   [
     'kicker',
-    ['font-size: 10.5px;', 'text-transform: uppercase;', 'letter-spacing: 0.12em;'],
+    [size(10.5), 'text-transform: uppercase;', 'letter-spacing: 0.12em;'],
     'section kickers: STATS, NODES, EVENT LOG',
   ],
-  ['hint', ['font-size: 10px;'], 'key hints and column headers'],
+  ['hint', [size(10)], 'key hints and column headers'],
 ]
 
 /**
@@ -371,6 +401,13 @@ const THEME_INLINE = `  --color-background: var(--background);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
 
+  /* Type scales, density does not (D195, 21 §Type scale). Tailwind's
+     own spacing scale is 0.25rem a step, which would grow with the base
+     the chooser sets and take every padding and gap in the app with it;
+     3 px is what that step already resolves to at the mock's 12 px base,
+     so this pins the density where it is without moving a pixel. */
+  --spacing: 3px;
+
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -446,12 +483,52 @@ function assertNoRoleCollision(css) {
   }
 }
 
-/** 12 px base, one face, one line height (10 §Type and density). */
+/**
+ * The chooser's four steps, as multipliers of `--ath-font-size`
+ * (21 §Type scale's second table, D195): `[step, numerator]` over
+ * {@link BASE_PX}.
+ *
+ * `default` is not here because `default` is the absence of the
+ * attribute — the `html` rule above is it — which is what makes an
+ * operator who has never touched the chooser, and one who has set it
+ * back, the same operator.
+ *
+ * They multiply the token rather than naming pixels so that a
+ * re-imported base flows through them unedited: change
+ * `--ath-font-size` in `nocturne.css` and all four steps move with it.
+ */
+const FONT_SIZE_STEPS = [
+  ['small', 11],
+  ['large', 13.5],
+  ['xlarge', 15],
+]
+
+/**
+ * The base the whole ramp is a fraction of: one face, one line height,
+ * and the four sizes the chooser picks between (10 §Type and density,
+ * 21 §Type scale).
+ *
+ * The SPA writes `data-font-size` on `<html>` from `usePrefs.fontSize`
+ * before first paint (D196); no component reads the preference to style
+ * itself, because everything under here is already relative to this
+ * declaration. Line-height stays unitless, so it scales for free.
+ *
+ * **Type scales, density does not** (D195): the spacing, the borders and
+ * the mock's pixel chrome are absolute, and `--spacing` in the
+ * `@theme inline` block above is what holds Tailwind's own scale still.
+ */
 const TYPE_BASE = `@layer base {
   html {
     font-size: var(--ath-font-size);
     line-height: 1.5;
   }
+
+${FONT_SIZE_STEPS.map(
+  ([step, numerator]) =>
+    `  html[data-font-size='${step}'] {\n` +
+    `    font-size: calc(var(--ath-font-size) * ${numerator} / ${BASE_PX});\n` +
+    '  }',
+).join('\n')}
 }`
 
 /**
@@ -470,7 +547,8 @@ export function renderTheme(nocturne) {
  * Four layers, per docs/v1/10-frontend.md §Design system:
  *   1. the Nocturne tokens, copied verbatim from the source
  *   2. the shadcn/ui variables, mapped onto them (§Tokens → shadcn)
- *   3. the Tailwind \`@theme inline\` exposure and the 12 px type base
+ *   3. the Tailwind \`@theme inline\` exposure, the type base and the
+ *      four sizes the font-size chooser picks between
  *   4. the utilities the mock styles from: the status colours, the type
  *      scale, the two mixed surfaces and the two animations
  *
@@ -498,7 +576,7 @@ ${SHADCN_MAPPING}
 ${THEME_INLINE}
 }
 
-/* --- App type base (10 §Type and density) --- */
+/* --- App type base and the chooser's steps (10 §Type and density) --- */
 
 ${TYPE_BASE}
 

@@ -49,6 +49,35 @@ function viewportWidth(): number {
   return typeof window === 'undefined' ? Number.POSITIVE_INFINITY : window.innerWidth
 }
 
+/**
+ * The four steps of the UI type scale, smallest first
+ * (`docs/v1/21-design-refresh.md` §Type scale, D195).
+ *
+ * The whole ramp is a fraction of the `<html>` font size, so one of
+ * these rescales every size in the app together; the generated
+ * `theme.css` is what maps a step to a base. `default` is the design's
+ * own 12 px and is the absence of the attribute.
+ */
+export const FONT_SIZES = ['small', 'default', 'large', 'xlarge'] as const
+
+/** One step of {@link FONT_SIZES}. */
+export type FontSize = (typeof FONT_SIZES)[number]
+
+/**
+ * Write a step onto `<html>` as `data-font-size`, or take the attribute
+ * off for `default`.
+ *
+ * The attribute is absent rather than `data-font-size="default"` so that
+ * an operator who has never opened the chooser and one who has set it
+ * back to the design's base are the same document (21 §Type scale).
+ */
+export function applyFontSize(fontSize: FontSize): void {
+  if (typeof document === 'undefined') return
+  const html = document.documentElement
+  if (fontSize === 'default') delete html.dataset.fontSize
+  else html.dataset.fontSize = fontSize
+}
+
 export type Prefs = {
   /** Run-list width in pixels; the splitter writes it as it is dragged. */
   listWidth: number
@@ -63,6 +92,12 @@ export type Prefs = {
   notifications: boolean
   /** The operator token, or `null` on a deployment that needs none. */
   token: string | null
+  /**
+   * The UI type scale's base, from the header's chooser and the
+   * palette's four rows (21 §Type scale, D195, D196). Presentation, per
+   * browser: no URL state, no server key.
+   */
+  fontSize: FontSize
 
   setListWidth: (width: number) => void
   setListCollapsed: (collapsed: boolean) => void
@@ -70,6 +105,7 @@ export type Prefs = {
   setAutoSwitchOnRequest: (on: boolean) => void
   setNotifications: (on: boolean) => void
   setToken: (token: string | null) => void
+  setFontSize: (fontSize: FontSize) => void
 }
 
 /** The `localStorage` key. Namespaced so a shared origin cannot collide. */
@@ -83,6 +119,7 @@ export const usePrefs = create<Prefs>()(
       autoSwitchOnRequest: true,
       notifications: false,
       token: null,
+      fontSize: 'default',
 
       setListWidth: (width) =>
         set({ listWidth: clampListWidth(width, viewportWidth()) }),
@@ -92,18 +129,39 @@ export const usePrefs = create<Prefs>()(
       setAutoSwitchOnRequest: (autoSwitchOnRequest) => set({ autoSwitchOnRequest }),
       setNotifications: (notifications) => set({ notifications }),
       setToken: (token) => set({ token }),
+      setFontSize: (fontSize) => set({ fontSize }),
     }),
     {
       name: PREFS_STORAGE_KEY,
-      // Only the five values of T058 are persisted; the actions are
-      // rebuilt from the module on every load.
+      // Only the six values are persisted — T058's five and T081's
+      // `fontSize`; the actions are rebuilt from the module on every
+      // load.
       partialize: (state) => ({
         listWidth: state.listWidth,
         listCollapsed: state.listCollapsed,
         autoSwitchOnRequest: state.autoSwitchOnRequest,
         notifications: state.notifications,
         token: state.token,
+        fontSize: state.fontSize,
       }),
     },
   ),
 )
+
+/**
+ * Apply the stored step and keep `<html>` in step with the store,
+ * returning the unsubscribe.
+ *
+ * Called from `main.tsx` **before** `createRoot(...).render()`:
+ * zustand's `persist` reads `localStorage` synchronously while this
+ * module is evaluated, so the attribute is on the document before the
+ * first paint and the app never renders at one size and then jumps
+ * (21 §Type scale). No component reads the preference to style itself —
+ * the ramp is relative to the base, and this is the base.
+ */
+export function syncFontSize(): () => void {
+  applyFontSize(usePrefs.getState().fontSize)
+  return usePrefs.subscribe((state, previous) => {
+    if (state.fontSize !== previous.fontSize) applyFontSize(state.fontSize)
+  })
+}

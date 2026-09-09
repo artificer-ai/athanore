@@ -3911,6 +3911,18 @@ rescales the whole ramp coherently, survives reload via
 `athanore.prefs`, and clearing site data restores the default; at
 `default` the rendered sizes are pixel-identical to before; gate green;
 snapshot unchanged.
+**Status.** Done. The six utilities are `calc(<px>rem / 12)` and the
+three `data-font-size` rules multiply `--ath-font-size`; `usePrefs`
+carries `fontSize` as its sixth persisted key and `main.tsx` calls
+`syncFontSize()` before `createRoot(...).render()`. The control is
+`FontSizeMenu` in the header — a 24×24 px `TextAa` button over a Radix
+popover holding a radio group — with the four `font size: <step>` rows
+beside it in the palette. `web/e2e/fontsize.spec.ts` measures the
+rendered ramp at 12 px and at `xlarge`'s 15 px base (metric 18.75 px,
+row 14.375 px) across a reload and a cleared `localStorage`, and
+`a11y.spec.ts` gained the `xlarge` run. One choice the plan did not
+name: the theme pins Tailwind's `--spacing` to the 3 px its `0.25rem`
+step already resolves to, so density cannot drift with the base (D199).
 
 ### T082 — Mobile support (A7.3)
 

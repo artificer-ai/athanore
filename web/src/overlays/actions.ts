@@ -17,12 +17,15 @@
  * — joined it with T066e, which is the task whose done condition is that
  * every operator op of 04 is reachable from the UI (D170, D175).
  *
- * **Two rows carry no key, and say so.** `reorder(run, direction)` is an
+ * **Six rows carry no key, and say so.** `reorder(run, direction)` is an
  * operator op of 04 that 10 §Keyboard has no binding for, and that
  * section is exhaustive — T067 binds exactly it — so the two rows that
  * move a run up and down the dispatch list print `—` in the key column
  * rather than advertising a key this app does not have (D175). The New
- * Run overlay's POSITION is the same op with `{index: 0}` (D57).
+ * Run overlay's POSITION is the same op with `{index: 0}` (D57). The
+ * four `font size: …` rows are keyless for the same reason: they are the
+ * keyboard-first half of the header's chooser (D196), and 10 §Keyboard
+ * binds no key to them either.
  *
  * Two shapes of command live here and they end the palette differently:
  *
@@ -40,6 +43,7 @@
  * row says.
  */
 import type { Overlay } from '../routes/search'
+import { FONT_SIZES, type FontSize } from '../store/prefs'
 
 /**
  * What the palette needs from the app to turn a command into an action.
@@ -76,6 +80,11 @@ export type PaletteContext = {
   cancelRun: () => void
   /** The palette's `move run up` / `move run down` (`reorder`, 04). */
   reorder: (direction: 'up' | 'down') => void
+  /**
+   * The UI type scale's base (21 §Type scale). The four rows are the
+   * header chooser's keyboard-first twin, and write the same pref.
+   */
+  setFontSize: (fontSize: FontSize) => void
 }
 
 /** One row of the palette: `name · hint · key`, and what it does. */
@@ -300,6 +309,20 @@ export const PALETTE_COMMANDS: readonly PaletteCommand[] = [
       ctx.toggleList()
     },
   },
+  // The header's chooser, as rows: 21 §Type scale asks for the four
+  // steps here so the keyboard-first path exists too (D196). They are
+  // about the browser and not the run, so none of them needs one.
+  ...FONT_SIZES.map((step) => ({
+    id: `font-size-${step}`,
+    name: `font size: ${step}`,
+    hint: 'the interface type scale',
+    key: KEYLESS,
+    needsRun: false,
+    perform: (ctx: PaletteContext) => {
+      ctx.close()
+      ctx.setFontSize(step)
+    },
+  })),
   {
     id: 'refresh',
     name: 'refresh',

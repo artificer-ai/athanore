@@ -24,7 +24,7 @@ export function StatusPill({
     <span
       data-tone={tone}
       className={cn(
-        'inline-block max-w-full truncate rounded-lg border border-border px-[7px] py-px text-[10.5px] tracking-[0.06em]',
+        'inline-block max-w-full truncate rounded-lg border border-border px-[7px] py-px text-[calc(10.5rem/12)] tracking-[0.06em]',
         toneClass(tone),
         tonePulses(tone) && 'animate-ath-pulse',
         className,
