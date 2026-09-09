@@ -3,11 +3,19 @@
 The unit under test is "what an installed package advertises", so the
 fixture is an **installed package**: :func:`install` writes a module and a
 `.dist-info` with an `entry_points.txt` into a directory, and that
-directory goes on `sys.path`. Nothing patches `importlib.metadata` —
-`entry_points(group="athanore.workflows")` reads real metadata off a real
+directory goes on `sys.path`. The group is read for real —
+`entry_points(group="athanore.workflows")` off real metadata on a real
 path entry, which is the only way this file can prove the group name, the
 `module:attr` form and the `dist.name` in a failure message are right
 rather than agreeing with a stub about them.
+
+What *is* narrowed is the result, and only since T074: the environment
+the gate runs in advertises a workflow of its own, because `examples/` is
+a workspace package and `feature_build` is one of its entry points. Every
+assertion below is about the distribution this file installed, so
+`only_this_files_distributions` drops the entries of any other one on the
+way out of `entry_points`. The mechanism is untouched — what `discover()`
+is handed is the list it would have been handed, minus the machine's.
 
 `serve` is exercised in-process with `Server.serve` captured. Everything
 this task decides — which workflows are registered, which one wins when
@@ -24,12 +32,15 @@ import importlib
 import os
 import sys
 from collections.abc import Callable, Iterator
+from importlib.metadata import EntryPoint
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from athanore.cli import main
 from athanore.cli.output import EXIT_API_ERROR, EXIT_OK, EXIT_USAGE
+from athanore.plugins import discovery
 from athanore.plugins.discovery import GROUP, DiscoveryError, discover
 from athanore.server import Server
 
@@ -136,6 +147,31 @@ def restore_imports() -> Iterator[None]:
     for name in set(sys.modules) - modules:
         del sys.modules[name]
     importlib.invalidate_caches()
+
+
+@pytest.fixture(autouse=True)
+def only_this_files_distributions(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Discovery sees what :func:`install` installed, and nothing else.
+
+    `athanore-examples` advertises `feature_build` in the same group
+    (T074) and is installed in the environment the gate runs in, so an
+    unfiltered `discover()` here would be reading the machine rather than
+    the fixture. Filtering by distribution is the narrowest thing that
+    can be done about it: the entries still come from
+    `importlib.metadata`, still carry the `dist` a failure message names,
+    and are still ordered by `discover()` itself.
+    """
+
+    real = discovery.entry_points
+
+    def scoped(**params: Any) -> list[EntryPoint]:
+        return [
+            entry
+            for entry in real(**params)
+            if entry.dist is not None and entry.dist.name == DIST
+        ]
+
+    monkeypatch.setattr(discovery, "entry_points", scoped)
 
 
 @pytest.fixture

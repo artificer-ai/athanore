@@ -72,11 +72,15 @@ the fake. Scenario selection is per node: the fake reads
 `ATHANORE_FAKE_SCENARIOS=<dir>` and picks `<workflow>.<node>.json`, then
 `<node>.json`, then `default.json`, using the `workflow` and `node` the
 kickoff prompt names (the fake parses its own prompt, which is why 19 is
-byte-exact). `examples/<wf>/scenarios/` ships one per node, each of which
-`log`s a plausible deliverable and `submit`s a value that satisfies the
-node's `output_model`, so every example runs to `completed` with no model
-in the loop. That is the phase gate of 14 and the Playwright fixture of
-10.
+byte-exact). `examples/<wf>/scenarios/` ships one per **agent** node, each of
+which `log`s a plausible deliverable and `submit`s a value that satisfies
+the node's `output_model`, so every example runs with no model in the
+loop. That is the phase gate of 14 and the Playwright fixture of 10. A
+node with no agent has no scenario and cannot have one — it is code, and
+it decides for itself: `feature_build`'s `gate` runs the repository's
+test command in the directory the server was started in, so a scripted
+run of that example reaches `git` where the command is green and loops
+back to `engineering` where it is not.
 - `FakeStatsProvider`: returns scripted session stats / stop reasons.
 - Time: `freezegun` for retention; the scheduler tick is injectable.
 
