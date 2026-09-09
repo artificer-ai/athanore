@@ -12,20 +12,26 @@ needs no arguments — ``athanore-examples`` advertises them in the
 a host that builds a server out of its own configuration, in its own
 process, beside its own code.
 
-The one thing it decides that a command line cannot is the pool, and the
-registrations below are 04 §Programmatic host's own four lines:
+The one thing it decides that a command line cannot is the pool. The
+registrations below are 04 §Programmatic host's own four lines, plus the
+two vendor-adapter examples, each on the pool its adapter belongs to:
 
-- ``feature_build`` and ``gamedev`` share the capacity-1 ``local`` pool.
-  Every seat of both runs on one model (``MODEL`` in each package), and
-  the LAN alternative to it answers a single request at a time: the model
-  would serialize the agents anyway, and a pool does that queueing in the
-  scheduler instead of in a socket timeout. Sharing the pool is what makes
-  it one queue rather than two that each think they are alone.
-- ``projects`` runs on ``cloud``, capacity 8. Its seats are Claude Code
-  over ACP — a hosted service that answers several requests at once — and
-  its product stage fans out one branch per deliverable, so the branches
-  are the thing worth running in parallel. Eight is the capacity 02
-  §Settings gives that pool in its worked ``athanore.toml``.
+- ``feature_build``, ``gamedev`` and ``docker_acp`` share the capacity-1
+  ``local`` pool. Every seat of the three runs on one model (``MODEL`` in
+  each package), and the LAN alternative to it answers a single request
+  at a time: the model would serialize the agents anyway, and a pool does
+  that queueing in the scheduler instead of in a socket timeout. Sharing
+  the pool is what makes it one queue rather than three that each think
+  they are alone — and ``docker_acp``'s agent is that same pi, dispatched
+  into the dev stack's container rather than spawned on the host.
+- ``projects`` and ``claude_acp`` run on ``cloud``, capacity 8. Their
+  seats are Claude Code over ACP — a hosted service that answers several
+  requests at once — and ``projects``' product stage fans out one branch
+  per deliverable, so the branches are the thing worth running in
+  parallel. Eight is the capacity 02 §Settings gives that pool in its
+  worked ``athanore.toml``. ``claude_acp`` is one short run of one agent;
+  what it must not do is queue behind the local model, because it is the
+  check that says whether the other adapter works at all.
 - ``msgtest`` is registered on no pool at all, which puts it on the
   default one. It runs no agents; what it waits for is a person, and a
   ``human_input`` gives its worker slot back for the duration of the wait
@@ -39,6 +45,9 @@ place to configure a deployment.
 """
 
 from __future__ import annotations
+
+from claude_acp import wf as claude_acp
+from docker_acp import wf as docker_acp
 
 from athanore import Pool, Server
 from feature_build import wf as feature_build
@@ -56,10 +65,13 @@ def build() -> Server:
     """
 
     local = Pool("local", capacity=1)
+    cloud = Pool("cloud", capacity=8)
     server = Server()
     server.register(feature_build, local)
     server.register(gamedev, local)
-    server.register(projects, Pool("cloud", capacity=8))
+    server.register(docker_acp, local)
+    server.register(projects, cloud)
+    server.register(claude_acp, cloud)
     server.register(msgtest)
     return server
 

@@ -297,10 +297,13 @@ determined are omitted. Never raises. The text form is
 
 `examples/` keeps: pi (default command, stats provider), Claude Code via
 `@agentclientprotocol/claude-agent-acp` (command + model only), the Docker
-sandbox (`docker run -i … athanore/pi-acp` as the ACP command;
-`permission_policy="auto_allow"` because the container is the guardrail),
-and the `projects` triage workflow. `examples/` has its own `pyproject`
-extras and tests; the core package imports none of it.
+sandbox (`./scripts/agent.sh pi` as the ACP command — the dev stack's own
+image and its own way in, rather than a second one built here (D64, D67);
+`permission_policy="auto_allow"` because the container is the guardrail,
+and the `http` tier because the `native` tier's two environment variables
+do not cross `docker compose run`), and the `projects` triage workflow.
+`examples/` has its own `pyproject` extras and tests; the core package
+imports none of it.
 
 Pinning: examples pin agent adapter versions (`npx -y pkg@x.y.z`) instead
 of floating `npx -y pkg` (12 §Supply chain).

@@ -12,7 +12,7 @@ example workflows and their tests are the acceptance harness throughout.
 | `athanore/tui.py`, `athanore/web/templates`, textual deps | deleted |
 | `workflow/` package at the root | `examples/` (feature_build, gamedev, msgtest, claude_acp, docker_acp, projects, pi stats provider) |
 | `DESIGN.md`, `docs/design/*`, `docs/specs/*`, `docs/bugs/*` | kept as history; `docs/v1/` is the current design; `README.md` points here |
-| `docker/`, `compose.yaml` | `examples/docker/` |
+| `docker/`, `compose.yaml` | kept at the root as the dev stack (`docker/dev`, `scripts/`): one image behind the gate, the app and every agent, and `examples/docker_acp` dispatches into it through `./scripts/agent.sh` rather than building a second one (D64, D67) |
 | `.gitignore` ignores `docs/design/*`, `docs/qa/*`, `docs/bugs/*` | The cited findings are folded into `docs/v1/20-carried-findings.md`, so `docs/v1` is self-contained (D59); whether to also un-ignore the history is open question 4 in 15. `docs/v1/` is tracked; add `.athanore/` (token file) and `athanore/web/dist/` (build output) to the ignore list |
 | `pyproject.toml` deps: textual, netext | removed; added: sqlalchemy[asyncio], aiosqlite, alembic, sse-starlette, pydantic-settings, structlog, typer, python-ulid; extras `postgres` (asyncpg). `examples/` becomes a uv workspace member with its own extras |
 | — | `web/` (Vite app), `pnpm-workspace.yaml`, build step copies to `athanore/web/dist`; hatch `artifacts = ["athanore/web/dist/**"]` so the ignored build output still ships in the wheel |
