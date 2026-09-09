@@ -12,7 +12,10 @@ is the part a command line has and a library call does not:
   file target is executed as a module with its own directory on
   ``sys.path``, which is what ``python that_file.py`` would have done, so
   a workflow that imports its siblings keeps working when it is named on
-  a command line instead of run.
+  a command line instead of run. :func:`discovered` asks the installed
+  distributions for the rest (09 §Discovery), unless ``--no-discover``
+  says not to, and a target the operator typed wins over a discovered
+  workflow of the same name.
 - **Where the pools come from.** :func:`layout` reads ``[pools]`` and
   ``[workflows]`` out of ``athanore.toml`` (02 §``athanore.toml``
   layout). They are not settings — ``AthanoreSettings`` ignores both
@@ -64,15 +67,24 @@ WORKFLOW_KEYS = frozenset({"pool"})
 def discovered() -> list[Workflow]:
     """The workflows installed packages advertise (09 §Discovery).
 
-    Entry-point discovery is T072's: it owns the ``athanore.workflows``
-    group, the ``module:attr``-or-callable form of an entry, and the
-    precedence between a discovered workflow and one named on the command
-    line. This function is where it lands, and until it does an
-    installation has nothing to discover — the workflows a server runs
-    are the ones its targets name.
+    The group, the ``module:attr``-or-callable form of an entry and the
+    refusal of one that is neither belong to
+    :mod:`athanore.plugins.discovery`; what belongs here is only that
+    ``serve`` asks for them at all, and the import is written inside the
+    body for the reason the module docstring gives — ``athanore token
+    show`` must not import a workflow, a graph and pydantic to parse a
+    flag.
+
+    The precedence between what this returns and what the operator typed
+    is applied in :func:`serve`, on the *workflow's* name rather than the
+    entry point's: the left-hand side of an entry is what the
+    distribution called it, and the name a run is submitted under is the
+    workflow's own.
     """
 
-    return []
+    from athanore.plugins.discovery import discover
+
+    return discover()
 
 
 def load_target(target: str) -> Workflow:
@@ -354,6 +366,7 @@ def serve(
     """Run a server for the given workflows until it is stopped."""
 
     from athanore.graph import GraphError
+    from athanore.plugins.discovery import DiscoveryError
     from athanore.server import MissingOperatorToken, Server, V0Database
 
     settings = _settings(
@@ -365,10 +378,20 @@ def serve(
     )
     workflows = [load_target(target) for target in targets or []]
     if not no_discover:
+        try:
+            advertised = discovered()
+        except DiscoveryError as exc:
+            # An installed package that advertises a workflow it cannot
+            # produce (09 §Discovery). Not a usage error — nothing was
+            # mistyped — and not something to skip past either, so it is
+            # the sentence naming the entry point and an exit. The way
+            # on, until the package is fixed, is `--no-discover`.
+            fail(str(exc))
+            raise typer.Exit(EXIT_API_ERROR) from exc
         named = {wf.name for wf in workflows}
         # An explicit target wins over a discovered workflow of the same
         # name: the operator naming a file means that file (09 §Discovery).
-        workflows.extend(wf for wf in discovered() if wf.name not in named)
+        workflows.extend(wf for wf in advertised if wf.name not in named)
     capacities, bindings = layout(settings.root_path)
 
     server = Server(settings)
