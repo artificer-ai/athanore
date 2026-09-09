@@ -1,11 +1,16 @@
 """The host for the workflows that maintain this checkout.
 
 A programmatic host rather than `athanore serve` (04 §Programmatic host),
-for the one reason a command line cannot cover: the pool. `feature`
-mutates the working tree — it branches, it merges, it runs the gate — so
-two runs of it in the same checkout at the same time would be two agents
-editing one branch. Capacity 1 is not a throughput choice here, it is the
-correctness of the thing.
+for the one reason a command line cannot cover: the pool. Both seats
+mutate the working tree — `feature` branches, merges and runs the gate;
+`planner` branches, writes documents and merges — so two runs at the same
+time in the same checkout would be two agents editing one tree. Capacity
+1 is not a throughput choice here, it is the correctness of the thing,
+and it is **one** pool for both because there is one working tree.
+
+`planner` also queues `feature` runs, over the API this host serves, so
+the two are on the same server for a second reason: a plan's tasks are
+submitted to the thing that will build them.
 
 Everything else — the bind, the database, the public URL — comes from the
 environment and `athanore.toml` (`ATHANORE_*`, 02 §Settings).
@@ -24,13 +29,16 @@ from __future__ import annotations
 
 from athanore import Pool, Server
 from workflows.feature import wf as feature
+from workflows.planner import wf as planner
 
 
 def build() -> Server:
-    """The server, with `feature` on a capacity-1 pool."""
+    """The server, with both seats on one capacity-1 pool."""
 
+    checkout = Pool("checkout", capacity=1)
     server = Server()
-    server.register(feature, Pool("checkout", capacity=1))
+    server.register(planner, checkout)
+    server.register(feature, checkout)
     return server
 
 

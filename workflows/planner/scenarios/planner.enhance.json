@@ -1,0 +1,14 @@
+{
+  "text": ["Read AGENTS.md, docs/v1/README.md and the documents the request touches."],
+  "log": "enhance: read the request against the specs and wrote the brief.",
+  "submit": {
+    "goal": "An operator asked for one thing; this is what it means in this repository.",
+    "context": "The documents in `docs/v1/` that specify it and the modules that would change.",
+    "requirements": [
+      "The behaviour that must exist when this is done, stated so it can be tested"
+    ],
+    "out_of_scope": ["What a reader might assume is included and is not"],
+    "open_questions": ["What the specs do not settle"]
+  },
+  "usage": { "input": 48000, "output": 900 }
+}
