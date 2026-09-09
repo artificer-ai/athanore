@@ -7,9 +7,22 @@ import './index.css'
 import { AppGate } from './app/AppGate'
 import { Providers } from './app/providers'
 import { router } from './routes/router'
+import { syncFontSize } from './store/prefs'
 
 const container = document.getElementById('root')
 if (!container) throw new Error('index.html is missing <div id="root">')
+
+/**
+ * The operator's type scale, on `<html>` before anything renders
+ * (21 §Type scale, D196).
+ *
+ * `usePrefs` hydrates from `localStorage` synchronously as its module is
+ * evaluated — the import above has already done it — so the base is set
+ * before the first paint rather than after one at the wrong size. Both
+ * branches below are under it, `/__tokens` included: the token page
+ * renders the same ramp.
+ */
+syncFontSize()
 
 const root = createRoot(container)
 const mount = (node: ReactNode) => root.render(<StrictMode>{node}</StrictMode>)

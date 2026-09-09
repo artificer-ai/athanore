@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { FONT_SIZES, usePrefs } from '../../store/prefs'
 import { ALL_WORKFLOWS, useUi } from '../../store/ui'
 import type { RunListModel } from '../RunList'
 import { Header } from '../Header'
@@ -36,6 +37,7 @@ function header(over: Partial<RunListModel> = {}) {
 describe('Header', () => {
   beforeEach(() => {
     useUi.setState({ runFilter: { workflow: ALL_WORKFLOWS, query: '' } })
+    usePrefs.setState({ fontSize: 'default' })
   })
 
   afterEach(() => {
@@ -130,5 +132,47 @@ describe('Header', () => {
     await user.click(screen.getByRole('button', { name: 'workflows' }))
 
     expect(onOpenLibrary).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers the four type-scale steps behind the text-size button', async () => {
+    // 21 §Type scale: an icon-only button, so the accessible name is the
+    // whole of what a screen reader has to go on (D196).
+    const user = userEvent.setup()
+    header()
+
+    await user.click(screen.getByRole('button', { name: 'text size' }))
+
+    const group = screen.getByRole('radiogroup', { name: 'text size' })
+    const rows = within(group).getAllByRole('radio')
+    expect(rows).toHaveLength(FONT_SIZES.length)
+    // The accessible name of each row is its step and nothing else: the
+    // dot that marks the current one is `aria-hidden`, because
+    // `aria-checked` already says it.
+    for (const [index, step] of FONT_SIZES.entries()) {
+      expect(rows[index]).toHaveAccessibleName(step)
+    }
+    // The step in force is marked, and it is the store's.
+    expect(within(group).getByRole('radio', { name: 'default' })).toBeChecked()
+  })
+
+  it('writes the chosen step to usePrefs and nothing else', async () => {
+    const user = userEvent.setup()
+    header()
+
+    await user.click(screen.getByRole('button', { name: 'text size' }))
+    await user.click(screen.getByRole('radio', { name: 'xlarge' }))
+
+    expect(usePrefs.getState().fontSize).toBe('xlarge')
+  })
+
+  it('marks the step the store already holds', async () => {
+    const user = userEvent.setup()
+    usePrefs.setState({ fontSize: 'small' })
+    header()
+
+    await user.click(screen.getByRole('button', { name: 'text size' }))
+
+    expect(screen.getByRole('radio', { name: 'small' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'default' })).not.toBeChecked()
   })
 })

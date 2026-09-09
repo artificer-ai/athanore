@@ -34,7 +34,7 @@ export function RunFilters({ workflows }: { workflows: readonly string[] }) {
           <ToggleGroup.Item
             key={workflow}
             value={workflow}
-            className="rounded-lg border border-border px-[8px] py-[3px] text-[10.5px] text-muted-foreground hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)] data-[state=on]:border-[var(--color-accent-600)] data-[state=on]:bg-accent data-[state=on]:text-[var(--color-accent-200)]"
+            className="rounded-lg border border-border px-[8px] py-[3px] text-[calc(10.5rem/12)] text-muted-foreground hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)] data-[state=on]:border-[var(--color-accent-600)] data-[state=on]:bg-accent data-[state=on]:text-[var(--color-accent-200)]"
           >
             {workflow}
           </ToggleGroup.Item>

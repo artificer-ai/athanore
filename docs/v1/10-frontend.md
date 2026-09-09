@@ -77,7 +77,10 @@ of TOML nobody executes.
 - **Header**: brand mark and the version; run count and
   a pulsing active-count dot; workflow filter chips (accent-tinted when
   selected); a `/` filter input; `＋ new run` (outlined primary);
-  `workflows` (neutral outline) opening the library.
+  `workflows` (neutral outline) opening the library; an icon-only
+  text-size control (`aria-label="text size"`) opening a popover with the
+  four steps of §Type and density's ramp as a radio group (21 §Type
+  scale, D196).
 - **Run list** (left, default 540 px, drag-resizable 260 px to
   `window − 340`, collapsible with `b` to a 30 px vertical rail reading
   `RUNS n`): grid columns RUN · WORKFLOW · TITLE · STATUS · NODE · AGE.
@@ -392,6 +395,30 @@ Source: `design/nocturne.css` (tokens) and `design/Athanore.dc.html`
   Sizes used: 15 px metric values (500), 12 px body, 11.5 px table
   rows, 11 px secondary, 10–10.5 px kickers and hints with `.1em`–`.14em`
   tracking, uppercase for section kickers (`STATS`, `NODES`, `EVENT LOG`).
+- **The ramp is base-relative** (21 §Type scale, D195): the six
+  utilities are emitted as exact fractions of the base — `text-metric`
+  `calc(15rem / 12)`, `text-body` `1rem`, `text-row` `calc(11.5rem / 12)`,
+  `text-meta` `calc(11rem / 12)`, `text-kicker` `calc(10.5rem / 12)`,
+  `text-hint` `calc(10rem / 12)` — so the pixel sizes above are what they
+  resolve to at the default base and the whole ramp moves together when
+  it changes. A size the ramp has no rung for (the status pill's and the
+  chips' 10.5 px, the graph rail's 9 px `loop` label) is written at the
+  call site in the same form — `text-[calc(10.5rem/12)]` — and never in
+  absolute pixels: an absolute size is invisible at the default base and
+  is the mixed-scale text 21 §Type scale forbids at every other step.
+  `web/src/styles/ramp.test.ts` sweeps `src/` for one.
+- **The base is the operator's**, chosen from the header's text-size
+  control: four steps as multipliers of `--ath-font-size` — `small`
+  ×11/12, `default` ×1, `large` ×13.5/12, `xlarge` ×15/12 — applied as
+  `data-font-size` on `<html>` (absent for `default`), which the
+  generated theme maps. The choice is `usePrefs.fontSize`, persisted in
+  `athanore.prefs`, written to the document before first paint; no
+  component reads it to style itself (21 §Type scale, D196).
+- **Type scales, density does not** (D195). Spacing, paddings, borders,
+  the 30 px collapsed rail and the pane-bar dots stay absolute, and the
+  theme pins Tailwind's `--spacing` to the 3 px its 0.25rem step already
+  resolves to so the utility scale cannot drift with the base (D199). A
+  component must not convert its spacing to rem to match the text.
 - Spacing follows the mock's pixel values (header `8px 14px`, pane
   headers `6px 14px`, rows `4px 12px`, tiles `8px 10px`, 1 px gaps
   between tiles on a neutral-900 ground). The Nocturne `--space-*`

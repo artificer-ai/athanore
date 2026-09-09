@@ -196,7 +196,7 @@ function LoopRail({ rail }: { rail: RailRow['rail'] }) {
       {rail.label && (
         <span
           data-testid="graph-loop-label"
-          className="absolute top-[18px] right-[20px] text-[9px] tracking-[0.06em] whitespace-nowrap text-[var(--color-neutral-500)]"
+          className="absolute top-[18px] right-[20px] text-[calc(9rem/12)] tracking-[0.06em] whitespace-nowrap text-[var(--color-neutral-500)]"
         >
           loop
         </span>

@@ -21,6 +21,7 @@ function context(over: Partial<PaletteContext> = {}): PaletteContext {
     canPauseResume: true,
     cancelRun: vi.fn(),
     reorder: vi.fn(),
+    setFontSize: vi.fn(),
     ...over,
   }
 }
@@ -222,6 +223,28 @@ describe('the palette catalogue', () => {
     // that table, so the two rows print `—` rather than inventing one.
     expect(action(ctx, 'move-run-up').key).toBe(KEYLESS)
     expect(action(ctx, 'move-run-down').key).toBe(KEYLESS)
+  })
+
+  it('sets the type scale from four rows, with no run and no key', () => {
+    // 21 §Type scale asks for the four steps in the palette so the
+    // header's chooser has a keyboard-first twin (D196). None of them
+    // is about a run, so none is disabled with nothing selected.
+    const ctx = context({ runId: undefined })
+
+    for (const step of ['small', 'default', 'large', 'xlarge'] as const) {
+      const row = action(ctx, `font-size-${step}`)
+      expect(row.name).toBe(`font size: ${step}`)
+      expect(row.key).toBe(KEYLESS)
+      expect(row.disabled).toBe(false)
+      row.run()
+    }
+
+    expect(ctx.setFontSize).toHaveBeenNthCalledWith(1, 'small')
+    expect(ctx.setFontSize).toHaveBeenNthCalledWith(2, 'default')
+    expect(ctx.setFontSize).toHaveBeenNthCalledWith(3, 'large')
+    expect(ctx.setFontSize).toHaveBeenNthCalledWith(4, 'xlarge')
+    // A direct command: it dismisses the palette and then acts.
+    expect(ctx.close).toHaveBeenCalledTimes(4)
   })
 
   it('leaves the app commands ungrouped, for plugins to group under', () => {

@@ -225,9 +225,33 @@ describe('theme.css', () => {
     expect(inline).not.toContain('--color-chart-5')
   })
 
-  it('sets the 12 px base of the app type scale', () => {
+  it('sets the base of the app type scale, and the chooser\u2019s four steps', () => {
+    // The base itself is the token; `text-body` is `1rem`, which is the
+    // base by definition (21 §Type scale).
     expect(theme).toContain('font-size: var(--ath-font-size);')
-    expect(theme).toContain('@utility text-body { font-size: 12px; }')
+    expect(theme).toContain('@utility text-body { font-size: 1rem; }')
+
+    // `default` is the absence of the attribute, so there are three
+    // rules and four steps (D195).
+    const steps: [string, string][] = [
+      ['small', '11'],
+      ['large', '13.5'],
+      ['xlarge', '15'],
+    ]
+    for (const [step, numerator] of steps) {
+      expect(theme).toContain(`html[data-font-size='${step}'] {`)
+      expect(theme).toContain(
+        `font-size: calc(var(--ath-font-size) * ${numerator} / 12);`,
+      )
+    }
+    expect(theme).not.toContain("html[data-font-size='default']")
+  })
+
+  it('holds the density still while the base moves (D195, D199)', () => {
+    // Tailwind's own spacing scale is 0.25rem a step, which would grow
+    // with the base the chooser sets and take every padding and gap in
+    // the app with it. 3 px is what it already resolves to at 12 px.
+    expect(theme).toContain('--spacing: 3px;')
   })
 
   it('paints every status colour of 10 §Status colours', () => {
@@ -253,20 +277,33 @@ describe('theme.css', () => {
     }
   })
 
-  it('carries the type scale of 10 §Type and density', () => {
-    expect(theme).toContain('@utility text-metric { font-size: 15px; font-weight: 500; }')
-    expect(theme).toContain('@utility text-row { font-size: 11.5px; }')
+  it('carries the type scale of 10 §Type and density, base-relative', () => {
+    // Exact fractions of the mock's 12 px base, never rounded decimals:
+    // at the default base every one of these resolves to the pixel size
+    // 10 names, and a changed base moves all six together (21 §Type
+    // scale, D195).
+    expect(theme).toContain(
+      '@utility text-metric { font-size: calc(15rem / 12); font-weight: 500; }',
+    )
+    expect(theme).toContain('@utility text-row { font-size: calc(11.5rem / 12); }')
     // 11 px secondary text. The class is `text-meta`, not `text-secondary`:
     // `secondary` is a shadcn colour role, Tailwind derives
     // `.text-secondary { color: var(--secondary) }` from it, and one class
     // cannot be a size and a colour at once (D151).
-    expect(theme).toContain('@utility text-meta { font-size: 11px; }')
+    expect(theme).toContain('@utility text-meta { font-size: calc(11rem / 12); }')
     expect(theme).not.toContain('@utility text-secondary')
     expect(theme).toContain(
-      '@utility text-kicker { font-size: 10.5px; text-transform: uppercase; ' +
-        'letter-spacing: 0.12em; }',
+      '@utility text-kicker { font-size: calc(10.5rem / 12); ' +
+        'text-transform: uppercase; letter-spacing: 0.12em; }',
     )
-    expect(theme).toContain('@utility text-hint { font-size: 10px; }')
+    expect(theme).toContain('@utility text-hint { font-size: calc(10rem / 12); }')
+    // No absolute pixel size survives in these utilities. That is this
+    // file's half of the rule only — the other half is a call site
+    // writing a size of its own, which `ramp.test.ts` sweeps `src/` for
+    // and `e2e/fontsize.spec.ts` measures at `xlarge`.
+    for (const [, body] of theme.matchAll(/@utility text-([a-z]+) \{([^}]*)\}/g)) {
+      expect(body).not.toMatch(/font-size:\s*[\d.]+px/)
+    }
     // The sizes are utilities, not `--text-*` theme entries: Tailwind would
     // derive a second `text-kicker` from such an entry (see gen-theme.mjs).
     expect(theme).not.toContain('--text-kicker:')

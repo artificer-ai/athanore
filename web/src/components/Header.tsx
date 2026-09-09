@@ -22,9 +22,19 @@
  * same gesture for `?overlay=library` (T066c), in the mock's neutral
  * outline rather than the accent one, because there is one primary
  * button in the app (10 §Components).
+ *
+ * {@link FontSizeMenu} sits beside them: the header is the one chrome
+ * that is always on screen, which is why the type-size chooser lives
+ * here rather than behind a settings overlay the SPA does not have
+ * (D196). The palette's four `font size: …` rows are the same choice
+ * from the keyboard.
  */
+import { TextAaIcon } from '@phosphor-icons/react'
+import { Popover, RadioGroup } from 'radix-ui'
+
 import { RunFilters } from './RunList'
 import type { RunListModel } from './RunList'
+import { FONT_SIZES, usePrefs, type FontSize } from '../store/prefs'
 import { useUi } from '../store/ui'
 
 /** Injected by `vite.config.ts` from `pyproject.toml`'s `[project] version`. */
@@ -32,6 +42,72 @@ const VERSION = __APP_VERSION__
 
 /** A count the server has not given yet (02 §Real data only). */
 const UNKNOWN = '—'
+
+/**
+ * The type-size chooser: an icon-only button opening a popover with the
+ * four steps of the ramp as a radio group (21 §Type scale, D196).
+ *
+ * It writes `usePrefs.fontSize` and nothing else. What that step *means*
+ * is the generated theme's — `data-font-size` on `<html>`, written by
+ * `syncFontSize()` — so no size in the app is decided here, and the
+ * ramp cannot go half-scaled.
+ *
+ * The trigger is 24×24 px and each row is at least 24 px tall (WCAG
+ * 2.5.8), which is also what makes the control usable by touch. The icon
+ * is sized in pixels rather than in `em`: what scales is type, not
+ * chrome (D195).
+ */
+export function FontSizeMenu() {
+  const fontSize = usePrefs((state) => state.fontSize)
+  const setFontSize = usePrefs((state) => state.setFontSize)
+
+  return (
+    <Popover.Root>
+      <Popover.Trigger
+        aria-label="text size"
+        title="text size"
+        className="flex h-[24px] w-[24px] cursor-pointer items-center justify-center rounded-lg border border-border text-[var(--color-neutral-400)] hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)]"
+      >
+        <TextAaIcon size={14} weight="regular" aria-hidden />
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align="end"
+          sideOffset={6}
+          data-testid="font-size"
+          className="z-50 rounded-lg border border-border bg-card p-[4px] shadow-md"
+        >
+          <RadioGroup.Root
+            aria-label="text size"
+            value={fontSize}
+            onValueChange={(value) => setFontSize(value as FontSize)}
+            className="flex flex-col"
+          >
+            {FONT_SIZES.map((step) => (
+              <RadioGroup.Item
+                key={step}
+                value={step}
+                data-font-size={step}
+                className="text-meta flex min-h-[24px] cursor-pointer items-center gap-[8px] rounded-lg px-[8px] py-[4px] text-[var(--color-neutral-400)] hover:bg-zebra data-[state=checked]:text-[var(--color-accent-200)]"
+              >
+                {/* The dot marks the current step for a sighted reader;
+                    `aria-checked` is Radix's and says it to every other
+                    one, so the glyph is hidden from the tree. */}
+                <span
+                  aria-hidden
+                  className="flex w-[6px] flex-none justify-center text-[var(--color-accent)]"
+                >
+                  <RadioGroup.Indicator>●</RadioGroup.Indicator>
+                </span>
+                {step}
+              </RadioGroup.Item>
+            ))}
+          </RadioGroup.Root>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
+  )
+}
 
 export function Header({
   runs,
@@ -98,6 +174,8 @@ export function Header({
       >
         workflows
       </button>
+
+      <FontSizeMenu />
 
       <span
         aria-hidden

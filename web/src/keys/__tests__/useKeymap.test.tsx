@@ -148,14 +148,20 @@ describe('the map', () => {
     }
   })
 
-  it('leaves the two keyless rows without a key', () => {
+  it('leaves the six keyless rows without a key', () => {
     // `reorder` is an operator op 10 §Keyboard has no binding for, and
     // that section is exhaustive: the palette prints `—` for it and the
-    // map has nothing to dispatch (D175).
+    // map has nothing to dispatch (D175). The four font-size steps are
+    // the same: they are the palette's half of the header's chooser and
+    // 10 §Keyboard binds no key to them either (D196).
     const keyless = PALETTE_COMMANDS.filter((command) => command.key === KEYLESS)
     expect(keyless.map((command) => command.id)).toEqual([
       'move-run-up',
       'move-run-down',
+      'font-size-small',
+      'font-size-default',
+      'font-size-large',
+      'font-size-xlarge',
     ])
   })
 

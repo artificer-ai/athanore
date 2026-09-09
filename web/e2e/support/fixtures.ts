@@ -213,6 +213,35 @@ export class Dashboard {
     ).toHaveCount(0, { timeout: RUN_TIMEOUT })
     return this.request(id)
   }
+
+  // -- the type scale --------------------------------------------------
+
+  /**
+   * Choose a step of the type ramp from the header's chooser, by mouse
+   * (21 §Type scale, D196).
+   *
+   * The gesture is the operator's whole one: the icon-only button, then
+   * the row in the popover. What it settles on is `data-font-size` on
+   * `<html>` — absent for `default`, which is the design's own base.
+   */
+  async chooseFontSize(step: 'small' | 'default' | 'large' | 'xlarge'): Promise<void> {
+    await this.page.getByRole('button', { name: 'text size' }).click()
+    await this.page.getByRole('radio', { name: step, exact: true }).click()
+    await this.page.keyboard.press('Escape')
+    await expect(this.page.getByRole('radiogroup', { name: 'text size' })).toHaveCount(0)
+    if (step === 'default') {
+      await expect(this.page.locator('html')).not.toHaveAttribute('data-font-size', /./)
+    } else {
+      await expect(this.page.locator('html')).toHaveAttribute('data-font-size', step)
+    }
+  }
+
+  /** The rendered `font-size` of an element, in pixels. */
+  async fontSize(locator: Locator): Promise<number> {
+    return locator.evaluate(
+      (element) => Number.parseFloat(getComputedStyle(element).fontSize),
+    )
+  }
 }
 
 export const test = base.extend<{ server: AthanoreServer; dashboard: Dashboard }>({
