@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 import {
+  KEYLESS,
   PALETTE_COMMANDS,
   buildPaletteActions,
   groupActions,
@@ -16,6 +17,10 @@ function context(over: Partial<PaletteContext> = {}): PaletteContext {
     refresh: vi.fn(),
     toggleList: vi.fn(),
     appendLog: vi.fn(),
+    pauseResume: vi.fn(),
+    canPauseResume: true,
+    cancelRun: vi.fn(),
+    reorder: vi.fn(),
     ...over,
   }
 }
@@ -64,6 +69,7 @@ describe('the palette catalogue', () => {
       ['edit-run', 'edit'],
       ['workflow-library', 'library'],
       ['keys', 'keys'],
+      ['delete-run', 'delete'],
     ] as const) {
       openOverlay.mockClear()
       action(ctx, id).run()
@@ -132,6 +138,11 @@ describe('the palette catalogue', () => {
       'cancel-task',
       'append-log',
       'rerun-node',
+      'pause-resume-run',
+      'cancel-run',
+      'delete-run',
+      'move-run-up',
+      'move-run-down',
       'edit-run',
     ])
   })
@@ -156,6 +167,61 @@ describe('the palette catalogue', () => {
     expect(ctx.openOverlay).not.toHaveBeenCalled()
     expect(ctx.appendLog).not.toHaveBeenCalled()
     expect(ctx.close).not.toHaveBeenCalled()
+  })
+
+  it('lists every operator op of 04 that is not a picker or a form', () => {
+    // T066e's done condition, as far as the palette carries it: `pause`,
+    // `resume`, `cancel`, `delete` and `reorder` are operator ops of 04
+    // §Operator operations, and the palette is where an operator finds
+    // them. `submit` and `edit` are the two overlays above; `retry`,
+    // `move`, `rerun` and `set_status` are the pickers and the drawer.
+    const ids = PALETTE_COMMANDS.map((command) => command.id)
+
+    expect(ids).toEqual(
+      expect.arrayContaining([
+        'pause-resume-run',
+        'cancel-run',
+        'delete-run',
+        'move-run-up',
+        'move-run-down',
+      ]),
+    )
+  })
+
+  it('performs pause/resume and cancel, then dismisses itself', () => {
+    const ctx = context()
+
+    action(ctx, 'pause-resume-run').run()
+    expect(ctx.close).toHaveBeenCalledOnce()
+    expect(ctx.pauseResume).toHaveBeenCalledOnce()
+
+    action(ctx, 'cancel-run').run()
+    expect(ctx.cancelRun).toHaveBeenCalledOnce()
+  })
+
+  it('disables pause/resume for a run in neither state', () => {
+    // 04 gives `pause` the precondition `running` or `queued` and
+    // `resume` the precondition `paused`; a terminal run is neither, and
+    // the row says so rather than posting a 409 to find out.
+    const ctx = context({ canPauseResume: false })
+
+    expect(action(ctx, 'pause-resume-run').disabled).toBe(true)
+    action(ctx, 'pause-resume-run').run()
+    expect(ctx.pauseResume).not.toHaveBeenCalled()
+  })
+
+  it('reorders in both directions, with no key to advertise', () => {
+    const ctx = context()
+
+    action(ctx, 'move-run-up').run()
+    action(ctx, 'move-run-down').run()
+
+    expect(ctx.reorder).toHaveBeenNthCalledWith(1, 'up')
+    expect(ctx.reorder).toHaveBeenNthCalledWith(2, 'down')
+    // 10 §Keyboard has no binding for `reorder` and T067 binds exactly
+    // that table, so the two rows print `—` rather than inventing one.
+    expect(action(ctx, 'move-run-up').key).toBe(KEYLESS)
+    expect(action(ctx, 'move-run-down').key).toBe(KEYLESS)
   })
 
   it('leaves the app commands ungrouped, for plugins to group under', () => {

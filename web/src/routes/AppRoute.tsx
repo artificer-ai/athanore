@@ -72,10 +72,37 @@ export function AppRoute() {
       }}
       onOpenTask={(taskId) => {
         // The task drawer is `?overlay=task&task=`, the pair 10 §Layout
-        // names: the overview's NODES rows and the graph's rows open it
-        // by writing the search, and the drawer itself is T066e.
+        // names: the overview's NODES rows, the graph's rows and the
+        // drawer's own lineage links open it by writing the search.
         void navigate({
           search: (prev) => ({ ...prev, overlay: 'task', task: taskId }),
+        })
+      }}
+      onFocusStream={(taskId, pane) => {
+        // One navigation and not three: the drawer closes, `?task=`
+        // stays — it is the agent pane's focused attempt (T063c) — and
+        // the cycle moves to that pane. Written separately, the last
+        // write would be updating a search the first had replaced.
+        void navigate({
+          search: (prev) => ({
+            ...prev,
+            overlay: undefined,
+            task: taskId,
+            ...(pane === undefined ? {} : { pane }),
+          }),
+        })
+      }}
+      onClearRun={() => {
+        // The delete confirm, once the run is gone: a selection that no
+        // longer exists would point the detail pane at a 404, and
+        // `?node=` and `?task=` were about that run too.
+        void navigate({
+          search: (prev) => ({
+            ...prev,
+            run: undefined,
+            node: undefined,
+            task: undefined,
+          }),
         })
       }}
     />

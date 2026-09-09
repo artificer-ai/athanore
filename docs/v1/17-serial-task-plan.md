@@ -3233,6 +3233,64 @@ T063c. Keys overlay: the footer chips expanded. All overlays close on
 **Tests.** Vitest: drawer renders a failed attempt with lineage; actions
 post; keys overlay lists every binding of 10 §Keyboard.
 **Done.** Every operator op of 04 reachable from the UI.
+**Status.** Done. `overlays/TaskDrawer.tsx` is everything about one
+attempt over `?overlay=task&task=` and one read of `GET /api/tasks/{id}`:
+the header's `task #41 · node · attempt n` and its status pill, a meta
+grid (RUN, NODE, ATTEMPT, PRIORITY with where it came from, CREATED and
+whichever of STARTED and FINISHED have happened), then LINEAGE, BRANCH,
+ERROR, PAYLOAD, RESULT, SUBMISSIONS and STATS — each drawn only when the
+attempt has one, so a `ready` task shows no empty ERROR box. **Lineage is
+a sentence**: `overlays/taskDrawer.ts` writes out the seven
+`lineage.reason` values the engine actually stores (`start`,
+`transition`, `retry`, `join`, `manual_retry`, `move`, `rerun` —
+`set_status` is a cancellation reason, never a lineage) and the parent it
+names is a control that opens *that* attempt, as are a join's arrivals,
+so a chain of attempts is walkable. A reason a later Athanore invents is
+printed under its own name.
+
+Its actions are the three operator ops of 04 that take a task: `retry`
+(`POST /api/tasks/{id}/retry`, disabled while the attempt is still going
+and saying why), `move…` (an inline list of the run's non-join nodes,
+`POST /api/tasks/{id}/move`, the graph asked for only once a move is
+being considered) and set-status (`POST /api/tasks/{id}/status`, **all
+three targets bar the one the attempt is in** — 04 gives the op no
+precondition and `ready` is reachable from nowhere else, D175 (2)). The
+move list is the drawer's own rather than the `m` picker seeded from
+`?task=`, because `?task=` outlives the drawer (D175 (3)). `focus stream`
+is one navigation: the overlay closes, `?task=` stays, and `?pane=`
+becomes the agent pane's index, which is looked up in the manifest.
+
+`overlays/Keys.tsx` is the `?` overlay, and `web/src/lib/keys.ts` is 10
+§Keyboard transcribed **once**: the footer strip, this overlay and
+T067's `useKeymap()` are three views of one table, which is the only way
+"the footer chips, expanded" stays true. `lib/__tests__/keys.test.ts`
+quotes 10 §Keyboard's own sentence and asserts the table carries every
+keycap in it and invents none, so a binding nobody transcribed fails a
+test.
+
+**Every operator op of 04 is now reachable**, which needed five more
+surfaces: `pause` / `resume` (`p`, one palette row over two endpoints,
+disabled on a terminal run), `cancel` (`c`, reporting the attempt count
+only that endpoint fills), `delete` (`D` → `overlays/DeleteRun.tsx`, the
+one confirm 10 §Keyboard asks for, focused on `cancel`, clearing `?run=`
+after) and `reorder`, which 10 §Keyboard has no key for and which is
+therefore two palette rows carrying `—` (D175 (5)). The eleven, walked:
+`submit` New Run · `edit` Edit Run · `reorder` palette (and New Run's
+POSITION) · `pause`/`resume` `p` · `cancel` `c` · `delete` `D` · `rerun`
+`r` · `retry` `t` and the drawer · `move` `m` and the drawer ·
+`set_status` `x` and the drawer. Verified in Chromium against
+`./scripts/run.sh` over a real failed run: the drawer on a `dead_letter`
+attempt with its transition lineage, its parent link opening `#1`,
+`retry` posting and the new attempt reading "an operator’s retry of task
+#2", set-status offering `ready` and `cancelled` and posting, the move
+list refusing the node the attempt is already on, `focus stream` landing
+on `?task=3&pane=2` with AGENT in the pane bar, the palette's `move run
+up` reporting `position 2`, `pause` then `resume`, `cancel run` reporting
+`1 attempt cancelled` and greying `p` after it, and `delete run` opening
+the confirm with the caret on `cancel` and then removing the run. The
+browser is also what capped a top-placed panel at `76vh`: the keys
+overlay is twenty-three rows and, pinned 12 vh down with the centred
+panels' height, its last rows fell off the bottom of the screen.
 
 ### T067 — Keyboard map and focus scoping (A4.8, D51)
 

@@ -2,34 +2,15 @@
  * The footer strip: the key-hint chips and the `^p palette` button
  * (`docs/v1/10-frontend.md` §Layout and §Keyboard).
  *
- * The chips are the mock's row with one correction the spec makes:
- * delete is `D`, not `d`, so that a `d` meant for "deny" one focus ring
- * away cannot reach the delete confirm (10 §Keyboard). The full map —
- * arrows, digits, `esc` — is the `?` overlay's (T066e); these are the
- * hints that fit on one line. Binding the keys themselves is T067's.
+ * The chips are the rows of `lib/keys.ts` that carry `footer`, in the
+ * map's order, so the strip and the `?` overlay that expands it cannot
+ * drift: 10 §Overlays calls the overlay "the footer chips, expanded",
+ * which is only true while both are drawn from one table. Binding the
+ * keys themselves is T067's.
  */
 import type { ReactNode } from 'react'
 
-/**
- * The footer's hints, in the mock's order (10 §Keyboard). Not exported:
- * the keyboard map itself is T067's, and this is the strip's copy.
- */
-const KEY_HINTS: ReadonlyArray<readonly [string, string]> = [
-  ['tab', 'focus'],
-  ['t', 'retry task'],
-  ['m', 'move task'],
-  ['x', 'cancel task'],
-  ['l', 'append log'],
-  ['n', 'new run'],
-  ['r', 'rerun node'],
-  ['p', 'pause/resume'],
-  ['c', 'cancel run'],
-  ['D', 'delete run'],
-  ['e', 'edit run'],
-  ['w', 'workflows'],
-  ['b', 'toggle list'],
-  ['?', 'keys'],
-]
+import { FOOTER_HINTS } from '../lib/keys'
 
 /** A keycap chip: neutral-900 on a neutral-800 rule, accent-300 text. */
 function Kbd({ children }: { children: ReactNode }) {
@@ -43,10 +24,12 @@ function Kbd({ children }: { children: ReactNode }) {
 export function Footer({ onOpenPalette }: { onOpenPalette: () => void }) {
   return (
     <footer className="bg-chrome flex flex-none flex-wrap items-center gap-[12px] border-t border-border px-[12px] py-[5px]">
-      {KEY_HINTS.map(([key, label]) => (
-        <span key={key} className="inline-flex items-center gap-[5px]">
-          <Kbd>{key}</Kbd>
-          <span className="text-hint text-muted-foreground">{label}</span>
+      {FOOTER_HINTS.map((hint) => (
+        <span key={hint.id} className="inline-flex items-center gap-[5px]">
+          {hint.keys.map((key) => (
+            <Kbd key={key}>{key}</Kbd>
+          ))}
+          <span className="text-hint text-muted-foreground">{hint.label}</span>
         </span>
       ))}
 
