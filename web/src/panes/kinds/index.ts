@@ -2,6 +2,7 @@
 export { AgentStream } from './AgentStream'
 export { ChartPane } from './ChartPane'
 export { DashboardPane } from './DashboardPane'
+export { FormPane } from './Form'
 export { GraphRail } from './GraphRail'
 export { KvPane } from './KvPane'
 export { Log } from './Log'

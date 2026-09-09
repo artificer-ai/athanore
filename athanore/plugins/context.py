@@ -68,6 +68,7 @@ if TYPE_CHECKING:  # pragma: no cover - imported for types only
     from athanore.engine.ops import Ops
 
 __all__ = [
+    "NO_NODE",
     "NO_RUN",
     "NO_TASK",
     "PluginContext",
@@ -86,6 +87,13 @@ NO_RUN = "no run in scope"
 #: the work log, the transcript and the submissions all belong to an
 #: attempt rather than to a run.
 NO_TASK = "no task in scope"
+
+#: And the third of the family, for a ``node``-scoped declaration invoked
+#: without one. No service is scoped to a node on its own — it travels
+#: with the attempt — so nothing here raises it; the action endpoint does,
+#: before a node-scoped handler is entered with a node it cannot read
+#: (:func:`athanore.plugins.mount.mount_actions`).
+NO_NODE = "no node in scope"
 
 
 class RunDetailRows(NamedTuple):

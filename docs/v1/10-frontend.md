@@ -188,7 +188,14 @@ surface panel, 1 px neutral-800 border, 8 px radius, `--shadow-lg`.
 `esc` closes any of them.
 
 - **Command palette** (`^p` / `⌘p`): `›` input, then rows of
-  `name · hint · key`. Every operator action is listed with its key.
+  `name · hint · key`. Every operator action is listed with its key, and
+  the registered workflows' declared actions follow them under
+  `plugin: <workflow>`; selecting one opens the **action** overlay.
+- **Action** (`?overlay=action&action=<workflow>:<name>`): the form of
+  one plugin action — the same control the `form` panel kind draws — over
+  the ids the selection resolves. It is not in the mock: an action listed
+  in the palette has to be runnable from there, and an action is a form
+  (T070, D181).
 - **Task drawer**: click a NODES row (overview) to open the attempt's
   detail (payload, result, error, submissions, stats, lineage, branch)
   with retry / move / set-status actions. Not from a graph row: §Graph
@@ -276,9 +283,12 @@ visible (the mock's `server-down placeholder` behaviour).
 `PaneRenderer` switches on `kind` (markdown, kv, table, log, chart,
 dashboard, form, custom, placeholder) and styles every kind with the
 mock's primitives (metric tiles, zebra tables, kicker labels). `form` is
-the one arm that is a placeholder card at the end of Phase 4: it needs
-the action execution endpoint, which is T070's, and a panel declaring it
-says so rather than drawing a form that could not be submitted.
+the one arm whose `source` is an action rather than a URL: the schema is
+already in the manifest, so the pane fetches nothing and the only request
+it makes is the `POST /api/plugins/{wf}/actions/{name}` the operator
+asked for. An action declaring `confirm` opens a confirmation dialog
+between the form and that call, and cancelling it sends nothing; the call
+that lands raises a toast, and any refusal stays on the form (T070).
 `ActionForm` wraps RJSF with the shadcn theme and the Nocturne tokens;
 422 errors from the server are mapped back onto fields through RJSF's
 `extraErrors`. The same component renders `form` requests and

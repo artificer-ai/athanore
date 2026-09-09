@@ -15,9 +15,10 @@
 
 /**
  * The overlays of 10 §Overlays, in the order that section lists them,
- * plus the one it does not list: `delete` is the confirm 10 §Keyboard
- * asks `D` to open, and it is an overlay like the rest because it is
- * `?overlay=` that says an overlay is up (T066e).
+ * plus the two it does not list: `delete` is the confirm 10 §Keyboard
+ * asks `D` to open (T066e), and `action` is where a plugin action the
+ * palette listed is filled in and run (T070). Both are overlays like the
+ * rest, because it is `?overlay=` that says an overlay is up.
  */
 export const OVERLAYS = [
   'palette',
@@ -31,6 +32,7 @@ export const OVERLAYS = [
   'pick-move',
   'pick-cancel',
   'pick-rerun',
+  'action',
 ] as const
 
 export type Overlay = (typeof OVERLAYS)[number]
@@ -49,6 +51,10 @@ export type Overlay = (typeof OVERLAYS)[number]
  *   writes it ("clicking a graph node opens this pane with `?node=`
  *   filtering to that node's entries and events", 10 §Panes), which is
  *   what makes a filtered log a link somebody can send.
+ * - `action` — `<workflow>:<name>`, the plugin action the `action`
+ *   overlay is about. Opaque here for the same reason `run` and `node`
+ *   are: which actions exist is the installed workflows' business, and
+ *   the overlay says so when the manifest carries none by that name.
  */
 export type AppSearch = {
   run?: string
@@ -56,6 +62,7 @@ export type AppSearch = {
   overlay?: Overlay
   task?: number
   node?: string
+  action?: string
 }
 
 const OVERLAY_SET: ReadonlySet<string> = new Set(OVERLAYS)
@@ -96,6 +103,7 @@ export function validateAppSearch(search: Record<string, unknown>): AppSearch {
   // reason a run id is: this build cannot know which names the selected
   // run's graph has, and the log pane draws no rows for one it has not.
   const node = asId(search['node'])
+  const action = asId(search['action'])
 
   return {
     ...(run === undefined ? {} : { run }),
@@ -103,5 +111,6 @@ export function validateAppSearch(search: Record<string, unknown>): AppSearch {
     ...(isOverlay(overlay) ? { overlay } : {}),
     ...(task === undefined ? {} : { task }),
     ...(node === undefined ? {} : { node }),
+    ...(action === undefined ? {} : { action }),
   }
 }

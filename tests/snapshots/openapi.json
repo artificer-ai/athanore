@@ -1,6 +1,21 @@
 {
   "components": {
     "schemas": {
+      "ActionCall": {
+        "description": "The body of ``POST /api/plugins/{wf}/actions/{name}`` (08 \u00a7Plugins).\n\n``input`` is whatever the action's form produced, and it is\nvalidated against the action's own model on arrival rather than\ndescribed here: the model is the plugin's, so no schema this\napplication generates could name it (09 \u00a7Declarations, \"the model\n**is** the form\"). An action that declares none takes none, and\nwhatever was sent is ignored.",
+        "properties": {
+          "input": {
+            "description": "The form's value. Validated against the action's model; a misfit is the 422 of 08 \u00a7Conventions, naming each field.",
+            "title": "Input"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/ActionScope",
+            "description": "The ids the handler's context is resolved from."
+          }
+        },
+        "title": "ActionCall",
+        "type": "object"
+      },
       "ActionOut": {
         "description": "One action of the manifest, and the form the SPA renders for it.",
         "properties": {
@@ -38,6 +53,49 @@
           "schema"
         ],
         "title": "ActionOut",
+        "type": "object"
+      },
+      "ActionScope": {
+        "description": "Where an action was invoked (08 \u00a7Plugins, 09 \u00a7Context and scopes).\n\nThe three ids a plugin *route* reads off its query string, sent in\nthe body because an action is a ``POST``. All three are optional\nhere: what an action needs resolved is the ``scope`` it declared,\nand :func:`mount_actions` is what holds the body to it.",
+        "properties": {
+          "node": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The node the action was invoked on.",
+            "title": "Node"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The run the action was invoked on.",
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The attempt the action was invoked on.",
+            "title": "Task Id"
+          }
+        },
+        "title": "ActionScope",
         "type": "object"
       },
       "AgentStats": {
@@ -5936,6 +5994,85 @@
           }
         ],
         "summary": "Everything the registered workflows contribute to the UI",
+        "tags": [
+          "plugins"
+        ]
+      }
+    },
+    "/api/plugins/{wf}/actions/{name}": {
+      "post": {
+        "description": "Validate the input, resolve the scope, run the handler.\n\nThe one way an action is invoked (09 \u00a7Wire contract). It answers\nwith whatever the handler returned, as JSON.",
+        "operationId": "run_action_api_plugins__wf__actions__name__post",
+        "parameters": [
+          {
+            "description": "The workflow that declared the action.",
+            "in": "path",
+            "name": "wf",
+            "required": true,
+            "schema": {
+              "description": "The workflow that declared the action.",
+              "title": "Wf",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The action's name.",
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "description": "The action's name.",
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ActionCall"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
+          }
+        },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
+        "summary": "Run one of a workflow's declared actions",
         "tags": [
           "plugins"
         ]

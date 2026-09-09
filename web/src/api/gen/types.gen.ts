@@ -5,6 +5,31 @@ export type ClientOptions = {
 };
 
 /**
+ * ActionCall
+ *
+ * The body of ``POST /api/plugins/{wf}/actions/{name}`` (08 §Plugins).
+ *
+ * ``input`` is whatever the action's form produced, and it is
+ * validated against the action's own model on arrival rather than
+ * described here: the model is the plugin's, so no schema this
+ * application generates could name it (09 §Declarations, "the model
+ * **is** the form"). An action that declares none takes none, and
+ * whatever was sent is ignored.
+ */
+export type ActionCall = {
+    /**
+     * Input
+     *
+     * The form's value. Validated against the action's model; a misfit is the 422 of 08 §Conventions, naming each field.
+     */
+    input?: unknown;
+    /**
+     * The ids the handler's context is resolved from.
+     */
+    scope?: ActionScope;
+};
+
+/**
  * ActionOut
  *
  * One action of the manifest, and the form the SPA renders for it.
@@ -40,6 +65,37 @@ export type ActionOut = {
      * What the button and the palette entry say.
      */
     title: string;
+};
+
+/**
+ * ActionScope
+ *
+ * Where an action was invoked (08 §Plugins, 09 §Context and scopes).
+ *
+ * The three ids a plugin *route* reads off its query string, sent in
+ * the body because an action is a ``POST``. All three are optional
+ * here: what an action needs resolved is the ``scope`` it declared,
+ * and :func:`mount_actions` is what holds the body to it.
+ */
+export type ActionScope = {
+    /**
+     * Node
+     *
+     * The node the action was invoked on.
+     */
+    node?: string | null;
+    /**
+     * Run Id
+     *
+     * The run the action was invoked on.
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     *
+     * The attempt the action was invoked on.
+     */
+    task_id?: number | null;
 };
 
 /**
@@ -3902,6 +3958,46 @@ export type ManifestApiPluginsGetResponses = {
 };
 
 export type ManifestApiPluginsGetResponse = ManifestApiPluginsGetResponses[keyof ManifestApiPluginsGetResponses];
+
+export type RunActionApiPluginsWfActionsNamePostData = {
+    body: ActionCall;
+    path: {
+        /**
+         * Wf
+         *
+         * The workflow that declared the action.
+         */
+        wf: string;
+        /**
+         * Name
+         *
+         * The action's name.
+         */
+        name: string;
+    };
+    query?: never;
+    url: '/api/plugins/{wf}/actions/{name}';
+};
+
+export type RunActionApiPluginsWfActionsNamePostErrors = {
+    /**
+     * No operator token, on a bind that requires one.
+     */
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
+};
+
+export type RunActionApiPluginsWfActionsNamePostError = RunActionApiPluginsWfActionsNamePostErrors[keyof RunActionApiPluginsWfActionsNamePostErrors];
+
+export type RunActionApiPluginsWfActionsNamePostResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
 
 export type ListRequestsApiRequestsGetData = {
     body?: never;

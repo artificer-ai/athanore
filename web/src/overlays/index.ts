@@ -10,6 +10,7 @@ export { Library, LIBRARY_GLOSS, LIBRARY_TITLE } from './Library'
 export { NewRun, NEW_RUN_TITLE } from './NewRun'
 export { OverlayDialog, OverlayHeader } from './OverlayPanel'
 export { Palette, PALETTE_TITLE } from './Palette'
+export { PluginAction, PLUGIN_ACTION_TITLE } from './PluginAction'
 export { Pickers } from './Pickers'
 export { TaskDrawer, RETRY_BLOCKED, TASK_DRAWER_TITLE } from './TaskDrawer'
 export {
@@ -20,6 +21,11 @@ export {
   type PaletteAction,
   type PaletteContext,
 } from './actions'
+export {
+  actionHint,
+  pluginGroup,
+  pluginPaletteActions,
+} from './pluginActions'
 export {
   anchorLine,
   initialSelection,

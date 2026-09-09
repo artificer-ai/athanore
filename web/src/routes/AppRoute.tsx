@@ -64,11 +64,25 @@ export function AppRoute() {
         // are T066a–T066e.
         void navigate({ search: (prev) => ({ ...prev, overlay }) })
       }}
+      onOpenAction={(action) => {
+        // `?overlay=action&action=<workflow>:<name>`, in one navigation:
+        // writing the next overlay is what closes the palette, and the
+        // action it is about is a parameter of its own because
+        // `?overlay=` names the overlay and not its subject (T070).
+        void navigate({
+          search: (prev) => ({ ...prev, overlay: 'action', action }),
+        })
+      }}
       onCloseOverlay={() => {
         // Closing is the same one parameter, written away: `esc` and a
         // click on the backdrop both end here, so the URL is what says
         // whether an overlay is up and the back button works on it.
-        void navigate({ search: (prev) => ({ ...prev, overlay: undefined }) })
+        // `?action=` goes with it, because the action overlay is the
+        // only thing that reads it — unlike `?task=`, which outlives the
+        // drawer as the agent pane's focused attempt.
+        void navigate({
+          search: (prev) => ({ ...prev, overlay: undefined, action: undefined }),
+        })
       }}
       onOpenTask={(taskId) => {
         // The task drawer is `?overlay=task&task=`, the pair 10 §Layout

@@ -244,8 +244,8 @@ describe('renderKind', () => {
     })
   })
 
-  describe('the kinds with no renderer yet', () => {
-    it('names the action a form panel was declared for', () => {
+  describe('the form kind', () => {
+    it('hands a form panel to the action its source names', () => {
       const content = renderKind(
         paneOf({ name: 'approve', kind: 'form', source: 'approve' }),
         undefined,
@@ -253,7 +253,12 @@ describe('renderKind', () => {
       )
 
       draw(content)
-      expect(screen.getByTestId('pane-placeholder')).toHaveTextContent('action approve')
+      // The schema comes from the manifest and this suite draws without
+      // one, so what shows is the pane waiting for it. That the dispatch
+      // reaches the runner at all is what is under test here; the form,
+      // the confirm and the POST are `Form.test.tsx`'s.
+      expect(content.scrolls).toBe(false)
+      expect(screen.getByRole('status')).toHaveTextContent('loading approve')
     })
 
     it('says so plainly for a form panel that named no action', () => {
@@ -261,10 +266,12 @@ describe('renderKind', () => {
 
       draw(content)
       expect(screen.getByTestId('pane-placeholder')).toHaveTextContent(
-        'the form renderer is not built yet',
+        'this form panel names no action',
       )
     })
+  })
 
+  describe('the kinds with no renderer yet', () => {
     it('degrades an unknown kind to a card that names its plugin', () => {
       // 09 §Panel kinds: "Unknown `kind` renders a placeholder card,
       // never a crash" — a plugin built against a later Athanore.

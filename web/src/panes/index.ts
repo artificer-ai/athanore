@@ -8,7 +8,17 @@
  */
 export { PaneBar } from './PaneBar'
 export { PaneRenderer } from './PaneRenderer'
-export { BUILTIN_WORKFLOW, useManifest } from './manifest'
+export {
+  actionId,
+  actionInvocation,
+  actionsOf,
+  findAction,
+  parseActionId,
+  waitingForAction,
+  type ActionSelection,
+  type PluginAction,
+} from './actions'
+export { BUILTIN_WORKFLOW, useManifest, useManifestEntries } from './manifest'
 export { type PanelParams, type PanelScope } from './source'
 export {
   cardsOf,

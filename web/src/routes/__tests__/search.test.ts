@@ -11,6 +11,7 @@ describe('validateAppSearch', () => {
         overlay: 'palette',
         task: 7,
         node: 'engineering',
+        action: 'gamedev:override',
       }),
     ).toEqual({
       run: '01JD5',
@@ -18,6 +19,7 @@ describe('validateAppSearch', () => {
       overlay: 'palette',
       task: 7,
       node: 'engineering',
+      action: 'gamedev:override',
     })
   })
 
@@ -60,6 +62,15 @@ describe('validateAppSearch', () => {
     expect(validateAppSearch({ node: '' })).toEqual({})
     expect(validateAppSearch({ node: '   ' })).toEqual({})
     expect(validateAppSearch({ node: 3 })).toEqual({})
+  })
+
+  it('drops an action id that is not a non-empty string', () => {
+    // Opaque like `run` and `node`: which actions exist is the installed
+    // workflows' business, and the overlay says so when there is no such
+    // one (T070).
+    expect(validateAppSearch({ action: '' })).toEqual({})
+    expect(validateAppSearch({ action: '   ' })).toEqual({})
+    expect(validateAppSearch({ action: 7 })).toEqual({})
   })
 
   it('ignores keys it does not know', () => {

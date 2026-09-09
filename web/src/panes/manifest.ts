@@ -44,19 +44,37 @@ export function useManifestQuery() {
   return useQuery({ ...options, queryFn: queryFn! })
 }
 
-/** The manifest, as the pane host reads it. */
-export function useManifest(): {
+/** What a reader of the manifest gets, whatever it asked for. */
+export type ManifestRead = {
   manifest: PluginManifestEntry[]
   isPending: boolean
   isError: boolean
-} {
+}
+
+/**
+ * The manifest, read and nothing more.
+ *
+ * `Array.isArray` rather than `?? []`: the manifest is the one resource
+ * whose absence has to be told from a server that answered with
+ * something else entirely (a proxy's error page, say), and a pane host
+ * that trusted the shape would throw where 09 wants a degradation.
+ *
+ * Separate from {@link useManifest} because reading the manifest and
+ * *registering* what it says are two things, and only one of them may
+ * happen once: the `refresh_on` table is global and is cleared before it
+ * is rebuilt (`./source.ts`), so the several surfaces that look an
+ * action or a panel up — a `form` pane, the action overlay — read
+ * through here and leave the registration to the pane host.
+ */
+export function useManifestEntries(): ManifestRead {
   const { data, isPending, isError } = useManifestQuery()
   const manifest = useMemo(() => (Array.isArray(data) ? data : EMPTY), [data])
-  usePanelRefreshRegistry(manifest)
-
-  // `Array.isArray` rather than `?? []`: the manifest is the one
-  // resource whose absence has to be told from a server that answered
-  // with something else entirely (a proxy's error page, say), and a pane
-  // host that trusted the shape would throw where 09 wants a degradation.
   return { manifest, isPending, isError }
+}
+
+/** The manifest, as the pane host reads it: read, and registered. */
+export function useManifest(): ManifestRead {
+  const read = useManifestEntries()
+  usePanelRefreshRegistry(read.manifest)
+  return read
 }
