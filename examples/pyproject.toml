@@ -1,6 +1,6 @@
 [project]
 name = "athanore-examples"
-version = "1.0.0a0"
+version = "1.0.0"
 description = "Example workflows and vendor adapters for Athanore"
 requires-python = ">=3.11"
 dependencies = ["athanore"]

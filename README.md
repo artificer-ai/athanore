@@ -30,10 +30,13 @@ Athanore stores runs in SQLite in the directory it is started in and needs
 nothing else: no service, no login, no API key until a workflow of yours
 dispatches an agent that wants one.
 
-**Version 1.0.0 is not tagged yet.** PyPI still carries the v0 MVP
-(0.0.12); this tree is `1.0.0a0`, released by the last task of
-[`docs/v1/17-serial-task-plan.md`](docs/v1/17-serial-task-plan.md). Until
-then, install it from a checkout — see [Development](#development).
+**Version 1.0.0 is tagged** — `v1.0.0`, the last task of
+[`docs/v1/17-serial-task-plan.md`](docs/v1/17-serial-task-plan.md). It is
+tagged in this repository and nowhere else: there is no git remote and
+nothing has been uploaded, so PyPI still carries the v0 MVP (`0.0.12`)
+and the `uv add` lines above will fetch that until 1.0.0 is published.
+Until it is, install v1 from a checkout — see
+[Development](#development).
 
 ## A first workflow
 

@@ -8,12 +8,16 @@ asserted rather than remembered.
 """
 
 import json
+import subprocess
+import sys
 import tomllib
 from pathlib import Path
 from typing import Any
 
 import pytest
 import yaml
+
+from tests.store.conftest import PG_REQUIRED_ENV
 
 # YAML 1.1 reads a bare `on:` as the boolean True, so a workflow's keys
 # are not all strings.
@@ -133,8 +137,14 @@ def test_the_coverage_gates_measure_paths_that_exist(ci: Workflow) -> None:
 
 
 def test_the_once_only_steps_run_once(ci: Workflow) -> None:
-    """ruff, pyright and lint-imports are interpreter-independent."""
-    once = {"ruff", "pyright", "lint-imports"}
+    """ruff, pyright, lint-imports and pip-audit are interpreter-independent.
+
+    `pip-audit` joined them in T079: it audits the resolved dependency
+    tree, which `uv.lock` fixes for every interpreter in the matrix, so
+    running it three times would ask the same question three times and
+    take three failures for one advisory.
+    """
+    once = {"ruff", "pyright", "lint-imports", "pip-audit"}
     for step in steps(ci["jobs"]["python"]):
         if step.get("name") in once:
             assert step["if"] == "matrix.python-version == '3.13'", step["name"]
@@ -378,10 +388,145 @@ def test_the_wheel_is_configured_to_carry_the_spa() -> None:
     assert "athanore/web/dist/**" in pyproject["tool"]["hatch"]["build"]["artifacts"]
 
 
+#: The audits of 13 §CI, turned on in T079: one per job, each the last
+#: step of the job it is in.
+AUDITS = {
+    "python": ("pip-audit", "uv run --no-sync pip-audit"),
+    "web": ("pnpm audit", "pnpm -C web audit --audit-level high"),
+}
+
+
+def test_both_audits_of_13_are_steps(ci: Workflow) -> None:
+    """13 §CI: "`pip-audit`, `pnpm audit`" — at the level T079 names."""
+    for job, (name, command) in AUDITS.items():
+        ran = commands(ci["jobs"][job])
+        assert command in ran, name
+
+
+def test_each_audit_is_the_last_thing_its_job_runs(ci: Workflow) -> None:
+    """An advisory published overnight must not mask a failure in the code.
+
+    Both audits go red without a line of this repository changing, and a
+    step that can do that, placed first, would stop the checks that are
+    actually about the diff from ever running (D191). Last, therefore —
+    after the Playwright report upload in `web`, so that a failing E2E
+    run is what the artifact belongs to.
+    """
+    for job, (name, _) in AUDITS.items():
+        named = [step.get("name") for step in steps(ci["jobs"][job]) if "run" in step]
+        assert named[-1] == name, job
+
+
+def test_the_gate_does_not_run_the_audits() -> None:
+    """The two checks that are CI's and not the gate's, deliberately (D191).
+
+    Every other check in `ci.yml` is one `./scripts/test.sh` runs, which
+    is what D74 and D178 are about — but the gate is the answer to "is
+    this branch green", and an answer that changes overnight because a
+    database on the internet changed is not that. They would also be
+    the only steps of the gate that needed the network.
+    """
+    gate = (ROOT / "scripts" / "test.sh").read_text()
+    for name, command in AUDITS.values():
+        assert command not in gate, name
+    assert "audit" not in gate
+
+
+def test_pip_audit_is_in_the_environment_ci_syncs() -> None:
+    """`uv run --no-sync pip-audit` needs it in the dev group, not on PyPI."""
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    assert "pip-audit" in pyproject["dependency-groups"]["dev"]
+
+
+def test_a_high_advisory_is_fixed_in_the_lockfile_not_waived() -> None:
+    """`pnpm audit --audit-level high` has no waiver list, so `overrides` is it.
+
+    `pnpm-workspace.yaml` is where a transitive dependency is pulled up
+    to a patched version, and `pnpm-lock.yaml` records the result — so
+    `pnpm install --frozen-lockfile`, which is what both CI and the gate
+    run, resolves the same tree the audit passed on (D191).
+    """
+    workspace = yaml.safe_load((ROOT / "pnpm-workspace.yaml").read_text())
+    overrides = workspace.get("overrides", {})
+    lock = yaml.safe_load((ROOT / "pnpm-lock.yaml").read_text())
+    assert lock.get("overrides", {}) == overrides
+
+
 def test_nightly_selects_the_postgres_marker(nightly: Workflow) -> None:
     job = nightly["jobs"]["postgres"]
     assert "pytest -m postgres" in commands(job)
     assert "asyncpg" in job["env"]["ATHANORE_TEST_PG_URL"]
+
+
+def test_nightly_refuses_to_skip_the_postgres_variants(nightly: Workflow) -> None:
+    """T079: the job runs the store suite **for real**.
+
+    The service container is the whole point of this job, so the skip
+    that is right on a dev machine with the `pg` profile down is wrong
+    here: it would be a green run that tested nothing.
+    `tests/store/conftest.py` turns it into a failure when this is set.
+    """
+    job = nightly["jobs"]["postgres"]
+    assert job["env"][PG_REQUIRED_ENV] == "1"
+    # The fixtures are what act on it; `tests/store/test_backend_matrix.py`
+    # is where the two postures are exercised. This asserts the join:
+    # the workflow sets the name the fixtures read.
+    assert PG_REQUIRED_ENV == "ATHANORE_TEST_PG_REQUIRED"
+
+
+#: A marker no test carries. `pytest -m` on it selects nothing, which is
+#: what the nightly job must never do quietly.
+ABSENT_MARKER = "no_such_marker_exists"
+
+
+def collect(*arguments: str) -> subprocess.CompletedProcess[str]:
+    """`pytest --collect-only` in this checkout, out of process."""
+
+    return subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "--collect-only",
+            "-q",
+            "-p",
+            "no:cacheprovider",
+            "tests/store",
+            *arguments,
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_the_nightly_marker_selects_the_store_suite() -> None:
+    """The selection is not empty, which is the other half of "for real".
+
+    A workflow that runs `pytest -m postgres` against a marker nothing
+    carries is a job that passes having done nothing at all. This asserts
+    the marker still reaches the parametrised half of the store suite —
+    out of process, because what is being checked is what the runner's
+    command line collects, not what this session happens to have.
+    """
+    result = collect("-m", "postgres")
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "tests collected" in result.stdout, result.stdout
+
+
+def test_a_marker_selection_that_matches_nothing_is_a_failure() -> None:
+    """The carve-out of D76 is gone (T079).
+
+    Until T014 there were no `postgres` tests, so `-m postgres` exited 5
+    and `tests/conftest.py` rewrote that to 0 — which is exactly what
+    would let the nightly job go green having collected nothing. The
+    tests exist now, so exit 5 means what pytest means by it again.
+    """
+    assert not (ROOT / "tests" / "conftest.py").exists()
+    result = collect("-m", ABSENT_MARKER)
+    assert result.returncode == pytest.ExitCode.NO_TESTS_COLLECTED, (
+        result.stdout + result.stderr
+    )
 
 
 def test_nightly_runs_the_same_postgres_as_the_dev_stack(

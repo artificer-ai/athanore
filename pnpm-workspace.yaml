@@ -5,3 +5,18 @@
 # container.
 packages:
   - "web"
+
+# `pnpm audit --audit-level high` is a gate (T079, 13 §CI), so a high
+# advisory in a transitive dependency is fixed here rather than waived.
+#
+# `js-yaml`: three high advisories (GHSA-52cp-r559-cp3m,
+# GHSA-5p4m-2wfm-xmqj, GHSA-2883-xcg3-v3hh — quadratic CPU on merge-key
+# chains and on `!!omap`) cover every 4.x below 4.3.2.
+# `@hey-api/openapi-ts` — pinned exactly, because it generates committed
+# code — reaches 4.2.0 through `@hey-api/json-schema-ref-parser`, while
+# the rest of the tree already resolves 4.3.2. The selector is narrowed
+# to the versions that are actually vulnerable (`@<4.3.2`) so the entry
+# stops applying once the dependency catches up, rather than pinning a
+# version nobody is asking for any more.
+overrides:
+  "js-yaml@<4.3.2": "^4.3.2"
