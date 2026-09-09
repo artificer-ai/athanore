@@ -55,10 +55,9 @@ starting. Everything that matters is specified in `docs/v1/`:
 - The package layout and the per-module responsibilities are in
   `docs/v1/02-architecture.md` §Package layout. Create modules there, not
   elsewhere.
-- Work on a branch per task, `feat/<task-id>`, cut from `main`; the
-  driver's `prepare` node makes it and its `merge` node lands it
-  `--no-ff` on `main` when the gate, the review and QA have all passed
-  (D68). Working by hand, do the same. `main` is never committed to
+- Work on a branch per task, `feat/<task-id>`, cut from `main`, and land
+  it `--no-ff` on `main` once the gate is green (D68). One merge commit
+  per task, with its work underneath. `main` is never committed to
   directly.
 - The dev stack (`compose.yaml`, `docker/dev/`, `scripts/`) is here, not in
   a separate repository as T000 assumed (D64). It is dev machinery: no
@@ -197,8 +196,8 @@ a sibling container per agent (`docker compose run --rm -T agent-pi`); the
 same workflow running under `./scripts/run.sh` spawns the adapter as an
 in-process subprocess. The container is the guardrail either way, so these
 agents run with `permission_policy="auto_allow"` (05 §User-land adapters).
-It is also exactly how v0 dispatches today (below), so there is one
-definition of the sandbox rather than one per driver.
+`compose.yaml` is the one definition of that sandbox, so there is
+nothing to keep in step.
 
 The agent services carry a fixed `athanore-builder` git identity, so a
 commit an agent makes is recognisable as one; `dev` and `app` do not, and
@@ -224,116 +223,6 @@ echo '{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":
 
 Host `~/.pi/agent/sessions` is mounted in, so pi's session JSONL is
 readable and `[stats]` lines carry real token counts (05 §Stats).
-
-### Driving the plan with v0
-
-The v1 tasks are executed by dispatching them to athanore **v0** — the
-MVP, in the sibling `athanore` checkout, tagged `v0.0.12`. It takes one
-task, branches, hands it to a pi agent in `athanore/dev`, runs the gate,
-has a second model review the branch and a third exercise the running
-feature, waits for you, merges to `main`, and shows the whole thing in
-its browser TUI.
-
-```sh
-./scripts/drive.sh up                     # orchestrator + TUI on :2424
-./scripts/drive.sh submit T003            # one task of the plan
-./scripts/drive.sh submit T003 "notes for the implementer"
-./scripts/drive.sh submit "sse replay cap" "see docs/v1/08-api.md"
-for t in T003 T004 T005; do ./scripts/drive.sh submit $t; done
-./scripts/drive.sh logs
-./scripts/drive.sh down
-```
-
-A run is one `POST /api/workflows/v1_feature/runs` with a `title` and a
-`description`; `submit` is that POST and nothing else. A `Txxx` title
-gets a description pointing at its heading in the plan — the plan and the
-specs it cites are in the checkout the agent works in, so the run carries
-a pointer, not a copy. Any other title is a free-form feature described
-by the notes you pass. Capacity 1 keeps a loop of them serial.
-
-A `docs/plans/<task-id>*.md` is where a task's implementation plan goes:
-the fenced scope, the file-by-file steps, and the verification a reviewer
-and QA will ask for. The `implement` node looks for it when it runs, not
-when the run was submitted, so a plan written after a batch was queued
-still reaches the agent that builds that task.
-
-The seat is `driver/athanore_build/feature.py`, workflow `v1_feature`:
-
-```
-prepare ─▶ implement ─▶ gate ─▶ review ─▶ qa ─▶ approve ─▶ merge
-              ▲           │        │       │       │
-              └───────────┴────────┴───────┘       └─▶ halted
-
-              every rejection loops back to implement, capped per lane at
-              BUILDER_MAX_LOOPS (3) and in total at BUILDER_MAX_ATTEMPTS
-              (6); past that the run fails and the queue is paused
-```
-
-`prepare`, `gate`, `approve`, `merge` and `halted` are pure Python — git
-and an exit code decide, never an agent:
-
-- **prepare** refuses to run on a dirty checkout, then branches
-  `feat/<task-id>` from `main`. A failed task therefore never lands, and
-  its branch stays for you to read.
-- **gate** first checks git (still on the branch, nothing uncommitted, a
-  commit actually exists) and then runs `./scripts/test.sh` in the
-  sandbox, routing on the exit code — so no agent ever decides whether
-  its own work passed, and none of the three verdicts comes from the
-  model that wrote the code.
-- **review** reads the whole branch diff and the gate's output; **qa**
-  exercises the running feature (imports, CLI, the app's endpoints, the
-  SPA under Playwright) and reports what it actually ran.
-- **approve** is the human gate: with `BUILDER_ATTENDED=1` it waits in
-  the TUI, holding the pool's one slot, which is what keeps the plan
-  serial while you read, and answering `stop` pauses the rest of the
-  queue and ends the run at `halted`, unmerged. With `BUILDER_ATTENDED=0`
-  (what `.env` sets now) it routes straight to `merge`, and review and QA
-  are the last word before `main`.
-- **merge** lands the branch `--no-ff` on `main` and deletes it: one
-  merge commit per task, with its work underneath.
-
-A failing run pauses every queued run behind it, because the next task
-would otherwise branch from a `main` that is missing the work it builds
-on. Resume from the TUI once you have dealt with it. Capacity 1 plus run
-order is the rest of "serial". Another seat is one module, one `wf`, one
-`register`.
-
-Each role picks an **adapter** and a **model**:
-`BUILDER_{IMPLEMENT,REVIEW,QA}_KIND` is `pi`, `claude` or `claude-fable`,
-and `_MODEL` must be an id that adapter accepts — pi's are
-`<provider>/<model>` from `docker/dev/pi/models.json`, Claude's are
-`opus[1m]`, `sonnet`, `haiku` and `default`. Fable is reachable only as
-its own kind: the adapter builds its model menu from a fixed set plus
-whatever `ANTHROPIC_MODEL` names in the container, and rejects anything
-else, so `agent-claude-fable` carries the model in its service
-definition (D75). `_EFFORT` sets the thought level (`low`…`max`).
-
-Both adapters answer an unknown model id by logging and continuing on
-their own default, which is how a build silently runs on the wrong
-model. The driver therefore refuses a mismatched KIND/MODEL pair at
-startup, and `./scripts/agent.sh <kind>` is the one way in.
-
-Claude agents authenticate from the `athanore-claude` volume
-(`./scripts/dev.sh`, then `claude`, then `/login` — once), and that
-volume's `settings.json` sets `permissions.defaultMode =
-bypassPermissions`: the container is the guardrail, so an agent does not
-round-trip a permission request per tool call.
-
-v0 does not know how to run a container. It dispatches through
-`./scripts/agent.sh` and runs the gate through `./scripts/test.sh` — the
-same two scripts you run, and the same two a v1 workflow will run after
-the port. `compose.yaml` is the one definition of the sandbox, so there
-is nothing to keep in step.
-
-**v0 and v1 are both the `athanore` distribution** and must never share
-an environment (D67). They are separated by environment, not by
-renaming: v0 in the orchestrator's venv (a path source to the sibling
-checkout, `exclude`d from this workspace), v1 in `athanore/dev`. They
-meet only through `scripts/agent.sh`, speaking ACP over stdio. The
-driver listens on 4102 so it never collides with the v1 app on 4002.
-
-`driver/` is dev machinery, like the rest of the stack: nothing in
-`athanore/` may import it, and it targets v0's API, not v1's.
 
 ## Architecture rules that must hold
 

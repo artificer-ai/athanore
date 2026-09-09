@@ -67,9 +67,6 @@ x-agent-environment: &agent-environment
   - GIT_AUTHOR_EMAIL=builder@athanore.local
   - GIT_COMMITTER_NAME=athanore-builder
   - GIT_COMMITTER_EMAIL=builder@athanore.local
-  # The v0 checkout: the reference the plan calls "the MVP". Goes when
-  # v0 goes (D67).
-  - MVP_CHECKOUT=${MAIN_CHECKOUT}
 
 x-volumes: &volumes
   # Same absolute path inside and out (see the header).
@@ -91,8 +88,6 @@ x-volumes: &volumes
   # Mounted rather than baked into the image so an edit to the extension
   # is live in the next agent run, without a rebuild (D126).
   - ${WORKSPACE}/examples/pi/extensions:/home/agent/.pi/agent/extensions:ro
-  # The v0 checkout, at its own host path like everything else.
-  - ${MAIN_CHECKOUT}:${MAIN_CHECKOUT}
   # Claude Code's credentials and settings live on a volume, not on a
   # bind mount of the host ~/.claude: the container authenticates once
   # (`./scripts/dev.sh "claude setup-token"`) and keeps its own state.
@@ -112,7 +107,6 @@ services:
       - athanore-ms-playwright:/home/agent/ms-playwright
       - ${HOST_HOME}/.pi/agent/sessions:/home/agent/.pi/agent/sessions
       - ${WORKSPACE}/examples/pi/extensions:/home/agent/.pi/agent/extensions:ro
-      - ${MAIN_CHECKOUT}:${MAIN_CHECKOUT}
       - athanore-claude:/home/agent/.claude
       - ${HOST_HOME}/.gitconfig:/home/agent/.gitconfig:ro
       # Sibling sandboxes for examples/docker_acp.
@@ -138,7 +132,6 @@ services:
       # (`scripts/agent.sh`), so the `native` tier's extension has to be
       # on pi's discovery path here too (D126).
       - ${WORKSPACE}/examples/pi/extensions:/home/agent/.pi/agent/extensions:ro
-      - ${MAIN_CHECKOUT}:${MAIN_CHECKOUT}
       - athanore-claude:/home/agent/.claude
       - ${HOST_HOME}/.gitconfig:/home/agent/.gitconfig:ro
       - /var/run/docker.sock:/var/run/docker.sock
@@ -196,70 +189,10 @@ services:
       - GIT_AUTHOR_EMAIL=builder@athanore.local
       - GIT_COMMITTER_NAME=athanore-builder
       - GIT_COMMITTER_EMAIL=builder@athanore.local
-      - MVP_CHECKOUT=${MAIN_CHECKOUT}
     volumes: *volumes
     stdin_open: true
     tty: false
     entrypoint: ["claude-agent-acp"]
-
-  # athanore **v0** driving the v1 serial plan. Its own image and its own
-  # venv: v0 and v1 are both the `athanore` distribution and must never
-  # share an environment (D67). Profile `drive`, port 4102 so it never
-  # collides with the v1 app on 4002.
-  #
-  #   ./scripts/drive.sh up
-  #   ./scripts/drive.sh submit --only T003
-  orchestrator:
-    profiles: ["drive"]
-    image: athanore/orchestrator:latest
-    build:
-      context: docker/orchestrator
-      args:
-        UID: ${UID:-1000}
-        GID: ${GID:-1000}
-        UV_VERSION: ${UV_VERSION:-0.12.10}
-    init: true
-    network_mode: host
-    working_dir: ${WORKSPACE}
-    group_add:
-      - ${DOCKER_GID:-999}
-    environment:
-      - OPENROUTER_API_KEY
-      - ANTHROPIC_API_KEY
-      - CLAUDE_CODE_OAUTH_TOKEN
-      - WORKSPACE=${WORKSPACE}
-      - MAIN_CHECKOUT=${MAIN_CHECKOUT}
-      - HOST_HOME=${HOST_HOME}
-      - SANDBOX_IMAGE=athanore/dev:latest
-      - BUILDER_IMPLEMENT_KIND=${BUILDER_IMPLEMENT_KIND:-claude}
-      - BUILDER_IMPLEMENT_MODEL=${BUILDER_IMPLEMENT_MODEL:-opus[1m]}
-      - BUILDER_IMPLEMENT_EFFORT=${BUILDER_IMPLEMENT_EFFORT:-}
-      - BUILDER_REVIEW_KIND=${BUILDER_REVIEW_KIND:-claude-fable}
-      - BUILDER_REVIEW_MODEL=${BUILDER_REVIEW_MODEL:-claude-fable-5}
-      - BUILDER_REVIEW_EFFORT=${BUILDER_REVIEW_EFFORT:-high}
-      - BUILDER_QA_KIND=${BUILDER_QA_KIND:-claude}
-      - BUILDER_QA_MODEL=${BUILDER_QA_MODEL:-opus[1m]}
-      - BUILDER_QA_EFFORT=${BUILDER_QA_EFFORT:-}
-      - BUILDER_MAX_LOOPS=${BUILDER_MAX_LOOPS:-3}
-      - BUILDER_MAX_ATTEMPTS=${BUILDER_MAX_ATTEMPTS:-6}
-      - BUILDER_AGENT_TIMEOUT=${BUILDER_AGENT_TIMEOUT:-10800}
-      - BUILDER_ATTENDED=${BUILDER_ATTENDED:-1}
-      - BUILDER_PORT=${BUILDER_PORT:-4102}
-      - BUILDER_WEB_PORT=${BUILDER_WEB_PORT:-2424}
-      # v0's own database, on a volume: never in the v1 checkout.
-      - ATHANORE_ROOT_PATH=/data
-    volumes:
-      # The daemon gets HOST paths, which is why everything is mounted at
-      # its own path — the sandbox `cwd` has to exist here too.
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ${WORKSPACE}:${WORKSPACE}
-      - ${MAIN_CHECKOUT}:${MAIN_CHECKOUT}
-      - athanore-v0-data:/data
-      - athanore-v0-venv:/home/app/venv
-      - athanore-v0-uv-cache:/home/app/.cache/uv
-      - ${HOST_HOME}/.pi/agent/sessions:/home/app/.pi/agent/sessions
-    entrypoint: ["bash", "-lc"]
-    command: ["cd ${WORKSPACE}/driver && uv sync && exec uv run python -m athanore_build --web --web-host 0.0.0.0"]
 
   # The nightly Postgres variants of the store suite (T014). Bridge
   # networking with a published port, so the host-networked services
@@ -292,9 +225,3 @@ volumes:
     name: athanore-claude
   athanore-postgres:
     name: athanore-postgres
-  athanore-v0-data:
-    name: athanore-v0-data
-  athanore-v0-venv:
-    name: athanore-v0-venv
-  athanore-v0-uv-cache:
-    name: athanore-v0-uv-cache
