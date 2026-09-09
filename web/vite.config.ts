@@ -85,5 +85,44 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['src/**/*.test.{ts,tsx}'],
     setupFiles: ['./src/test-setup.ts'],
+
+    /**
+     * The coverage gate of `docs/v1/17-serial-task-plan.md` § T068: 80 %
+     * of `web/src`.
+     *
+     * It is configured here rather than added as a step of its own so
+     * that `pnpm -C web test` *is* the gate — `./scripts/test.sh` (D74)
+     * and the CI `web` job both run that one command, and a threshold
+     * only one of them applied would be a threshold nobody noticed
+     * slipping. `--coverage` is on the `test` script for the same
+     * reason: one command, one definition of green.
+     *
+     * All four metrics, not only lines. A branch a test never takes is a
+     * behaviour nobody exercised, and this app's realtime layer, its
+     * kind dispatch and its keymap are almost entirely branches.
+     *
+     * What is left out is what there is nothing to test: the generated
+     * client and the generated theme tokens (rebuilt and diffed by the
+     * `contract` job instead), the entry point, the test setup itself,
+     * and the fixtures the suites share.
+     */
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        'src/api/gen/**',
+        'src/**/*.gen.ts',
+        'src/main.tsx',
+        'src/test-setup.ts',
+        'src/**/__tests__/fixtures.ts',
+      ],
+      reporter: ['text', 'text-summary'],
+      thresholds: {
+        statements: 80,
+        branches: 80,
+        functions: 80,
+        lines: 80,
+      },
+    },
   },
 })

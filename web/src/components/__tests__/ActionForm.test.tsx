@@ -213,3 +213,160 @@ describe('a refusal from the server', () => {
     expect(screen.getByTestId('action-form-submit')).toHaveTextContent('sending…')
   })
 })
+
+/**
+ * Arrays, which is where an RJSF theme usually breaks: the entry
+ * controls are the theme's own buttons, and a theme that renders the
+ * field but not its toolbar leaves an operator able to add a row and
+ * never able to remove one.
+ */
+describe('an array', () => {
+  /** An array of objects, and one of strings, under one root. */
+  const ARRAYS: RJSFSchema = {
+    type: 'object',
+    properties: {
+      labels: { type: 'array', title: 'labels', items: { type: 'string' } },
+      reviewers: {
+        type: 'array',
+        title: 'reviewers',
+        items: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', title: 'name' },
+            blocking: { type: 'boolean', title: 'blocking' },
+          },
+        },
+      },
+    },
+  }
+
+  /** The `add item` control of the array whose fields start with `path`. */
+  function addTo(path: string): HTMLElement {
+    const controls = screen.getAllByRole('button', { name: /add item/i })
+    const found = controls.find((control) =>
+      control.closest('[id]')?.id.startsWith(`${PREFIX}_${path}`),
+    )
+    return found ?? controls[0]!
+  }
+
+  it('round-trips an array of objects, entry by entry', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+
+    render(<ActionForm schema={ARRAYS} idPrefix={PREFIX} onSubmit={onSubmit} />)
+
+    await user.click(addTo('reviewers'))
+    await user.type(field('reviewers_0_name'), 'scott')
+    await user.click(field('reviewers_0_blocking'))
+    await user.click(addTo('reviewers'))
+    await user.type(field('reviewers_1_name'), 'ana')
+
+    await user.click(screen.getByTestId('action-form-submit'))
+
+    expect(onSubmit.mock.calls[0]?.[0]).toEqual({
+      reviewers: [
+        { name: 'scott', blocking: true },
+        { name: 'ana' },
+      ],
+    })
+  })
+
+  it('drops the entry the operator removes, and keeps the rest in order', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+
+    render(<ActionForm schema={ARRAYS} idPrefix={PREFIX} onSubmit={onSubmit} />)
+
+    for (const [index, label] of ['gate', 'review', 'merge'].entries()) {
+      await user.click(addTo('labels'))
+      await user.type(field(`labels_${String(index)}`), label)
+    }
+
+    const remove = screen.getAllByRole('button', { name: /remove/i })
+    await user.click(remove[1]!)
+    await user.click(screen.getByTestId('action-form-submit'))
+
+    expect(onSubmit.mock.calls[0]?.[0]).toEqual({ labels: ['gate', 'merge'] })
+  })
+
+  it('reorders an entry without losing what is in it', async () => {
+    const user = userEvent.setup()
+    const onSubmit = vi.fn()
+
+    render(<ActionForm schema={ARRAYS} idPrefix={PREFIX} onSubmit={onSubmit} />)
+
+    for (const [index, label] of ['gate', 'review'].entries()) {
+      await user.click(addTo('labels'))
+      await user.type(field(`labels_${String(index)}`), label)
+    }
+
+    await user.click(screen.getAllByRole('button', { name: /move up/i })[1]!)
+    await user.click(screen.getByTestId('action-form-submit'))
+
+    expect(onSubmit.mock.calls[0]?.[0]).toEqual({ labels: ['review', 'gate'] })
+  })
+
+  it('lands a 422 on the entry its `loc` index names', async () => {
+    const user = userEvent.setup()
+
+    const { rerender } = render(
+      <ActionForm schema={ARRAYS} idPrefix={PREFIX} onSubmit={vi.fn()} />,
+    )
+    await user.click(addTo('reviewers'))
+    await user.click(addTo('reviewers'))
+
+    rerender(
+      <ActionForm
+        schema={ARRAYS}
+        idPrefix={PREFIX}
+        message="one reviewer is not on this project"
+        errors={[
+          { loc: ['reviewers', 1, 'name'], msg: 'unknown reviewer', type: 'value_error' },
+        ]}
+        onSubmit={vi.fn()}
+      />,
+    )
+
+    // The index is a step of the path like any other: a validator that
+    // raised on the second element must not mark the first
+    // (`athanore/requests/validators.py`).
+    expect(fieldErrors('reviewers_1_name')).toHaveTextContent('unknown reviewer')
+    expect(fieldErrors('reviewers_0_name')).toBeNull()
+  })
+})
+
+/**
+ * A refusal whose `loc` the schema draws no field for. The summary line
+ * exists so that a validator which knows more than the schema says is
+ * still read: dropping it would leave the form silently refusing.
+ */
+describe('a refusal the schema has no field for', () => {
+  it('keeps the whole of it in the line above the form', () => {
+    // Mounted clean and then refused, which is the order it happens in:
+    // the operator submits and the refusal comes back to a form that is
+    // already on screen.
+    const { rerender } = render(
+      <ActionForm schema={NESTED} idPrefix={PREFIX} onSubmit={vi.fn()} />,
+    )
+
+    rerender(
+      <ActionForm
+        schema={NESTED}
+        idPrefix={PREFIX}
+        message="the branch is already merged"
+        errors={[
+          { loc: ['merge_base'], msg: 'no such ref', type: 'value_error' },
+          { loc: [], msg: 'this answer contradicts itself', type: 'value_error' },
+        ]}
+        onSubmit={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByTestId('action-form-message')).toHaveTextContent(
+      'the branch is already merged',
+    )
+    // Nothing was dropped on the floor and nothing crashed on a path
+    // with no field at the end of it.
+    expect(screen.getByTestId('action-form')).toBeInTheDocument()
+  })
+})

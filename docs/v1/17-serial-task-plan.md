@@ -3367,6 +3367,79 @@ keymap scoping. `vitest --coverage` gate ≥ 80 % on `web/src`.
 **Tests.** The suites themselves.
 **Done.** `pnpm test --run` green; coverage gate in CI.
 
+**Status.** Done. The five suites the task names are filled in, and the
+gate is on.
+
+**The renderers.** `panes/__tests__/content.test.tsx` is new and is the
+kind dispatch itself — `renderKind` and `paneContent` are plain functions
+of `(pane, data, ctx)`, so every kind, every mismatch and every state a
+panel can be in is one call rather than a mount with a network around it,
+which is what makes it affordable to assert all of them: the six data
+kinds over 09's own samples, each of their mismatch cards, the two
+builtin renderers and their drift, the three custom elements and the
+placeholder for a tag this build cannot draw, `form` with and without an
+action, an unknown kind from the core and from a plugin, the four things
+an unresolved scope waits for, and a refused source as a
+`PanelSourceError`, as a plain `Error` and as neither.
+`panes/__tests__/kinds.test.tsx` gains the narrowing table beneath them:
+what each of `asLog`, `asChart`, `asDashboard`, `asOverview` and
+`formatValue`/`compareValues` refuses, because a guard that let a bad
+shape through would move the failure into a renderer, where it is a white
+screen instead of a card.
+
+**ActionForm.** Arrays are where an RJSF theme usually breaks, so
+`components/__tests__/ActionForm.test.tsx` now round-trips an array of
+objects entry by entry, removes an entry, reorders one, lands a 422 on
+the entry its `loc` **index** names, and keeps a refusal whose `loc` the
+schema draws no field for in the line above the form.
+
+**The invalidation table.** `realtime/__tests__/invalidate.test.ts` adds
+the precedence cases the row comments claim: a panel's `refresh_on` glob
+against the name that arrived, two panels that spelled one event
+differently, a name that joins a registration rather than replacing it,
+the feed's subscription to what is registered, a burst of five
+`task.stream` events collapsing to one refetch for a panel that asked for
+that name and to none for a panel that only globbed `task.*`, and the
+three ways an append gives up — a page it cannot merge, a server that
+refused, a fetch that threw.
+
+**The SSE wrapper.** `realtime/__tests__/sse.test.ts` adds a plugin name
+subscribed once and carried onto the next connection, `reconnectNow`
+before `start` and after `stop`, `resync` dropping what the coalescer had
+collected but not yet sent, and the two ways `#afterReconnect` ends
+without a manifest refetch — a refused refetch, and a tab that never knew
+when the server started.
+
+**Keymap scoping.** `keys/__tests__/useKeymap.test.tsx` adds a chord
+nothing claims, a chord whose key is not one character, the same chord
+from `meta` for a mac, a key something nearer has already dealt with, the
+listener going away on unmount, a keystroke from inside a rich editor's
+markup, one from an element only `isContentEditable` reports as editable,
+and one whose target is not an element at all — which is neither the run
+list's `⏎` nor a request panel's `a`.
+
+**Under-covered files, read rather than averaged.** `AppRoute` was the
+worst at 48 % and is now covered by `routes/__tests__/AppRoute.test.tsx`,
+one case per callback over the search each writes — including the three
+that write more than one key at once. Beside it: the shell's four run
+operations and the graph pane's two handovers (`App.test.tsx`), the
+splitter's `onLayoutChanged` (`components/__tests__/Splitter.test.tsx`),
+the four "what did the refusal say" helpers (`lib/errors.ts`,
+`panes/kinds/log.ts`, `panes/kinds/requests.ts`, `components/answer.ts`),
+`fetchPanel`'s non-standard refusals, and `lib/highlight.ts`, whose one
+promise — never throw, answer `null` — is tested over a replaced shiki
+rather than a real grammar.
+
+**The gate.** `web/vite.config.ts` carries `coverage.thresholds` at 80 on
+all four metrics and `pnpm -C web test` is `vitest run --coverage`, so
+`./scripts/test.sh` (D74) and the CI `web` job apply one threshold rather
+than two that can drift (D177). 970 tests over 59 files; 97.8 % of
+statements, 92.7 % of branches, 98.4 % of functions, 99.1 % of lines.
+`src/components/ui/table.tsx` is the one file under the threshold, at
+75 %: `TableFooter` and `TableCaption` are shadcn primitives nothing in
+this app renders yet, and they are left measured rather than excluded so
+that stays visible.
+
 ### T068a — Playwright E2E and the a11y gate (A4.10)
 
 **Do.** `web/e2e/` Playwright config starting `athanore serve` with

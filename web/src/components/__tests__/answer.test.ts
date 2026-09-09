@@ -59,6 +59,12 @@ describe('a refusal', () => {
       'the answer was not recorded',
     )
     expect(answerFailure(new Error('network down'), 'x').message).toBe('network down')
+    // A body that arrived as a bare string, which is what a proxy in
+    // front of the server answers with.
+    expect(answerFailure('502 Bad Gateway', 'x').message).toBe('502 Bad Gateway')
+    expect(answerFailure('   ', 'the answer was not recorded').message).toBe(
+      'the answer was not recorded',
+    )
   })
 
   it('calls exactly the two 409s a conflict', () => {

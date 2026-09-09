@@ -144,6 +144,30 @@ def test_web_job_runs_the_pnpm_half_of_the_gate(ci: Workflow) -> None:
         assert f"pnpm -C web {command}" in ran
 
 
+#: The SPA's coverage gate: 80 % of `web/src`, on all four metrics
+#: (`docs/v1/17-serial-task-plan.md` § T068, D177).
+WEB_COVERAGE_THRESHOLD = 80
+WEB_COVERAGE_METRICS = ("statements", "branches", "functions", "lines")
+
+
+def test_web_job_gates_the_spa_coverage_t068_asks_for() -> None:
+    """The threshold is in the config `pnpm -C web test` reads (D177).
+
+    Not a step of its own: `./scripts/test.sh` runs `pnpm -C web test`
+    too, so configuring it is what makes the gate and this job apply the
+    same one. That is why this asserts the config and the script rather
+    than a line of YAML.
+    """
+    package = json.loads((ROOT / "web" / "package.json").read_text())
+    assert "--coverage" in package["scripts"]["test"]
+
+    config = (ROOT / "web" / "vite.config.ts").read_text()
+    for metric in WEB_COVERAGE_METRICS:
+        assert f"{metric}: {WEB_COVERAGE_THRESHOLD}," in config, metric
+
+    assert "@vitest/coverage-v8" in package["devDependencies"]
+
+
 def test_web_work_is_probe_guarded(ci: Workflow) -> None:
     """Every step of the `web` job runs only if the probe found `web/`.
 

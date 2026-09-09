@@ -38,6 +38,7 @@ athanore.db-wal
 web/node_modules/
 web/dist/
 web/test-results/
+web/coverage/
 web/playwright-report/
 athanore/web/dist/*
 !athanore/web/dist/

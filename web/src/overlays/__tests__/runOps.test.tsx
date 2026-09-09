@@ -14,7 +14,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createAppQueryClient } from '../../api/client'
 import type { RunStatus } from '../../api/gen/types.gen'
-import { pauseDirection, useRunOps } from '../runOps'
+import { RUN_OP_FALLBACKS, pauseDirection, useRunOps } from '../runOps'
 
 const { toast } = vi.hoisted(() => {
   const fn = Object.assign(vi.fn(), { error: vi.fn() })
@@ -167,6 +167,18 @@ describe('useRunOps', () => {
     expect(sent[1]?.body).toEqual({ direction: 1 })
   })
 
+  it('says just `run cancelled` when the endpoint filled no note', async () => {
+    stubServer({ status: 200, body: { ok: true } })
+    const user = userEvent.setup()
+    render(<Harness status="running" />)
+
+    await user.click(screen.getByRole('button', { name: 'c' }))
+
+    await waitFor(() => {
+      expect(toast).toHaveBeenCalledWith('run cancelled')
+    })
+  })
+
   it('reports a refusal rather than swallowing it', async () => {
     stubServer({ status: 409, body: { error: 'the run is not paused', code: 'conflict' } })
     const user = userEvent.setup()
@@ -178,4 +190,26 @@ describe('useRunOps', () => {
       expect(toast.error).toHaveBeenCalledWith('the run is not paused')
     })
   })
+
+  it.each([
+    ['p', 'running', RUN_OP_FALLBACKS.pause],
+    ['p', 'paused', RUN_OP_FALLBACKS.resume],
+    ['c', 'running', RUN_OP_FALLBACKS.cancel],
+    ['up', 'queued', RUN_OP_FALLBACKS.reorder],
+  ])(
+    'falls back to its own sentence when `%s` is refused with nothing to say',
+    async (button, status, fallback) => {
+      // A 409 whose body carried no `error`: the operation still has to
+      // name itself, or the toast says nothing about what did not happen.
+      stubServer({ status: 409, body: {} })
+      const user = userEvent.setup()
+      render(<Harness status={status as RunStatus} />)
+
+      await user.click(screen.getByRole('button', { name: button }))
+
+      await waitFor(() => {
+        expect(toast.error).toHaveBeenCalledWith(fallback)
+      })
+    },
+  )
 })

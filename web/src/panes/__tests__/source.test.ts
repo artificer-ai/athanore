@@ -219,4 +219,54 @@ describe('fetchPanel', () => {
     expect((failure as PanelSourceError).code).toBe('plugin_error')
     expect((failure as PanelSourceError).message).toBe('the plugin raised')
   })
+
+  /**
+   * A refusal that did not arrive in the API's one error shape. A pane
+   * that only said "failed" would leave the operator guessing between a
+   * plugin that raised, a run that is gone and a server that is not
+   * there, so whatever *did* arrive is carried through.
+   */
+  it.each([
+    ['a body that is a bare string', '"the plugin exploded"', 'the plugin exploded'],
+    ['no body at all', '', '502 Bad Gateway'],
+    ['a body with no `error` key', '{"detail": "nope"}', '502 Bad Gateway'],
+    ['an empty `error`', '{"error": ""}', '502 Bad Gateway'],
+  ])('reads %s', async (_case, body, said) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(body === '' ? null : body, {
+            status: 502,
+            statusText: 'Bad Gateway',
+            headers: { 'Content-Type': 'application/json' },
+          }),
+      ),
+    )
+
+    const failure = (await fetchPanel('/api/plugins/gamedev/words', {}).catch(
+      (error: unknown) => error,
+    )) as PanelSourceError
+
+    expect(failure.message).toBe(said)
+    expect(failure.status).toBe(502)
+    // No code invented for a body that carried none.
+    expect(failure.code).toBeUndefined()
+  })
+
+  it('refuses a 200 whose body was not the shape the client expects', async () => {
+    // `result.response.ok` is the second half of the check: a proxy that
+    // answered `204` with nothing is not this panel's data.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 304, statusText: 'Not Modified' })),
+    )
+
+    const failure = (await fetchPanel('/api/plugins/gamedev/words', {}).catch(
+      (error: unknown) => error,
+    )) as PanelSourceError
+
+    expect(failure).toBeInstanceOf(PanelSourceError)
+    expect(failure.status).toBe(304)
+  })
 })

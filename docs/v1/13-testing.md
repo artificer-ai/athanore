@@ -15,7 +15,7 @@ tests of the same behaviours.
 | Agent façade | `FakeACPAgent` subprocess | Session lifecycle, config by category, streaming, permissions by kind, elicitation bridge, HTTP ask, repair turns, truncation via a fake stats provider, env scrubbing, timeout/cancel/refusal exit paths, stats on every path, tooling tier selection (`auto` → `mcp` when advertised, else `http`; the `mcp` tier through `mcp_calls`; the athanore tool server auto-allowed under `ask`) |
 | API | httpx against the live app | Every endpoint, auth matrix (loopback plain / network bind with and without token / task token / expired task token), error shapes, 413, SSE replay and live, OpenAPI snapshot |
 | Plugins | a test workflow with one of each declaration | Manifest, scoping (404 on foreign run), action validation, node liveness, assets served, `on` handlers |
-| SPA unit | Vitest + Testing Library | Renderers per kind, ActionForm round-trips nested schemas, invalidation table, SSE wrapper reconnect |
+| SPA unit | Vitest + Testing Library | Renderers per kind, ActionForm round-trips nested schemas and arrays, invalidation table precedence and coalescing, SSE wrapper reconnect and `resync`, keymap scoping |
 | E2E | Playwright against `athanore serve` with example workflows on `FakeACPAgent` | Submit → watch graph → answer permission → answer human_input → completion; reorder; pause/resume; server-down banner; keyboard shortcuts; inbox |
 | Examples | pytest in `examples/` | Graph shapes, prompts inlined, models declared (from the MVP's `test_gamedev`, `test_agents`) |
 
@@ -90,7 +90,10 @@ adapters (`ATHANORE_SMOKE=1`), never run in CI.
 GitHub Actions: `uv sync`, ruff, pyright, import-linter, pytest (SQLite),
 pnpm typecheck/lint/vitest, build SPA, Playwright, OpenAPI snapshot check,
 `pip-audit`, `pnpm audit`. Nightly: Postgres matrix. Coverage gates:
-`graph`/`engine`/`requests` ≥ 95 %, overall ≥ 85 %.
+`graph`/`engine`/`requests` ≥ 95 %, overall ≥ 85 %; `web/src` ≥ 80 % on
+statements, branches, functions and lines, configured in
+`web/vite.config.ts` so that `pnpm -C web test` — which is what both the
+gate and CI run — applies it (D177).
 
 ## Definition of done for a feature
 
