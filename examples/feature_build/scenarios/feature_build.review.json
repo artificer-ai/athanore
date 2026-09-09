@@ -1,0 +1,6 @@
+{
+  "text": ["Reviewed the diff and re-ran the checks myself."],
+  "log": "review: approve. `_rows()` is shared by both formats, the flag is documented, and `make check` and `make test` are green on this branch.",
+  "submit": { "verdict": "approve", "feedback": "" },
+  "usage": { "input": 5200, "output": 260 }
+}

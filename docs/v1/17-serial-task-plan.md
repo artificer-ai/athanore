@@ -3682,6 +3682,29 @@ PiSessionStats()`, node options where the MVP used ad-hoc retries.
 inlined, models declared).
 **Done.** `athanore serve` discovers `feature_build`.
 
+**Status.** Done. `examples/feature_build/` is the MVP's eight-stage
+pipeline written against the v1 API: `prompt → product → architecture →
+engineering → review ⇄ qa → gate → git`, with the product stage fanning
+out one branch per deliverable and review, QA and the gate each holding
+the edge back to engineering. Seven seats subclass `pi.PiAgent`, so the
+pinned `pi-acp` command, the `native` tier and `PiSessionStats()` are
+declared once where the vendor knowledge already lives; each seat adds
+its inlined prompt and, for the two stages the graph routes on, its
+`output_model`. What v0 left implicit is now node options — `retries`
+and `timeout` on every node, `retries=0` on `git` because a commit is
+not idempotent — and `ProductSpec.deliverables` carries `min_length=1`,
+so an empty fan-out is a 422 the agent repairs inside its session rather
+than a run that completes having built nothing. `examples/__main__.py`
+is the programmatic host of 04, and `examples/pyproject.toml` advertises
+the workflow in the `athanore.workflows` group. `examples/feature_build/
+scenarios/` ships one `feature_build.<node>.json` per agent stage (13
+§Running examples on the fake); the run they drive was watched end to
+end against a real `athanore serve` with `ATHANORE_AGENT_COMMAND`
+pointed at `FakeACPAgent`. The one change outside `examples/` is
+`tests/cli/test_discovery.py`, which now scopes discovery to the
+distribution it installs — the gate's environment advertises a workflow
+of its own as of this task (D186).
+
 ### T075 — Port `gamedev`, `msgtest`, `projects` (A6.1)
 
 **Do.** Same treatment; `gamedev` additionally declares the plugin

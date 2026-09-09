@@ -1,0 +1,14 @@
+{
+  "text": ["Wrote the spec and split it into one deliverable."],
+  "log": "product: spec at docs/specs/report-list-json.md — one deliverable, `report list --json`.",
+  "submit": {
+    "spec_path": "docs/specs/report-list-json.md",
+    "deliverables": [
+      {
+        "title": "`report list --json`",
+        "description": "Add a --json flag to `report list` in cli/report.py. It prints one JSON array of the rows the table shows, and an empty array when there are none. Acceptance: `report list --json | jq length` works on an empty database and on a populated one."
+      }
+    ]
+  },
+  "usage": { "input": 2100, "output": 340 }
+}
