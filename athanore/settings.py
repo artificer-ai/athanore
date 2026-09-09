@@ -40,7 +40,7 @@ def _translate_legacy_db_url(value: str) -> str:
     v0 treated ``ARTIFICER_DB`` as a filesystem path
     (``athanore/server.py:139``), so a bare path must become
     ``sqlite+aiosqlite:///{path}``. A value that already carries a URL
-    scheme is left untouched (D71).
+    scheme is left untouched (D72).
     """
     if "://" in value:
         return value

@@ -38,10 +38,13 @@ athanore/                      Python package (distribution "athanore")
   workflow.py                  Workflow: the user-facing object. Owns a graph
                                builder and the plugin declarations (09); the
                                only module that imports both.
+  server.py                    Server: the composition root (04 §Programmatic host).
+                               Above every tier; nothing in the package imports it.
   graph/                       signature parsing + validation. Pure; no I/O, no asyncio.
     builder.py                 GraphBuilder, node(), EdgeRef, Transition
     model.py                   Graph, Node (frozen dataclasses)
     validate.py                finalize(): errors listed in 04
+    json.py                    jsonable(): what the engine may persist
   engine/                      execution. Depends on graph, store, events.
     scheduler.py               dispatch loop, pools, claiming, re-admit queue
     live.py                    registry of in-flight TaskContexts (context_for(task_id))
@@ -50,11 +53,14 @@ athanore/                      Python package (distribution "athanore")
     pools.py                   Pool, capacity accounting, slot lease
     recovery.py                startup recovery
     context.py                 TaskContext, current_task()
+    services.py                TaskServices: the narrow store surface a body gets
+    errors.py                  NonRetryable, the failure classes, operation refusals (D42)
     ops.py                     operator operations (pause, cancel, rerun, move…)
   requests/                    human-in-the-loop channel (06)
     service.py                 create / answer / wait / reopen
     validators.py              pydantic + light JSON-schema validators
     human.py                   human_input()
+    errors.py                  the five refusals of the channel
   agents/                      façade (05)
     base.py                    Agent, AgentResult, prompts, kickoff
     acp.py                     ACPAgent + ACPClient
@@ -63,33 +69,52 @@ athanore/                      Python package (distribution "athanore")
     stats.py                   stats entry building; SessionStatsProvider protocol
   events/
     bus.py                     EventBus: publish(Event) → persist + subscribers
-    names.py                   the event vocabulary (constants)
+    names.py                   the event vocabulary (StrEnum) and glob matching
+    model.py                   Event: the envelope the bus publishes and the store keeps
+    payloads.py                one typed payload model per event name (18)
   store/
     tables.py                  SQLAlchemy 2.0 Core metadata (Table objects, no ORM)
+    rows.py                    domain enums + the read models the repositories return
     repos/                     one repository per aggregate (runs, tasks, log, …)
-    uow.py                     UnitOfWork (session + transaction + outbox)
+    uow.py                     Store, UnitOfWork (transaction + outbox), Reader
+    engine.py                  the async engine factory (WAL, per-connection settings)
+    clock.py                   now(): the store's one clock
+    retention.py               the periodic prune (07 §Retention)
+    migrate.py                 Alembic, driven programmatically
     migrations/                Alembic environment + versions
     legacy.py                  v0 athanore.db importer
   plugins/                     (09)
     decl.py                    Route, Action, Panel, Handler declarations
     registry.py                collect, validate, build manifest
-    mount.py                   mount routers, assets
-    builtin/                   the core-shipped plugins (run views, requests, graph)
+    context.py                 PluginContext: what a handler is handed, and its scope
+    mount.py                   mount routers, actions, assets
+    discovery.py               entry-point discovery (09 §Discovery)
+    builtin/                   the core-shipped panes (overview, log, agent, graph, requests)
   api/                         (08)
     app.py                     create_app(settings, engine, store, plugins)
     deps.py                    auth dependencies (operator bearer, task token)
-    errors.py                  ApiError → {"error", "code", ...}
+    errors.py                  ErrorCode, ApiError → {"error", "code", ...}
+    middleware.py              the request-body cap (08 §Sizes)
+    openapi.py                 what the generated document says about itself
     schemas/                   pydantic response/request models
-    routers/                   workflows, runs, tasks, requests, events, plugins, agent
+    routers/                   system, workflows, runs, tasks, requests, agent
+    mcp.py                     /mcp/agent: the agent surface as MCP tools (D63)
     sse.py                     event stream endpoint
     static.py                  SPA + plugin assets
   cli/                         (11) typer app
-  testing/                     MockAgent, FakeACPAgent process, fixtures
+  testing/                     the doubles (05 §Testing doubles, 13 §Fakes)
+    mock.py                    MockAgent, StatsMockAgent, FakeStatsProvider: no subprocess
+    fake_acp.py                the FakeACPAgent script: a real ACP subprocess, from a scenario
+    scenarios.py               scenario(**kwargs) → the command line that runs one
   web/dist/                    built SPA, shipped as package data
 web/                           SPA source (Vite + React + TypeScript), builds to athanore/web/dist
 examples/                      user-land workflows (feature_build, gamedev, …) and adapters
-docs/                          these documents
-tests/                         Python tests (13)
+docs/v1/                       these documents; docs/plans/ one plan per task of 17
+tests/                         Python tests (13); web/e2e/ the Playwright suite
+compose.yaml, docker/, scripts/  the dev stack: one image behind the gate, the app,
+                               the SPA server and every agent (D64). Dev machinery —
+                               nothing in athanore/ may depend on it, and driver/ is
+                               athanore v0 driving this build (D67)
 ```
 
 ### Layering rule
@@ -161,8 +186,11 @@ from athanore import (
 )
 ```
 
-`AthanoreWorkflow`, `AthanoreACPAgent`, `AthanoreServer` remain as aliases
-for one minor version (14).
+`AthanoreWorkflow`, `AthanoreAgent`, `AthanoreACPAgent` and `AthanoreServer`
+remain as aliases for one minor version (14 §Compatibility). Every access
+warns — the alias is never cached, so a second module that imports the old
+name is told the same thing as the first — and none of them is in
+`__all__`, because a deprecated name is one you had to type (D148).
 
 ## Library choices
 
@@ -180,8 +208,8 @@ for one minor version (14).
 | Logging | structlog (JSON in prod, pretty in dev) | Structured, contextual (run_id/task_id bound per attempt) |
 | CLI | typer + rich | Argument parsing with help, tables, colors, low ceremony |
 | Retries in clients | httpx transport `retries=` | Connection-level retries only, in the CLI; never in the engine (rule 3 owns retries) |
-| Tests | pytest, pytest-asyncio, hypothesis (graph parsing), respx | See 13 |
-| Lint / types | ruff, pyright (strict on `graph`, `engine`, `store`), import-linter | |
+| Tests | pytest, pytest-asyncio, hypothesis (graph parsing), respx, freezegun, pytest-cov | See 13 |
+| Lint / types | ruff, pyright (strict on `graph`, `engine`, `store`), import-linter; oxlint for the SPA, the linter its own scaffold ships (D77) | |
 | Python | 3.11+; 3.13 in the dev stack and the CI default | `StrEnum` (events, error codes) and `asyncio.timeout` (the three nested timeouts of D60) are the floor; every runtime dependency already supports 3.11 (D66) |
 | Packaging | uv, hatchling; `athanore[postgres]` extra | |
 | Frontend | Vite, React 19, TypeScript strict, TanStack Router + Query, Tailwind v4, shadcn/ui, react-hook-form + zod, `@rjsf/core` + `@rjsf/shadcn` (JSON-Schema forms), cmdk, Phosphor icons, `@fontsource-variable/jetbrains-mono`, react-markdown + shiki (lazy), @tanstack/react-virtual, react-resizable-panels, `@hey-api/openapi-ts` (client + TanStack Query options), Vitest + Testing Library + Playwright | See 10; the design mock's single-page dashboard |
@@ -291,10 +319,14 @@ SPA ─POST /api/requests/{id}/answer {option_id | value}─▶ api.requests
 | `cors_origins` | [] | Dev only |
 | `log_format` | `pretty` in TTY, `json` otherwise | |
 | `stream_flush_interval` | 0.4s | Agent stream batching |
+| `run_migrations` | true | `Server.start()` migrates before it serves; false leaves the schema to `athanore db upgrade` (11) |
+| `forwarded_allow_ips` | unset | Passed to uvicorn: which proxies' `X-Forwarded-*` to trust (12 §Beyond the LAN) |
 | `retention` | events 30d, stream chunks 14d | 07 |
 
-Legacy names (`ARTIFICER_PORT`, `ARTIFICER_DB`) are read with a deprecation
-warning for one minor version.
+Legacy names (`ARTIFICER_HOST`, `ARTIFICER_PORT`, `ARTIFICER_DB`) are read
+with a deprecation warning for one minor version, and only when the
+`ATHANORE_*` name is unset. `ARTIFICER_DB` was a filesystem path in v0, so
+a bare path becomes `sqlite+aiosqlite:///{path}` (D72).
 
 ### `athanore.toml` layout
 
