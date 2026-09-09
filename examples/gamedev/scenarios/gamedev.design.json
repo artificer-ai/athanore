@@ -1,0 +1,5 @@
+{
+  "text": ["Wrote the design doc: mechanics, palette, juice and screens."],
+  "log": "design: Neon Snake — 32x24 grid at 20px, 8 steps/s ramping to 16 over 60s, wrap-around edges, +1 per pellet. Controls: arrows/WASD to turn, SPACE to start, P to pause, R to restart. Palette #05060a background, #38f8d4 snake, #ff4fa3 pellet, #f7f7ff HUD. Juice: pellet pop with 8 particles, 120ms screen shake on death, a rising blip per pellet and a falling saw on death (WebAudio). Screens: title with the controls listed, playing with score/speed HUD, paused, game over with the score and a RESTART button. Out of scope: mobile, high-score persistence.",
+  "usage": { "input": 2400, "output": 620 }
+}

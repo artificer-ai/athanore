@@ -539,7 +539,12 @@ def test_the_distribution_advertises_the_workflow() -> None:
         for entry in entry_points(group=GROUP)
         if entry.dist is not None and entry.dist.name == DISTRIBUTION
     }
-    assert advertised == {"feature_build": "feature_build:wf"}
+    assert advertised == {
+        "feature_build": "feature_build:wf",
+        "gamedev": "gamedev:wf",
+        "msgtest": "msgtest:wf",
+        "projects": "projects:wf",
+    }
 
 
 def test_athanore_serve_discovers_feature_build() -> None:
@@ -549,10 +554,17 @@ def test_athanore_serve_discovers_feature_build() -> None:
     assert found["feature_build"] is wf
 
 
-def test_the_programmatic_host_registers_it_on_a_capacity_one_pool(
+def test_the_programmatic_host_registers_every_example_on_its_pool(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    """`examples/__main__.py` is 04 §Programmatic host's form, built."""
+    """`examples/__main__.py` is 04 §Programmatic host's form, built.
+
+    Its four registrations are that section's own four lines:
+    `feature_build` and `gamedev` share the capacity-1 `local` pool
+    because they share the one model, `projects` runs on `cloud` because
+    its seats are a hosted service, and `msgtest` names no pool at all
+    and so lands on the default one.
+    """
 
     for key in [name for name in os.environ if name.startswith("ATHANORE_")]:
         monkeypatch.delenv(key, raising=False)
@@ -567,8 +579,19 @@ def test_the_programmatic_host_registers_it_on_a_capacity_one_pool(
     spec.loader.exec_module(module)
 
     server: Server = module.build()
-    assert list(server.workflows) == ["feature_build"]
-    assert server.engine.pools.snapshot() == {"local": {"capacity": 1, "in_flight": 0}}
+    assert list(server.workflows) == [
+        "feature_build",
+        "gamedev",
+        "projects",
+        "msgtest",
+    ]
+    assert server.engine.pools.snapshot() == {
+        "local": {"capacity": 1, "in_flight": 0},
+        "cloud": {"capacity": 8, "in_flight": 0},
+        # `msgtest` named no pool, so registering it created the default
+        # one at `settings.workers`.
+        "default": {"capacity": 1, "in_flight": 0},
+    }
 
 
 # --------------------------------------------------------------------------

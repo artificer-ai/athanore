@@ -1,0 +1,5 @@
+{
+  "text": ["Rewording the brief into a task description; not implementing anything."],
+  "log": "prompt: intake — Add a --json flag to `report list`. Where: cli/report.py, in the triaged project. Acceptance: `report list --json` prints one JSON array of the same rows the table shows, and exits 0 with an empty array when there are none.",
+  "usage": { "input": 1420, "output": 180 }
+}

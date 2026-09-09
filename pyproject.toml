@@ -96,7 +96,14 @@ select = ["E", "F", "I", "UP", "B", "ASYNC"]
 # `pi` and the example workflows are this workspace's own packages, not
 # dependencies: ruff infers `athanore` as first-party from the source tree
 # and would otherwise sort an example's own imports in among pytest's.
-known-first-party = ["athanore", "feature_build", "pi"]
+known-first-party = [
+    "athanore",
+    "feature_build",
+    "gamedev",
+    "msgtest",
+    "pi",
+    "projects",
+]
 
 [tool.pyright]
 typeCheckingMode = "standard"

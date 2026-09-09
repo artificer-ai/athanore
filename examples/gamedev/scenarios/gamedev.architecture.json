@@ -1,0 +1,35 @@
+{
+  "text": ["Planned the single-file build and decomposed it into five steps."],
+  "log": "architecture: canvas 2D, no dependencies, rAF with a clamped delta and a fixed 1/8s step accumulator. Sections in order: CONST, audio, input, grid/snake, state machine, render, boot. Logical 640x480 canvas scaled by devicePixelRatio, letterboxed on resize. Input on window with preventDefault for arrows and space; listeners attached once at boot, never per restart. One AudioContext, unlocked on the first keydown.",
+  "submit": {
+    "summary": "Five steps: scaffold, movement, pellets and scoring, screens and HUD, juice and audio.",
+    "steps": [
+      {
+        "name": "scaffold",
+        "charter": "Create output/neon-snake.html with the doctype, the canvas, the CONST object copied verbatim from the design, the resize/DPR sizing, the utils, and a marked placeholder comment for every later step.",
+        "done_when": "The file exists and the extracted <script> passes `node --check`."
+      },
+      {
+        "name": "movement",
+        "charter": "Grid, snake body, turning with the arrow/WASD bindings, wrap-around edges, and the fixed-step accumulator that advances it.",
+        "done_when": "step() advances the head one cell per tick and wraps at all four edges."
+      },
+      {
+        "name": "pellets",
+        "charter": "Pellet placement off the snake, eating, growth, score, and the speed ramp from 8 to 16 steps/s over 60s.",
+        "done_when": "Eating a pellet grows the snake by one cell and increments score."
+      },
+      {
+        "name": "screens",
+        "charter": "The title/playing/paused/gameover state machine, the HUD, and the RESTART button.",
+        "done_when": "SPACE starts, P pauses and resumes, self-collision reaches game over, and R restarts."
+      },
+      {
+        "name": "juice",
+        "charter": "Pellet pop particles, the 120ms death shake, and the WebAudio blip and death saw, unlocked on first input.",
+        "done_when": "A pellet spawns 8 particles and plays a blip; death shakes the canvas and plays the saw."
+      }
+    ]
+  },
+  "usage": { "input": 4200, "output": 900 }
+}

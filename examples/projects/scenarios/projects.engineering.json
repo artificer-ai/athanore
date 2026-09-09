@@ -1,0 +1,5 @@
+{
+  "text": ["Made the change in the project and ran its suite locally."],
+  "log": "engineering: added `--json` to `report list`, extracted `_rows()`, and added the two CLI tests. The project's own `uv run pytest -q` is green here.",
+  "usage": { "input": 5600, "output": 1400 }
+}
