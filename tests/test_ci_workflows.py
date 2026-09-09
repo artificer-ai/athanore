@@ -60,8 +60,8 @@ def test_workflows_parse(ci: Workflow, nightly: Workflow) -> None:
         assert workflow.get("on", workflow.get(True))
 
 
-def test_ci_jobs_are_python_web_and_contract(ci: Workflow) -> None:
-    assert list(ci["jobs"]) == ["python", "web", "contract"]
+def test_ci_jobs_are_python_web_contract_and_package(ci: Workflow) -> None:
+    assert list(ci["jobs"]) == ["python", "web", "contract", "package"]
 
 
 def test_python_matrix_covers_the_supported_floor(ci: Workflow) -> None:
@@ -303,6 +303,79 @@ def test_the_contract_jobs_generators_exist() -> None:
     assert "gen" in json.loads((ROOT / "web" / "package.json").read_text())["scripts"]
     assert (ROOT / "tests" / "snapshots" / "openapi.json").is_file()
     assert (ROOT / "web" / "src" / "api" / "gen" / "index.ts").is_file()
+
+
+#: The packaging check both the gate and the `package` job run (T069).
+PACKAGE_CHECK = "scripts/check_wheel.py"
+
+
+def test_package_job_builds_the_spa_before_the_wheel(ci: Workflow) -> None:
+    """T069: "`pnpm build` in CI before `uv build`".
+
+    The wheel is built from the sdist and ships `athanore/web/dist` as
+    package data, so a wheel built first carries whatever the SPA was
+    last time. The order is asserted here as step order, and enforced by
+    the check itself, which refuses to build over an SPA that is not
+    there (D180).
+    """
+    job = ci["jobs"]["package"]
+    ran = commands(job)
+    assert "pnpm -C web install --frozen-lockfile" in ran
+    assert "pnpm -C web build" in ran
+    assert PACKAGE_CHECK in ran
+
+    named = [step.get("name") for step in steps(job)]
+    assert named.index("pnpm build") < named.index(
+        "build the wheel and serve it from a clean venv"
+    )
+
+
+def test_package_job_has_the_python_environment_the_check_needs(
+    ci: Workflow,
+) -> None:
+    """It runs `uv build` and installs the result, so it needs uv and node."""
+    job = ci["jobs"]["package"]
+    assert "uv sync --all-packages --all-groups --all-extras" in commands(job)
+    assert any(
+        step.get("uses", "").startswith("astral-sh/setup-uv") for step in steps(job)
+    )
+    assert any(
+        step.get("uses", "").startswith("actions/setup-node") for step in steps(job)
+    )
+
+
+def test_the_gate_runs_the_packaging_check_too(ci: Workflow) -> None:
+    """`./scripts/test.sh` is the definition of green (D74, D178).
+
+    This repository has no runner, so a check only `ci.yml` performs is
+    a check that never runs at all — and this is the one check that a
+    release depends on and nothing else covers.
+    """
+    gate = (ROOT / "scripts" / "test.sh").read_text()
+    assert PACKAGE_CHECK in gate
+    assert PACKAGE_CHECK in commands(ci["jobs"]["package"])
+
+    # After the SPA build, whose output it packages.
+    assert gate.index("pnpm -C web build") < gate.index(PACKAGE_CHECK)
+
+
+def test_the_packaging_check_exists_and_is_not_conditional(ci: Workflow) -> None:
+    assert (ROOT / PACKAGE_CHECK).is_file()
+    for step in steps(ci["jobs"]["package"]):
+        assert "if" not in step, step.get("name", step.get("uses"))
+
+
+def test_the_wheel_is_configured_to_carry_the_spa() -> None:
+    """`[tool.hatch.build] artifacts` is what puts the SPA in the wheel.
+
+    `.gitignore` drops `athanore/web/dist/*`, and `uv build` builds the
+    wheel from the sdist, so a file the sdist does not carry can never
+    reach the wheel. `scripts/check_wheel.py` proves the wheel is right;
+    this names the one line that makes it so, which is what a reader
+    deleting it would otherwise have nothing to read.
+    """
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    assert "athanore/web/dist/**" in pyproject["tool"]["hatch"]["build"]["artifacts"]
 
 
 def test_nightly_selects_the_postgres_marker(nightly: Workflow) -> None:

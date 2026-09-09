@@ -214,3 +214,49 @@ jobs:
 
       - name: snapshot and client are fresh
         run: git diff --exit-code tests/snapshots web/src/api/gen
+
+  # The Phase 4 checkpoint (T069): the wheel carries the SPA and a clean
+  # install serves it. Nothing else in the gate covers that join —
+  # vitest tests the SPA, the `web` job builds it, and the Playwright
+  # suite drives a source checkout — so a wheel that shipped without
+  # `athanore/web/dist` would serve the "the interface is not built"
+  # page and every other check would still be green.
+  package:
+    name: package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: pnpm
+        run: npm install --global --no-fund --no-audit pnpm@10
+
+      - name: pnpm install
+        run: pnpm -C web install --frozen-lockfile
+
+      # `pnpm build` **before** the wheel is built, which is the whole
+      # point of this job: the wheel then carries a fresh SPA rather than
+      # whatever was last built. `scripts/check_wheel.py` runs `uv build`
+      # itself and refuses to when `athanore/web/dist/index.html` is not
+      # there, so the order is enforced rather than merely written down
+      # here (D180).
+      - name: pnpm build
+        run: pnpm -C web build
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: uv sync
+        run: uv sync --all-packages --all-groups --all-extras
+
+      # `uv build`, then the wheel's contents, then `pip install` into a
+      # clean venv and `athanore serve --port 0` out of a temporary
+      # directory. The last step is the one that catches a wheel that
+      # builds but does not serve.
+      - name: build the wheel and serve it from a clean venv
+        run: uv run --no-sync scripts/check_wheel.py

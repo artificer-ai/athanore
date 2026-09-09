@@ -3470,6 +3470,24 @@ the dashboard, which took three fixes in `web/src`: the run list's
 SPA; `athanore serve` from a clean venv shows the UI. Update 10 with
 deviations found (record in 15).
 
+**Status.** Done. The check is `scripts/check_wheel.py`, run by the CI
+`package` job and by `./scripts/test.sh` alike (D74, D178): it refuses to
+build while `athanore/web/dist/index.html` is missing — which is how
+"`pnpm build` before `uv build`" becomes a check and not a step order —
+then runs `uv build`, reads the wheel for `index.html` and every
+`/assets/…` file that document references, `pip install`s it into a
+`python -m venv`, and serves it with `athanore serve --port 0` from a
+temporary directory with every `ATHANORE_*` variable dropped. `/` must
+come back as the wheel's document byte for byte, every asset must load,
+and `/api/health` must report the version just built (D180). Nine
+deviations between 10 and the SPA that shipped are folded into 10 and
+recorded in D179; eight are the document lagging a decision already
+made, and the ninth is a real gap — §Attention's "a new request switches
+the pane to agent once" was never built, `usePrefs.autoSwitchOnRequest`
+is persisted and read by nothing, and no Phase 4 task's **Do** named the
+behaviour. It is written into 10 as unbuilt rather than removed. 10 also
+gains the §Build section `athanore/api/static.py` was already citing.
+
 ---
 
 ## Phase 5 — Plugin actions, assets, discovery
