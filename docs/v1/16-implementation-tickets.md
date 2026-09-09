@@ -110,7 +110,8 @@ Sizing: S ≤ 1 day, M 2–3 days, L 4–5 days.
 ## Epic 7 — Post-1.0: design refresh, narrow viewports, type scale
 
 The first post-1.0 work, specified by 21 and appended to the serial plan
-as Phase 7 (T080–T083). Presentation only: no ticket here may change
+as Phase 7 (T080–T082), one task per ticket. Presentation only: no
+ticket here may change
 `athanore/`, the wire contract, or the plugin contract, and
 `tests/snapshots/openapi.json` stays byte-identical throughout.
 
@@ -118,8 +119,7 @@ as Phase 7 (T080–T083). Presentation only: no ticket here may change
 |---|---|---|---|---|
 | A7.1 | Re-import `docs/v1/design/` from the live Claude Design project (verbatim, new date in `design/README.md`), regenerate `theme.css`/`tokens.gen.ts` via `gen:theme`, sync 10 §Design system, decision row per deviation; stop-and-ask on structural change. **Blocked** until the operator authorizes DesignSync or drops the files in | S | 21 §Re-import, D198 | |
 | A7.2 | Base-relative type ramp and the font-size chooser: `gen-theme.mjs` emits the `calc(<px>rem / 12)` ramp and the `data-font-size` steps, `usePrefs.fontSize`, header popover + palette rows, applied before first paint; axe at `xlarge` | M | 21 §Type scale, D195, D196 | A7.1 |
-| A7.3 | Narrow shell: the `md` breakpoint, stacked list↔detail on `?run=`, back control in the pane bar, two-line run-list rows, wrapped header with scrollable chip strip, footer's mobile treatment, splitter unmounted | M | 21 §Narrow layout, D194 | A7.1 |
-| A7.4 | Narrow overlays and the touch gate: every overlay fits 390 px (library and task drawer as sheets, stacked library columns), mobile Playwright spec driving the five flows by `tap()` at 390×844, axe at the mobile viewport | M | 21 §Narrow layout, §Gates, D197 | A7.2, A7.3 |
+| A7.3 | Mobile support: the `md` breakpoint, stacked list↔detail on `?run=`, back control in the pane bar, two-line run-list rows, wrapped header with scrollable chip strip, footer's mobile treatment, splitter unmounted; every overlay fits 390 px (library and task drawer as sheets, stacked library columns); mobile Playwright spec driving the five flows by `tap()` at 390×844, axe at the mobile viewport | L | 21 §Narrow layout, §Touch operation, §Gates, D194, D197 | A7.1, A7.2 |
 
 ## Cross-cutting decisions still open (15 §Open questions)
 

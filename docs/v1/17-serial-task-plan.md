@@ -3912,7 +3912,7 @@ rescales the whole ramp coherently, survives reload via
 `default` the rendered sizes are pixel-identical to before; gate green;
 snapshot unchanged.
 
-### T082 — The narrow shell (A7.3)
+### T082 — Mobile support (A7.3)
 
 **Do.** Below Tailwind's `md` (768 px, one breakpoint, D194): the
 splitter is not mounted and the middle shows one region — the run list
@@ -3926,36 +3926,30 @@ wraps to two rows with the chips + `/` filter as a horizontally
 scrollable strip; `＋ new run` and `workflows` stay visible; narrow
 chrome controls get ≥ 24×24 px hit areas (WCAG 2.5.8). Footer hides the
 key-hint chips and keeps the palette button, relabelled `palette`, as a
-touch target. The keyboard map stays bound at every width. Update 10
-§Layout.
-**Tests.** Vitest: the narrow row renders both lines from a
-`RunSummary`; the back control writes the search; the shell picks the
-region from `?run=` at a narrow width. Playwright at 390×844
-(`hasTouch`, `isMobile`, `tap()`): list → open a run → detail → back;
-no horizontal page scroll on list or detail.
-**Done.** At 390 px the operator moves list ↔ detail by touch with no
-horizontal page scroll; at ≥ 768 px the layout is exactly 10 §Layout
-unchanged; gate green; snapshot unchanged.
-
-### T083 — Narrow overlays and the touch gate (A7.4)
-
-**Do.** Every overlay fits the narrow viewport per 21 §Narrow layout:
-panel width/height capped to the viewport minus backdrop margin with
-internal scroll; palette full-width under the header; new run / edit
-span the width and the chip group wraps; the library stacks its columns
-as a full-screen sheet; the task drawer is a full-screen sheet; pickers,
+touch target. The keyboard map stays bound at every width. Every
+overlay fits the narrow viewport per 21 §Narrow layout: panel
+width/height capped to the viewport minus backdrop margin with internal
+scroll; palette full-width under the header; new run / edit span the
+width and the chip group wraps; the library stacks its columns as a
+full-screen sheet; the task drawer is a full-screen sheet; pickers,
 keys, delete-confirm and action overlays sized to fit; every overlay
 closable by touch (backdrop tap, real close/cancel buttons). Update 10
-§Overlays and §Accessibility and quality.
-**Tests.** Playwright `web/e2e/mobile.spec.ts` at 390×844, everything by
-`tap()`: the five flows of 21 §Touch operation end to end on the `probe`
-fixture — view the list, open the run, cycle panes with `▶`, answer the
-open request, start a new run from `＋ new run` — plus each overlay
-opened and dismissed within the viewport. axe at 390×844 on the
-loaded-dashboard state stays over the D178 floor.
+§Layout, §Overlays and §Accessibility and quality.
+**Tests.** Vitest: the narrow row renders both lines from a
+`RunSummary`; the back control writes the search; the shell picks the
+region from `?run=` at a narrow width. Playwright `web/e2e/mobile.spec.ts`
+at 390×844 (`hasTouch`, `isMobile`, everything by `tap()`): the five
+flows of 21 §Touch operation end to end on the `probe` fixture — view
+the list, open the run (back returns to the list, no horizontal page
+scroll on either), cycle panes with `▶`, answer the open request, start
+a new run from `＋ new run` — plus each overlay opened and dismissed
+within the viewport. axe at 390×844 on the loaded-dashboard state stays
+over the D178 floor.
 **Done.** Every 21 §Touch operation flow passes by touch alone at
-390×844; the axe gate holds at desktop and mobile viewports and at
-`xlarge` (T081's run stays green); gate green; snapshot unchanged.
+390×844 with no horizontal page scroll; every overlay fits and closes
+by touch; at ≥ 768 px the layout is exactly 10 §Layout unchanged; the
+axe gate holds at desktop and mobile viewports and at `xlarge` (T081's
+run stays green); gate green; snapshot unchanged.
 
 
 ---
@@ -3973,7 +3967,7 @@ loaded-dashboard state stays over the D178 floor.
 | A4.1–A4.10 | T057–T069 |
 | A5.1–A5.4 | T070–T073 |
 | A6.1–A6.4 | T074–T079 |
-| A7.1–A7.4 | T080–T083 |
+| A7.1–A7.3 | T080–T082 |
 
 Sequencing changes relative to 16, all recorded in 15 when executed:
 the TUI is not deleted at all in this repository — it never lived here

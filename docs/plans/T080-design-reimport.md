@@ -54,7 +54,7 @@ artifacts:
 - change token *families* (a new ramp, a removed ramp) rather than
   values;
 - prescribe a mobile layout or a font-size control that differs from
-  `21` §Narrow layout / §Type scale — T082/T083/T081 build to 21, and
+  `21` §Narrow layout / §Type scale — T081/T082 build to 21, and
   only the operator can rule that the mock supersedes it.
 
 ## What this task is not
