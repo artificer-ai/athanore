@@ -14,17 +14,24 @@
  * inbox will have one pane, and the manifest is a request that can still
  * be in flight. Each of those reads differently and says so.
  *
+ * The region takes focus itself when `⏎` hands it the keyboard (10
+ * §Keyboard), which is what `ref` and `tabIndex={-1}` are for: the
+ * shell holds the reference because the shell is where the key is bound.
+ *
  * The body does not scroll: the pane does. A `log` pane virtualises, and
  * a viewport that grows with its content is not one a virtualiser can
  * measure, so `PaneRenderer` is given the height and decides what to do
  * with it (10 §Panes).
  */
+import type { Ref } from 'react'
+
 import { PaneBar } from '../panes/PaneBar'
 import { PaneRenderer } from '../panes/PaneRenderer'
 import type { PaneModel } from '../panes/usePanes'
 import { useUi } from '../store/ui'
 
 export function Detail({
+  ref,
   panes,
   taskId,
   node,
@@ -33,6 +40,11 @@ export function Detail({
   onOpenNode,
   onOpenLibrary,
 }: {
+  /**
+   * The region itself, so that `⏎` can hand it the keyboard (T067). It
+   * is a plain prop because React 19 passes `ref` as one.
+   */
+  ref?: Ref<HTMLElement> | undefined
   panes: PaneModel
   /** The focused attempt, from `?task=`: a `task`-scoped panel's id. */
   taskId?: number | undefined
@@ -52,12 +64,17 @@ export function Detail({
 
   return (
     <section
+      ref={ref}
       aria-label="detail"
       data-region="detail"
       data-focused={focused}
+      // Focusable programmatically and not by `tab`: `⏎` focus detail
+      // moves the keyboard here (10 §Keyboard), and the region is a
+      // container rather than a control, so it is not a tab stop.
+      tabIndex={-1}
       onMouseDown={() => setFocus('detail')}
       onFocusCapture={() => setFocus('detail')}
-      className="flex h-full min-h-0 min-w-0 flex-1 flex-col"
+      className="flex h-full min-h-0 min-w-0 flex-1 flex-col focus:outline-none"
     >
       <PaneBar panes={panes} />
 

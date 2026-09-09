@@ -68,6 +68,7 @@ import {
 } from '../api/gen/@tanstack/react-query.gen'
 import type { GraphNode, TaskView } from '../api/gen/types.gen'
 import { taskTone, toneClass } from '../components/RunList'
+import { useKeyOwner } from '../keys'
 import { actionError } from '../lib/errors'
 import { cn } from '../lib/utils'
 import { queryKeys } from '../realtime/invalidate'
@@ -140,6 +141,10 @@ export function Pickers({
   onClose: () => void
 }) {
   const kind = isPicker(overlay) ? overlay : undefined
+  // An open overlay owns the keyboard: while it is up the app's global
+  // map is off, so a `d` in here cannot reach the delete confirm
+  // (`keys/scope.ts`, 10 §Keyboard).
+  useKeyOwner(kind !== undefined)
   const restoreFocusTo = useRef<HTMLElement | null>(null)
   const input = useRef<HTMLInputElement | null>(null)
 

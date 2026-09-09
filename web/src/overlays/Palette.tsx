@@ -37,6 +37,7 @@ import { Command } from 'cmdk'
 import { Dialog, VisuallyHidden } from 'radix-ui'
 import { useRef } from 'react'
 
+import { useKeyOwner } from '../keys'
 import { groupActions, type PaletteAction } from './actions'
 
 /** The dialog's accessible name, and cmdk's label for the listbox. */
@@ -55,6 +56,10 @@ export function Palette({
   onClose: () => void
 }) {
   const sections = groupActions(actions)
+  // An open overlay owns the keyboard: while it is up the app's global
+  // map is off, so a `d` in here cannot reach the delete confirm
+  // (`keys/scope.ts`, 10 §Keyboard).
+  useKeyOwner(open)
   const restoreFocusTo = useRef<HTMLElement | null>(null)
   const input = useRef<HTMLInputElement | null>(null)
 

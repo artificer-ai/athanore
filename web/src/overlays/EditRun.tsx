@@ -48,6 +48,7 @@ import {
   getRunApiRunsRunIdGetOptions,
 } from '../api/gen/@tanstack/react-query.gen'
 import type { RunDetail } from '../api/gen/types.gen'
+import { useKeyOwner } from '../keys'
 import { actionError } from '../lib/errors'
 import { queryKeys } from '../realtime/invalidate'
 
@@ -101,6 +102,11 @@ export function EditRun({
   runId: string | undefined
   onClose: () => void
 }) {
+  // An open overlay owns the keyboard: while it is up the app's global
+  // map is off, so a `d` in here cannot reach the delete confirm
+  // (`keys/scope.ts`, 10 §Keyboard).
+  useKeyOwner(open)
+
   const restoreFocusTo = useRef<HTMLElement | null>(null)
   const panel = useRef<HTMLDivElement | null>(null)
   // Whether the dialog's open-focus has already run: it is what tells a

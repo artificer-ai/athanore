@@ -33,15 +33,24 @@
  * It is one component in three places: docked under the agent stream,
  * inside a requests-pane card, and inside an inbox card. The panel knows
  * only the request.
+ *
+ * **`a` and `d` are this panel's keys and nobody else's** (10 §Keyboard,
+ * D51). It registers them with the keyboard map against its own root, so
+ * they fire for the panel the keystroke came from and for neither of the
+ * other two on screen; outside a panel they do nothing at all. They pick
+ * by ACP kind — `allow_once` before `allow_always`, `reject_once` before
+ * `reject_always` — and are the same POST the buttons make, so a request
+ * that offers no such option has no such key.
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 import type { RJSFSchema } from '@rjsf/utils'
 
 import { answerRequestApiRequestsRequestIdAnswerPostMutation } from '../api/gen/@tanstack/react-query.gen'
 import type { RequestView } from '../api/gen/types.gen'
+import { useAnswerKeys } from '../keys'
 import { cn } from '../lib/utils'
 // The leaf module and not the `panes/kinds` barrel: the barrel exports
 // the requests pane, which draws the card that draws this panel, and a
@@ -49,7 +58,15 @@ import { cn } from '../lib/utils'
 import { awaiting } from '../panes/kinds/requests'
 import { queryKeys } from '../realtime/invalidate'
 import { ActionForm } from './ActionForm'
-import { answerFailure, isConflict, optionClass, optionTone } from './answer'
+import {
+  ALLOW_KINDS,
+  answerFailure,
+  DENY_KINDS,
+  isConflict,
+  optionClass,
+  optionOfKind,
+  optionTone,
+} from './answer'
 
 /** What the panel says when a POST failed and the body said nothing. */
 const FALLBACK = 'the answer was not recorded'
@@ -96,8 +113,24 @@ export function RequestPanel({ request }: { request: RequestView }) {
     answer.mutate({ path: { request_id: request.id }, body })
   }
 
+  // `a` and `d`, live only while the keystroke comes from inside this
+  // panel (`keys/scope.ts`). A mode with no options, an options request
+  // that offers neither kind, and a POST already in flight each leave
+  // the key with nothing to do, which is what `null` says.
+  const root = useRef<HTMLDivElement | null>(null)
+  const byKind = (kinds: readonly string[]): (() => void) | null => {
+    if (request.mode !== 'options' || busy) return null
+    const option = optionOfKind(request.options, kinds)
+    if (option === undefined) return null
+    return () => {
+      send({ option_id: option.option_id })
+    }
+  }
+  useAnswerKeys(root, { allow: byKind(ALLOW_KINDS), deny: byKind(DENY_KINDS) })
+
   return (
     <div
+      ref={root}
       data-testid="request-panel"
       data-mode={request.mode}
       data-request={request.id}

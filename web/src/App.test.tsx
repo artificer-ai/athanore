@@ -224,31 +224,37 @@ function rows() {
   )
 }
 
-describe('App', () => {
-  beforeEach(() => {
-    // The cache is seeded, so nothing here needs the network — except
-    // `refresh`, which invalidates every entry this tab holds and so
-    // refetches all of them. Answering those keeps a rejected request
-    // from surfacing as an unhandled error in whichever test happens to
-    // be running when it lands.
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((request: Request) =>
-        Promise.resolve(
-          new Response(
-            JSON.stringify(request.url.includes('/source') ? SOURCE : []),
-            { status: 200, headers: { 'Content-Type': 'application/json' } },
-          ),
-        ),
+/**
+ * A fresh tab: no client state left over, and a server that answers.
+ *
+ * The cache is seeded, so nothing here needs the network — except
+ * `refresh`, which invalidates every entry this tab holds and so
+ * refetches all of them. Answering those keeps a rejected request from
+ * surfacing as an unhandled error in whichever test happens to be
+ * running when it lands.
+ */
+function freshTab() {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((request: Request) =>
+      Promise.resolve(
+        new Response(JSON.stringify(request.url.includes('/source') ? SOURCE : []), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
       ),
-    )
-    usePrefs.setState({ listWidth: DEFAULT_LIST_WIDTH, listCollapsed: false })
-    useUi.setState({
-      focus: 'list',
-      runFilter: { workflow: ALL_WORKFLOWS, query: '' },
-      logComposerFor: null,
-    })
+    ),
+  )
+  usePrefs.setState({ listWidth: DEFAULT_LIST_WIDTH, listCollapsed: false })
+  useUi.setState({
+    focus: 'list',
+    runFilter: { workflow: ALL_WORKFLOWS, query: '' },
+    logComposerFor: null,
   })
+}
+
+describe('App', () => {
+  beforeEach(freshTab)
 
   afterEach(() => {
     vi.unstubAllGlobals()
@@ -600,5 +606,227 @@ describe('App', () => {
     await userEvent.click(command('retry task'))
 
     expect(onOpenOverlay).toHaveBeenCalledExactlyOnceWith('pick-retry')
+  })
+})
+
+/* -------------------------------------------------------------------- */
+/* The keyboard map (T067)                                               */
+/* -------------------------------------------------------------------- */
+
+/**
+ * 10 §Keyboard, over the real shell.
+ *
+ * `keys/__tests__/useKeymap.test.tsx` asserts the table and the scoping
+ * against a harness; what is asserted here is the wiring — that the key
+ * reaches the same action the palette row does, over the same model.
+ */
+describe('the keyboard map', () => {
+  beforeEach(freshTab)
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  /** Press a plain key on the page itself, as an operator would. */
+  function press(key: string, init: Partial<KeyboardEventInit> = {}) {
+    fireEvent.keyDown(document.body, { key, ...init })
+  }
+
+  it('opens the delete confirm on `D`, and nothing at all on `d`', () => {
+    const onOpenOverlay = vi.fn()
+    shell({ run: 'aaaa1111bbbb' }, { onOpenOverlay })
+
+    // D51: `d` is the request panel's deny and reaches nothing else, so
+    // a `d` meant for it one focus ring away destroys nothing.
+    press('d')
+    expect(onOpenOverlay).not.toHaveBeenCalled()
+
+    press('D', { shiftKey: true })
+    expect(onOpenOverlay).toHaveBeenCalledExactlyOnceWith('delete')
+  })
+
+  it('opens the overlays 10 §Keyboard names', () => {
+    const onOpenOverlay = vi.fn()
+    shell({ run: 'aaaa1111bbbb' }, { onOpenOverlay })
+
+    for (const [key, overlay] of [
+      ['n', 'new'],
+      ['w', 'library'],
+      ['e', 'edit'],
+      ['?', 'keys'],
+      ['t', 'pick-retry'],
+      ['m', 'pick-move'],
+      ['x', 'pick-cancel'],
+      ['r', 'pick-rerun'],
+    ]) {
+      press(key!)
+      expect(onOpenOverlay, `\`${key!}\` opens ${overlay!}`).toHaveBeenCalledWith(
+        overlay,
+      )
+    }
+  })
+
+  it('selects the next and previous row with `j`/`k`, clamped', () => {
+    const onSelectRun = vi.fn()
+    shell({ run: 'aaaa1111bbbb' }, { onSelectRun })
+
+    press('j')
+    expect(onSelectRun).toHaveBeenCalledExactlyOnceWith('cccc3333dddd')
+
+    // The first row is the top: `k` there stays, as the mock's `move`
+    // does, rather than wrapping to the bottom of the list.
+    onSelectRun.mockClear()
+    press('k')
+    expect(onSelectRun).not.toHaveBeenCalled()
+  })
+
+  it('selects the first row when nothing is selected yet', () => {
+    const onSelectRun = vi.fn()
+    shell({}, { onSelectRun })
+
+    press('ArrowDown')
+    expect(onSelectRun).toHaveBeenCalledExactlyOnceWith('aaaa1111bbbb')
+  })
+
+  it('cycles the panes with `←`/`→` and jumps with `1`–`9`', () => {
+    const onSelectPane = vi.fn()
+    shell({ run: 'aaaa1111bbbb' }, { onSelectPane })
+
+    press('ArrowRight')
+    expect(onSelectPane).toHaveBeenLastCalledWith(1)
+
+    // Three panes in the manifest above, so `←` from the first wraps.
+    press('ArrowLeft')
+    expect(onSelectPane).toHaveBeenLastCalledWith(2)
+
+    press('3')
+    expect(onSelectPane).toHaveBeenLastCalledWith(2)
+
+    // `1`–`9` reaches a pane or nothing: there is no fourth.
+    onSelectPane.mockClear()
+    press('4')
+    expect(onSelectPane).not.toHaveBeenCalled()
+  })
+
+  it('collapses the run list on `b`', () => {
+    shell()
+    expect(usePrefs.getState().listCollapsed).toBe(false)
+
+    press('b')
+    expect(usePrefs.getState().listCollapsed).toBe(true)
+  })
+
+  it('puts the caret in the log composer on `l`', () => {
+    const onSelectPane = vi.fn()
+    shell({ run: 'aaaa1111bbbb' }, { onSelectPane })
+
+    press('l')
+
+    expect(onSelectPane).toHaveBeenCalledExactlyOnceWith(1)
+    expect(useUi.getState().logComposerFor).toBe('aaaa1111bbbb')
+  })
+
+  it('refetches everything this tab holds on `^r`', () => {
+    const { queryClient } = shell()
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+
+    press('r', { ctrlKey: true })
+
+    // Every entry, with no key: `refresh` is the whole cache (10
+    // §Realtime and caching).
+    expect(invalidate).toHaveBeenCalledExactlyOnceWith()
+  })
+
+  it('opens the palette on `^p`', () => {
+    const onOpenPalette = vi.fn()
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { staleTime: 5000, retry: false } },
+    })
+    queryClient.setQueryData(listRunsApiRunsGetQueryKey(), RUNS)
+    queryClient.setQueryData(manifestApiPluginsGetQueryKey(), MANIFEST)
+    render(
+      <QueryClientProvider client={queryClient}>
+        <App
+          search={{}}
+          onSelectRun={() => {}}
+          onSelectPane={() => {}}
+          onOpenPalette={onOpenPalette}
+        />
+      </QueryClientProvider>,
+    )
+
+    fireEvent.keyDown(document.body, { key: 'p', ctrlKey: true })
+    expect(onOpenPalette).toHaveBeenCalledOnce()
+  })
+
+  it('closes the open overlay on `esc`, and closes nothing when none is', () => {
+    const onCloseOverlay = vi.fn()
+    shell({ overlay: 'keys' }, { onCloseOverlay })
+
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(onCloseOverlay).toHaveBeenCalled()
+
+    cleanup()
+    onCloseOverlay.mockClear()
+    shell({}, { onCloseOverlay })
+
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(onCloseOverlay).not.toHaveBeenCalled()
+  })
+
+  it('hands the keyboard to the detail pane on `⏎`', () => {
+    shell({ run: 'aaaa1111bbbb' })
+    expect(useUi.getState().focus).toBe('list')
+
+    fireEvent.keyDown(screen.getByRole('region', { name: 'runs' }), { key: 'Enter' })
+
+    expect(useUi.getState().focus).toBe('detail')
+    expect(document.activeElement).toBe(screen.getByRole('region', { name: 'detail' }))
+  })
+
+  it('is off while the operator is typing into the `/` input', () => {
+    const onOpenOverlay = vi.fn()
+    const onSelectRun = vi.fn()
+    shell({ run: 'aaaa1111bbbb' }, { onOpenOverlay, onSelectRun })
+
+    const input = screen.getByRole('textbox', { name: 'filter runs' })
+    for (const key of ['n', 'D', 'j', 'w']) fireEvent.keyDown(input, { key })
+
+    expect(onOpenOverlay).not.toHaveBeenCalled()
+    expect(onSelectRun).not.toHaveBeenCalled()
+  })
+
+  it('is off while an overlay owns the keyboard', () => {
+    const onOpenOverlay = vi.fn()
+    const onSelectRun = vi.fn()
+    shell({ run: 'aaaa1111bbbb', overlay: 'keys' }, { onOpenOverlay, onSelectRun })
+
+    press('n')
+    press('D', { shiftKey: true })
+    press('j')
+
+    expect(onOpenOverlay).not.toHaveBeenCalled()
+    expect(onSelectRun).not.toHaveBeenCalled()
+  })
+
+  it('binds every keycap of `lib/keys.ts` that names an action', () => {
+    // The table is the contract (10 §Keyboard is exhaustive), so the
+    // check is that nothing in it is drawn in the footer and the `?`
+    // overlay without something behind it. The four navigation rows and
+    // the two request-panel rows are asserted above and in
+    // `keys/__tests__`; the rest are palette commands.
+    const commands = new Set(PALETTE_COMMANDS.map((one) => one.key))
+    const navigation = new Set(['↑', '↓', 'j', 'k', '←', '→', '1–9', '⏎', 'tab'])
+    const scoped = new Set(['a', 'd'])
+    const app = new Set(['^p', 'esc'])
+
+    for (const binding of KEY_BINDINGS) {
+      for (const cap of binding.keys) {
+        expect(
+          commands.has(cap) || navigation.has(cap) || scoped.has(cap) || app.has(cap),
+          `\`${cap}\` is bound to something`,
+        ).toBe(true)
+      }
+    }
   })
 })

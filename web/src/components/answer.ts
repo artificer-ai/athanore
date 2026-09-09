@@ -13,7 +13,7 @@
  */
 import type { ErrorSchema } from '@rjsf/utils'
 
-import type { ErrorCode, ValidationError } from '../api/gen/types.gen'
+import type { ErrorCode, RequestOption, ValidationError } from '../api/gen/types.gen'
 
 /**
  * The two refusals that mean the request moved under the operator: it
@@ -162,4 +162,41 @@ export const OPTION_CLASSES: Record<OptionTone, string> = {
 /** The classes an option button of this kind carries. */
 export function optionClass(kind: string | null | undefined): string {
   return OPTION_CLASSES[optionTone(kind)]
+}
+
+/* -------------------------------------------------------------------- */
+/* The two keys the request panel adds                                   */
+/* -------------------------------------------------------------------- */
+
+/**
+ * What `a` picks, in preference order, and what `d` picks
+ * (`docs/v1/10-frontend.md` §Keyboard, `docs/v1/20-carried-findings.md`).
+ *
+ * ACP's four permission kinds carry the meaning; the list order a client
+ * sends them in is unspecified, so the choice is by kind and never by
+ * position. `*_once` before `*_always` is the order 05 §Policies gives
+ * `auto_allow` and `auto_deny` and the order `athanore permit` / `deny`
+ * uses (11 §Commands): a keystroke answers this one call and does not
+ * quietly install a standing rule.
+ */
+export const ALLOW_KINDS: readonly string[] = ['allow_once', 'allow_always']
+export const DENY_KINDS: readonly string[] = ['reject_once', 'reject_always']
+
+/**
+ * The first option whose kind is in `kinds`, or `undefined` when the
+ * request offers none of them.
+ *
+ * A `human_input` choice carries no kinds at all (06 §The model), so
+ * this is `undefined` for it — and `a` and `d` do nothing there, which
+ * is right: they are allow and deny, and that question is neither.
+ */
+export function optionOfKind(
+  options: readonly RequestOption[] | null | undefined,
+  kinds: readonly string[],
+): RequestOption | undefined {
+  for (const kind of kinds) {
+    const found = (options ?? []).find((option) => option.kind === kind)
+    if (found !== undefined) return found
+  }
+  return undefined
 }

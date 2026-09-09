@@ -11,10 +11,13 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  ALLOW_KINDS,
   answerFailure,
+  DENY_KINDS,
   extraErrorsFrom,
   isConflict,
   optionClass,
+  optionOfKind,
   optionTone,
 } from '../answer'
 
@@ -131,5 +134,39 @@ describe('an option’s kind', () => {
     for (const kind of ['allow_once', 'reject_once', 'defer']) {
       expect(optionClass(kind)).toContain('border-')
     }
+  })
+})
+
+describe('the option `a` and `d` pick', () => {
+  /** The three the fake agent offers, in an order nothing may rely on. */
+  const OPTIONS = [
+    { option_id: 'r', name: 'Reject', kind: 'reject_once' },
+    { option_id: 'aa', name: 'Always allow', kind: 'allow_always' },
+    { option_id: 'a', name: 'Allow once', kind: 'allow_once' },
+    { option_id: 'defer', name: 'Ask me later' },
+  ]
+
+  it('prefers `*_once`, whatever order the options arrived in', () => {
+    // 20 §Findings: ACP leaves list order unspecified, and 05 §Policies
+    // picks `allow_once` before `allow_always` so a keystroke answers
+    // this call rather than installing a standing rule.
+    expect(optionOfKind(OPTIONS, ALLOW_KINDS)?.option_id).toBe('a')
+    expect(optionOfKind(OPTIONS, DENY_KINDS)?.option_id).toBe('r')
+  })
+
+  it('falls back to `*_always` when `*_once` is not offered', () => {
+    const always = OPTIONS.filter((option) => option.kind !== 'allow_once')
+    expect(optionOfKind(always, ALLOW_KINDS)?.option_id).toBe('aa')
+  })
+
+  it('finds nothing in a question that is neither allow nor deny', () => {
+    const labels = [
+      { option_id: 'main', name: 'main' },
+      { option_id: 'next', name: 'next' },
+    ]
+    expect(optionOfKind(labels, ALLOW_KINDS)).toBeUndefined()
+    expect(optionOfKind(labels, DENY_KINDS)).toBeUndefined()
+    expect(optionOfKind(null, ALLOW_KINDS)).toBeUndefined()
+    expect(optionOfKind(undefined, DENY_KINDS)).toBeUndefined()
   })
 })

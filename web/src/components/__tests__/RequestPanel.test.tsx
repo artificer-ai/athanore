@@ -13,12 +13,13 @@
  * surface that is, and how it looks, is `components/ui/sonner.tsx`.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createAppQueryClient } from '../../api/client'
 import type { RequestView } from '../../api/gen/types.gen'
+import { useKeymap } from '../../keys'
 import { request } from '../../panes/__tests__/fixtures'
 import { RequestPanel } from '../RequestPanel'
 
@@ -322,5 +323,130 @@ describe('a refusal', () => {
     expect(await screen.findByTestId('request-error')).toHaveTextContent(
       'Failed to fetch',
     )
+  })
+})
+
+/* -------------------------------------------------------------------- */
+/* `a` and `d`                                                           */
+/* -------------------------------------------------------------------- */
+
+/**
+ * The panel under the app's one keyboard listener, with a control
+ * outside it to press the same keys from.
+ *
+ * The real map is mounted rather than a stand-in: what 10 §Keyboard
+ * fixes is that `a` and `d` are live "when the request panel has focus"
+ * and dead everywhere else (D51), and only the real handler decides
+ * that.
+ */
+function underTheKeymap(view: RequestView) {
+  function Harness() {
+    useKeymap({
+      actions: [],
+      select: () => {},
+      cyclePane: () => {},
+      jumpPane: () => {},
+      focusDetail: () => {},
+      openPalette: () => {},
+      close: () => {},
+    })
+
+    return (
+      <>
+        <input aria-label="filter runs" />
+        <section aria-label="runs" data-region="list">
+          <button type="button">a run row</button>
+        </section>
+        <RequestPanel request={view} />
+      </>
+    )
+  }
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <Harness />
+    </QueryClientProvider>,
+  )
+}
+
+describe('the request panel’s two keys', () => {
+  it('answers `allow_once` on `a`, from inside the panel', async () => {
+    const sent = stubAnswer({ ok: true })
+    underTheKeymap(PERMISSION)
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Allow once' }), { key: 'a' })
+
+    await waitFor(() => expect(sent).toHaveLength(1))
+    expect(sent[0]?.method).toBe('POST')
+    expect(sent[0]?.url).toContain('/api/requests/13/answer')
+    expect(sent[0]?.body).toEqual({ option_id: 'allow_once' })
+  })
+
+  it('answers `reject_once` on `d`', async () => {
+    const sent = stubAnswer({ ok: true })
+    underTheKeymap(PERMISSION)
+
+    fireEvent.keyDown(screen.getByTestId('request-panel'), { key: 'd' })
+
+    await waitFor(() => expect(sent).toHaveLength(1))
+    expect(sent[0]?.body).toEqual({ option_id: 'reject_once' })
+  })
+
+  it('does nothing from the run list, and nothing from an input', async () => {
+    const sent = stubAnswer({ ok: true })
+    underTheKeymap(PERMISSION)
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'a run row' }), { key: 'a' })
+    fireEvent.keyDown(screen.getByRole('region', { name: 'runs' }), { key: 'd' })
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'filter runs' }), { key: 'a' })
+
+    // Nothing to wait for: the assertion is that no POST was made, and a
+    // flush of the microtask queue is enough to see one that was.
+    await Promise.resolve()
+    expect(sent).toEqual([])
+  })
+
+  it('has no key for a question that is not allow or deny', async () => {
+    const sent = stubAnswer({ ok: true })
+    // A `human_input` choice: labels, no ACP kinds (06 §The model).
+    underTheKeymap(
+      request({
+        id: 21,
+        source: 'node',
+        kind: 'question',
+        mode: 'options',
+        prompt: 'which branch?',
+        options: [
+          { option_id: 'main', name: 'main' },
+          { option_id: 'next', name: 'next' },
+        ],
+        pending: true,
+      }),
+    )
+
+    fireEvent.keyDown(screen.getByTestId('request-panel'), { key: 'a' })
+    fireEvent.keyDown(screen.getByTestId('request-panel'), { key: 'd' })
+
+    await Promise.resolve()
+    expect(sent).toEqual([])
+  })
+
+  it('has no key for a text request, whose keystrokes are its answer', async () => {
+    const sent = stubAnswer({ ok: true })
+    underTheKeymap(
+      request({
+        id: 22,
+        source: 'node',
+        kind: 'question',
+        mode: 'text',
+        prompt: 'which branch?',
+        pending: true,
+      }),
+    )
+
+    fireEvent.keyDown(screen.getByTestId('request-panel'), { key: 'a' })
+
+    await Promise.resolve()
+    expect(sent).toEqual([])
   })
 })
