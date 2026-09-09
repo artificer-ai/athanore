@@ -89,7 +89,10 @@ adapters (`ATHANORE_SMOKE=1`), never run in CI.
 
 GitHub Actions: `uv sync`, ruff, pyright, import-linter, pytest (SQLite),
 pnpm typecheck/lint/vitest, build SPA, Playwright, OpenAPI snapshot check,
-`pip-audit`, `pnpm audit`. Nightly: Postgres matrix. Coverage gates:
+the packaging check (`scripts/check_wheel.py`: the SPA built, then `uv
+build`, then the wheel installed into a clean venv and asked for `/` —
+10 §Build, D180), `pip-audit`, `pnpm audit`. Nightly: Postgres matrix.
+Coverage gates:
 `graph`/`engine`/`requests` ≥ 95 %, overall ≥ 85 %; `web/src` ≥ 80 % on
 statements, branches, functions and lines, configured in
 `web/vite.config.ts` so that `pnpm -C web test` — which is what both the

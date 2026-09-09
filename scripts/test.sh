@@ -63,6 +63,13 @@ if [ -f web/package.json ]; then
   # real `athanore serve` with FakeACPAgent behind every agent (T068a),
   # so it comes last and after the build that produced its subject.
   step "web e2e"       "$(browsers)" pnpm -C web exec playwright test
+  # The Phase 4 checkpoint (T069): `uv build`, then the wheel's contents,
+  # then a clean `pip install` of it serving `/` out of a temporary
+  # directory. It runs here and not only on a runner for D178's reason —
+  # this repository has no runner, so a check only `.github/workflows/
+  # ci.yml` performs is a check that never runs. It needs the build
+  # above, which is why it is after it.
+  step "package"       yes uv run --no-sync python scripts/check_wheel.py
 else
   skipped+=("web (no web/ yet — T007)")
 fi

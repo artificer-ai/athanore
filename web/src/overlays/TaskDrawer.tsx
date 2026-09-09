@@ -5,8 +5,9 @@
  * (`docs/v1/10-frontend.md` §Overlays, `docs/v1/04-engine.md` §Operator
  * operations, `docs/v1/08-api.md` §Tasks).
  *
- * It opens from the overview's NODES rows (T063a) and from the graph
- * pane's rows (T063e), and it is reached the way every overlay is: two
+ * It opens from the overview's NODES rows (T063a) and from nowhere else
+ * — a graph row click filters the log instead (D167) — and it is reached
+ * the way every overlay is: two
  * search parameters and nothing else. `?task=` outlives the overlay on
  * purpose — it is also the agent pane's focused attempt (T063c) — which
  * is what makes `focus stream` a navigation rather than a message: the
