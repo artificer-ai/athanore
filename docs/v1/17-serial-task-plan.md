@@ -3618,6 +3618,18 @@ precedence in 09/11.
 **Tests.** `tests/cli/test_discovery.py` with a fake distribution
 registered via a temporary `entry_points` shim.
 **Done.** Tests pass.
+**Status.** Done.
+
+`athanore/plugins/discovery.py` is `discover()` and nothing else: the
+`athanore.workflows` group, the `module:attr`-or-callable form, a fixed
+load order, and `DiscoveryError` for an entry that yields no workflow.
+`serve` already had `--no-discover`, the two `athanore.toml` tables and
+the precedence hook (T053); what this task added there is the call, the
+refusal a broken entry point earns (D184), and the precedence written
+down in 09 §Discovery and 11 §Server. The fake distribution is a real
+one — a `.dist-info` with an `entry_points.txt`, on `sys.path` — so the
+group name and the `dist.name` in a failure message are asserted against
+`importlib.metadata` rather than against a stub of it.
 
 ### T073 — Plugin test workflow and the plugin suite (A5.4)
 

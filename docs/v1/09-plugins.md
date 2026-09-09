@@ -328,6 +328,12 @@ scopes).
   explicitly. Pools come from `athanore.toml`:
 
 ```toml
+[project.entry-points."athanore.workflows"]
+feature_build = "acme.flows:feature_build"
+gamedev       = "acme.flows:build_gamedev"   # a callable returning one
+```
+
+```toml
 [pools]
 local = 1
 cloud = 8
@@ -336,6 +342,47 @@ cloud = 8
 feature_build = { pool = "local" }
 gamedev = { pool = "local" }
 ```
+
+`athanore.plugins.discovery.discover()` is the whole of it, and four
+rules make it predictable. They are the ones an operator otherwise only
+learns by being surprised, so they are written down here and in 11
+§Server.
+
+**The entry point's name is not the workflow's name.** The left-hand side
+above is what the distribution called the entry; the name a run is
+submitted under, that `[workflows]` binds to a pool and that the
+precedence below is applied to, is the `Workflow`'s own. They are usually
+the same string and nothing requires it.
+
+**An explicit target wins.** `athanore serve pkg.mod:wf` registers that
+workflow, and a discovered workflow with the same name is dropped rather
+than registered beside it: naming a target means that target, which is
+what makes it possible to serve a working copy of an installed workflow
+without uninstalling it. `--no-discover` turns discovery off entirely, so
+the workflows served are exactly the targets given — none, if none were
+given.
+
+**A discovered workflow is an ordinary one.** It is bound to a pool by
+`[workflows.<name>]` exactly as a target is, runs on the default pool
+(`workers`) if nothing binds it, and is refused at registration by the
+same rules — a name that shadows a CLI verb or a pool, a graph that does
+not finalize, a panel that names a node it does not have.
+
+**A broken entry point stops the server.** Loading one runs the
+installing package's code, and a module that will not import, an
+attribute that is not there, a value that is not a `Workflow` or a
+factory that raised are all that package being broken rather than a
+mistyped command. `serve` prints the entry point, the distribution and
+the cause, and exits 1; skipping it would start a server whose missing
+workflow is next observed as a 404 on a name that is definitely
+installed. `--no-discover` is the way past a package that cannot be
+fixed today.
+
+Entries are loaded in a fixed order — entry-point name, then value — so
+two installations of the same packages register the same workflows in
+the same order, and two distributions advertising the same workflow name
+collide the same way every time instead of resolving by whichever the
+file system yielded first.
 
 ## Security (12 has the model)
 

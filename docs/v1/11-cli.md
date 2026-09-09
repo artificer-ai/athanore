@@ -24,6 +24,28 @@ at the URL that was printed — which on `--port 0` is knowable only once
 the socket is bound. Replaces `python -m workflow` (examples keep a
 `__main__` that calls `Server` directly for the programmatic form).
 
+What is served, in order (09 §Discovery has the same rules from the
+plugin side):
+
+1. **The targets given**, in the order they were given. Every failure to
+   resolve one — no such module, no such file, no such attribute, an
+   attribute that is not a `Workflow` — costs 2.
+2. **Then the entry points**, unless `--no-discover`. A discovered
+   workflow whose *workflow name* matches a target already loaded is
+   dropped: an explicit target wins, so a working copy can be served
+   without uninstalling the package that ships it. An entry point that
+   cannot be loaded is not skipped — it names itself, its distribution
+   and its cause, and exits 1.
+3. **Then the pools.** `[workflows.<name>].pool` binds a workflow, by
+   workflow name, to the capacity `[pools]` declares for that name; a
+   workflow nothing binds runs on the default pool, sized by `--workers`.
+   A binding naming a pool `[pools]` does not declare costs 2 and names
+   the pool — it is a typo, and a typo that fell back to the default
+   would put the work on the wrong capacity for as long as nobody looked.
+   A binding for a workflow this server does not run is a warning, said
+   once: an `athanore.toml` describes a project's workflows, and serving
+   one of them on purpose is ordinary.
+
 ```
 athanore db upgrade | current | backup <path> | import-v0 <file>
 athanore token show | rotate
