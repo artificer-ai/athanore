@@ -3713,6 +3713,35 @@ panel/action from 09 §Declarations as the showcase (`/words` route,
 `examples/tests/test_gamedev.py`.
 **Done.** `tests/test_gamedev.py` deleted; `examples/tests` green.
 
+**Status.** Done. `examples/gamedev/` is the MVP's game pipeline written
+against the v1 API — `prompt → design → director → architecture →
+engineering → review → human_qa → qa → publish` — with no gate and no
+git: the browser is the test and a game ships as a file. The architect
+submits an ordered `ArchitecturePlan` and the engineering node runs one
+agent session per build step, reading the *absence* of a plan on a
+loop-back as "one targeted fix"; `human_qa` is `human_input`, so the
+attempt gives its pool slot back while a person plays the game and the
+reply becomes part of QA's verdict rather than advice beside it. Seven
+seats subclass `pi.PiAgent` with `thinking = "off"` carried from the MVP,
+and `Deliverable.file_path` is `output/<slug>.html` by pattern, so the
+pipeline's one hard constraint is a 422 the director repairs rather than
+prose in a prompt. `gamedev/plugin.py` is 09 §Declarations built for
+real: the `/words` route, the `override` action and the `Words` table
+pane, all three about the name a game goes by, with the action writing
+through `ctx.ops` because a `run`-scoped handler has no attempt to reach
+the work-log service with (D187). `examples/msgtest/` is three nodes, two
+questions and zero agents, the second question a *choice* so one run
+renders both request modes; `examples/projects/` is `feature_build`'s
+tail behind a triage stage, its seats being `feature_build`'s agent
+classes with a Claude-Code adapter in front of them in the MRO and the
+triaged directory threaded through every payload. Both new agent
+workflows ship `scenarios/` (13 §Running examples on the fake); the
+scripted `gamedev` run was watched end to end against a real `athanore
+serve` on `FakeACPAgent`, and its `Words` pane opened in a browser.
+`examples/__main__.py` and `examples/pyproject.toml` now carry all four
+workflows, and the two host/discovery assertions in
+`examples/tests/test_feature_build.py` moved with them.
+
 ### T076 — Port `claude_acp`, `docker_acp`, `examples/docker` (A6.1)
 
 **Do.** `claude_acp`: `command=["npx","-y","@agentclientprotocol/claude-agent-acp@X.Y.Z"]`,

@@ -1,0 +1,6 @@
+{
+  "text": ["Ran the command both ways against an empty and a populated database."],
+  "log": "qa: approve. `report list --json` prints `[]` on an empty database and a three-element array on a populated one, both exit 0, and `report list` still prints the table.",
+  "submit": { "verdict": "approve", "feedback": "" },
+  "usage": { "input": 4300, "output": 300 }
+}

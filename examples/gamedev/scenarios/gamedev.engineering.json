@@ -1,0 +1,5 @@
+{
+  "text": ["Wrote this step's section into the file and checked that it parses."],
+  "log": "engineering: applied this build step to output/neon-snake.html and left the later steps' placeholders untouched. `node --check` on the extracted script is clean.",
+  "usage": { "input": 6400, "output": 2200 }
+}
