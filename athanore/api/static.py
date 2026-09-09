@@ -66,6 +66,7 @@ __all__ = [
     "DIST",
     "RESERVED_PREFIXES",
     "SPA",
+    "PluginAssets",
     "PolicyFiles",
     "install_cors",
     "mount_plugin_assets",
@@ -155,6 +156,35 @@ class PolicyFiles(StaticFiles):
         response = await super().get_response(path, scope)
         response.headers["content-security-policy"] = CSP
         return response
+
+
+class PluginAssets(PolicyFiles):
+    """A workflow's asset directory, refusing in the API's error shape.
+
+    `StaticFiles` answers a missing file — and a traversal, which it
+    resolves to the same thing — with Starlette's own
+    ``{"detail": "Not Found"}``. Under ``/plugins/…`` that would be the
+    *second* answer to one question: a workflow that ships no assets has
+    nothing mounted at all, so the router falls back to :class:`SPA`,
+    which gives the ``{error, code}`` of 08 §Conventions for every
+    reserved prefix. One shape for "there is no such asset", whether or
+    not the workflow that would have served it ships any.
+
+    Only a 404 is rewritten. A 405 the method does not allow and a 304
+    the browser's validator earned are answers of their own.
+    """
+
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        try:
+            return await super().get_response(path, scope)
+        except HTTPException as exc:
+            if exc.status_code != 404:
+                raise
+            return ApiError(
+                404,
+                ErrorCode.not_found,
+                f"no such asset: {scope.get('path', path)}",
+            ).response()
 
 
 def _unbuilt() -> HTMLResponse:
@@ -257,12 +287,15 @@ def mount_plugin_assets(app: FastAPI, workflow: str, directory: Path) -> Mount:
 
     ``check_dir`` is left on, so a declared directory that does not exist
     raises here — at registration, which is where 09 §Registration and
-    validation says a plugin's mistakes are reported.
+    validation says a plugin's mistakes are reported. `StaticFiles` is
+    also what makes a traversal impossible: it normalises the path it is
+    given and refuses anything that resolves outside the directory (12
+    §Plugins), so ``../`` reaches nothing and answers 404.
     """
 
     mount = Mount(
         f"/plugins/{workflow}/static",
-        app=PolicyFiles(directory=directory),
+        app=PluginAssets(directory=directory),
         name=f"plugin-assets:{workflow}",
     )
     app.router.routes.append(mount)

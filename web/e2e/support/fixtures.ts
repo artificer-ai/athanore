@@ -24,7 +24,7 @@ const BUILTIN_WORKFLOW = '_builtin'
 export const RUN_TIMEOUT = 30_000
 
 /** The workflows `support/server.ts` registers (`../workflows.py`). */
-export type FixtureWorkflow = 'probe' | 'spread' | 'hold'
+export type FixtureWorkflow = 'probe' | 'spread' | 'hold' | 'plugged'
 
 export class Dashboard {
   readonly page: Page
@@ -118,12 +118,24 @@ export class Dashboard {
 
   /** Show a builtin pane by name: the bar's dots are a radio group. */
   async pane(name: string): Promise<void> {
+    await this.showPane(name, BUILTIN_WORKFLOW)
+  }
+
+  /**
+   * Show a pane a workflow contributed, by its name and its workflow.
+   *
+   * The same gesture as {@link Dashboard.pane} — a plugin's pane is a
+   * dot in the same bar (09 §Builtins are plugins) — with the manifest
+   * id it settles on named, because that id is `<workflow>:<panel>` and
+   * a plugin's is not `_builtin`'s.
+   */
+  async showPane(name: string, workflow: string): Promise<void> {
     await this.page.locator(`[data-pane="${name}"][role="radio"]`).click()
     // The pane host names the panel it is drawing by its manifest id,
-    // which is `<workflow>:<panel>` — `_builtin` for all of these (09).
+    // which is `<workflow>:<panel>` (09).
     await expect(this.page.getByTestId('pane-body')).toHaveAttribute(
       'data-pane',
-      `${BUILTIN_WORKFLOW}:${name}`,
+      `${workflow}:${name}`,
     )
   }
 

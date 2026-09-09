@@ -57,7 +57,47 @@ export const STALE_TIME_MS = 5000
 export const QUERY_RETRIES = 1
 
 /** The HTTP status that means "prove who you are". */
-const UNAUTHORIZED = 401
+export const UNAUTHORIZED = 401
+
+/**
+ * The query client the fetch client reads its credential out of.
+ *
+ * Held here so that {@link apiAuthHeaders} can answer the same question
+ * the request interceptor does, from the same cache, without either of
+ * them owning a second copy of `/api/me`. Set by
+ * {@link createAppQueryClient} and replaced when a second app is
+ * mounted, which is the same lifetime the interceptors have.
+ */
+let configured: QueryClient | null = null
+
+/**
+ * The `Authorization` header this server wants, or none at all.
+ *
+ * **One rule, in one place.** The interceptor below applies it to every
+ * typed call, and `window.athanore.fetch` applies it to the calls a
+ * plugin's web component makes (09 §Escape hatch) — and a plugin route
+ * is an operator route (12 §Plugins), so the two must not be able to
+ * disagree about when a credential is sent. The rule is D154's: the
+ * stored token goes out on everything, including `/api/me`, and is
+ * withheld only from a server that has already answered `auth: "off"`.
+ */
+export function apiAuthHeaders(): Record<string, string> {
+  const me = configured?.getQueryData<Me>(meQueryOptions().queryKey)
+  const token = usePrefs.getState().token
+  if (token === null || me?.auth === 'off') return {}
+  return { Authorization: `Bearer ${token}` }
+}
+
+/**
+ * Report a refusal the way the response interceptor does.
+ *
+ * A 401 from anywhere means the token this browser holds is missing or
+ * no longer good — from a plugin's own request as much as from a typed
+ * one, since both go through the same door.
+ */
+export function reportUnauthorized(status: number): void {
+  if (status === UNAUTHORIZED) useUi.getState().setNeedsToken(true)
+}
 
 /**
  * The query options for `GET /api/me` — what this server wants and
@@ -102,26 +142,23 @@ export function useMe() {
  */
 function configureApiClient(queryClient: QueryClient): void {
   client.setConfig({ baseUrl: API_BASE_URL })
+  configured = queryClient
 
   client.interceptors.request.clear()
   client.interceptors.response.clear()
 
   client.interceptors.request.use((request) => {
-    const me = queryClient.getQueryData<Me>(meQueryOptions().queryKey)
-    const token = usePrefs.getState().token
     // Withheld from a server that has said it does not want it, and from
     // no other: before `/api/me` has answered, the credential is what
     // makes its answer worth having, and `/api/me` never refuses one.
-    if (token !== null && me?.auth !== 'off') {
-      request.headers.set('Authorization', `Bearer ${token}`)
+    for (const [header, value] of Object.entries(apiAuthHeaders())) {
+      request.headers.set(header, value)
     }
     return request
   })
 
   client.interceptors.response.use((response) => {
-    if (response.status === UNAUTHORIZED) {
-      useUi.getState().setNeedsToken(true)
-    }
+    reportUnauthorized(response.status)
     return response
   })
 }

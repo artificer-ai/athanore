@@ -43,8 +43,15 @@ describe('the token page', () => {
     render(<Tokens />)
     const tokens = generatedTokens()
     expect(tokens.length).toBeGreaterThan(50)
+    // One pass over the DOM rather than one query per token: the page is
+    // a row per token and there are a hundred and fifty of them, so a
+    // `getByText` each is a hundred and fifty full-tree scans — enough,
+    // under the coverage run's load, to time the test out.
+    const rendered = new Set(
+      screen.getAllByText(/^--[a-z0-9-]+$/).map((node) => node.textContent),
+    )
     for (const token of tokens) {
-      expect(screen.getByText(token), `${token} is not on the page`).toBeVisible()
+      expect(rendered, `${token} is not on the page`).toContain(token)
     }
   })
 

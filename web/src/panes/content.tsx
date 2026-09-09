@@ -43,26 +43,28 @@
  *   item 2). {@link BUILTIN_RENDERERS} is the whole of that, and it is
  *   keyed by the panel's name on `_builtin` alone. The `custom` panels
  *   the core ships — the agent stream, the requests pane, the graph rail
- *   — go through {@link ELEMENT_RENDERERS} instead, keyed by their tag
+ *   — go through `src/plugins/registry.ts` instead, keyed by their tag
  *   and not by their workflow, because an element is a tag this build
- *   knows how to draw and a plugin declaring the same one means it.
+ *   knows how to draw and a plugin declaring the same one means it. That
+ *   is the same table a plugin's tag is looked up in, and the same one
+ *   that answers `undefined` for a tag this build does not draw — which
+ *   is what sends it to {@link CustomElementHost} to be mounted for
+ *   real.
  */
 import type { ReactNode } from 'react'
 
+import { CustomElementHost } from './CustomElementHost'
 import {
-  AgentStream,
   ChartPane,
   DashboardPane,
   ErrorCard,
   FormPane,
-  GraphRail,
   KvPane,
   Log,
   LogPane,
   MarkdownPane,
   Overview,
   PlaceholderCard,
-  Requests,
   TablePane,
   asChart,
   asDashboard,
@@ -80,6 +82,7 @@ import {
   type PanelScope,
 } from './source'
 import type { Pane } from './usePanes'
+import { elementRenderer, type ElementContent } from '../plugins'
 
 /**
  * What to draw, and whether it brings its own scroller.
@@ -90,8 +93,12 @@ import type { Pane } from './usePanes'
  * that never ends. The overview does too, because its sections are
  * full-bleed strips divided by rules rather than a padded column. Every
  * other kind is poured into the pane's.
+ *
+ * The same type an element renderer returns, and deliberately one type:
+ * a `custom` panel is drawn by the registry or by the host and either
+ * way it is a pane's body (`src/plugins/registry.ts`).
  */
-export type Content = { node: ReactNode; scrolls: boolean }
+export type Content = ElementContent
 
 /** What the panel is being drawn for, beyond its own data. */
 export type RenderContext = {
@@ -217,57 +224,6 @@ const BUILTIN_RENDERERS: Record<
 }
 
 /**
- * The custom-element table: the tags this build renders itself.
- *
- * 09 §Builtins are plugins ships the operator views as `custom` panels
- * — `<ath-agent-stream>`, `<ath-requests>`, `<ath-run-graph>` — and the
- * SPA carries their renderers in its own bundle. What comes through the
- * manifest is their *placement and liveness*, which is the whole point:
- * the host has no hard-coded list of panes, only a list of tags it
- * happens to know how to draw.
- *
- * A tag that is not in here is a plugin's own element, and it draws the
- * placeholder below until T071 mounts one from the manifest's assets.
- * That is the same degradation an unknown `kind` gets: an element this
- * build cannot draw is never a crash.
- */
-const ELEMENT_RENDERERS: Record<string, (ctx: RenderContext) => Content> = {
-  'ath-agent-stream': (ctx) => ({
-    // It virtualises, so it needs a viewport with a height rather than
-    // one that grows with its content — the same reason the log does.
-    scrolls: true,
-    node: <AgentStream runId={ctx.scope.runId} taskId={ctx.scope.taskId} />,
-  }),
-
-  // The same tag is both the run's requests pane and its `global` inbox
-  // twin (`athanore/plugins/builtin/requests.py`), because the element
-  // table is keyed by tag: what differs between the two is the scope
-  // they are drawn in, and the renderer reads it.
-  'ath-requests': (ctx) => ({
-    // It brings its own header and its own scroller, as the log and the
-    // agent pane do, so the pane must not wrap it in a second one.
-    scrolls: true,
-    node: <Requests runId={ctx.scope.runId} />,
-  }),
-
-  // The rail list of 10 §Graph pane. Its own header and its own
-  // scroller, like the two above, because the EDGES column beside the
-  // rail is part of the pane's body rather than of a section poured
-  // into the host's scroller.
-  'ath-run-graph': (ctx) => ({
-    scrolls: true,
-    node: (
-      <GraphRail
-        runId={ctx.scope.runId}
-        taskId={ctx.scope.taskId}
-        onOpenNode={ctx.onOpenNode}
-        onOpenLibrary={ctx.onOpenLibrary}
-      />
-    ),
-  }),
-}
-
-/**
  * The renderer for `pane`'s kind over `data`, or the card that says why
  * there is none.
  *
@@ -365,18 +321,34 @@ export function renderKind(pane: Pane, data: unknown, ctx: RenderContext): Conte
     }
     case 'custom': {
       const element = pane.panel.element ?? undefined
-      const renderer = element === undefined ? undefined : ELEMENT_RENDERERS[element]
+      if (element === undefined) {
+        // Registration refuses a `custom` panel with no element (09
+        // §Registration and validation, rule 3), so a panel that arrives
+        // without one is a server this build was not written for.
+        return {
+          scrolls: false,
+          node: (
+            <PlaceholderCard
+              title="this custom panel names no element"
+              detail={`registered by ${pane.workflow}`}
+            />
+          ),
+        }
+      }
+      // The tags this build draws itself resolve through the same table a
+      // plugin's would, which is what makes the builtins' placement — and
+      // nothing else about them — the manifest's business (09 §Builtins
+      // are plugins).
+      const renderer = elementRenderer(element)
       if (renderer !== undefined) return renderer(ctx)
       return {
         scrolls: false,
         node: (
-          <PlaceholderCard
-            title="this panel is a plugin element"
-            detail={
-              element === undefined
-                ? 'plugin elements are not mounted yet'
-                : `<${element}> · plugin elements are not mounted yet`
-            }
+          <CustomElementHost
+            tag={element}
+            workflow={pane.workflow}
+            scope={ctx.scope}
+            {...(pane.panel.node == null ? {} : { node: pane.panel.node })}
           />
         ),
       }

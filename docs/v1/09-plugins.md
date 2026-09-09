@@ -146,6 +146,39 @@ window.athanore = {
 
 Nothing else. Any framework may be used inside the element.
 
+Four things about that surface the implementation settles (D183):
+
+- **`fetch` may not leave the prefix.** A path is resolved *under*
+  `/api/plugins/{wf}/`; `..`, an absolute URL and a protocol-relative
+  path are refused with a `TypeError` before a request is made. A plugin
+  reaches its own routes and no other part of the API.
+- **The element carries the same object.** `fetch` needs a workflow and
+  `window` is one object, so the global is bound to the workflow whose
+  element mounted most recently and the host also sets `athanore` on the
+  element itself, bound to that element's own workflow. The surface is
+  the same three capabilities either way; only where it is reached from
+  differs. Both are in place *before the element is connected*, on every
+  mount and not only the first — an already defined tag runs
+  `connectedCallback` the instant it is inserted, so the host builds the
+  element and appends it rather than leaving the insertion to React.
+  `connectedCallback` is therefore where an element may read either one.
+- **`subscribe` names are globs**, matched the way `refresh_on`'s are,
+  over the tab's one `EventSource`. A subscriber that raises is logged
+  and dropped — the browser's half of "a plugin cannot break the engine".
+- **A missing asset is the 404 of 08 §Conventions**, `{error, code:
+  "not_found"}`, so a URL under `/plugins/…` that names no file answers
+  the same way whether or not the workflow that would have served it
+  ships any assets. Traversal resolves to the same answer: `StaticFiles`
+  refuses a path outside the directory (12 §Plugins).
+
+Resolution order for a relative `assets=`: the declaring module's own
+directory, then `importlib.resources.files(<its package>)` when that
+directory holds no such name — which is the installed case, where the
+data a wheel ships need not sit beside the module that declared the
+workflow. A host may override both with an explicit root. A directory
+none of them finds is refused at registration, naming the path and the
+package (§Registration and validation, check 5).
+
 ## Registration and validation
 
 `server.register(wf)` collects declarations, then fails fast on six

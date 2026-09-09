@@ -222,7 +222,10 @@ describe('renderKind', () => {
       expect(screen.queryByTestId('pane-placeholder')).toBeNull()
     })
 
-    it('renders a placeholder for a tag this build cannot draw', () => {
+    it('sends a tag this build does not draw to the element host', () => {
+      // Its workflow ships no assets here, so the host says what it is
+      // waiting for; `CustomElementHost.test.tsx` mounts the tag for
+      // real (09 §Escape hatch).
       const content = renderKind(
         paneOf({ name: 'playfield', kind: 'custom', element: 'gd-playfield' }),
         undefined,
@@ -239,7 +242,7 @@ describe('renderKind', () => {
 
       draw(content)
       expect(screen.getByTestId('pane-placeholder')).toHaveTextContent(
-        'plugin elements are not mounted yet',
+        'this custom panel names no element',
       )
     })
   })

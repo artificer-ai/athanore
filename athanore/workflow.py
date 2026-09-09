@@ -56,7 +56,7 @@ class Workflow:
         self._graph: Graph | None = None
         self._declarations = Declarations()
         self._assets = assets
-        self._base = _caller_directory()
+        self._base, self._package = _caller_location()
 
     @property
     def name(self) -> str:
@@ -96,8 +96,29 @@ class Workflow:
         the process's working directory when there is no such module (a
         REPL, an ``exec``). Captured at construction because that is the
         only moment the defining module is on the stack.
+
+        It is the first answer and usually the only one:
+        :attr:`assets_package` is consulted only where this directory
+        does not hold the declared ``assets=``, which is the installed
+        case ``importlib.resources`` exists for (09 §Escape hatch).
         """
         return self._base
+
+    @property
+    def assets_package(self) -> str | None:
+        """The package the declaring module belongs to, or ``None``.
+
+        ``importlib.resources.files(<package>)`` is how a relative
+        ``assets=`` is resolved once the workflow is installed rather
+        than run out of a checkout: it asks the *loader* where the
+        package's data is instead of assuming a ``__file__`` beside it,
+        which is what 09 §Escape hatch means by "package data when
+        installed". Captured here for the same reason
+        :attr:`assets_base` is — the defining module is on the stack
+        exactly once — and ``None`` for a module that is in no package
+        at all, which leaves :attr:`assets_base` to answer.
+        """
+        return self._package
 
     def route(
         self, path: str, *, methods: str | Sequence[str] | None = None
@@ -313,22 +334,36 @@ class Workflow:
         return f"<Workflow {self.name!r} {len(self._builder.nodes)} nodes, {state}>"
 
 
-def _caller_directory() -> Path:
-    """The directory of the module that called :class:`Workflow`.
+def _caller_location() -> tuple[Path, str | None]:
+    """Where the module that called :class:`Workflow` lives.
 
     ``assets="./static"`` is resolved relative to the declaring module
     (09 §Escape hatch), and the frame above this one is the only place
-    that module's file can be read from. A caller with no file — the
-    REPL, an ``exec``, a frozen entry point — resolves against the
-    working directory instead, which is the best answer available and
-    still one a missing directory reports honestly at registration.
+    that module can be read from. Two answers come off it, because there
+    are two ways to find a module's directory and the packaged case
+    needs the second:
+
+    - its **directory**, from ``__file__``. A caller with none — the
+      REPL, an ``exec``, a frozen entry point — resolves against the
+      working directory instead, which is the best answer available and
+      still one a missing directory reports honestly at registration.
+    - its **package**, from ``__package__``, which is the module's own
+      name when the module is a package and its parent's otherwise.
+      That is what
+      :func:`athanore.plugins.registry.package_directory` hands to
+      ``importlib.resources.files``, and it is the answer that survives
+      installation. A top-level module belongs to no package and has
+      none, which leaves the directory to answer.
     """
 
     frame = inspect.currentframe()
     # This function's frame, then `Workflow.__init__`'s, then the caller's.
     caller = frame.f_back.f_back if frame is not None and frame.f_back else None
-    file = caller.f_globals.get("__file__") if caller is not None else None
-    return Path(file).resolve().parent if file else Path.cwd()
+    globals_ = caller.f_globals if caller is not None else {}
+    file = globals_.get("__file__")
+    package = globals_.get("__package__")
+    directory = Path(file).resolve().parent if file else Path.cwd()
+    return directory, package if isinstance(package, str) and package else None
 
 
 def _input_model(fn: Callable[..., Any]) -> type[BaseModel] | None:

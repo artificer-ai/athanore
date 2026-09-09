@@ -3556,6 +3556,56 @@ components via a registry so the host has no hard-coded pane knowledge.
 event via `subscribe`.
 **Done.** Tests pass.
 
+**Status.** Done. Server: `create_app` mounts each spec's `assets_dir()`
+at `/plugins/{wf}/static/` behind `PluginAssets` — `StaticFiles` under
+the CSP of 12 §Plugins, so a traversal resolves outside the directory
+and is refused, and a 404 is rewritten into the `{error, code}` of 08
+§Conventions so a missing asset answers one way whether or not its
+workflow ships any (D183). A relative `assets=` resolves against the
+declaring module's directory first and
+`importlib.resources.files(<its package>)` second — `Workflow` captures
+`__package__` beside `__file__`, `PluginSpec.package` carries it, and
+the registration refusal names both. The manifest already listed every
+`.js`; `tests/plugins/test_assets.py` is what proves the URLs it lists
+are the files the app serves.
+
+SPA: `web/src/plugins/` is the browser half — `registry.ts` maps a tag
+to a renderer and the three the core ships (`ath-agent-stream`,
+`ath-requests`, `ath-run-graph`) register into it at module load, so
+`content.tsx` has one lookup and no branch a plugin's tag could never
+reach; `assets.ts` injects each manifest URL once as
+`<script type="module">`, keyed off `document.head` so there is one
+record rather than two; `bridge.ts` is `window.athanore`, whose `fetch`
+resolves under `/api/plugins/{wf}/` and refuses anything that leaves it,
+whose `subscribe` is the tab's one `EventFeed` filtered by the same
+globs `refresh_on` uses, and whose `theme.tokens` are the design
+system's custom properties as the document resolves them.
+`panes/CustomElementHost.tsx` is the thin wrapper: it installs the
+global, builds `<tag run-id task-id node>` with its own bridge on it,
+appends it, and injects the assets — or draws the placeholder card when
+the workflow ships nothing that could define the tag. It owns the
+insertion rather than rendering the tag as JSX because an already
+defined tag runs `connectedCallback` the instant it is inserted, and
+React inserts a host node before it attaches a ref and before it runs an
+effect: a bridge handed over from either would be there on a document's
+first mount and missing on every mount after it, which is every time an
+operator cycles back to the pane (D183).
+
+Verified in Chromium by `web/e2e/plugin.spec.ts` against a real
+`athanore serve`: the `plugged` fixture workflow ships
+`web/e2e/static/playfield.js`, its `<e2e-playfield>` pane appears in the
+cycle from the manifest alone, the module is injected once, the element
+fetches its own route through `window.athanore.fetch`, paints itself in
+`--color-accent-300`, and counts a `log.appended` that an operator note
+appended over the API delivers through `subscribe`. A second test cycles
+away from the pane and back three times and asserts the element fetches,
+paints and is laid out on every lap, not only the first. The same spec
+asserts the traversal 404 over a real socket. One unrelated repair:
+`src/dev/Tokens.test.tsx` asked `getByText` once per token — a hundred
+and fifty full-tree scans — and timed out under the coverage run once
+two more test files were sharing the workers; it now reads the page
+once.
+
 ### T072 — Entry-point discovery and `athanore.toml` pools (A5.3)
 
 **Do.** `athanore/plugins/discovery.py`: `discover() -> list[Workflow]`

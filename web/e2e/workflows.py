@@ -1,6 +1,6 @@
 """The workflows the Playwright suite drives (T068a, 13 §Pyramid).
 
-Three of them, and between them they are every shape the E2E specs need:
+Four of them, and between them they are every shape the E2E specs need:
 
 - :data:`probe` is the run the suite watches from `submit` to
   `completed` — an agent that asks for permission to make a tool call,
@@ -19,6 +19,13 @@ Three of them, and between them they are every shape the E2E specs need:
   suite gets a queue — a second and a third submission stay ``queued``,
   which is what `pause`, `resume` and `reorder` act on.
 
+- :data:`plugged` is the plugin host of 09 §Escape hatch: a workflow
+  that ships a static ES module (``static/playfield.js``) and declares a
+  ``custom`` pane for the element that module defines. It is what
+  ``plugin.spec.ts`` mounts, and the only fixture whose behaviour is in
+  JavaScript rather than in Python — which is the point of it, since
+  what T071 built is the seam between the two.
+
 They live here rather than in ``examples/`` because they are fixtures of
 this suite: ``examples/msgtest``, which 17 §T068a names, is T075's and
 does not exist yet (D178). When it lands it is one more target on the
@@ -29,12 +36,27 @@ from __future__ import annotations
 
 import asyncio
 
-from athanore import ACPAgent, Workflow, human_input
+from athanore import ACPAgent, PluginContext, Workflow, human_input
 
-__all__ = ["Builder", "HOLD_SECONDS", "QUESTION", "hold", "probe", "spread"]
+__all__ = [
+    "Builder",
+    "HOLD_SECONDS",
+    "QUESTION",
+    "PLAYFIELD_WORD",
+    "hold",
+    "plugged",
+    "probe",
+    "spread",
+]
 
 #: What :data:`probe` asks the operator, and what the spec looks for.
 QUESTION = "Ship it?"
+
+#: What :data:`plugged`'s route answers with, and what the element it
+#: mounts puts on screen. The spec looks for it, which is how "the
+#: element fetched through `window.athanore`" is asserted rather than
+#: assumed.
+PLAYFIELD_WORD = "athanor"
 
 #: How long :data:`hold`'s one node sleeps. Longer than any run of the
 #: suite: the point of the node is that it never finishes on its own, and
@@ -135,9 +157,49 @@ def _hold() -> Workflow:
     return wf
 
 
-#: The three, built at import: ``athanore serve <file>:<attr>`` resolves
+def _plugged() -> Workflow:
+    """A workflow that ships a web component, and a pane that mounts it.
+
+    ``assets="./static"`` is resolved relative to *this module* (09
+    §Escape hatch), so the directory beside this file is what the server
+    serves at ``/plugins/plugged/static/`` and what the manifest lists.
+    The panel names the tag ``static/playfield.js`` defines; nothing in
+    the SPA knows that tag, which is what makes the pane a real test of
+    the seam rather than of a builtin.
+    """
+
+    wf = Workflow("plugged", assets="./static")
+
+    @wf.node(start=True)
+    async def play():
+        """One round, so the run reaches a terminal state promptly."""
+
+        return {"word": PLAYFIELD_WORD}
+
+    @wf.route("/state")
+    async def state(ctx: PluginContext) -> dict:
+        """What the element draws: the run it is scoped to, and a word."""
+
+        return {
+            "word": PLAYFIELD_WORD,
+            "run_id": ctx.run_id,
+            "title": ctx.run.title if ctx.run is not None else None,
+        }
+
+    wf.panel(
+        "Playfield",
+        slot="run",
+        kind="custom",
+        element="e2e-playfield",
+        refresh_on=["log.appended"],
+    )
+    return wf
+
+
+#: The four, built at import: ``athanore serve <file>:<attr>`` resolves
 #: an attribute and refuses anything that is not a :class:`Workflow`
 #: already (11 §Server), so a factory would never be reached.
 probe = _probe()
 spread = _spread()
 hold = _hold()
+plugged = _plugged()
