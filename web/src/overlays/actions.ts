@@ -12,12 +12,17 @@
  * **The palette lists what the app can do, and nothing else.** It is a
  * menu, not a place features are built: a command belongs here once the
  * task that implements it has landed, so an operator who cannot find
- * something here cannot do it at all. Three of the mock's rows are
- * therefore absent for now — `pause / resume run` (`p`), `cancel run`
- * (`c`) and `delete run` (`D`) are operator ops of 04 that no part of
- * the SPA performs yet; they join this table with the tasks that build
- * them, and the footer and the `?` overlay go on advertising their keys
- * in the meantime (D170).
+ * something here cannot do it at all. The three rows T066a left out —
+ * `pause / resume run` (`p`), `cancel run` (`c`) and `delete run` (`D`)
+ * — joined it with T066e, which is the task whose done condition is that
+ * every operator op of 04 is reachable from the UI (D170, D175).
+ *
+ * **Two rows carry no key, and say so.** `reorder(run, direction)` is an
+ * operator op of 04 that 10 §Keyboard has no binding for, and that
+ * section is exhaustive — T067 binds exactly it — so the two rows that
+ * move a run up and down the dispatch list print `—` in the key column
+ * rather than advertising a key this app does not have (D175). The New
+ * Run overlay's POSITION is the same op with `{index: 0}` (D57).
  *
  * Two shapes of command live here and they end the palette differently:
  *
@@ -56,6 +61,21 @@ export type PaletteContext = {
   toggleList: () => void
   /** `l`: show the log pane and put the caret in its composer. */
   appendLog: () => void
+  /**
+   * `p`: pause a running or queued run, resume a paused one.
+   *
+   * The status is the shell's to know — it holds `GET /api/runs` — so
+   * the command asks for the toggle and does not name a direction. A
+   * run in a terminal status is neither pausable nor resumable, which
+   * is what {@link PaletteContext.canPauseResume} says.
+   */
+  pauseResume: () => void
+  /** Whether `p` would do anything to the selected run right now. */
+  canPauseResume: boolean
+  /** `c`: cancel every attempt of the run. */
+  cancelRun: () => void
+  /** The palette's `move run up` / `move run down` (`reorder`, 04). */
+  reorder: (direction: 'up' | 'down') => void
 }
 
 /** One row of the palette: `name · hint · key`, and what it does. */
@@ -105,6 +125,9 @@ export function groupActions(
   return sections
 }
 
+/** The key column of a row that has no key (10 §Keyboard is exhaustive). */
+export const KEYLESS = '—'
+
 /** A catalogue entry, before a context turns it into a {@link PaletteAction}. */
 type PaletteCommand = {
   id: string
@@ -113,6 +136,11 @@ type PaletteCommand = {
   key: string
   /** Whether the command is about the selected run. */
   needsRun: boolean
+  /**
+   * A second condition on top of the selection, for the one command
+   * that has one. Absent means "a selected run is enough".
+   */
+  available?: (ctx: PaletteContext) => boolean
   perform: (ctx: PaletteContext) => void
 }
 
@@ -181,6 +209,63 @@ export const PALETTE_COMMANDS: readonly PaletteCommand[] = [
     perform: opens('pick-rerun'),
   },
   {
+    id: 'pause-resume-run',
+    name: 'pause / resume run',
+    hint: 'hold the orchestrator',
+    key: 'p',
+    needsRun: true,
+    // The one command whose availability is not just "is a run
+    // selected": 04 gives `pause` and `resume` preconditions that
+    // between them cover every non-terminal run, so a terminal one is
+    // listed and disabled rather than posting a 409 to find out.
+    available: (ctx) => ctx.canPauseResume,
+    perform: (ctx) => {
+      ctx.close()
+      ctx.pauseResume()
+    },
+  },
+  {
+    id: 'cancel-run',
+    name: 'cancel run',
+    hint: 'stop every queued node',
+    key: 'c',
+    needsRun: true,
+    perform: (ctx) => {
+      ctx.close()
+      ctx.cancelRun()
+    },
+  },
+  {
+    id: 'delete-run',
+    name: 'delete run',
+    hint: 'remove the run and its logs',
+    key: 'D',
+    needsRun: true,
+    perform: opens('delete'),
+  },
+  {
+    id: 'move-run-up',
+    name: 'move run up',
+    hint: 'earlier in the dispatch list',
+    key: KEYLESS,
+    needsRun: true,
+    perform: (ctx) => {
+      ctx.close()
+      ctx.reorder('up')
+    },
+  },
+  {
+    id: 'move-run-down',
+    name: 'move run down',
+    hint: 'later in the dispatch list',
+    key: KEYLESS,
+    needsRun: true,
+    perform: (ctx) => {
+      ctx.close()
+      ctx.reorder('down')
+    },
+  },
+  {
     id: 'edit-run',
     name: 'edit run',
     hint: 'change the title and description',
@@ -231,7 +316,9 @@ export const PALETTE_COMMANDS: readonly PaletteCommand[] = [
 /** Bind {@link PALETTE_COMMANDS} to one app state. */
 export function buildPaletteActions(ctx: PaletteContext): PaletteAction[] {
   return PALETTE_COMMANDS.map((command) => {
-    const disabled = command.needsRun && ctx.runId === undefined
+    const disabled =
+      (command.needsRun && ctx.runId === undefined) ||
+      (command.available !== undefined && !command.available(ctx))
 
     return {
       id: command.id,

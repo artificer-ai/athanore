@@ -42,17 +42,22 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Detail } from './components/Detail'
 import { Footer } from './components/Footer'
 import { Header } from './components/Header'
-import { RunList, useRunListModel } from './components/RunList'
+import { RunList, useRunListModel, useRuns } from './components/RunList'
 import { ServerDownBanner } from './components/ServerDownBanner'
 import { Splitter } from './components/Splitter'
 import { useAttention } from './components/attention'
 import {
+  DeleteRun,
   EditRun,
+  Keys,
   Library,
   NewRun,
   Palette,
   Pickers,
+  TaskDrawer,
   buildPaletteActions,
+  pauseDirection,
+  useRunOps,
 } from './overlays'
 import { BUILTIN_WORKFLOW, usePanes } from './panes'
 import type { AppSearch, Overlay } from './routes/search'
@@ -65,6 +70,9 @@ const NOTHING = () => {}
 /** The builtin pane a graph row jumps to (10 §Graph pane, 09 §Builtins). */
 const LOG_PANE = 'log'
 
+/** The builtin pane the task drawer's `focus stream` jumps to (T063c). */
+const AGENT_PANE = 'agent'
+
 export default function App({
   search,
   onSelectRun,
@@ -75,6 +83,8 @@ export default function App({
   onOpenNode,
   onOpenOverlay,
   onCloseOverlay,
+  onFocusStream,
+  onClearRun,
 }: {
   search: AppSearch
   onSelectRun: (runId: string) => void
@@ -92,6 +102,23 @@ export default function App({
   onOpenOverlay?: ((overlay: Overlay) => void) | undefined
   /** Close whichever overlay is up: `?overlay=` away (10 §Overlays). */
   onCloseOverlay?: (() => void) | undefined
+  /**
+   * The task drawer's `focus stream`: show `taskId`'s transcript.
+   *
+   * One navigation and not three — `?overlay=` away, `?task=` kept, and
+   * the agent pane's index — because the drawer is closing onto the pane
+   * it is handing over to, and three writes would leave the last one
+   * updating a search the first had already replaced.
+   */
+  onFocusStream?: ((taskId: number, pane: number | undefined) => void) | undefined
+  /**
+   * Nothing is selected any more: `?run=` away.
+   *
+   * The delete confirm is the one thing that calls it. A run that no
+   * longer exists cannot be the selection, and leaving `?run=` on a
+   * deleted id would point the detail pane at a 404.
+   */
+  onClearRun?: (() => void) | undefined
 }) {
   const runs = useRunListModel()
   useAttention()
@@ -107,6 +134,18 @@ export default function App({
   const logPane = panes.panes.findIndex(
     (pane) => pane.workflow === BUILTIN_WORKFLOW && pane.name === LOG_PANE,
   )
+  const agentPane = panes.panes.findIndex(
+    (pane) => pane.workflow === BUILTIN_WORKFLOW && pane.name === AGENT_PANE,
+  )
+
+  // The status that decides whether `p` pauses the selected run,
+  // resumes it, or is disabled (`overlays/runOps.ts`). It is read off
+  // the same `GET /api/runs` entry the list draws from — the whole
+  // entry, not `runs.rows`, because the header's chip and its `/` input
+  // narrow those and a run the operator has filtered out of sight is
+  // still the selected one.
+  const selected = useRuns().data?.find((run) => run.id === search.run)
+  const runOps = useRunOps()
 
   // The palette's rows are the app's own actions, so they are built here
   // rather than inside it: `refresh` is this tab's whole cache,
@@ -132,6 +171,19 @@ export default function App({
       if (logPane < 0 || search.run === undefined) return
       panes.jump(logPane)
       focusLogComposer(search.run)
+    },
+    pauseResume: () => {
+      if (search.run === undefined) return
+      runOps.pauseResume(search.run, selected?.status)
+    },
+    canPauseResume: pauseDirection(selected?.status) !== null,
+    cancelRun: () => {
+      if (search.run === undefined) return
+      runOps.cancel(search.run)
+    },
+    reorder: (direction) => {
+      if (search.run === undefined) return
+      runOps.reorder(search.run, direction)
     },
   })
 
@@ -212,6 +264,35 @@ export default function App({
         overlay={search.overlay}
         runId={search.run}
         onClose={onCloseOverlay ?? NOTHING}
+      />
+
+      {/* Everything about one attempt, over `?overlay=task&task=`. The
+          `?task=` it opens on outlives it: it is also the agent pane's
+          focused attempt, which is what `focus stream` hands over to
+          (`overlays/TaskDrawer.tsx`). */}
+      <TaskDrawer
+        open={search.overlay === 'task'}
+        taskId={search.task}
+        onClose={onCloseOverlay ?? NOTHING}
+        onOpenTask={onOpenTask}
+        onFocusStream={
+          onFocusStream === undefined
+            ? undefined
+            : (taskId) => {
+                onFocusStream(taskId, agentPane < 0 ? undefined : agentPane)
+              }
+        }
+      />
+
+      <Keys open={search.overlay === 'keys'} onClose={onCloseOverlay ?? NOTHING} />
+
+      {/* The one confirm of 10 §Keyboard: `delete(run)` is the only
+          operator op that destroys anything (`overlays/DeleteRun.tsx`). */}
+      <DeleteRun
+        open={search.overlay === 'delete'}
+        runId={search.run}
+        onClose={onCloseOverlay ?? NOTHING}
+        onDeleted={onClearRun}
       />
     </div>
   )

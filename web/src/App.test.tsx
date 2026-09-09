@@ -8,6 +8,7 @@ import {
   getGraphApiRunsRunIdGraphGetQueryKey,
   getRunApiRunsRunIdGetQueryKey,
   getSourceApiWorkflowsNameSourceGetQueryKey,
+  getTaskApiTasksTaskIdGetQueryKey,
   listRunsApiRunsGetQueryKey,
   listWorkflowsApiWorkflowsGetQueryKey,
   manifestApiPluginsGetQueryKey,
@@ -17,10 +18,12 @@ import type {
   PluginManifestEntry,
   RunDetail,
   RunSummary,
+  TaskDetail,
   WorkflowOut,
 } from './api/gen/types.gen'
 import type { AppSearch, Overlay } from './routes/search'
 import { PALETTE_COMMANDS } from './overlays'
+import { KEY_BINDINGS } from './lib/keys'
 import { DEFAULT_LIST_WIDTH, usePrefs } from './store/prefs'
 import { ALL_WORKFLOWS, useUi } from './store/ui'
 
@@ -46,16 +49,20 @@ const RUNS: RunSummary[] = [
   },
 ]
 
-/** The two builtin panes a pane bar has something to cycle with. */
+/** The three builtin panes a pane bar has something to cycle with. */
 const MANIFEST: PluginManifestEntry[] = [
   {
     workflow: '_builtin',
     panels: [
       { name: 'overview', slot: 'run', placement: 'pane', scope: 'run', kind: 'custom' },
       { name: 'log', slot: 'run', placement: 'pane', scope: 'run', kind: 'custom' },
+      { name: 'agent', slot: 'run', placement: 'pane', scope: 'run', kind: 'custom' },
     ],
   },
 ]
+
+/** The index of `agent` in that cycle: what `focus stream` jumps to. */
+const AGENT_PANE_INDEX = 2
 
 // The library overlay highlights its source with shiki, which is a
 // chunk this suite has no reason to load: the overlay draws its lines
@@ -112,6 +119,22 @@ const RUN_GRAPH: GraphOut = {
   edges: [],
 }
 
+/** The attempt `?task=` names, as the task drawer reads it. */
+const TASK_DETAIL: TaskDetail = {
+  id: 7,
+  run_id: 'aaaa1111bbbb',
+  node: 'prepare',
+  attempt: 1,
+  status: 'failed',
+  priority: 0,
+  explicit: false,
+  terminal: false,
+  created: '2026-09-08T08:56:00Z',
+  error: 'AssertionError: the gate is red',
+  lineage: { reason: 'start' },
+  submissions: [],
+}
+
 /** The registered workflows the New Run overlay's chips are built from. */
 const WORKFLOWS: WorkflowOut[] = [
   {
@@ -141,6 +164,7 @@ function shell(
     onSelectPane?: (index: number) => void
     onOpenOverlay?: (overlay: Overlay) => void
     onCloseOverlay?: () => void
+    onFocusStream?: (taskId: number, pane: number | undefined) => void
   } = {},
 ) {
   const queryClient = new QueryClient({
@@ -161,6 +185,10 @@ function shell(
     getGraphApiRunsRunIdGraphGetQueryKey({ path: { run_id: 'aaaa1111bbbb' } }),
     RUN_GRAPH,
   )
+  queryClient.setQueryData(
+    getTaskApiTasksTaskIdGetQueryKey({ path: { task_id: 7 } }),
+    TASK_DETAIL,
+  )
 
   const rendered = render(
     <QueryClientProvider client={queryClient}>
@@ -175,6 +203,9 @@ function shell(
         {...(over.onCloseOverlay === undefined
           ? {}
           : { onCloseOverlay: over.onCloseOverlay })}
+        {...(over.onFocusStream === undefined
+          ? {}
+          : { onFocusStream: over.onFocusStream })}
       />
     </QueryClientProvider>,
   )
@@ -406,6 +437,61 @@ describe('App', () => {
     // failed, which is an attempt that has stopped.
     expect(await within(picker).findByText('prepare')).toBeInTheDocument()
     expect(picker.querySelector('[data-task="7"]')).not.toBeNull()
+  })
+
+  it('draws the task drawer only when `?overlay=task&task=` says so', async () => {
+    shell({ run: 'aaaa1111bbbb', task: 7 })
+    expect(screen.queryByTestId('task-drawer')).toBeNull()
+
+    cleanup()
+    shell({ overlay: 'task', run: 'aaaa1111bbbb', task: 7 })
+    // Over the cached attempt, so it is the panel and not the notice.
+    expect(await screen.findByTestId('task-lineage')).toHaveTextContent(
+      'the run’s first attempt',
+    )
+    expect(screen.getByTestId('task-error')).toHaveTextContent('the gate is red')
+  })
+
+  it('hands `focus stream` the attempt and the agent pane’s index', async () => {
+    const onFocusStream = vi.fn()
+    shell({ overlay: 'task', run: 'aaaa1111bbbb', task: 7 }, { onFocusStream })
+
+    await userEvent.click(await screen.findByTestId('task-focus-stream'))
+
+    // The index is looked up in the manifest rather than assumed: a
+    // plugin's own `agent` panel is not this one (09 §Builtins).
+    expect(onFocusStream).toHaveBeenCalledExactlyOnceWith(7, AGENT_PANE_INDEX)
+  })
+
+  it('draws the keys overlay only when `?overlay=keys` says so', () => {
+    shell()
+    expect(screen.queryByTestId('keys')).toBeNull()
+
+    cleanup()
+    shell({ overlay: 'keys' })
+    expect(
+      screen.getByTestId('keys').querySelectorAll('[data-binding]'),
+    ).toHaveLength(KEY_BINDINGS.length)
+  })
+
+  it('draws the delete confirm only when `?overlay=delete` says so', () => {
+    shell({ run: 'aaaa1111bbbb' })
+    expect(screen.queryByTestId('delete-run')).toBeNull()
+
+    cleanup()
+    shell({ overlay: 'delete', run: 'aaaa1111bbbb' })
+    expect(screen.getByTestId('delete-run')).toHaveTextContent('cannot be undone')
+  })
+
+  it('disables pause / resume for a run in neither state', () => {
+    // The second seeded run is `completed`, which 04 makes neither
+    // pausable nor resumable; the first is `running`.
+    shell({ overlay: 'palette', run: 'aaaa1111bbbb' })
+    expect(command('pause / resume run')).toHaveAttribute('data-disabled', 'false')
+
+    cleanup()
+    shell({ overlay: 'palette', run: 'cccc3333dddd' })
+    expect(command('pause / resume run')).toHaveAttribute('data-disabled', 'true')
   })
 
   it('opens the workflow library from the header’s workflows button', async () => {

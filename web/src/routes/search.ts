@@ -13,7 +13,12 @@
  * field that fails is simply absent from the result.
  */
 
-/** The overlays of 10 §Overlays, in the order that section lists them. */
+/**
+ * The overlays of 10 §Overlays, in the order that section lists them,
+ * plus the one it does not list: `delete` is the confirm 10 §Keyboard
+ * asks `D` to open, and it is an overlay like the rest because it is
+ * `?overlay=` that says an overlay is up (T066e).
+ */
 export const OVERLAYS = [
   'palette',
   'new',
@@ -21,6 +26,7 @@ export const OVERLAYS = [
   'edit',
   'keys',
   'task',
+  'delete',
   'pick-retry',
   'pick-move',
   'pick-cancel',
