@@ -1,0 +1,13 @@
+{
+  "text": ["Implemented the change and committed it on the branch."],
+  "log": "implement: added the thing the description asked for, with a test beside it, and committed it on the branch.",
+  "submit": {
+    "headline": "add the thing the description asked for",
+    "summary": "Added the behaviour the run's description specifies, with a test at the lowest layer that can express it. Ran the gate locally before finishing.",
+    "files": ["athanore/example.py", "tests/test_example.py"],
+    "tests_added": ["tests/test_example.py"],
+    "how_to_exercise": "uv run pytest -q tests/test_example.py",
+    "open_points": ""
+  },
+  "usage": { "input": 48000, "output": 3200 }
+}

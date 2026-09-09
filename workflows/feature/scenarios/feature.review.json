@@ -1,0 +1,10 @@
+{
+  "text": ["Read the whole diff and re-ran the checks myself."],
+  "log": "review: ok. The change matches the description, the test fails without the fix, and nothing in AGENTS.md's layering is crossed.",
+  "submit": {
+    "ok": true,
+    "blocking": [],
+    "notes": "The diff is the feature and nothing else. The test is at the right layer and fails without the change. No stubs, no TODOs, no narrowed scope."
+  },
+  "usage": { "input": 62000, "output": 1400 }
+}
