@@ -99,7 +99,22 @@ line.
   stops the run.
 - **The gate decides whether you passed, not you.** After you finish,
   `{GATE_COMMAND}` runs. If it is red you will be given its output and asked
-  to fix it. Running it yourself first is the fastest way to avoid that.
+  to fix it.
+- **Do not run the whole gate yourself.** It is ruff, pyright, import-linter,
+  both suites, the SPA build, Playwright and the packaging check, and it takes
+  many minutes; the node after you already runs it once, on the branch, for
+  real. Running it per attempt buys nothing and spends the run's wall clock.
+  Run the narrow checks over what you actually changed instead:
+
+      uv run pytest tests/<the ones you touched> -q
+      uv run ruff check <paths> && uv run ruff format --check <paths>
+      uv run pyright <paths>
+      uv run lint-imports              # only if you moved or added an import
+      pnpm -C web typecheck && pnpm -C web test    # only if you changed web/
+
+  Those are seconds each, and they catch what the gate would have caught in
+  the code you wrote. Reach for the full gate only when a red gate has come
+  back and the narrow checks cannot reproduce it.
 - **A reviewer and a QA engineer come after the gate.** Both can send the work
   back to you with specific findings. When that happens you are told exactly
   what to fix — fix that, and only that.
