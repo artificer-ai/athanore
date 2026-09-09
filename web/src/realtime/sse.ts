@@ -35,7 +35,12 @@ import { manifestApiPluginsGetQueryKey } from '../api/gen/@tanstack/react-query.
 import type { EventName, Me } from '../api/gen/types.gen'
 import { usePrefs } from '../store/prefs'
 import { useUi, type FeedStatus } from '../store/ui'
-import { Invalidator, subscribeRefreshOn, type AthanoreEvent } from './invalidate'
+import {
+  Invalidator,
+  eventNameMatches,
+  subscribeRefreshOn,
+  type AthanoreEvent,
+} from './invalidate'
 
 /** The stream (08 §Events). Excluded from the generated client (D135). */
 export const EVENTS_PATH = '/api/events'
@@ -116,6 +121,19 @@ export type EventSourceLike = {
   close: () => void
 }
 
+/**
+ * One reader of the feed that is not the cache: a plugin's web
+ * component, subscribed through `window.athanore.subscribe` (09 §Escape
+ * hatch).
+ *
+ * `names` are globs over the vocabulary, matched the way `refresh_on`
+ * is, so an element may say `task.*` and mean it.
+ */
+type Reader = {
+  names: readonly string[]
+  listener: (event: AthanoreEvent) => void
+}
+
 export type EventFeedOptions = {
   /** Open the stream. Injected by tests; the default is the browser's. */
   open?: (url: string) => EventSourceLike
@@ -144,6 +162,7 @@ export class EventFeed {
   readonly #onState: (status: FeedStatus, retryAt: number | null) => void
   readonly #invalidator: Invalidator
   readonly #names = new Set<string>(EVENT_NAMES)
+  readonly #readers = new Set<Reader>()
 
   #source: EventSourceLike | null = null
   #timer: ReturnType<typeof setTimeout> | null = null
@@ -207,8 +226,36 @@ export class EventFeed {
     this.#clearTimer()
     this.#closeSource()
     this.#invalidator.dispose()
+    this.#readers.clear()
     for (const unsubscribe of this.#unsubscribe) unsubscribe()
     this.#unsubscribe = []
+  }
+
+  /**
+   * Deliver matching events to `listener` until the returned function
+   * is called.
+   *
+   * What `window.athanore.subscribe` is (09 §Escape hatch): the tab's
+   * one stream, filtered, rather than a second `EventSource` per plugin
+   * element. Each name is also {@link EventFeed.watch}ed, because a
+   * browser's `EventSource` delivers a named frame only to a listener
+   * registered for that name — so a plugin's own `plugin.<wf>.<name>`
+   * event arrives because it was subscribed to here.
+   *
+   * A listener that throws is logged and dropped for that frame: a
+   * plugin cannot break the feed, which is the browser half of "a
+   * plugin cannot break the engine" (09 §Mounting).
+   */
+  subscribe(
+    names: readonly string[],
+    listener: (event: AthanoreEvent) => void,
+  ): () => void {
+    const reader: Reader = { names: [...names], listener }
+    this.#readers.add(reader)
+    for (const name of reader.names) this.watch(name)
+    return () => {
+      this.#readers.delete(reader)
+    }
   }
 
   /** Deliver one more event name to the invalidation table. */
@@ -342,6 +389,19 @@ export class EventFeed {
     }
 
     this.#invalidator.handle(envelope)
+    this.#deliver(envelope)
+  }
+
+  /** Hand `event` to every plugin reader whose globs match its name. */
+  #deliver(event: AthanoreEvent): void {
+    for (const reader of this.#readers) {
+      if (!reader.names.some((name) => eventNameMatches(name, event.name))) continue
+      try {
+        reader.listener(event)
+      } catch (error) {
+        console.error('athanore: a plugin event subscriber threw', error)
+      }
+    }
   }
 
   #publish(status: FeedStatus, retryAt: number | null): void {

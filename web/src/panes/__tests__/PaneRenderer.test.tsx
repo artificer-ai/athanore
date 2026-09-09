@@ -20,6 +20,7 @@ import {
   manifestApiPluginsGetQueryKey,
 } from '../../api/gen/@tanstack/react-query.gen'
 import type { PanelOut, RunSummary } from '../../api/gen/types.gen'
+import { injectedAssets } from '../../plugins'
 import { PaneRenderer } from '../PaneRenderer'
 import type { PanelScope } from '../source'
 import type { Pane } from '../usePanes'
@@ -246,16 +247,32 @@ describe('what it cannot draw', () => {
     expect(urls).toEqual([])
   })
 
-  it('renders a placeholder for an element this build cannot draw', () => {
+  it('mounts a plugin’s own element from the manifest’s assets', () => {
     const urls = stubFetch({})
+    queryClient.setQueryData(manifestApiPluginsGetQueryKey(), MANIFEST)
 
     // `<gd-playfield>` is a plugin's own tag: it is not in the element
-    // table, so it degrades to the card naming it rather than to a
-    // crash, which is what T071 replaces with the manifest's assets.
+    // table, so the host injects the workflow's assets and renders the
+    // tag with the scope on it (09 §Escape hatch).
+    draw(PLAYFIELD)
+
+    const element = screen.getByTestId('plugin-element')
+    expect(element.tagName.toLowerCase()).toBe('gd-playfield')
+    expect(element).toHaveAttribute('run-id', RUN)
+    expect(screen.queryByTestId('pane-placeholder')).not.toBeInTheDocument()
+    // The asset is a `<script>`, not a request the panel made: a
+    // `custom` panel has no `source` to fetch (09 §Panel kinds).
+    expect(urls).toEqual([])
+    expect(injectedAssets()).toEqual(['/plugins/gamedev/static/playfield.js'])
+  })
+
+  it('says so when a plugin element has nothing that could define it', () => {
+    // No manifest, so no assets: the tag would sit there empty forever,
+    // and 09's degradation is a card that names it.
     draw(PLAYFIELD)
 
     expect(screen.getByTestId('pane-placeholder')).toHaveTextContent('<gd-playfield>')
-    expect(urls).toEqual([])
+    expect(screen.queryByTestId('plugin-element')).not.toBeInTheDocument()
   })
 
   it('draws the requests pane for <ath-requests>', async () => {

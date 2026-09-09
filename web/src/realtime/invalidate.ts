@@ -227,6 +227,18 @@ export function subscribeRefreshOn(
 
 const globs = new Map<string, RegExp>()
 
+/**
+ * Does `name` match `pattern`, read as an event-name glob?
+ *
+ * The one matcher: the table's rows, a panel's `refresh_on` and a
+ * plugin element's `window.athanore.subscribe` names are all globs over
+ * the same vocabulary (09 §Wire contract), and three spellings of
+ * "matches" would be three chances for `task.*` to mean three things.
+ */
+export function eventNameMatches(pattern: string, name: string): boolean {
+  return globMatches(pattern, name)
+}
+
 function globMatches(pattern: string, name: string): boolean {
   let matcher = globs.get(pattern)
   if (matcher === undefined) {

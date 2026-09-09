@@ -34,6 +34,7 @@ The six, in the order :func:`validate` runs them:
 
 from __future__ import annotations
 
+import importlib.resources
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
@@ -50,6 +51,7 @@ __all__ = [
     "PluginValidationError",
     "collect",
     "manifest_entry",
+    "package_directory",
     "validate",
 ]
 
@@ -86,11 +88,11 @@ class PluginSpec:
     :func:`manifest_entry` renders, and the subscriptions
     :func:`athanore.plugins.mount.dispatch_handlers` makes.
 
-    ``assets`` and ``base`` are kept apart rather than joined here
-    because 09 resolves a relative ``assets=`` against the *declaring
-    module*, and a host serving package data may hand :func:`validate` a
-    different root (an installed wheel's extracted data). :meth:`assets_dir`
-    is the one place the two are put together.
+    ``assets``, ``base`` and ``package`` are kept apart rather than
+    joined here because 09 resolves a relative ``assets=`` against the
+    *declaring module*, and a host serving package data may hand
+    :func:`validate` a different root (an installed wheel's extracted
+    data). :meth:`assets_dir` is the one place they are put together.
     """
 
     workflow: str
@@ -100,13 +102,28 @@ class PluginSpec:
     handlers: tuple[Handler, ...] = ()
     assets: str | Path | None = None
     base: Path = Path()
+    package: str | None = None
 
     def assets_dir(self, root: Path | None = None) -> Path | None:
         """The declared assets directory, resolved, or ``None``.
 
-        An absolute ``assets=`` is itself; a relative one is resolved
-        against ``root`` when a host supplies one, and against
-        :attr:`base` — the module that declared the workflow — otherwise.
+        An absolute ``assets=`` is itself, and a relative one is
+        resolved against the first of three that answers:
+
+        1. ``root``, when a host supplies one. An explicit root is an
+           instruction, so it is not second-guessed — a directory that
+           is not there under it is the refusal :func:`validate` gives.
+        2. :attr:`base`, the directory of the module that declared the
+           workflow. That is the checkout case and the ordinary one.
+        3. ``importlib.resources.files(package)``, when :attr:`base`
+           holds no such directory. This is 09 §Escape hatch's "package
+           data when installed": the loader is asked where the package's
+           data is rather than a ``__file__`` beside it being assumed,
+           which is the answer that survives an install whose module and
+           whose data are not in one directory.
+
+        The :attr:`base` answer comes back when none of them is a
+        directory, so a refusal names the path an author will recognise.
         """
 
         if self.assets is None:
@@ -114,7 +131,17 @@ class PluginSpec:
         declared = Path(self.assets)
         if declared.is_absolute():
             return declared
-        return ((root if root is not None else self.base) / declared).resolve()
+        if root is not None:
+            return (root / declared).resolve()
+        beside_the_module = (self.base / declared).resolve()
+        if beside_the_module.is_dir():
+            return beside_the_module
+        packaged = package_directory(self.package)
+        if packaged is not None:
+            in_the_package = (packaged / declared).resolve()
+            if in_the_package.is_dir():
+                return in_the_package
+        return beside_the_module
 
     @property
     def prefix(self) -> str:
@@ -168,6 +195,7 @@ def collect(workflow: Workflow) -> PluginSpec:
         handlers=tuple(declarations.handlers),
         assets=workflow.assets,
         base=workflow.assets_base,
+        package=workflow.assets_package,
     )
 
 
@@ -322,6 +350,37 @@ def _asset_urls(spec: PluginSpec, assets_root: Path | None = None) -> list[str]:
     )
 
 
+def package_directory(package: str | None) -> Path | None:
+    """Where ``package``'s data is on disk, or ``None``.
+
+    ``importlib.resources.files`` asks the package's *loader*, which is
+    what makes it the right question for an installed distribution: a
+    ``__file__`` may be absent, and the data a wheel ships as package
+    data need not be beside the module that declared the workflow (09
+    §Escape hatch).
+
+    ``None`` for three answers this server cannot serve from, and each
+    of them leaves the declaring module's own directory to answer:
+
+    - a package that cannot be imported in this process at all;
+    - a namespace package, whose ``files()`` is a ``MultiplexedPath``
+      over several directories rather than one;
+    - a package inside a zip, whose ``files()`` is a ``zipfile.Path``.
+      `StaticFiles` serves a directory, so assets that are not on the
+      filesystem are assets this server has nothing to mount — and
+      :func:`validate` says so at registration rather than the mount
+      failing later.
+    """
+
+    if not package:
+        return None
+    try:
+        located = importlib.resources.files(package)
+    except (ImportError, TypeError, ValueError, NotADirectoryError):
+        return None
+    return located if isinstance(located, Path) else None
+
+
 # -- the six checks --------------------------------------------------------
 
 
@@ -447,14 +506,20 @@ def _check_assets(spec: PluginSpec, assets_root: Path | None) -> None:
     Checked here rather than when the mount is built so that the refusal
     names the workflow and the declaration; the mount refuses too
     (``StaticFiles(check_dir=True)``), and both are registration-time.
+
+    The refusal names the package as well as the path when the workflow
+    was declared inside one, because a relative ``assets=`` is looked for
+    in both (:meth:`PluginSpec.assets_dir`) and an author reading only
+    half of that would go looking in the wrong checkout.
     """
 
     directory = spec.assets_dir(assets_root)
     if directory is None or directory.is_dir():
         return
+    packaged = "" if spec.package is None else f" or in package {spec.package!r}"
     raise PluginValidationError(
         f"workflow {spec.workflow!r} declares assets={spec.assets!r}, which "
-        f"resolves to {directory} — not a directory"
+        f"resolves to {directory}{packaged} — not a directory"
     )
 
 

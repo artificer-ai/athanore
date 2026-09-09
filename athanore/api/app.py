@@ -46,7 +46,7 @@ from athanore.api.openapi import (
 )
 from athanore.api.routers import agent, requests, runs, system, tasks, workflows
 from athanore.api.sse import router as sse_router
-from athanore.api.static import install_cors, mount_spa
+from athanore.api.static import install_cors, mount_plugin_assets, mount_spa
 from athanore.engine import Engine
 from athanore.plugins.context import PluginHost
 from athanore.plugins.mount import dispatch_handlers, mount_plugins
@@ -173,6 +173,17 @@ def create_app(
     # per workflow at `/api/plugins/{workflow}`, under the same operator
     # door as everything else (09 §Mounting, 12 §Plugins).
     mount_plugins(app, app.state.plugins)
+    # ...and the JavaScript a workflow ships beside them, at
+    # `/plugins/{workflow}/static/` (09 §Escape hatch). Not under
+    # `/api/`: it is a document's asset rather than an operation, it is
+    # served by `StaticFiles` under the SPA's own content-security
+    # policy, and the `<script type="module">` the SPA injects for it
+    # carries no credential — which is why the manifest lists the URLs
+    # and this is the only thing at them.
+    for spec in app.state.plugins:
+        directory = spec.assets_dir()
+        if directory is not None:
+            mount_plugin_assets(app, spec.workflow, directory)
     # The SPA at `/`, as the router's fallback rather than as a route:
     # every route is matched first — including the ones a plugin
     # registers after this call — and an unmatched path is the client

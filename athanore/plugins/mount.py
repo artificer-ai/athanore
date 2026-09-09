@@ -33,6 +33,15 @@ committed, the other handlers still run, and the run carries on. A
 handler that is merely slow costs its subscription events rather than
 stalling a writer, because the bus never awaits a subscriber (D29).
 
+**What is not here.** The assets a workflow ships are served under
+``/plugins/{wf}/static/`` (09 §Escape hatch) by
+:func:`athanore.api.static.mount_plugin_assets`, which
+:func:`athanore.api.app.create_app` calls for every spec that declares
+one. They are files rather than operations: they hang off ``/`` rather
+than ``/api/``, they carry the SPA's content-security policy rather than
+the operator door, and the module that owns the other things at ``/`` is
+where they belong.
+
 This module reaches up into :mod:`athanore.api` for two things and two
 only — the operator dependency, and the OpenAPI security requirement
 that documents it. Both are named exemptions in the layering contract

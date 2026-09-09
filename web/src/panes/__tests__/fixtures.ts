@@ -152,6 +152,10 @@ export const GAMEDEV_ENTRY: PluginManifestEntry = {
     action({ name: 'flag', title: 'Flag this attempt', scope: 'task' }),
     action({ name: 'reseed', title: 'Reseed the dictionary', scope: 'global' }),
   ],
+  // The module that defines `<gd-playfield>`, as the server lists it:
+  // every `.js` under the workflow's `assets=` directory, sorted (09
+  // §Escape hatch, `athanore/plugins/registry.py`).
+  assets: ['/plugins/gamedev/static/playfield.js'],
 }
 
 /** Another workflow, so ownership has something to exclude. */
