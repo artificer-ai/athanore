@@ -6,13 +6,14 @@ Python graph (decorated functions as nodes, edges inferred from parameter
 names); a server executes runs of that graph, dispatching agents over ACP;
 an operator watches and steers from a browser SPA or a small CLI.
 
-This directory is the ground-up redesign of the MVP in this repository.
-The MVP (the `athanore/` package, `workflow/`, `tests/`, `DESIGN.md`, and
-the notes under `docs/design/`) proved every feature the product needs. v1
-keeps every one of those features and their hard-won decisions, and gives
-them a clean architecture: a small core, a real web frontend, a plugin
-system so workflows ship their own UI, and a local-first trust model that
-stays simple on one machine and becomes explicit only when you bind to a
+This directory is the ground-up redesign of the MVP, which lives in the
+neighbouring v0 checkout and not here (D65). The MVP (its `athanore/`
+package, `workflow/`, `tests/`, `DESIGN.md`, and the notes under
+`docs/design/`) proved every feature the product needs. v1 keeps every one
+of those features and their hard-won decisions, and gives them a clean
+architecture: a small core, a real web frontend, a plugin system so
+workflows ship their own UI, and a local-first trust model that stays
+simple on one machine and becomes explicit only when you bind to a
 network.
 
 ## Provenance
@@ -21,10 +22,11 @@ These documents were written in, and copied from, the **athanore MVP
 repository** (`~/Projects/athanore`, the v0 code at version 0.0.11,
 commit `2244f91`, 2026-09-05). That repository is the behavioural
 specification v1 re-implements: wherever a document or the task plan
-says "the MVP", "port", or `$MVP_CHECKOUT`, it means that checkout. Its
-`docs/v1/` is the original of this directory; keep the two in sync while
-both exist, and treat this copy as the working one once development
-starts here.
+says "the MVP", "port", or `$MVP_CHECKOUT`, it means that checkout, now
+tagged `v0.0.12` and driving this build from the orchestrator's own
+environment (D67). Its `docs/v1/` was the original of this directory;
+**this copy is the working one** — the two have diverged since
+development started here, and the MVP's copy is history.
 
 ## How to read
 
@@ -54,12 +56,27 @@ afterwards; cross-references use the document number.
 | 19 | [Agent prompt text](19-agent-prompts.md) | The verbatim kickoff, ask, submission, and repair blocks agents receive |
 | 20 | [Carried findings](20-carried-findings.md) | The MVP's ACP findings and permission decisions the other documents cite, folded in so the set is self-contained |
 | — | [design/](design/README.md) | The imported Claude Design mock and Nocturne tokens |
+| — | [../plans/](../plans/) | One implementation plan per task of 17: the fenced scope, the file-by-file steps, and the verification a reviewer and QA ask for. Written before the task is built and read by whoever builds it |
 
 ## Status
 
-Design complete and reviewed (architectural review 2026-09-05; the
-resulting changes are D38–D51 in [15-decisions.md](15-decisions.md); a
-gap review the same day added D52–D61 and documents 18–20).
+**Being built, from these documents.** [17](17-serial-task-plan.md) is
+executed in order, one task per commit and one merge commit per task, and
+every task that has landed carries a `**Status.** Done.` line saying what
+it landed and where it departed from the plan — so the plan, not this
+paragraph, is where the build's position is read. Phases 0 to 5 of
+[14](14-migration-and-phasing.md) are delivered (the store, the engine,
+requests, agents, the API and its plugin host, the CLI, and the SPA);
+phase 6 is the examples, the live smoke scripts, this pass over the
+documents, and the 1.0.0 release.
+
+The documents are kept in step with what shipped rather than left as the
+design that preceded it: the architectural review of 2026-09-05 is D38–D51
+in [15-decisions.md](15-decisions.md), a gap review the same day added
+D52–D61 and documents 18–20, every choice made while building is a row
+after those, and the phase checkpoints (T029, T041, T056, T069) are where
+04, 05, 06, 10 and 13 were brought back in line with the code.
+
 The Claude Design project (`Athanore.dc.html`, "Nocturne" design system)
 is imported under [design/](design/README.md) and is the normative
 source for [10-frontend.md](10-frontend.md). Tickets are in
@@ -69,7 +86,8 @@ execution order is [17-serial-task-plan.md](17-serial-task-plan.md).
 ## Conventions used in these documents
 
 - **MUST / SHOULD / MAY** carry their RFC 2119 meanings.
-- "**MVP**" means the code in this repository today (v0.0.11).
+- "**MVP**" (also "v0") means the code in the neighbouring `athanore`
+  checkout, tagged `v0.0.12`, and never code in this repository (D65).
 - "**Operator**" is the human running Athanore. "**Agent**" is an ACP
   subprocess. "**Node body**" is the Python function a node runs.
 - A "**seam**" is an existing extension point. New capability attaches to a

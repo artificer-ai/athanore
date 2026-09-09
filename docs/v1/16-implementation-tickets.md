@@ -78,7 +78,7 @@ Sizing: S ≤ 1 day, M 2–3 days, L 4–5 days.
 
 | Id | Ticket | Size | Spec | Depends |
 |---|---|---|---|---|
-| A4.1 | App shell: TanStack Router single route with `?run=&pane=`, zustand persisted prefs, header/list/detail/footer layout, splitter, list collapse, CRT chrome with reduced-motion off | L | 10 §Layout | A0.6, A0.7 |
+| A4.1 | App shell: TanStack Router single route with `?run=&pane=`, zustand persisted prefs, header/list/detail/footer layout, splitter, list collapse | L | 10 §Layout | A0.6, A0.7 |
 | A4.2 | SSE wrapper (`Last-Event-ID`, reconnect, `started_at` manifest refetch) + invalidation table with exact-before-glob matching and 250 ms coalescing; server-down banner | M | 10 §Realtime and caching | A4.1, A3.5 |
 | A4.3 | Run list grid with status pills, NODE cell + `⚠`, workflow chips, `/` filter | M | 10 §Layout, §Attention | A4.2 |
 | A4.4 | Pane host driven by the manifest: cycle order, dots, index clamp, `PaneRenderer` for `markdown/kv/table/log/chart/dashboard/form/custom/placeholder` | L | 10 §Panes, 09 §Panel kinds | A4.2, A3.9 |
@@ -102,9 +102,9 @@ Sizing: S ≤ 1 day, M 2–3 days, L 4–5 days.
 
 | Id | Ticket | Size | Spec | Depends |
 |---|---|---|---|---|
-| A6.1 | Port `examples/` (feature_build, gamedev, msgtest, claude_acp, docker_acp, projects) to the v1 API with pinned adapter versions; `examples/docker` | M | 05 §User-land adapters, 14 | A5.3 |
+| A6.1 | Port `examples/` (feature_build, gamedev, msgtest, claude_acp, docker_acp, projects) to the v1 API with pinned adapter versions. (No `examples/docker`: `docker/dev` is the one image and `scripts/agent.sh` the one way in, D64/D188) | M | 05 §User-land adapters, 14 | A5.3 |
 | A6.2 | Live smoke scripts (`ATHANORE_SMOKE=1`) against pi and Claude ACP | S | 13 §Live smoke | A6.1 |
-| A6.3 | Delete the TUI, `web/templates`, textual/netext deps; README rewrite pointing at `docs/v1`; deprecated aliases with warnings | S | 14 §Compatibility | A6.1 |
+| A6.3 | README rewrite pointing at `docs/v1`; `DESIGN.md` banner; deprecated aliases with warnings; `docs/v1` staleness pass. (No TUI, `web/templates` or textual deps to delete — none of them live here, D65) | S | 14 §Compatibility | A6.1 |
 | A6.4 | `pip-audit` / `pnpm audit` in CI, coverage gates, final `docs/v1` pass, tag 1.0.0 | S | 13 §CI | A6.3 |
 
 ## Cross-cutting decisions still open (15 §Open questions)

@@ -41,15 +41,18 @@ starting. Everything that matters is specified in `docs/v1/`:
 
 ## Current state of the tree
 
-- The `uv init` placeholders are gone: T001 rewrote `.gitignore`, T002
-  rewrote `pyproject.toml` and deleted `main.py`. `athanore/__init__.py`
-  exists but is empty; T003 creates the packages of 02 §Package layout.
+- Phases 0 to 5 of `docs/v1/14-migration-and-phasing.md` have landed: the
+  package of 02 §Package layout is built (store, engine, requests, agents,
+  the API and its plugin host, the CLI, `server.py`), the SPA in `web/`
+  ships in the wheel, and `examples/` carries the six example workflows.
+  Where the build is exactly is read from the `**Status.** Done.` lines of
+  `docs/v1/17-serial-task-plan.md`, never from this paragraph.
 - This repository has **no MVP code** — the MVP lives in the neighbouring
   `athanore` checkout and is the behavioural spec, not a coexisting
   codebase (D65). Tasks that say "port `tests/test_x.py`" mean: write the
   v1 test informed by that file and tick its row in
   `docs/porting-ledger.md`.
-- Target package layout and the per-module responsibilities are in
+- The package layout and the per-module responsibilities are in
   `docs/v1/02-architecture.md` §Package layout. Create modules there, not
   elsewhere.
 - Work on a branch per task, `feat/<task-id>`, cut from `main`; the

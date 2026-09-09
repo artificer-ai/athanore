@@ -6,12 +6,17 @@ example workflows and their tests are the acceptance harness throughout.
 
 ## Repository changes
 
-| Today | v1 |
+The left column is the **MVP checkout**, not this one: v1 is a clean-slate
+repository that holds no MVP code (D65), so nothing in the "deleted" rows
+was ever deleted here — they say what v1 does not carry forward, and the
+MVP keeps them until it retires with v0.
+
+| MVP | v1 |
 |---|---|
 | `athanore/` flat modules | `athanore/{graph,engine,agents,requests,events,store,plugins,api,cli,testing,web}` (02) |
 | `athanore/tui.py`, `athanore/web/templates`, textual deps | deleted |
 | `workflow/` package at the root | `examples/` (feature_build, gamedev, msgtest, claude_acp, docker_acp, projects, pi stats provider) |
-| `DESIGN.md`, `docs/design/*`, `docs/specs/*`, `docs/bugs/*` | kept as history; `docs/v1/` is the current design; `README.md` points here |
+| `DESIGN.md`, `docs/design/*`, `docs/specs/*`, `docs/bugs/*` | kept as history in the MVP checkout; `docs/v1/` is the current design, `docs/plans/` the per-task plans, and both `README.md` and a one-paragraph `DESIGN.md` point here |
 | `docker/`, `compose.yaml` | kept at the root as the dev stack (`docker/dev`, `scripts/`): one image behind the gate, the app and every agent, and `examples/docker_acp` dispatches into it through `./scripts/agent.sh` rather than building a second one (D64, D67) |
 | `.gitignore` ignores `docs/design/*`, `docs/qa/*`, `docs/bugs/*` | The cited findings are folded into `docs/v1/20-carried-findings.md`, so `docs/v1` is self-contained (D59); whether to also un-ignore the history is open question 4 in 15. `docs/v1/` is tracked; add `.athanore/` (token file) and `athanore/web/dist/` (build output) to the ignore list |
 | `pyproject.toml` deps: textual, netext | removed; added: sqlalchemy[asyncio], aiosqlite, alembic, sse-starlette, pydantic-settings, structlog, typer, python-ulid; extras `postgres` (asyncpg). `examples/` becomes a uv workspace member with its own extras |
@@ -32,13 +37,17 @@ example workflows and their tests are the acceptance harness throughout.
 ## Phases
 
 Each phase ends green on CI with the examples running on `FakeACPAgent`.
+"**Port** `test_x`" means D65's reading of it: write the v1 test informed
+by the MVP's file — which is in the neighbouring checkout, not here — and
+tick its row in `docs/porting-ledger.md`. Nothing is moved, because there
+is nothing here to move.
 
 ### Phase 0 — Scaffold (1 week)
 
 Package layout, settings, structlog, ruff/pyright/import-linter, CI,
 `web/` scaffold with shadcn and the neutral theme, OpenAPI → TypeScript
-pipeline. The MVP code is moved under the new layout unchanged where it
-can be (graph, routing rules) so tests keep running.
+pipeline. Nothing is carried over unchanged: the graph and the routing
+rules are written fresh against the MVP's tests in phase 1 (D65).
 
 ### Phase 1 — Store and engine (2 weeks)
 
@@ -86,7 +95,8 @@ in 10 §Design system is the first commit of the phase.
 ### Phase 6 — Examples, docs, release (1 week)
 
 Port `examples/`, live smoke against pi and Claude ACP adapters, README,
-`docs/v1` final pass, delete the TUI, tag 1.0.0.
+`docs/v1` final pass, tag 1.0.0. There is no TUI to delete: it never
+lived in this repository and retires with v0 (D65, D13).
 
 ## Risks
 

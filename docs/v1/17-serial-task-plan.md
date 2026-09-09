@@ -3784,6 +3784,25 @@ for stale statements found during implementation; add this document's
 row to `docs/v1/README.md`.
 **Done.** `grep -r "ARTIFICER\|artificer" athanore` returns only the
 deprecation shim.
+**Status.** Done. The grep returns `athanore/settings.py` and nothing
+else. `README.md` is rewritten around a two-node workflow that dispatches
+no agent and was run end to end before it was committed, and it says
+plainly that 1.0.0 is tagged by T079 and that PyPI still carries v0.
+`DESIGN.md` is a new file, because it never lived here (D65): one
+paragraph pointing at `docs/v1`. The aliases warn once *per access*,
+which is D148's decision and not this task's "not per access" gloss —
+D190 (1) records why it stands and what the strengthened check in
+`tests/test_public_api.py` now asserts. The staleness pass is the rows of
+15 from D59 on, each read against the document it names: `docs/v1/README.md`
+(the MVP is the neighbouring checkout, the status is what shipped,
+`docs/plans/` joins the map), 02 (the package tree that shipped, all four
+aliases, oxlint, two settings), 14 (§Repository changes is the MVP's
+tree; no TUI is deleted here), 16 (A4.1's CRT chrome, A6.3's deletions),
+and one wrong decision citation in `athanore/settings.py`. `AGENTS.md`
+§Current state of the tree is corrected too: it still announced T003.
+D190 lists the
+whole set and the three cross-checks that found nothing (08's paths, the
+error codes, the CLI surface).
 
 ### T079 — Audits, coverage gates, release (A6.4)
 

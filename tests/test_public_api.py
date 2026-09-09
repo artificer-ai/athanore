@@ -29,6 +29,7 @@ from __future__ import annotations
 import ast
 import subprocess
 import sys
+import warnings
 from importlib import import_module
 from pathlib import Path
 
@@ -149,17 +150,30 @@ def test_an_alias_warns_and_resolves_to_the_current_name(
 
 
 @pytest.mark.parametrize("alias", sorted(ALIASES))
-def test_an_alias_warns_on_every_access(alias: str) -> None:
-    """The second import of an old name is told what the first was.
+def test_an_alias_warns_exactly_once_per_access(alias: str) -> None:
+    """One warning per access: never none, never two, never once per process.
 
-    The resolved object is cached under the name that replaced it, never
-    under the alias, so the warning is not a once-per-process event that
-    the module a second author imports would miss.
+    17 §T078 asks that every alias "warns once", and this is the reading
+    D148 settled and D190 records: once *per access*. The resolved object
+    is cached under the name that replaced it and never under the alias,
+    so the warning is not a once-per-process event that the module a
+    second author imports would miss — and there is exactly one of them
+    per access, which is the half `pytest.warns` cannot say: a shim that
+    warned and then delegated to something that warned again would pass
+    that and fail this.
     """
 
+    current = ALIASES[alias]
     for _ in range(2):
-        with pytest.warns(DeprecationWarning):
-            getattr(athanore, alias)
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            value = getattr(athanore, alias)
+        deprecations = [
+            entry for entry in caught if issubclass(entry.category, DeprecationWarning)
+        ]
+        assert len(deprecations) == 1
+        assert f"use athanore.{current}" in str(deprecations[0].message)
+        assert value is getattr(athanore, current)
 
 
 @pytest.mark.parametrize("alias", sorted(ALIASES))
