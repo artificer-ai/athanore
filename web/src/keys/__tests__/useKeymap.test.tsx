@@ -1,0 +1,392 @@
+/**
+ * `useKeymap`: `docs/v1/10-frontend.md` §Keyboard, and the scoping that
+ * is the reason 10 moved delete off `d` and onto `D` (D51).
+ *
+ * The map is asserted against the catalogue it dispatches on rather than
+ * against a second list written here: every palette row that carries a
+ * keycap is pressed, and the row that ran is the row that cap names. A
+ * binding somebody forgets to implement therefore fails here, and a test
+ * that walked a table of its own would only agree with itself.
+ *
+ * The scoping tests are the ones the task names, and they are all one
+ * question asked from four places: what happened when the key was
+ * pressed *there*.
+ */
+import { render, screen, fireEvent } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
+import { useRef } from 'react'
+
+import { PALETTE_COMMANDS, KEYLESS } from '../../overlays/actions'
+import { claimKeyboard, useAnswerKeys } from '../scope'
+import { useKeymap, type KeymapAction, type KeymapHandlers } from '../useKeymap'
+
+/** The spies every test asserts on. */
+function handlers() {
+  return {
+    select: vi.fn(),
+    cyclePane: vi.fn(),
+    jumpPane: vi.fn(),
+    focusDetail: vi.fn(),
+    openPalette: vi.fn(),
+    close: vi.fn(),
+  }
+}
+
+type Spies = ReturnType<typeof handlers>
+
+/** The catalogue, with a spy behind each row. */
+function catalogue(disabled = false): { actions: KeymapAction[]; ran: string[] } {
+  const ran: string[] = []
+  const actions = PALETTE_COMMANDS.map((command) => ({
+    key: command.key,
+    disabled,
+    run: () => {
+      if (disabled) return
+      ran.push(command.id)
+    },
+  }))
+  return { actions, ran }
+}
+
+/** The panel `a` and `d` belong to, registered as the real one is. */
+function Panel({ allow, deny }: { allow: () => void; deny: () => void }) {
+  const root = useRef<HTMLDivElement | null>(null)
+  useAnswerKeys(root, { allow, deny })
+
+  return (
+    <div ref={root} data-testid="request-panel">
+      <button type="button">Allow once</button>
+    </div>
+  )
+}
+
+/**
+ * The four places a key can be pressed: an input, the run list, the
+ * request panel, and the page itself.
+ */
+function Harness({
+  keymap,
+  allow,
+  deny,
+}: {
+  keymap: KeymapHandlers
+  allow: () => void
+  deny: () => void
+}) {
+  useKeymap(keymap)
+
+  return (
+    <>
+      <input aria-label="filter runs" />
+      <textarea aria-label="a note" />
+      <div aria-label="a document" contentEditable suppressContentEditableWarning />
+      <section aria-label="runs" data-region="list">
+        <button type="button">a run row</button>
+      </section>
+      <section aria-label="detail" data-region="detail">
+        <Panel allow={allow} deny={deny} />
+      </section>
+    </>
+  )
+}
+
+let spies: Spies
+let allow: Mock<() => void>
+let deny: Mock<() => void>
+let released: Array<() => void>
+
+/** Mount the harness over `actions`. */
+function mount(actions: readonly KeymapAction[]) {
+  return render(
+    <Harness keymap={{ ...spies, actions }} allow={allow} deny={deny} />,
+  )
+}
+
+/** Nothing in the map ran. */
+function nothingHappened(ran: string[]) {
+  expect(ran).toEqual([])
+  for (const spy of Object.values(spies)) expect(spy).not.toHaveBeenCalled()
+  expect(allow).not.toHaveBeenCalled()
+  expect(deny).not.toHaveBeenCalled()
+}
+
+const list = () => screen.getByRole('region', { name: 'runs' })
+const panel = () => screen.getByTestId('request-panel')
+const filter = () => screen.getByRole('textbox', { name: 'filter runs' })
+
+beforeEach(() => {
+  spies = handlers()
+  allow = vi.fn<() => void>()
+  deny = vi.fn<() => void>()
+  released = []
+})
+
+afterEach(() => {
+  for (const back of released.splice(0)) back()
+})
+
+/* -------------------------------------------------------------------- */
+/* The table                                                             */
+/* -------------------------------------------------------------------- */
+
+describe('the map', () => {
+  it('runs the catalogue row each keycap names', () => {
+    for (const command of PALETTE_COMMANDS) {
+      if (command.key === KEYLESS) continue
+
+      const { actions, ran } = catalogue()
+      const view = mount(actions)
+
+      const chord = command.key.startsWith('^')
+      fireEvent.keyDown(document.body, {
+        key: chord ? command.key.slice(1) : command.key,
+        ctrlKey: chord,
+      })
+
+      expect(ran, `\`${command.key}\` runs ${command.name}`).toEqual([command.id])
+      view.unmount()
+    }
+  })
+
+  it('leaves the two keyless rows without a key', () => {
+    // `reorder` is an operator op 10 §Keyboard has no binding for, and
+    // that section is exhaustive: the palette prints `—` for it and the
+    // map has nothing to dispatch (D175).
+    const keyless = PALETTE_COMMANDS.filter((command) => command.key === KEYLESS)
+    expect(keyless.map((command) => command.id)).toEqual([
+      'move-run-up',
+      'move-run-down',
+    ])
+  })
+
+  it('selects with `↑`/`↓` and `j`/`k`, clamped by the shell', () => {
+    const { actions } = catalogue()
+    mount(actions)
+
+    fireEvent.keyDown(document.body, { key: 'ArrowDown' })
+    fireEvent.keyDown(document.body, { key: 'j' })
+    fireEvent.keyDown(document.body, { key: 'ArrowUp' })
+    fireEvent.keyDown(document.body, { key: 'k' })
+
+    expect(spies.select.mock.calls).toEqual([[1], [1], [-1], [-1]])
+  })
+
+  it('cycles the panes with `←`/`→`', () => {
+    const { actions } = catalogue()
+    mount(actions)
+
+    fireEvent.keyDown(document.body, { key: 'ArrowRight' })
+    fireEvent.keyDown(document.body, { key: 'ArrowLeft' })
+
+    expect(spies.cyclePane.mock.calls).toEqual([[1], [-1]])
+  })
+
+  it('jumps to a pane with `1`–`9`, and nowhere with `0`', () => {
+    const { actions, ran } = catalogue()
+    mount(actions)
+
+    fireEvent.keyDown(document.body, { key: '1' })
+    fireEvent.keyDown(document.body, { key: '9' })
+    expect(spies.jumpPane.mock.calls).toEqual([[0], [8]])
+
+    spies.jumpPane.mockClear()
+    fireEvent.keyDown(document.body, { key: '0' })
+    expect(spies.jumpPane).not.toHaveBeenCalled()
+    expect(ran).toEqual([])
+  })
+
+  it('opens the palette on `^p` and refuses the browser its own `^r`', () => {
+    const { actions, ran } = catalogue()
+    mount(actions)
+
+    const palette = fireEvent.keyDown(document.body, { key: 'p', ctrlKey: true })
+    expect(spies.openPalette).toHaveBeenCalledOnce()
+    // The chord is the app's: the browser must not also print the page.
+    expect(palette).toBe(false)
+
+    const refresh = fireEvent.keyDown(document.body, { key: 'r', ctrlKey: true })
+    expect(ran).toEqual(['refresh'])
+    expect(refresh).toBe(false)
+  })
+
+  it('leaves an `alt` chord alone', () => {
+    const { actions, ran } = catalogue()
+    mount(actions)
+
+    fireEvent.keyDown(document.body, { key: 'n', altKey: true })
+    nothingHappened(ran)
+  })
+
+  it('does not run a row this state has disabled', () => {
+    // "retry task" with no run selected is a command that exists and is
+    // not available (`overlays/actions.ts`).
+    const { actions, ran } = catalogue(true)
+    mount(actions)
+
+    fireEvent.keyDown(document.body, { key: 't' })
+    expect(ran).toEqual([])
+  })
+
+  it('leaves a key nothing in the map claims', () => {
+    const { actions, ran } = catalogue()
+    mount(actions)
+
+    const handled = fireEvent.keyDown(document.body, { key: 'z' })
+    expect(handled).toBe(true)
+    nothingHappened(ran)
+  })
+})
+
+/* -------------------------------------------------------------------- */
+/* `⏎` focus detail                                                      */
+/* -------------------------------------------------------------------- */
+
+describe('`⏎`', () => {
+  it('hands the keyboard to the detail pane from the run list', () => {
+    const { actions } = catalogue()
+    mount(actions)
+
+    fireEvent.keyDown(list(), { key: 'Enter' })
+    expect(spies.focusDetail).toHaveBeenCalledOnce()
+  })
+
+  it('does the same from a run row, and does only that', () => {
+    // The row is a `<button>`, so the key is cancelled: `↑`/`↓` and
+    // `j`/`k` select a run — the list's own footer strip says so —
+    // and Enter is the other half of that pair, not a second way to
+    // press the row.
+    const { actions } = catalogue()
+    mount(actions)
+
+    const cancelled = fireEvent.keyDown(
+      screen.getByRole('button', { name: 'a run row' }),
+      { key: 'Enter' },
+    )
+
+    expect(spies.focusDetail).toHaveBeenCalledOnce()
+    expect(cancelled).toBe(false)
+  })
+
+  it('does the same from the page itself, where a fresh tab starts', () => {
+    const { actions } = catalogue()
+    mount(actions)
+
+    fireEvent.keyDown(document.body, { key: 'Enter' })
+    expect(spies.focusDetail).toHaveBeenCalledOnce()
+  })
+
+  it('belongs to whatever has focus outside the list', () => {
+    const { actions } = catalogue()
+    mount(actions)
+
+    fireEvent.keyDown(panel(), { key: 'Enter' })
+    expect(spies.focusDetail).not.toHaveBeenCalled()
+  })
+})
+
+/* -------------------------------------------------------------------- */
+/* Scoping                                                               */
+/* -------------------------------------------------------------------- */
+
+describe('inside an input', () => {
+  it('suppresses every shortcut, which is what `D` exists for', () => {
+    const { actions, ran } = catalogue()
+    mount(actions)
+
+    for (const key of ['d', 'D', 'n', 'j', 'a', '1']) {
+      fireEvent.keyDown(filter(), { key })
+    }
+
+    nothingHappened(ran)
+  })
+
+  it('suppresses them in a textarea and a contenteditable too', () => {
+    const { actions, ran } = catalogue()
+    mount(actions)
+
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'a note' }), { key: 'n' })
+    fireEvent.keyDown(screen.getByLabelText('a document'), { key: 'n' })
+
+    nothingHappened(ran)
+  })
+
+  it('still closes on `esc`, and still takes the chords', () => {
+    const { actions, ran } = catalogue()
+    mount(actions)
+
+    fireEvent.keyDown(filter(), { key: 'Escape' })
+    expect(spies.close).toHaveBeenCalledOnce()
+
+    fireEvent.keyDown(filter(), { key: 'r', ctrlKey: true })
+    expect(ran).toEqual(['refresh'])
+  })
+})
+
+describe('while an overlay owns the keyboard', () => {
+  beforeEach(() => {
+    released.push(claimKeyboard())
+  })
+
+  it('suppresses the app’s own keys', () => {
+    const { actions, ran } = catalogue()
+    mount(actions)
+
+    for (const key of ['n', 'D', 'j', 'a', '1']) {
+      fireEvent.keyDown(document.body, { key })
+    }
+
+    nothingHappened(ran)
+  })
+
+  it('leaves `esc` and the chords, which are how it is left', () => {
+    const { actions, ran } = catalogue()
+    mount(actions)
+
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(spies.close).toHaveBeenCalledOnce()
+
+    fireEvent.keyDown(document.body, { key: 'p', ctrlKey: true })
+    expect(spies.openPalette).toHaveBeenCalledOnce()
+
+    fireEvent.keyDown(document.body, { key: 'r', ctrlKey: true })
+    expect(ran).toEqual(['refresh'])
+  })
+})
+
+describe('`a` and `d`', () => {
+  it('answer only with the request panel focused', () => {
+    const { actions, ran } = catalogue()
+    mount(actions)
+
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Allow once' }), { key: 'a' })
+    expect(allow).toHaveBeenCalledOnce()
+
+    fireEvent.keyDown(panel(), { key: 'd' })
+    expect(deny).toHaveBeenCalledOnce()
+    expect(ran).toEqual([])
+  })
+
+  it('do nothing at all from the run list', () => {
+    // The whole of D51: a `d` meant for "deny" that lands one focus ring
+    // away must not reach the delete confirm, and it does not reach
+    // anything else either.
+    const { actions, ran } = catalogue()
+    mount(actions)
+
+    fireEvent.keyDown(list(), { key: 'd' })
+    fireEvent.keyDown(list(), { key: 'a' })
+
+    nothingHappened(ran)
+  })
+
+  it('are the panel’s own and not the run list’s `D`', () => {
+    const { actions, ran } = catalogue()
+    mount(actions)
+
+    // `D` is the app's wherever it is pressed outside an input, and the
+    // panel does not swallow it.
+    fireEvent.keyDown(panel(), { key: 'D', shiftKey: true })
+    expect(ran).toEqual(['delete-run'])
+    expect(deny).not.toHaveBeenCalled()
+  })
+})

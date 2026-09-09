@@ -29,6 +29,11 @@
  * holds the model can hand it to all of them without any of them owning
  * the others.
  *
+ * `useKeymap` is bound here for the same reason and reads the same three
+ * models: 10 §Keyboard is one map over the whole app, and every action
+ * in it is already in this function — the palette's catalogue, the pane
+ * cycle, and the selection the route writes (`src/keys/useKeymap.ts`).
+ *
  * The overlays hang off the shell rather than off whatever opened them,
  * because `?overlay=` is one piece of state and the thing it names is
  * over the whole app (10 §Overlays). They portal out of this tree, so
@@ -38,6 +43,7 @@
  * palette's rows and (T067) the `n` and `w` keys.
  */
 import { useQueryClient } from '@tanstack/react-query'
+import { useRef } from 'react'
 
 import { Detail } from './components/Detail'
 import { Footer } from './components/Footer'
@@ -46,6 +52,7 @@ import { RunList, useRunListModel, useRuns } from './components/RunList'
 import { ServerDownBanner } from './components/ServerDownBanner'
 import { Splitter } from './components/Splitter'
 import { useAttention } from './components/attention'
+import { useKeymap } from './keys'
 import {
   DeleteRun,
   EditRun,
@@ -126,6 +133,8 @@ export default function App({
   const queryClient = useQueryClient()
   const toggleListCollapsed = usePrefs((state) => state.toggleListCollapsed)
   const focusLogComposer = useUi((state) => state.focusLogComposer)
+  const setFocus = useUi((state) => state.setFocus)
+  const detail = useRef<HTMLElement | null>(null)
 
   // Which pane the log is, in *this* selection's cycle: the manifest
   // decides how many panes there are and a plugin's `log` panel is not
@@ -187,6 +196,48 @@ export default function App({
     },
   })
 
+  // 10 §Keyboard, bound to exactly the model above. Fourteen of its keys
+  // are the palette's rows and are dispatched on that catalogue's key
+  // column; what is left is navigation, which no palette row can be.
+  useKeymap({
+    actions: paletteActions,
+    // The mock's `move`: clamped rather than wrapping, so holding `j` at
+    // the bottom of the list stays there instead of jumping to the top.
+    // With nothing selected, `↓` takes the first row and `↑` the last.
+    select: (delta) => {
+      const rows = runs.rows
+      if (rows.length === 0) return
+      const at = rows.findIndex((row) => row.id === search.run)
+      const to =
+        at < 0
+          ? delta > 0
+            ? 0
+            : rows.length - 1
+          : Math.min(Math.max(at + delta, 0), rows.length - 1)
+      const row = rows[to]
+      if (row !== undefined && row.id !== search.run) onSelectRun(row.id)
+    },
+    cyclePane: (delta) => {
+      if (delta > 0) panes.next()
+      else panes.prev()
+    },
+    jumpPane: panes.jump,
+    // `⏎ focus detail`: the region the keystrokes go to (`store/ui.ts`)
+    // and the element that holds the browser's focus, which are two
+    // halves of one move.
+    focusDetail: () => {
+      setFocus('detail')
+      detail.current?.focus()
+    },
+    openPalette: onOpenPalette,
+    // `esc close`: there is nothing to close with no overlay up, and a
+    // navigation that rewrote the same search would be one entry of
+    // history per keystroke.
+    close: () => {
+      if (search.overlay !== undefined) onCloseOverlay?.()
+    },
+  })
+
   return (
     <div className="text-body flex h-dvh flex-col overflow-hidden bg-background text-foreground">
       <Header
@@ -207,6 +258,7 @@ export default function App({
         }
         detail={
           <Detail
+            ref={detail}
             panes={panes}
             taskId={search.task}
             node={search.node}

@@ -60,6 +60,7 @@ import {
 } from '../api/gen/@tanstack/react-query.gen'
 import type { RunSummary, SourceOut, WorkflowOut } from '../api/gen/types.gen'
 import { useRuns } from '../components/RunList'
+import { useKeyOwner } from '../keys'
 import { actionError } from '../lib/errors'
 import { tokenize } from '../lib/highlight'
 import { cn } from '../lib/utils'
@@ -119,6 +120,11 @@ export function Library({
   node?: string | undefined
   onClose: () => void
 }) {
+  // An open overlay owns the keyboard: while it is up the app's global
+  // map is off, so a `d` in here cannot reach the delete confirm
+  // (`keys/scope.ts`, 10 §Keyboard).
+  useKeyOwner(open)
+
   const restoreFocusTo = useRef<HTMLElement | null>(null)
   const panel = useRef<HTMLDivElement | null>(null)
   // Whether the dialog's open-focus has already run: it is what tells a

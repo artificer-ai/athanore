@@ -26,6 +26,8 @@
 import { Dialog } from 'radix-ui'
 import { useRef, type ReactNode, type RefObject } from 'react'
 
+import { useKeyOwner } from '../keys'
+
 /** Where the panel sits: near the top like a palette, or centred. */
 export type OverlayPlacement = 'top' | 'centre'
 
@@ -66,6 +68,11 @@ export function OverlayDialog({
   focusRef?: RefObject<HTMLElement | null> | undefined
   children: ReactNode
 }) {
+  // An open overlay owns the keyboard: while it is up the app's global
+  // map is off, so a `d` in here cannot reach the delete confirm
+  // (`keys/scope.ts`, 10 §Keyboard).
+  useKeyOwner(open)
+
   const restoreFocusTo = useRef<HTMLElement | null>(null)
   const panel = useRef<HTMLDivElement | null>(null)
 

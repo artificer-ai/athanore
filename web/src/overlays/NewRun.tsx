@@ -72,6 +72,7 @@ import { toast } from 'sonner'
 
 import { listWorkflowsApiWorkflowsGetOptions } from '../api/gen/@tanstack/react-query.gen'
 import type { WorkflowOut } from '../api/gen/types.gen'
+import { useKeyOwner } from '../keys'
 import { queryKeys } from '../realtime/invalidate'
 import { ALL_WORKFLOWS, useUi } from '../store/ui'
 import {
@@ -125,6 +126,11 @@ function Kicker({ id, children }: { id: string; children: string }) {
 const TITLE_ID = 'new-run-title'
 
 export function NewRun({ open, onClose }: { open: boolean; onClose: () => void }) {
+  // An open overlay owns the keyboard: while it is up the app's global
+  // map is off, so a `d` in here cannot reach the delete confirm
+  // (`keys/scope.ts`, 10 §Keyboard).
+  useKeyOwner(open)
+
   const restoreFocusTo = useRef<HTMLElement | null>(null)
   const panel = useRef<HTMLDivElement | null>(null)
   // Whether the dialog's open-focus has already run. It is what tells a

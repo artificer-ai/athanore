@@ -3303,6 +3303,61 @@ invalidates all; `?` opens keys.
 answers only with panel focus.
 **Done.** Tests pass.
 
+**Status.** Done. `web/src/keys/useKeymap.ts` is one `keydown` listener on
+`window`, bound in the shell where every action it needs is already in
+hand. **The commands are not written twice**: fourteen of 10 §Keyboard's
+keys are rows of the palette's catalogue (`overlays/actions.ts`), which
+already carries the keycap that runs each one, so the map dispatches on
+that column — a key that ran something other than the row advertising it
+would be a lie on screen. What is left over is navigation, which no
+palette row can be: `↑`/`↓` and `j`/`k` select (clamped, as the mock's
+`move`), `←`/`→` cycle and `1`–`9` jump through `usePanes`, `⏎` focuses
+the detail pane, `^p` opens the palette and `esc` closes what is up.
+
+**Scoping is the task.** `web/src/keys/scope.ts` holds two registries,
+both read inside the handler rather than through React state. An overlay
+claims the keyboard while it is open (`useKeyOwner`, in the five dialogs
+that roll their own Radix root and in the one `OverlayDialog` the other
+three share), which is what stops a `d` inside a picker reaching the
+delete confirm; a request panel registers its own `a` and `d` against its
+own root, so the panel the keystroke came from answers and neither of the
+other two on screen does. Over those sit the three rules in the mock's
+order: `esc` closes from anywhere, an input included; `^p` and `^r` are
+chords and fire wherever the caret is, cancelled so the browser neither
+prints nor reloads; every plain key is off while the target is an
+`input`, `textarea`, `select` or contenteditable and off while an overlay
+owns the keyboard. `tab` is deliberately not intercepted — D176 (1).
+
+`a` and `d` pick by ACP kind, `allow_once` before `allow_always` and
+`reject_once` before `reject_always` (05 §Policies, 11 §Commands, 20), so
+a `human_input` choice carrying no kinds has no such key rather than a
+key that answers the wrong thing. `⏎` is the run list's alone and cancels
+the keystroke: `↑`/`↓` select, `⏎` focuses, which is what the list's own
+footer strip has said since T060 (D176 (5)).
+
+Tests: `keys/__tests__/useKeymap.test.tsx` presses every keycap of the
+catalogue and asserts the row that ran is the row that cap names, then
+asks the four scoping questions from the four places a key can be pressed
+— the list, an input, an overlay and the panel; `keys/__tests__/scope.test.ts`
+covers the two registries without React; `App.test.tsx` asserts the
+wiring end to end (`D` opens the confirm, `d` opens nothing, `j`/`k`
+select, `^r` invalidates the whole cache, `b` collapses the list, `l`
+takes the caret) and that every keycap of `lib/keys.ts` is bound to
+something; `components/__tests__/RequestPanel.test.tsx` asserts the two
+keys over the real map and the real POST.
+
+Verified in Chromium against `./scripts/run.sh` and Vite, over three runs
+each holding a pending permission: `j`/`k` walking and clamping the
+selection, `→` moving `LOG (2/5)` and `3` jumping, `?` opening the keys
+overlay and `D` doing nothing while it was up, `esc` closing it, `d`
+doing nothing and `D` opening the confirm, `dDnj` typed into the `/`
+input reaching nothing but the input, `b` collapsing to the rail and
+back, `n`/`w`/`e`/`t`/`m`/`x`/`r` opening their overlays, `^p` the
+palette, `^r` refetching without navigating, `l` landing the caret in the
+log composer, `⏎` from a row handing focus to the detail region, `a`
+outside the panel leaving the request pending and `a` inside it recording
+`allow_once`.
+
 ### T068 — Vitest suites and coverage (A4.10)
 
 **Do.** Fill in the unit suites the earlier tasks stubbed: renderers per
