@@ -3858,6 +3858,106 @@ card with its text field, no console errors. `v1.0.0` is tagged in this
 checkout; there is still no remote, so nothing is pushed and nothing is
 published — the README says so (D191 (5)).
 
+## Phase 7 — Post-1.0: design refresh, narrow viewports, type scale
+
+The first work after the v1.0.0 tag, specified by 21 and cut as Epic 7
+in 16. Presentation only: no task below touches `athanore/`, the wire
+contract or the plugin contract, and `tests/snapshots/openapi.json` is
+byte-identical after every one of them. `docs/plans/<id>-*.md` exists
+for each task and fences its scope.
+
+### T080 — Re-import the design and regenerate the theme (A7.1)
+
+**Do.** Refresh `docs/v1/design/Athanore.dc.html` and `nocturne.css`
+verbatim from the Claude Design project (via DesignSync once the
+operator has run `/design-login`, or from files the operator dropped
+in), keeping the current import's curation of `nocturne.css` (tokens,
+overrides, keyframes — its header comment); record the new date in
+`design/README.md`; `pnpm -C web gen:theme`; fold every changed token or
+treatment into 10 §Design system; one 15 row per deviation the app does
+not follow, per 21 §Re-import's diff discipline. **Stop and ask** on any
+D198 trigger (new/removed `--ath-status-*`, a second theme or mode, a
+changed token family, a mobile layout or font-size control that differs
+from 21). **Blocked** until the operator authorizes DesignSync or
+provides the files.
+**Tests.** The existing `theme.test.ts` `--check`; `git diff
+--exit-code` after a second `gen:theme` run.
+**Done.** `docs/v1/design/` carries the refreshed artifacts and the new
+date; the regenerated theme is committed; the old→new `nocturne.css`
+diff is fully accounted for in theme or decisions; gate green; snapshot
+unchanged.
+
+### T081 — Base-relative type ramp and the font-size chooser (A7.2)
+
+**Do.** `gen-theme.mjs`: emit the six type utilities as
+`calc(<px>rem / 12)` per 21 §Type scale's table, and the app type base
+as `html { font-size: var(--ath-font-size) }` plus
+`html[data-font-size='small'|'large'|'xlarge']` steps multiplying the
+token (×11/12, ×13.5/12, ×15/12). SPA: `usePrefs.fontSize`
+(`'small' | 'default' | 'large' | 'xlarge'`, default `'default'`,
+persisted and partialized); a subscription writes `data-font-size` on
+`<html>` (absent for `default`) before first paint and on change; an
+icon-only text-size button in the header beside `workflows`
+(`aria-label="text size"`) opening a Radix popover with a radio group of
+the four steps; four palette rows (`font size: <step>`). Update 10
+§Design system §Type and density and §Layout's header line.
+**Tests.** Vitest: the generated ramp values and attribute mapping; the
+pref's default, set, persistence shape; the popover and palette rows
+dispatch. Playwright: choose `xlarge`, reload, the choice holds and
+metric/row/kicker text scaled together; axe at the desktop viewport with
+`xlarge` selected stays over the D178 floor.
+**Done.** The chooser is reachable from the header and the palette,
+rescales the whole ramp coherently, survives reload via
+`athanore.prefs`, and clearing site data restores the default; at
+`default` the rendered sizes are pixel-identical to before; gate green;
+snapshot unchanged.
+
+### T082 — The narrow shell (A7.3)
+
+**Do.** Below Tailwind's `md` (768 px, one breakpoint, D194): the
+splitter is not mounted and the middle shows one region — the run list
+while `?run=` is unset, the detail while it is set; the pane bar's left
+slot becomes a back control (accessible label "back to runs") clearing
+`?run=` in place of the collapse toggle; `listWidth`/`listCollapsed`
+inert, kept. Run list rows become the two-line form of 21 §Narrow layout
+(TITLE + STATUS pill; `run id · workflow · node · age` in `text-meta`,
+`⚠` kept); the list footer keeps `n shown`, drops the key hints. Header
+wraps to two rows with the chips + `/` filter as a horizontally
+scrollable strip; `＋ new run` and `workflows` stay visible; narrow
+chrome controls get ≥ 24×24 px hit areas (WCAG 2.5.8). Footer hides the
+key-hint chips and keeps the palette button, relabelled `palette`, as a
+touch target. The keyboard map stays bound at every width. Update 10
+§Layout.
+**Tests.** Vitest: the narrow row renders both lines from a
+`RunSummary`; the back control writes the search; the shell picks the
+region from `?run=` at a narrow width. Playwright at 390×844
+(`hasTouch`, `isMobile`, `tap()`): list → open a run → detail → back;
+no horizontal page scroll on list or detail.
+**Done.** At 390 px the operator moves list ↔ detail by touch with no
+horizontal page scroll; at ≥ 768 px the layout is exactly 10 §Layout
+unchanged; gate green; snapshot unchanged.
+
+### T083 — Narrow overlays and the touch gate (A7.4)
+
+**Do.** Every overlay fits the narrow viewport per 21 §Narrow layout:
+panel width/height capped to the viewport minus backdrop margin with
+internal scroll; palette full-width under the header; new run / edit
+span the width and the chip group wraps; the library stacks its columns
+as a full-screen sheet; the task drawer is a full-screen sheet; pickers,
+keys, delete-confirm and action overlays sized to fit; every overlay
+closable by touch (backdrop tap, real close/cancel buttons). Update 10
+§Overlays and §Accessibility and quality.
+**Tests.** Playwright `web/e2e/mobile.spec.ts` at 390×844, everything by
+`tap()`: the five flows of 21 §Touch operation end to end on the `probe`
+fixture — view the list, open the run, cycle panes with `▶`, answer the
+open request, start a new run from `＋ new run` — plus each overlay
+opened and dismissed within the viewport. axe at 390×844 on the
+loaded-dashboard state stays over the D178 floor.
+**Done.** Every 21 §Touch operation flow passes by touch alone at
+390×844; the axe gate holds at desktop and mobile viewports and at
+`xlarge` (T081's run stays green); gate green; snapshot unchanged.
+
+
 ---
 
 ## Traceability
@@ -3873,6 +3973,7 @@ published — the README says so (D191 (5)).
 | A4.1–A4.10 | T057–T069 |
 | A5.1–A5.4 | T070–T073 |
 | A6.1–A6.4 | T074–T079 |
+| A7.1–A7.4 | T080–T083 |
 
 Sequencing changes relative to 16, all recorded in 15 when executed:
 the TUI is not deleted at all in this repository — it never lived here
