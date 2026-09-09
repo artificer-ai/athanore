@@ -146,6 +146,39 @@ jobs:
         if: steps.probe.outputs.present == 'yes'
         run: pnpm -C web build
 
+      # The E2E suite (T068a) drives the build above against a real
+      # `athanore serve`, so this job needs the Python environment too:
+      # the server is the subject, not a mock of one. Every agent in it
+      # is `FakeACPAgent` (ATHANORE_AGENT_COMMAND), so no model is ever
+      # in the loop.
+      - uses: astral-sh/setup-uv@v6
+        if: steps.probe.outputs.present == 'yes'
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: uv sync
+        if: steps.probe.outputs.present == 'yes'
+        run: uv sync --all-packages --all-groups --all-extras
+
+      # Chromium only, as T068a asks: one engine, the same one
+      # `docker/dev/Dockerfile` bakes into the dev image (D68), pinned by
+      # the `@playwright/test` in `web/package.json`.
+      - name: playwright browser
+        if: steps.probe.outputs.present == 'yes'
+        run: pnpm -C web exec playwright install --with-deps chromium
+
+      - name: pnpm e2e
+        if: steps.probe.outputs.present == 'yes'
+        run: pnpm -C web exec playwright test
+
+      - uses: actions/upload-artifact@v4
+        if: steps.probe.outputs.present == 'yes' && failure()
+        with:
+          name: playwright-report
+          path: web/playwright-report
+          retention-days: 7
+
   # One wire contract: OpenAPI is generated from the code and the
   # TypeScript client from OpenAPI, both committed. This job regenerates
   # them and fails if the tree is stale. Both generators exist as of
