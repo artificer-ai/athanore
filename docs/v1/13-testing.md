@@ -156,8 +156,15 @@ GitHub Actions: `uv sync`, ruff, pyright, import-linter, pytest (SQLite),
 pnpm typecheck/lint/vitest, build SPA, Playwright, OpenAPI snapshot check,
 the packaging check (`scripts/check_wheel.py`: the SPA built, then `uv
 build`, then the wheel installed into a clean venv and asked for `/` —
-10 §Build, D180), `pip-audit`, `pnpm audit`. Nightly: Postgres matrix.
-Coverage gates:
+10 §Build, D180), `pip-audit`, `pnpm audit`. The two audits run last in
+their job, and are the only checks `./scripts/test.sh` does not run:
+their verdict comes from an advisory database rather than from the tree,
+so they change without a commit. A high advisory in a transitive
+dependency is fixed by an `overrides` entry in `pnpm-workspace.yaml`,
+not waived. Nightly: Postgres matrix, with `ATHANORE_TEST_PG_REQUIRED`
+set — the job provisions a database, so the skip that is right on a
+machine without one is a failure there, and a `-m` selection that
+matches nothing is exit 5 rather than a pass. Coverage gates:
 `graph`/`engine`/`requests` ≥ 95 %, overall ≥ 85 %; `web/src` ≥ 80 % on
 statements, branches, functions and lines, configured in
 `web/vite.config.ts` so that `pnpm -C web test` — which is what both the

@@ -37,6 +37,14 @@ jobs:
 
     env:
       ATHANORE_TEST_PG_URL: postgresql+asyncpg://postgres:athanore@127.0.0.1:5432/postgres
+      # For real, not "for real if the database happens to be up" (T079).
+      # `tests/store/conftest.py` skips the Postgres parameter when
+      # nothing answers, which is right on a dev machine that has not run
+      # `docker compose --profile pg up -d postgres` and wrong here,
+      # where the service container is the whole point of the job: a
+      # skip would be a green run that tested nothing. This variable
+      # turns that skip into a failure (D191).
+      ATHANORE_TEST_PG_REQUIRED: "1"
 
     steps:
       - uses: actions/checkout@v4
@@ -50,7 +58,11 @@ jobs:
       - name: uv sync
         run: uv sync --all-packages --all-groups --all-extras
 
-      # The marker is registered in pyproject.toml; the tests it selects
-      # arrive in T014. An empty selection is a pass, not exit 5 (D76).
+      # The marker is registered in pyproject.toml and the tests it
+      # selects arrived in T014, so an empty selection is now a failure
+      # (exit 5) and not the pass D76 made it while there was nothing to
+      # select: the carve-out in `tests/conftest.py` is gone (D191).
+      # Between that and `ATHANORE_TEST_PG_REQUIRED`, the two ways this
+      # job could be green having run nothing are both closed.
       - name: pytest -m postgres
         run: uv run --no-sync pytest -m postgres -q

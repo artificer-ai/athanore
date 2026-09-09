@@ -1,9 +1,13 @@
 # The gate, on a runner. `./scripts/test.sh` is the definition of green
 # (D74) and this file follows it: every check below is a check the gate
-# runs, in the gate's order. The one departure is `--cov` on pytest,
-# which measures rather than checks. If the two ever disagree about what
-# green means, the gate is right and this file is wrong;
-# `tests/test_ci_workflows.py` is what notices.
+# runs, in the gate's order. There are three departures, and they are
+# the checks whose verdict does not come from this tree alone: `--cov`
+# on pytest, which measures so that the four coverage gates after it can
+# check, and `pip-audit` / `pnpm audit`, which ask the advisory
+# databases a question whose answer changes without a commit (T079,
+# D191). Both audits run last in their job for that reason. If the two
+# files ever disagree about what green means, the gate is right and this
+# one is wrong; `tests/test_ci_workflows.py` is what notices.
 name: CI
 
 on:
@@ -87,6 +91,19 @@ jobs:
       - name: lint-imports
         if: matrix.python-version == '3.13'
         run: uv run --no-sync lint-imports
+
+      # 13 §CI's Python audit (T079). Last, and deliberately: an
+      # advisory published overnight goes red without a line of this
+      # repository changing, and a step that can do that must not be
+      # allowed to mask a real failure in the code by running before it.
+      # It audits the environment `uv sync` prepared — the resolved
+      # tree, not the ranges in `pyproject.toml` — and it is one of the
+      # two checks the gate does not run, because the gate is offline
+      # and reproducible and this asks the advisory database a question
+      # whose answer changes by the day (D191).
+      - name: pip-audit
+        if: matrix.python-version == '3.13'
+        run: uv run --no-sync pip-audit
 
   # The SPA half of the gate. `web/` arrives in T007; until it does this
   # job checks out, finds no `web/package.json`, and passes having run
@@ -178,6 +195,16 @@ jobs:
           name: playwright-report
           path: web/playwright-report
           retention-days: 7
+
+      # 13 §CI's node audit (T079), at the level T079 names. Last for
+      # the same reason `pip-audit` is, and after the upload above so
+      # that a failing E2E run is what the report artifact belongs to.
+      # A high advisory in a transitive dependency is fixed by an
+      # `overrides` entry in `pnpm-workspace.yaml`, not waived here
+      # (D191).
+      - name: pnpm audit
+        if: steps.probe.outputs.present == 'yes'
+        run: pnpm -C web audit --audit-level high
 
   # One wire contract: OpenAPI is generated from the code and the
   # TypeScript client from OpenAPI, both committed. This job regenerates

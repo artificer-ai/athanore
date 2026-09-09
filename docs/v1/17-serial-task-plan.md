@@ -3813,6 +3813,50 @@ examples...:feature_build --port 0`; browse. Bump version `1.0.0`, tag,
 push.
 **Done.** Tag `v1.0.0` exists; the wheel on a clean machine serves the
 SPA and runs `msgtest` on `FakeACPAgent`.
+**Status.** Done. The audits are on and both are clean: `pip-audit`
+finds nothing (it skips `athanore` and `athanore-examples`, which are not
+on PyPI at this version), and `pnpm audit --audit-level high` is clean
+after the one finding it had — three high `js-yaml` advisories reached
+through `@hey-api/openapi-ts` — was **fixed** by an `overrides` entry in
+`pnpm-workspace.yaml` rather than waived (D191 (2)); the generated client
+is byte-identical after it. Both audits run last in their job and are the
+only two checks `./scripts/test.sh` does not run, because their verdict
+comes from an advisory database and not from the tree (D191 (1)). The
+coverage gates needed no change — T056 had already enforced all four —
+and this is where they were first run: graph 100 %, engine 98 %, requests
+99 %, overall 93 %, against 95/95/95/85. The nightly job is "for real"
+two ways: `tests/conftest.py` and D76's exit-5 carve-out are gone, so a
+`-m` selection that matches nothing is a failure again, and
+`ATHANORE_TEST_PG_REQUIRED=1` turns the Postgres skips into failures
+(D191 (3)). Both postures were exercised on `pytest -m postgres
+tests/store`, which selects 280 variants: with the variable unset all
+280 skip as before, and with `ATHANORE_TEST_PG_REQUIRED=1` and no
+database the same selection errors 267 times, which is the red build the
+job must produce. The remaining 13
+skips are the `sqlite_url` fixture's "this behaviour is SQLite's own",
+which are correct and stay skips. **`pytest -m postgres` against a live
+database was not run here**: the container this task was built in is an
+agent container, which by design mounts no docker socket
+(`compose.yaml`), so `docker compose --profile pg up -d postgres` is not
+available to it and no PostgreSQL server is installed in the image. The
+live path is untouched by this task — `_no_postgres` is only reached when
+the database does not answer — but the run itself is owed and is the one
+step of `docs/plans/T079-release.md`'s verification list that was not
+performed.
+Version `1.0.0` in both `pyproject.toml`s, snapshot and client
+regenerated. The clean-machine check: `uv build --all-packages`, both
+wheels `pip install`ed into a fresh venv, served from a temporary
+directory with every `ATHANORE_*` dropped — `/api/health` reports
+`1.0.0`, `/` is the built SPA and its two assets load, `athanore serve
+feature_build:wf msgtest:wf --no-discover` registers both graphs,
+`msgtest` runs to completion through the CLI (`answer athanor`, `answer
+approve`, output `{'word': 'athanor', 'verdict': 'approve'}`), and
+`feature_build` dispatches every agent node on `FakeACPAgent` from the
+installed scenarios. The SPA was opened in Chromium against that
+installation: header `ATHANORE v1.0.0`, the run in the list, the inbox
+card with its text field, no console errors. `v1.0.0` is tagged in this
+checkout; there is still no remote, so nothing is pushed and nothing is
+published — the README says so (D191 (5)).
 
 ---
 

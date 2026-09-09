@@ -8,12 +8,16 @@ copy carries the ``postgres`` marker.
 
 Three properties are deliberate:
 
-- **The Postgres variants skip, they never error.** They skip when
-  ``ATHANORE_TEST_PG_URL`` is unset, and they skip when it is set but
-  nothing is listening — which is what the dev container looks like
-  before ``docker compose --profile pg up -d postgres``. The probe runs
-  once per session and its verdict is cached, so a suite with the profile
-  down pays for one refused connection, not one per test.
+- **The Postgres variants skip, they never error — unless the caller
+  says they must run.** They skip when ``ATHANORE_TEST_PG_URL`` is
+  unset, and they skip when it is set but nothing is listening — which
+  is what the dev container looks like before ``docker compose --profile
+  pg up -d postgres``. The probe runs once per session and its verdict is
+  cached, so a suite with the profile down pays for one refused
+  connection, not one per test. Set ``ATHANORE_TEST_PG_REQUIRED`` and
+  both of those skips become failures: that is the nightly job, where a
+  database is provisioned for the run and a skip would be a green build
+  that tested nothing (T079, D191).
 - **Each test gets an empty database.** SQLite gets a fresh file under
   ``tmp_path``. PostgreSQL cannot, so the schema is dropped and recreated
   before each test — including ``alembic_version``, so a migration test
@@ -32,6 +36,7 @@ from __future__ import annotations
 import os
 from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import NoReturn
 
 import pytest
 from sqlalchemy import text
@@ -46,9 +51,38 @@ from athanore.store.uow import Store
 #: live PostgreSQL (T000; `compose.yaml`'s `pg` profile).
 PG_URL_ENV = "ATHANORE_TEST_PG_URL"
 
+#: Set by the nightly workflow to mean "this run exists to exercise
+#: PostgreSQL": a missing URL or a database that does not answer is then
+#: a failure rather than a skip (T079).
+PG_REQUIRED_ENV = "ATHANORE_TEST_PG_REQUIRED"
+
 #: One probe per URL per session: ``None`` once it answered, or the
 #: reason it did not.
 _PG_PROBE: dict[str, str | None] = {}
+
+
+def _postgres_is_required() -> bool:
+    """Is a Postgres that does not answer a failure rather than a skip?
+
+    Anything but empty, ``0``, ``false`` or ``no`` means yes: the
+    variable is set by a workflow file, and a value nobody meant as a
+    negative must not silently disarm the check it exists to arm.
+    """
+
+    return os.environ.get(PG_REQUIRED_ENV, "").strip().lower() not in {
+        "",
+        "0",
+        "false",
+        "no",
+    }
+
+
+def _no_postgres(reason: str) -> NoReturn:
+    """Skip because there is no database — or fail, if one was promised."""
+
+    if _postgres_is_required():
+        pytest.fail(f"{PG_REQUIRED_ENV} is set, so this must not skip: {reason}")
+    pytest.skip(reason)
 
 
 @pytest.fixture(
@@ -92,7 +126,7 @@ async def db_url(backend: str, sqlite_path: Path) -> str:
         return f"sqlite+aiosqlite:///{sqlite_path}"
     url = os.environ.get(PG_URL_ENV)
     if not url:
-        pytest.skip(f"{PG_URL_ENV} is not set")
+        _no_postgres(f"{PG_URL_ENV} is not set")
     await _require_postgres(url)
     await _empty_postgres(url)
     return url
@@ -140,7 +174,7 @@ async def _require_postgres(url: str) -> None:
             await engine.dispose()
     reason = _PG_PROBE[url]
     if reason is not None:
-        pytest.skip(
+        _no_postgres(
             f"no PostgreSQL at {PG_URL_ENV} "
             f"(`docker compose --profile pg up -d postgres`): {reason}"
         )
