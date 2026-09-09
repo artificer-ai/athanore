@@ -3887,6 +3887,18 @@ date; the regenerated theme is committed; the old→new `nocturne.css`
 diff is fully accounted for in theme or decisions; gate green; snapshot
 unchanged.
 
+**Status.** Done. The re-import ran over DesignSync and changed no
+bytes: `Athanore.dc.html` came back byte-identical, and the Nocturne
+token sheet still declares the same 51 tokens at the same values, so the
+old→new `nocturne.css` diff is empty, `gen:theme` rewrote `theme.css` and
+`tokens.gen.ts` identically, and 10 §Design system had nothing to fold.
+What the project has grown since 2026-09-05 is a second mock,
+`Athanore Terminal.dc.html`, imported verbatim beside the first and
+normative for nothing: its terminal chrome is fenced out of this task,
+and its five-step CSS-`zoom` text-size control and 760 px `mobileView`
+layout are D198 stop-and-ask triggers, so 21 stands and T082 builds to 21
+until the operator rules otherwise (D200).
+
 ### T081 — Base-relative type ramp and the font-size chooser (A7.2)
 
 **Do.** `gen-theme.mjs`: emit the six type utilities as

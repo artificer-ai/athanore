@@ -78,6 +78,17 @@ Out of scope, explicitly:
   rules that no refreshed artifacts exist or none are wanted, the
   re-import task is dropped at approval and the rest of this document
   stands on the current import.
+- **What the 2026-09-09 re-import actually found** (T080, D200): nothing
+  moved. `Athanore.dc.html` and the Nocturne token sheet came back
+  byte-for-byte what the 2026-09-05 import already carried, so the
+  regenerated theme is identical and this document's sections below are
+  unaffected. The project has since grown a *second* mock,
+  `design/Athanore Terminal.dc.html`, imported verbatim and normative for
+  nothing: it restyles the dashboard as a hard-edged terminal and
+  prescribes a five-step CSS-`zoom` text-size control and a 760 px
+  `mobileView` layout. Both are stop-and-ask triggers, and no ruling has
+  been made, so **§Type scale and §Narrow layout below stand as written**
+  and the tasks that build them build to this document, not to that mock.
 
 ## Type scale (normative)
 

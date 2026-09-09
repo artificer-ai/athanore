@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/nocturne-d69e1996-1205-4cb2-8105-fd5d8d48df7b/styles.css">
+<script src="_ds/nocturne-d69e1996-1205-4cb2-8105-fd5d8d48df7b/_ds_bundle.js"></script>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+  body { margin: 0; background: var(--color-bg); color: var(--color-text); font-family: "JetBrains Mono", ui-monospace, monospace; }
+  a { color: var(--color-accent-300); text-decoration: none; }
+  a:hover { color: var(--color-accent-200); }
+  *::selection { background: color-mix(in srgb, var(--color-accent) 30%, transparent); }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--color-neutral-800); border-radius: 0; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  @keyframes ath-pulse { 0%,100% { opacity: 1 } 50% { opacity: .25 } }
+  @keyframes ath-caret { 0%,49% { opacity: 1 } 50%,100% { opacity: 0 } }
+</style>
+</helmet>
+
+<div ref="{{ rootRef }}" style="{{ rootZoom }}">
+
+  <header style="display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; padding: 8px 14px; border-bottom: 1px solid var(--color-accent-800); background: linear-gradient(180deg, color-mix(in srgb, var(--color-surface) 55%, var(--color-bg)), var(--color-bg));">
+    <div style="display: flex; align-items: baseline; gap: 8px;">
+      <span style="color: var(--color-accent-200); font-weight: 700; letter-spacing: .18em; font-size: 12px;">┤ ATHANORE ├</span>
+      <span style="color: var(--color-neutral-500); font-size: 11px;">v0.0.11</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 10px; color: var(--color-neutral-500); font-size: 11px; white-space: nowrap;">
+      <span>{{ runCount }} runs</span>
+      <span style="color: var(--color-neutral-800);">│</span>
+      <span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 6px; height: 6px; border-radius: 0; background: var(--color-accent); box-shadow: 0 0 8px var(--color-accent); animation: ath-pulse 1.6s ease-in-out infinite;"></span>{{ activeCount }} active</span>
+    </div>
+    <div style="flex: 1;"></div>
+    <div style="{{ filterRowStyle }}">
+      <sc-for list="{{ workflowFilters }}" as="f" hint-placeholder-count="4">
+        <button type="button" onClick="{{ f.onClick }}" style="{{ f.style }}" style-hover="border-color: var(--color-accent-600); color: var(--color-accent-200);">{{ f.label }}</button>
+      </sc-for>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px; border: 1px solid var(--color-accent-800); border-radius: 0; padding: 4px 8px; background: var(--color-surface); min-width: 0; flex: 1 1 150px; max-width: 240px;">
+      <span style="color: var(--color-neutral-500);">/</span>
+      <input value="{{ query }}" onChange="{{ onQuery }}" placeholder="filter runs" style="{{ searchInput }}">
+    </div>
+    <div style="display: flex; align-items: center; border: 1px solid var(--color-accent-800);">
+      <button type="button" onClick="{{ uiDown }}" title="smaller text" style="{{ iconBtn }}" style-hover="color: var(--color-accent-200);">a−</button>
+      <span style="color: var(--color-neutral-500); font-size: 10px; padding: 0 2px; min-width: 30px; text-align: center;">{{ uiLabel }}</span>
+      <button type="button" onClick="{{ uiUp }}" title="larger text" style="{{ iconBtn }}" style-hover="color: var(--color-accent-200);">A+</button>
+    </div>
+    <button type="button" onClick="{{ openNewRun }}" class="btn btn-primary" style="{{ actionBtn }}" style-hover="background: color-mix(in srgb, var(--color-accent) 14%, transparent);">＋ new run</button>
+    <button type="button" onClick="{{ openLibrary }}" style="{{ ghostBtn }}" style-hover="border-color: var(--color-accent-600); color: var(--color-accent-200);">workflows</button>
+  </header>
+
+  <div style="flex: 1; display: flex; align-items: stretch; min-height: 0;">
+
+    <sc-if value="{{ railVisible }}" hint-placeholder-val="{{ false }}">
+      <button type="button" onClick="{{ toggleList }}" title="show run list (b)" style="width: 30px; flex: none; border: 0; border-right: 1px solid var(--color-accent-800); background: color-mix(in srgb, var(--color-surface) 45%, var(--color-bg)); color: var(--color-neutral-500); cursor: pointer; font-family: inherit; font-size: 11px; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 10px 0;" style-hover="color: var(--color-accent-200); background: var(--color-neutral-900);">
+        <span>»</span>
+        <span style="writing-mode: vertical-rl; letter-spacing: .18em; font-size: 10px;">RUNS {{ rowCount }}</span>
+      </button>
+    </sc-if>
+
+    <sc-if value="{{ listVisible }}" hint-placeholder-val="{{ true }}">
+    <section style="{{ listStyle }}">
+      <div style="{{ headRowStyle }}">
+        <span></span>
+        <span style="{{ colId }}">RUN</span><span style="{{ colWf }}">WORKFLOW</span><span>TITLE</span><span>STATUS</span><span style="{{ colNode }}">NODE</span><span style="text-align: right;">AGE</span>
+      </div>
+      <div style="flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0;">
+        <sc-for list="{{ rows }}" as="r" hint-placeholder-count="16">
+          <div onClick="{{ r.onClick }}" style="{{ r.style }}" style-hover="background: var(--color-neutral-900);">
+            <span style="color: var(--color-accent-300);">{{ r.cursor }}</span>
+            <span style="{{ r.idStyle }}">{{ r.id }}</span>
+            <span style="{{ r.wfStyle }}">{{ r.workflow }}</span>
+            <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ r.title }}</span>
+            <span style="{{ r.statusStyle }}">{{ r.status }}</span>
+            <span style="{{ r.nodeStyle }}">{{ r.node }}</span>
+            <span style="{{ r.ageStyle }}">{{ r.age }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="padding: 5px 12px; border-top: 1px solid var(--color-accent-800); color: var(--color-neutral-500); font-size: 10px; display: flex; gap: 14px; background: color-mix(in srgb, var(--color-surface) 45%, var(--color-bg));">
+        <span>{{ rowCount }} shown</span>
+        <span>↑↓ select</span>
+        <span>⏎ focus detail</span>
+      </div>
+    </section>
+    </sc-if>
+
+    <sc-if value="{{ splitterVisible }}" hint-placeholder-val="{{ true }}">
+      <div onMouseDown="{{ startDrag }}" title="drag to resize" style="{{ splitterStyle }}" style-hover="background: var(--color-accent-700);"></div>
+    </sc-if>
+
+    <sc-if value="{{ detailVisible }}" hint-placeholder-val="{{ true }}">
+    <section style="flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0;">
+      <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 6px 12px; border-bottom: 1px solid var(--color-accent-800); background: color-mix(in srgb, var(--color-surface) 45%, var(--color-bg));">
+        <sc-if value="{{ backVisible }}" hint-placeholder-val="{{ false }}">
+          <button type="button" onClick="{{ showList }}" title="back to runs" style="{{ backBtn }}" style-hover="border-color: var(--color-accent-600);">« runs</button>
+        </sc-if>
+        <sc-if value="{{ collapseVisible }}" hint-placeholder-val="{{ true }}">
+          <button type="button" onClick="{{ toggleList }}" title="hide run list (b)" style="background: transparent; border: 1px solid var(--color-accent-800); border-radius: 0; color: var(--color-neutral-500); cursor: pointer; font-family: inherit; font-size: 10px; padding: 1px 6px; margin-right: 2px;" style-hover="border-color: var(--color-accent-600); color: var(--color-accent-200);">❮</button>
+        </sc-if>
+        <button type="button" onClick="{{ prevPane }}" style="{{ arrowBtn }}" style-hover="color: var(--color-accent-200);">&lt;-</button>
+        <span style="color: var(--color-accent-300); font-weight: 500; letter-spacing: .08em; font-size: 11px; white-space: nowrap;">{{ paneLabel }}</span>
+        <button type="button" onClick="{{ nextPane }}" style="{{ arrowBtn }}" style-hover="color: var(--color-accent-200);">-&gt;</button>
+        <div style="display: flex; gap: 4px; margin-left: 4px;">
+          <sc-for list="{{ paneDots }}" as="d" hint-placeholder-count="5">
+            <button type="button" onClick="{{ d.onClick }}" title="{{ d.name }}" style="{{ d.wrapStyle }}"><span style="{{ d.style }}"></span></button>
+          </sc-for>
+        </div>
+        <div style="flex: 1;"></div>
+        <span style="color: var(--color-neutral-500); font-size: 10px;">run</span>
+        <span style="color: var(--color-neutral-400); font-size: 11px;">{{ sel.id }}</span>
+        <span style="{{ sel.statusPill }}">{{ sel.status }}</span>
+      </div>
+
+      <div style="flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0;">
+
+        <sc-if value="{{ isOverview }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-direction: column;">
+            <div style="padding: 12px 14px; border-bottom: 1px solid var(--color-accent-900);">
+              <div style="color: var(--color-accent-300); font-size: 10px; letter-spacing: .14em; margin-bottom: 8px;">┤ STATS ├</div>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1px; background: var(--color-neutral-900); border: 1px solid var(--color-accent-800); border-radius: 0; overflow: hidden;">
+                <sc-for list="{{ sel.metrics }}" as="m" hint-placeholder-count="4">
+                  <div style="background: var(--color-surface); padding: 8px 10px;">
+                    <div style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .1em;">{{ m.label }}</div>
+                    <div style="color: var(--color-text); font-size: 15px; margin-top: 3px; font-weight: 500;">{{ m.value }}</div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 3px;">
+                <sc-for list="{{ sel.tokenBars }}" as="b" hint-placeholder-count="6">
+                  <div style="display: grid; grid-template-columns: minmax(0, 84px) minmax(60px, 1fr) minmax(0, 70px); align-items: center; gap: 8px;">
+                    <span style="color: var(--color-neutral-500); text-align: right; font-size: 11px;">{{ b.node }}</span>
+                    <span style="{{ b.fill }}">{{ b.blocks }}</span>
+                    <span style="color: var(--color-neutral-500); font-size: 11px; text-align: right;">{{ b.count }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+
+            <div style="padding: 12px 14px; border-bottom: 1px solid var(--color-accent-900); display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px 22px;">
+              <sc-for list="{{ sel.meta }}" as="m" hint-placeholder-count="6">
+                <div style="display: grid; grid-template-columns: minmax(0, 86px) minmax(0, 1fr); gap: 10px; align-items: start;">
+                  <span style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .1em; padding-top: 1px;">{{ m.label }}</span>
+                  <span style="color: var(--color-neutral-300); overflow-wrap: anywhere;">{{ m.value }}</span>
+                </div>
+              </sc-for>
+            </div>
+
+            <div style="padding: 12px 14px;">
+              <div style="color: var(--color-accent-300); font-size: 10px; letter-spacing: .14em; margin-bottom: 8px;">┤ NODES ├</div>
+              <div style="display: grid; grid-template-columns: minmax(60px, 1fr) 34px minmax(0, 80px) minmax(0, 76px) minmax(0, 58px); gap: 6px; color: var(--color-neutral-500); font-size: 10px; letter-spacing: .06em; padding: 0 8px 5px; overflow: hidden;">
+                <span>NODE</span><span>ATT</span><span>STATUS</span><span style="text-align: right;">TOKENS</span><span style="text-align: right;">DUR</span>
+              </div>
+              <div style="border: 1px solid var(--color-accent-800); border-radius: 0; overflow: hidden;">
+                <sc-for list="{{ sel.nodeRows }}" as="n" hint-placeholder-count="7">
+                  <div style="{{ n.style }}" style-hover="background: var(--color-neutral-900);">
+                    <span style="color: var(--color-neutral-300); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ n.node }}</span>
+                    <span style="color: var(--color-neutral-500);">{{ n.att }}</span>
+                    <span style="{{ n.statusStyle }}">{{ n.status }}</span>
+                    <span style="color: var(--color-neutral-500); text-align: right; overflow: hidden; white-space: nowrap;">{{ n.tokens }}</span>
+                    <span style="color: var(--color-neutral-500); text-align: right; overflow: hidden; white-space: nowrap;">{{ n.dur }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isLog }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column;">
+            <div style="display: flex; align-items: center; gap: 10px; padding: 6px 14px; border-bottom: 1px solid var(--color-accent-900); color: var(--color-neutral-500); font-size: 10px; letter-spacing: .1em;">
+              <span>┤ EVENT LOG ├</span>
+              <span style="color: var(--color-neutral-800);">│</span>
+              <span>{{ logCount }} lines</span>
+              <div style="flex: 1;"></div>
+              <span style="{{ tailStyle }}">{{ tailLabel }}</span>
+            </div>
+            <div style="padding: 8px 14px 20px; display: flex; flex-direction: column; gap: 1px;">
+              <sc-for list="{{ logLines }}" as="l" hint-placeholder-count="18">
+                <div style="display: grid; grid-template-columns: minmax(0, 58px) minmax(0, 130px) minmax(120px, 1fr); gap: 8px; padding: 1px 0;">
+                  <span style="color: var(--color-neutral-500); font-size: 11px;">{{ l.t }}</span>
+                  <span style="color: var(--color-accent-2-400); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ l.src }}</span>
+                  <span style="{{ l.style }}">{{ l.msg }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isAgent }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 6px 14px; border-bottom: 1px solid var(--color-accent-800); color: var(--color-neutral-500); font-size: 10px; letter-spacing: .1em;">
+              <span style="white-space: nowrap;">┤ AGENT STREAM ├</span>
+              <span style="color: var(--color-neutral-800);">│</span>
+              <span style="color: var(--color-neutral-300); white-space: nowrap;">{{ sel.agentTask }}</span>
+              <div style="flex: 1;"></div>
+              <span style="white-space: nowrap;">{{ sel.agentModel }}</span>
+            </div>
+            <div style="padding: 12px 14px 24px; display: flex; flex-direction: column; gap: 10px;">
+              <sc-for list="{{ agentBlocks }}" as="b" hint-placeholder-count="5">
+                <div style="{{ b.wrap }}">
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
+                    <span style="{{ b.kindStyle }}">{{ b.kind }}</span>
+                    <span style="color: var(--color-neutral-500); font-size: 10px;">{{ b.meta }}</span>
+                  </div>
+                  <div style="{{ b.bodyStyle }}">{{ b.body }}</div>
+                </div>
+              </sc-for>
+              <sc-if value="{{ agentTyping }}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; align-items: center; gap: 8px; color: var(--color-neutral-500);">
+                  <span style="color: var(--color-accent-400);">assistant</span>
+                  <span style="width: 7px; height: 13px; background: var(--color-accent); display: inline-block; animation: ath-caret 1s step-end infinite;"></span>
+                </div>
+              </sc-if>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isGraph }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 6px 14px; border-bottom: 1px solid var(--color-accent-800); color: var(--color-neutral-500); font-size: 10px; letter-spacing: .1em;">
+              <span style="white-space: nowrap;">┤ WORKFLOW GRAPH ├</span>
+              <span style="color: var(--color-neutral-800);">│</span>
+              <span style="color: var(--color-neutral-300); white-space: nowrap;">{{ sel.workflow }}</span>
+              <div style="flex: 1;"></div>
+              <span style="display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;"><span style="width: 6px; height: 6px; border-radius: 0; background: var(--color-accent);"></span>active</span>
+              <span style="display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;"><span style="width: 6px; height: 6px; border-radius: 0; background: var(--color-neutral-500);"></span>done</span>
+              <span style="display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;"><span style="width: 6px; height: 6px; border-radius: 0; background: #d9868f;"></span>failed</span>
+            </div>
+            <div style="padding: 18px 14px 28px; display: flex; flex-wrap: wrap; gap: 22px 26px; align-items: flex-start;">
+              <div style="display: flex; flex-direction: column; align-items: stretch; gap: 0; min-width: 0; flex: 1 1 280px;">
+                <sc-for list="{{ graphNodes }}" as="g" hint-placeholder-count="8">
+                  <div style="display: grid; grid-template-columns: minmax(0, 1fr) 58px; align-items: stretch;">
+                    <div style="display: flex; flex-direction: column; align-items: stretch; min-width: 0;">
+                      <div onClick="{{ g.onClick }}" style="{{ g.style }}" style-hover="border-color: var(--color-accent-500);">
+                        <span style="{{ g.markStyle }}">{{ g.mark }}</span>
+                        <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ g.name }}</span>
+                        <span style="color: var(--color-neutral-500); font-size: 10px; white-space: nowrap;">{{ g.detail }}</span>
+                      </div>
+                      <sc-if value="{{ g.hasEdge }}" hint-placeholder-val="{{ true }}">
+                        <div style="display: flex; flex-direction: column; align-items: center; width: 28px; margin-left: 12px;">
+                          <span style="width: 1px; height: 16px; background: var(--color-neutral-700); display: block;"></span>
+                          <span style="color: var(--color-neutral-500); font-size: 10px; line-height: 8px; height: 10px;">v</span>
+                        </div>
+                      </sc-if>
+                    </div>
+                    <div style="position: relative; min-width: 0;">
+                      <sc-if value="{{ g.railDown }}" hint-placeholder-val="{{ false }}">
+                        <span style="position: absolute; right: 14px; top: 50%; bottom: 0; width: 1px; background: var(--color-neutral-700); display: block;"></span>
+                      </sc-if>
+                      <sc-if value="{{ g.railUp }}" hint-placeholder-val="{{ false }}">
+                        <span style="position: absolute; right: 14px; top: 0; height: 50%; width: 1px; background: var(--color-neutral-700); display: block;"></span>
+                      </sc-if>
+                      <sc-if value="{{ g.railJoin }}" hint-placeholder-val="{{ false }}">
+                        <span style="position: absolute; left: 2px; right: 14px; top: 14px; height: 1px; background: var(--color-neutral-700); display: block;"></span>
+                      </sc-if>
+                      <sc-if value="{{ g.railArrow }}" hint-placeholder-val="{{ false }}">
+                        <span style="position: absolute; left: -4px; top: 7px; color: var(--color-neutral-500); font-size: 10px; line-height: 1;">&lt;</span>
+                      </sc-if>
+                      <sc-if value="{{ g.railLabel }}" hint-placeholder-val="{{ false }}">
+                        <span style="position: absolute; right: 20px; top: 18px; color: var(--color-neutral-500); font-size: 9px; letter-spacing: .06em; white-space: nowrap;">loop</span>
+                      </sc-if>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+              <div style="flex: 1 1 210px; min-width: 0; max-width: 320px; border-top: 1px solid var(--color-accent-900); padding-top: 14px;">
+                <div style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .14em; margin-bottom: 8px;">┤ EDGES ├</div>
+                <div style="display: flex; flex-direction: column; gap: 5px;">
+                  <sc-for list="{{ graphEdges }}" as="e" hint-placeholder-count="4">
+                    <div style="display: flex; gap: 8px; align-items: baseline;">
+                      <span style="color: var(--color-accent-400); font-size: 11px;">{{ e.kind }}</span>
+                      <span style="color: var(--color-neutral-500); font-size: 11px; overflow-wrap: anywhere;">{{ e.desc }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+                <div style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .14em; margin: 16px 0 8px;">┤ SOURCE ├</div>
+                <div style="color: var(--color-neutral-500); font-size: 11px; overflow-wrap: anywhere;">workflows/feature_build.py</div>
+                <button type="button" onClick="{{ openLibrary }}" style="margin-top: 10px; background: transparent; border: 1px solid var(--color-accent-800); border-radius: 0; color: var(--color-neutral-400); font-family: inherit; font-size: 11px; padding: 4px 8px; cursor: pointer;" style-hover="border-color: var(--color-accent-600); color: var(--color-accent-200);">open definition</button>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isPlugin }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column;">
+            <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 6px 14px; border-bottom: 1px solid var(--color-accent-900); color: var(--color-neutral-500); font-size: 10px; letter-spacing: .1em;">
+              <span style="color: var(--color-accent-300);">PLUGIN</span>
+              <span style="color: var(--color-neutral-800);">│</span>
+              <span style="color: var(--color-neutral-400);">{{ plugin.title }}</span>
+              <div style="flex: 1;"></div>
+              <span style="white-space: nowrap;">{{ plugin.source }}</span>
+            </div>
+            <div style="padding: 12px 14px 24px; display: flex; flex-direction: column; gap: 14px;">
+              <div style="color: var(--color-neutral-500); font-size: 11.5px; max-width: 620px;">{{ plugin.note }}</div>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 1px; background: var(--color-neutral-900); border: 1px solid var(--color-accent-800); border-radius: 0; overflow: hidden;">
+                <sc-for list="{{ plugin.metrics }}" as="m" hint-placeholder-count="3">
+                  <div style="background: var(--color-surface); padding: 8px 10px;">
+                    <div style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .1em;">{{ m.label }}</div>
+                    <div style="color: var(--color-text); font-size: 15px; margin-top: 3px; font-weight: 500;">{{ m.value }}</div>
+                  </div>
+                </sc-for>
+              </div>
+              <div>
+                <div style="display: grid; grid-template-columns: minmax(80px, 1fr) minmax(0, 92px) minmax(0, 68px); gap: 8px; color: var(--color-neutral-500); font-size: 10px; letter-spacing: .06em; padding: 0 8px 5px;">
+                  <span>{{ plugin.colA }}</span><span>{{ plugin.colB }}</span><span style="text-align: right;">{{ plugin.colC }}</span>
+                </div>
+                <div style="border: 1px solid var(--color-accent-800); border-radius: 0; overflow: hidden;">
+                  <sc-for list="{{ plugin.rows }}" as="r" hint-placeholder-count="5">
+                    <div style="{{ r.style }}">
+                      <span style="color: var(--color-neutral-300); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ r.a }}</span>
+                      <span style="color: var(--color-accent-2-400); overflow: hidden; white-space: nowrap;">{{ r.b }}</span>
+                      <span style="color: var(--color-neutral-500); text-align: right; overflow: hidden; white-space: nowrap;">{{ r.c }}</span>
+                    </div>
+                  </sc-for>
+                </div>
+              </div>
+              <div style="color: var(--color-neutral-500); font-size: 10.5px;">registered by {{ plugin.workflow }} · panes are contributed with @wf.pane(name=…)</div>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isMessages }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column;">
+            <div style="display: flex; align-items: center; gap: 10px; padding: 6px 14px; border-bottom: 1px solid var(--color-accent-900); color: var(--color-neutral-500); font-size: 10px; letter-spacing: .1em;">
+              <span>┤ MESSAGES ├</span>
+              <span style="color: var(--color-neutral-800);">│</span>
+              <span>{{ messageCount }} between nodes</span>
+            </div>
+            <div style="padding: 12px 14px 24px; display: flex; flex-direction: column; gap: 8px;">
+              <sc-for list="{{ messages }}" as="m" hint-placeholder-count="5">
+                <div style="border: 1px solid var(--color-accent-800); border-radius: 0; background: var(--color-surface); padding: 8px 10px;">
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                    <span style="color: var(--color-accent-2-400); font-size: 11px;">{{ m.from }}</span>
+                    <span style="color: var(--color-neutral-500);">→</span>
+                    <span style="color: var(--color-accent-2-400); font-size: 11px;">{{ m.to }}</span>
+                    <div style="flex: 1;"></div>
+                    <span style="color: var(--color-neutral-500); font-size: 10px;">{{ m.t }}</span>
+                  </div>
+                  <div style="color: var(--color-neutral-300); overflow-wrap: anywhere;">{{ m.body }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+      </div>
+    </section>
+    </sc-if>
+  </div>
+
+  <footer style="{{ footerStyle }}">
+    <sc-for list="{{ keyHints }}" as="k" hint-placeholder-count="12">
+      <span style="display: inline-flex; align-items: center; gap: 5px;">
+        <span style="background: var(--color-neutral-900); border: 1px solid var(--color-accent-800); border-radius: 0; color: var(--color-accent-300); font-size: 10px; padding: 0 4px;">{{ k.key }}</span>
+        <span style="color: var(--color-neutral-500); font-size: 10px;">{{ k.label }}</span>
+      </span>
+    </sc-for>
+    <div style="flex: 1;"></div>
+    <button type="button" onClick="{{ openPalette }}" style="{{ paletteBtn }}" style-hover="border-color: var(--color-accent-600);">
+      <span style="color: var(--color-accent-300); font-size: 10px;">^p</span>
+      <span style="color: var(--color-neutral-500); font-size: 10px;">palette</span>
+    </button>
+  </footer>
+
+  <sc-if value="{{ showPalette }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeOverlay }}" style="position: fixed; inset: 0; background: rgba(10,11,18,.72); display: flex; align-items: flex-start; justify-content: center; padding-top: 12vh; z-index: 40;">
+      <div onClick="{{ stop }}" style="width: min(560px, 92vw); background: var(--color-surface); border: 1px solid var(--color-accent-800); border-radius: 0; box-shadow: var(--shadow-lg); overflow: hidden;">
+        <div style="display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--color-accent-900);">
+          <span style="color: var(--color-accent-300);">$</span>
+          <input value="{{ paletteQuery }}" onChange="{{ onPaletteQuery }}" placeholder="run a command" autoFocus="{{ true }}" style="flex: 1; background: transparent; border: 0; outline: none; color: var(--color-text); font-family: inherit; font-size: 12px;">
+          <span style="color: var(--color-neutral-500); font-size: 10px;">esc</span>
+        </div>
+        <div style="max-height: 300px; overflow: auto;">
+          <sc-for list="{{ paletteItems }}" as="c" hint-placeholder-count="8">
+            <div onClick="{{ c.onClick }}" style="{{ c.style }}" style-hover="background: var(--color-neutral-900);">
+              <span style="color: var(--color-neutral-300);">{{ c.name }}</span>
+              <span style="color: var(--color-neutral-500); font-size: 10px;">{{ c.hint }}</span>
+              <span style="color: var(--color-accent-300); font-size: 10px;">{{ c.key }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ showNewRun }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeOverlay }}" style="position: fixed; inset: 0; background: rgba(10,11,18,.72); display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 40;">
+      <div onClick="{{ stop }}" style="width: min(600px, 94vw); background: var(--color-surface); border: 1px solid var(--color-accent-800); border-radius: 0; box-shadow: var(--shadow-lg);">
+        <div style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--color-accent-900);">
+          <span style="color: var(--color-accent-300); letter-spacing: .12em; font-size: 11px;">┤ NEW RUN ├</span>
+          <div style="flex: 1;"></div>
+          <span style="color: var(--color-neutral-500); font-size: 10px;">⌘⏎ submit · esc cancel</span>
+        </div>
+        <div style="padding: 14px; display: flex; flex-direction: column; gap: 12px;">
+          <div>
+            <div style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .1em; margin-bottom: 5px;">WORKFLOW</div>
+            <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+              <sc-for list="{{ workflowChoices }}" as="w" hint-placeholder-count="6">
+                <button type="button" onClick="{{ w.onClick }}" style="{{ w.style }}" style-hover="border-color: var(--color-accent-600);">{{ w.name }}</button>
+              </sc-for>
+            </div>
+          </div>
+          <div>
+            <div style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .1em; margin-bottom: 5px;">TITLE</div>
+            <input value="{{ newTitle }}" onChange="{{ onNewTitle }}" placeholder="short summary" style="width: 100%; box-sizing: border-box; background: var(--color-bg); border: 1px solid var(--color-accent-800); border-radius: 0; padding: 7px 9px; color: var(--color-text); font-family: inherit; font-size: 12px; outline: none;">
+          </div>
+          <div>
+            <div style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .1em; margin-bottom: 5px;">DESCRIPTION</div>
+            <textarea value="{{ newDesc }}" onChange="{{ onNewDesc }}" rows="5" placeholder="what should the agents do" style="width: 100%; box-sizing: border-box; background: var(--color-bg); border: 1px solid var(--color-accent-800); border-radius: 0; padding: 7px 9px; color: var(--color-text); font-family: inherit; font-size: 12px; outline: none; resize: vertical;"></textarea>
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px;">
+            <div>
+              <div style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .1em; margin-bottom: 5px;">PRIORITY {{ newPriority }}</div>
+              <input type="range" min="1" max="10" value="{{ newPriority }}" onChange="{{ onNewPriority }}" style="width: 100%; accent-color: var(--color-accent);">
+            </div>
+            <div>
+              <div style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .1em; margin-bottom: 5px;">ENTRY NODE</div>
+              <div style="color: var(--color-neutral-300); border: 1px solid var(--color-accent-800); border-radius: 0; padding: 7px 9px; background: var(--color-bg);">prompt</div>
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px; justify-content: flex-end; padding: 12px 14px; border-top: 1px solid var(--color-accent-900);">
+          <button type="button" onClick="{{ closeOverlay }}" style="background: transparent; border: 1px solid var(--color-accent-800); border-radius: 0; color: var(--color-neutral-400); font-family: inherit; font-size: 11px; padding: 5px 12px; cursor: pointer;" style-hover="border-color: var(--color-neutral-800);">cancel</button>
+          <button type="button" onClick="{{ submitNewRun }}" class="btn btn-primary" style="font-family: inherit; font-size: 11px; padding: 5px 14px;" style-hover="background: color-mix(in srgb, var(--color-accent) 14%, transparent);">submit run</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ showLibrary }}" hint-placeholder-val="{{ false }}">
+    <div onClick="{{ closeOverlay }}" style="position: fixed; inset: 0; background: rgba(10,11,18,.72); display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 40;">
+      <div onClick="{{ stop }}" style="width: min(880px, 96vw); height: min(640px, 88vh); background: var(--color-surface); border: 1px solid var(--color-accent-800); border-radius: 0; box-shadow: var(--shadow-lg); display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--color-accent-900);">
+          <span style="color: var(--color-accent-300); letter-spacing: .12em; font-size: 11px;">┤ WORKFLOW LIBRARY ├</span>
+          <span style="color: var(--color-neutral-500); font-size: 10px;">defined in python · hot-reloaded from workflows/</span>
+          <div style="flex: 1;"></div>
+          <span style="color: var(--color-neutral-500); font-size: 10px;">esc close</span>
+        </div>
+        <div style="flex: 1; display: grid; grid-template-columns: 230px minmax(0, 1fr); min-height: 0;">
+          <div style="border-right: 1px solid var(--color-neutral-900); overflow: auto;">
+            <sc-for list="{{ libraryList }}" as="w" hint-placeholder-count="6">
+              <div onClick="{{ w.onClick }}" style="{{ w.style }}" style-hover="background: var(--color-neutral-900);">
+                <div style="display: flex; align-items: baseline; gap: 8px;">
+                  <span style="color: var(--color-neutral-300);">{{ w.name }}</span>
+                  <span style="color: var(--color-neutral-500); font-size: 10px;">{{ w.nodes }} nodes</span>
+                </div>
+                <div style="color: var(--color-neutral-500); font-size: 10px; margin-top: 2px;">{{ w.runs }} runs · {{ w.file }}</div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="overflow: auto; padding: 12px 14px;">
+            <div style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .14em; margin-bottom: 8px;">{{ libraryFile }}</div>
+            <pre style="margin: 0; color: var(--color-neutral-300); font-family: inherit; font-size: 11px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere;">{{ librarySource }}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;textSize&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;compact&quot;,&quot;default&quot;,&quot;large&quot;,&quot;x-large&quot;,&quot;huge&quot;],&quot;default&quot;:&quot;default&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Density&quot;},&quot;streamLive&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Behavior&quot;},&quot;showKeyHints&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Chrome&quot;}}">
+const S = {
+  completed: 'color: #8fbfa4;',
+  running: 'color: var(--color-accent-400);',
+  failed: 'color: #d9868f;',
+  cancelled: 'color: var(--color-neutral-500);',
+  queued: 'color: var(--color-neutral-400);',
+  done: 'color: #8fbfa4;',
+  gate: 'color: #d9c184;'
+};
+
+const RUNS = [
+  { id: 'a4c81f20b91e', workflow: 'feature_build', title: 'Rebuild run detail as a web pane set', status: 'running', node: 'engineering', age: '4m', priority: 8,
+    desc: 'Port the TUI pane cycle to the web app. Keep left/right cycling, mono type, and the keybinding footer.',
+    tokens: '612,884', cost: '$0.2914', dur: '246s', session: '01a02310', model: 'openrouter/qwen/qwen3.8-27b',
+    bars: [['prompt', 12], ['product', 26], ['architecture', 44], ['engineering', 100], ['review', 0], ['qa', 0]],
+    nodes: [['prompt', 1, 'done', '18,204', '9s'], ['product', 1, 'done', '61,933', '58s'], ['architecture', 1, 'done', '119,447', '74s'], ['engineering', 1, 'running', '413,300', '105s'], ['review', 0, 'queued', '-', '-'], ['qa', 0, 'queued', '-', '-'], ['gate', 0, 'queued', '-', '-']] },
+  { id: 'f6ab30faba29', workflow: 'feature_build', title: 'stack stats and overview', status: 'cancelled', node: '-', age: '15.8d', priority: 8,
+    desc: "I want stats and overview stacked vertically now. Let's do stats on top of overview and make sure it can scroll if needed",
+    tokens: '4,272,351', cost: '$1.9332', dur: '6523s', session: '01a021ac', model: 'openrouter/qwen/qwen3.8-27b',
+    bars: [['architecture', 125306], ['engineering', 2798300], ['product', 241399], ['prompt', 45942], ['qa', 888985], ['review', 172419]],
+    nodes: [['prompt', 1, 'done', '45,942', '31s'], ['product', 1, 'done', '241,399', '212s'], ['architecture', 1, 'done', '125,306', '141s'], ['engineering', 1, 'cancelled', '2,798,300', '3944s'], ['review', 1, 'done', '172,419', '198s'], ['qa', 1, 'done', '888,985', '1297s'], ['gate', 0, 'queued', '-', '-']] },
+  { id: '8ee3f15c0056', workflow: 'feature_build', title: 'append log', status: 'completed', node: '-', age: '16.7d' },
+  { id: 'ffce43abefb2', workflow: 'feature_build', title: 'edit run', status: 'completed', node: '-', age: '16.7d' },
+  { id: '6e9d6ec4ff4b', workflow: 'feature_build', title: 'run preview pane resize', status: 'completed', node: '-', age: '16.9d' },
+  { id: '6b575a340367', workflow: 'feature_build', title: 'Build scott-bot demo chat app (Django + channels)', status: 'completed', node: '-', age: '16.6d' },
+  { id: 'edc4ee865700', workflow: 'feature_build', title: 'Single-page TUI: run list as main content', status: 'completed', node: '-', age: '16.0d' },
+  { id: '01f8cc33ecf7', workflow: 'feature_build', title: 'run preview pane test', status: 'completed', node: '-', age: '17.1d' },
+  { id: '52e99ae4a27f', workflow: 'feature_build', title: 'remove artificer watermark', status: 'completed', node: '-', age: '15.8d' },
+  { id: 'cb77b50d839d', workflow: 'feature_build', title: 'make right pane half the width', status: 'completed', node: '-', age: '15.8d' },
+  { id: '05f3eb06d981', workflow: 'gamedev', title: 'snakes', status: 'completed', node: '-', age: '15.5d' },
+  { id: '73f80f676e7d', workflow: 'gamedev', title: 'asteroids', status: 'completed', node: '-', age: '15.5d' },
+  { id: 'c57ce6cab9a9', workflow: 'gamedev', title: 'tank battle', status: 'completed', node: '-', age: '15.1d' },
+  { id: '24d000f03bc9', workflow: 'gamedev', title: 'Escape Velocity', status: 'completed', node: '-', age: '14.8d' },
+  { id: '59e00fe2f94d', workflow: 'gamedev', title: 'Orbit Salvage', status: 'completed', node: '-', age: '14.6d' },
+  { id: 'dc1d4206dbd1', workflow: 'gamedev', title: 'Escape Velocity 2.0', status: 'cancelled', node: '-', age: '14.0d' },
+  { id: '61433ef1b528', workflow: 'gamedev', title: 'racing game', status: 'failed', node: 'engineering', age: '12.7d' },
+  { id: '0fa90f98b85f', workflow: 'gamedev', title: 'Shooter', status: 'failed', node: 'qa', age: '12.7d' },
+  { id: '166b20fa311a', workflow: 'gamedev', title: 'Street Fighter clone', status: 'failed', node: 'review', age: '12.6d' },
+  { id: 'a73b33b223d3', workflow: 'gamedev', title: 'squirrels vs chipmunks', status: 'cancelled', node: '-', age: '12.6d' },
+  { id: '4889e2f2aee4', workflow: 'msgtest', title: 'testing message task', status: 'completed', node: '-', age: '12.5d' },
+  { id: '8ce64406a905', workflow: 'claude_acp', title: 'Change x to 2', status: 'failed', node: 'engineering', age: '10.5d' },
+  { id: '56d9260d6176', workflow: 'claude_acp', title: 'Change x to 2', status: 'completed', node: '-', age: '10.5d' },
+  { id: '65a2753d52f3', workflow: 'projects', title: 'Change x to 2 in proj-alpha', status: 'failed', node: 'engineering', age: '9.6d' },
+  { id: '51049fd1c2c2', workflow: 'projects', title: 'Change x to 2 in proj-alpha', status: 'completed', node: '-', age: '9.6d' },
+  { id: 'de9f91f0c5ad', workflow: 'claude_acp', title: 'do it', status: 'cancelled', node: '-', age: '2.6d' },
+  { id: '40569672650c', workflow: 'feature_build', title: 'hello permission', status: 'cancelled', node: '-', age: '2.6d' },
+  { id: 'fadb08d815df', workflow: 'claude_acp', title: 'test permission', status: 'completed', node: '-', age: '2.6d' },
+  { id: '7c00258d0ce7', workflow: 'docker_acp', title: 'Change x to 2', status: 'completed', node: '-', age: '15.3h' },
+  { id: '64c9018f98bc', workflow: 'docker_acp', title: 'Make the tests pass', status: 'failed', node: 'engineering', age: '14.6h' },
+  { id: 'e689461b9de7', workflow: 'docker_acp', title: 'Make the tests pass', status: 'completed', node: '-', age: '14.6h' },
+  { id: '5db3860a7fd3', workflow: 'docker_acp', title: 'test', status: 'failed', node: 'prompt', age: '1.0h' },
+  { id: '9c179e3daabc', workflow: 'docker_acp', title: 'hello via openrouter', status: 'completed', node: '-', age: '55m' },
+  { id: 'c0bdbd320909', workflow: 'docker_acp', title: 'ga', status: 'completed', node: '-', age: '53m' }
+];
+
+const PANES = ['overview', 'log', 'agent', 'graph', 'messages'];
+
+const PLUGINS = {
+  feature_build: [
+    { name: 'diff', title: 'diff — working tree vs main', source: 'plugins/diff.py', note: 'Contributed by feature_build. Shows the engineering node’s working tree against the base branch, refreshed on every tool edit.',
+      metrics: [['FILES', '6'], ['ADDED', '+412'], ['REMOVED', '−138']], cols: ['FILE', 'CHANGE', 'HUNKS'],
+      rows: [['artificer/web/panes.py', '+128 −14', '5'], ['artificer/web/keys.py', '+22 −3', '2'], ['artificer/web/split.py', '+96 −0', '1'], ['tests/test_panes.py', '+141 −9', '6'], ['tests/test_keys.py', '+18 −4', '2'], ['docs/panes.md', '+7 −108', '3']] },
+    { name: 'ci', title: 'ci — checks for this run', source: 'plugins/ci.py', note: 'Polls the CI provider for the branch the engineering node pushed.',
+      metrics: [['CHECKS', '5'], ['PASSING', '4'], ['DURATION', '3m 12s']], cols: ['CHECK', 'RESULT', 'TIME'],
+      rows: [['ruff', 'pass', '4s'], ['pytest', 'pass', '112s'], ['mypy', 'pass', '31s'], ['playwright', 'running', '—'], ['build', 'pass', '45s']] }
+  ],
+  gamedev: [
+    { name: 'playtest', title: 'playtest — headless session', source: 'plugins/playtest.py', note: 'Runs the build headless and reports frame timing plus crash traces.',
+      metrics: [['SESSIONS', '12'], ['AVG FPS', '58.4'], ['CRASHES', '1']], cols: ['SESSION', 'OUTCOME', 'FPS'],
+      rows: [['s-01', 'clear', '61.0'], ['s-02', 'clear', '59.8'], ['s-03', 'crash', '—'], ['s-04', 'clear', '57.2'], ['s-05', 'clear', '58.9']] }
+  ],
+  docker_acp: [
+    { name: 'sandbox', title: 'sandbox — container state', source: 'plugins/sandbox.py', note: 'Inspects the container the ACP agent is attached to, including mounts and exec history.',
+      metrics: [['IMAGE', 'py312'], ['UPTIME', '14m'], ['MOUNTS', '3']], cols: ['PATH', 'MODE', 'SIZE'],
+      rows: [['/work', 'rw', '184MB'], ['/root/.cache/uv', 'rw', '612MB'], ['/artifacts', 'rw', '22MB']] }
+  ],
+  projects: [
+    { name: 'pull request', title: 'pull request — proj-alpha', source: 'plugins/pr.py', note: 'Tracks the PR the projects workflow opens once the agent node finishes.',
+      metrics: [['STATE', 'open'], ['REVIEWS', '1'], ['COMMITS', '4']], cols: ['EVENT', 'ACTOR', 'WHEN'],
+      rows: [['opened', 'athanore[bot]', '9.6d'], ['review requested', 'athanore[bot]', '9.6d'], ['comment', 'scott', '9.5d'], ['commit pushed', 'athanore[bot]', '9.5d']] }
+  ]
+};
+
+const LOG_SEED = [
+  ['00:00.4', 'orchestrator', 'run submitted — workflow=feature_build priority=8', ''],
+  ['00:00.6', 'prompt/engine', '[stats] node=prompt attempt=1 ok — tokens=18,204, 9s', ''],
+  ['00:09.9', 'orchestrator', 'edge prompt → product', 'dim'],
+  ['00:10.1', 'product/agent', '[product] scoped the pane-cycle port; 4 acceptance criteria', ''],
+  ['01:08.2', 'product/engine', '[stats] node=product attempt=1 ok — tokens=61,933, 58s', ''],
+  ['01:08.5', 'architecture/agent', '[architecture] pane state lives in the run detail reducer', ''],
+  ['02:22.7', 'architecture/engine', '[stats] node=architecture attempt=1 ok — tokens=119,447, 74s', ''],
+  ['02:23.0', 'orchestrator', 'edge architecture → engineering', 'dim'],
+  ['02:23.4', 'engineering/acp', 'session=01a02310 model=openrouter/qwen/qwen3.8-27b', 'dim'],
+  ['02:31.9', 'engineering/agent', '> tool: read artificer/tui.py', 'accent'],
+  ['02:44.1', 'engineering/agent', '> tool: edit artificer/web/panes.py (+128 −14)', 'accent'],
+  ['03:02.8', 'engineering/agent', '> tool: uv run pytest tests/test_panes.py -q', 'accent'],
+  ['03:41.5', 'engineering/engine', 'tools=17 calls, tokens=413,300, cost=$0.2914', '']
+];
+
+const STREAM = [
+  ['engineering/agent', '> tool: uv run pytest tests/test_panes.py -q — 14 passed', 'accent'],
+  ['engineering/agent', 'pane cycle wraps at 5/5 → 1/5, arrows mirror the TUI', ''],
+  ['engineering/agent', '> tool: edit artificer/web/keys.py (+22 −3)', 'accent'],
+  ['engineering/engine', 'heartbeat ok — tokens=+18,402 cost=+$0.0081', 'dim'],
+  ['engineering/agent', 'footer hints now read from the same keymap table', ''],
+  ['engineering/agent', '> tool: uv run ruff check artificer/ — clean', 'accent']
+];
+
+const AGENT = [
+  { kind: 'system', meta: 'task 402 · engineering · attempt 1', body: 'You are the engineering node of feature_build. Implement the architecture note, run the tests, and hand off to review with a CHANGES block.' },
+  { kind: 'assistant', meta: '', body: 'Reading the TUI pane implementation first so the web panes keep the same cycle order and keybindings.' },
+  { kind: 'tool', meta: 'read · artificer/tui.py', body: 'class RunDetail(Static):\n    PANES = ("overview", "log", "agent", "graph", "messages")\n\n    def cycle(self, delta: int) -> None:\n        self.index = (self.index + delta) % len(self.PANES)\n        self.refresh_pane()' },
+  { kind: 'tool', meta: 'edit · artificer/web/panes.py', body: '+ PANES = ("overview", "log", "agent", "graph", "messages")\n+\n+ def cycle(state, delta):\n+     state.pane = (state.pane + delta) % len(PANES)\n+     return state\n- pane = request.args.get("pane", "overview")' },
+  { kind: 'assistant', meta: '', body: 'Tests pass (14 passed). Pane state is now a single index, so ◀ ▶, the dots, and the keymap all drive the same reducer.\n\nCHANGES\n- artificer/web/panes.py: pane cycle as an index with wraparound\n- artificer/web/keys.py: left/right bound to cycle(-1) / cycle(+1)\n- tests/test_panes.py: wraparound at both ends' }
+];
+
+const GRAPH = [
+  { name: 'prompt', state: 'done', detail: '18,204 · 9s', edge: 'edge' },
+  { name: 'product', state: 'done', detail: '61,933 · 58s', edge: 'edge' },
+  { name: 'architecture', state: 'done', detail: '119,447 · 74s', edge: 'edge' },
+  { name: 'engineering', state: 'active', detail: 'attempt 1 · 105s', edge: 'edge' },
+  { name: 'review', state: 'queued', detail: 'waiting', edge: 'loop → engineering' },
+  { name: 'qa', state: 'queued', detail: 'waiting', edge: 'loop → engineering' },
+  { name: 'gate', state: 'queued', detail: 'human approval', edge: 'edge' },
+  { name: 'git', state: 'queued', detail: 'commit + push', edge: '' }
+];
+
+const EDGES = [
+  ['edge', 'prompt → product → architecture → engineering'],
+  ['edge', 'engineering → review → qa → gate → git'],
+  ['loop', 'review → engineering on finding'],
+  ['loop', 'qa → engineering on failure'],
+  ['gate', 'gate blocks until approved']
+];
+
+const MESSAGES = [
+  { from: 'review', to: 'engineering', t: '02:19.4', body: 'Finding: stats bar lines wrap at default terminal sizes. Bar-width budget uses the pane region, not the drawn text width.' },
+  { from: 'engineering', to: 'review', t: '02:41.0', body: 'Fixed — each bar row is fitted per-line against content_size.width minus horizontal padding.' },
+  { from: 'qa', to: 'engineering', t: '03:02.2', body: 'Assertion regex fails on comma-formatted counts (2,407,502). Widening to [\\d,]+.' },
+  { from: 'architecture', to: 'engineering', t: '01:12.8', body: 'Keep pane state as one index in the reducer so the keymap and the arrows cannot drift.' },
+  { from: 'orchestrator', to: 'gate', t: '—', body: 'Gate will hold for human approval once qa reports clean.' }
+];
+
+const LIBRARY = {
+  feature_build: { nodes: 8, runs: 12, file: 'workflows/feature_build.py', src: 'from athanore import Workflow, node, gate\n\nwf = Workflow("feature_build", priority=8)\n\n@wf.node(entry=True)\ndef prompt(ctx):\n    return ctx.expand(ctx.run.description)\n\n@wf.node(after="prompt")\ndef product(ctx):\n    return ctx.agent("product", acceptance_criteria=True)\n\n@wf.node(after="product")\ndef architecture(ctx):\n    return ctx.agent("architecture")\n\n@wf.node(after="architecture", retries=3)\ndef engineering(ctx):\n    return ctx.acp("claude", cwd=ctx.workspace)\n\n@wf.node(after="engineering")\ndef review(ctx):\n    if finding := ctx.agent("review").finding:\n        return ctx.loop_to("engineering", finding)\n\n@wf.node(after="review")\ndef qa(ctx):\n    if not ctx.tests().passed:\n        return ctx.loop_to("engineering", ctx.tests().report)\n\n@wf.node(after="qa")\ndef gate(ctx):\n    return gate.human(ctx, message="ready to merge?")\n\n@wf.node(after="gate")\ndef git(ctx):\n    ctx.commit(); ctx.push()' },
+  gamedev: { nodes: 5, runs: 9, file: 'workflows/gamedev.py', src: 'from athanore import Workflow\n\nwf = Workflow("gamedev", priority=5)\n\n@wf.node(entry=True)\ndef design(ctx):\n    return ctx.agent("game_design")\n\n@wf.node(after="design")\ndef build(ctx):\n    return ctx.acp("claude", cwd=ctx.workspace)\n\n@wf.node(after="build", retries=2)\ndef playtest(ctx):\n    if not ctx.tests("playtest").passed:\n        return ctx.loop_to("build", ctx.tests("playtest").report)\n\n@wf.node(after="playtest")\ndef polish(ctx):\n    return ctx.acp("claude", prompt="juice and balance")\n\n@wf.node(after="polish")\ndef ship(ctx):\n    ctx.commit(); ctx.publish("itch")' },
+  claude_acp: { nodes: 2, runs: 5, file: 'workflows/claude_acp.py', src: 'from athanore import Workflow\n\nwf = Workflow("claude_acp", priority=6)\n\n@wf.node(entry=True)\ndef agent(ctx):\n    return ctx.acp("claude", cwd=ctx.workspace, permission="ask")\n\n@wf.node(after="agent")\ndef verify(ctx):\n    return ctx.tests()' },
+  docker_acp: { nodes: 3, runs: 6, file: 'workflows/docker_acp.py', src: 'from athanore import Workflow, sandbox\n\nwf = Workflow("docker_acp", priority=4)\n\n@wf.node(entry=True)\n@sandbox(image="athanore/agent:py312")\ndef agent(ctx):\n    return ctx.acp("claude", cwd="/work")\n\n@wf.node(after="agent")\ndef tests(ctx):\n    return ctx.shell("uv run pytest -q")\n\n@wf.node(after="tests")\ndef collect(ctx):\n    ctx.artifacts("/work/dist")' },
+  projects: { nodes: 3, runs: 2, file: 'workflows/projects.py', src: 'from athanore import Workflow, projects\n\nwf = Workflow("projects", priority=7)\n\n@wf.node(entry=True)\ndef resolve(ctx):\n    return projects.checkout(ctx.run.params["project"])\n\n@wf.node(after="resolve")\ndef agent(ctx):\n    return ctx.acp("claude", cwd=ctx.workspace)\n\n@wf.node(after="agent")\ndef pr(ctx):\n    ctx.open_pr(title=ctx.run.title)' },
+  msgtest: { nodes: 2, runs: 1, file: 'workflows/msgtest.py', src: 'from athanore import Workflow\n\nwf = Workflow("msgtest", priority=1)\n\n@wf.node(entry=True)\ndef send(ctx):\n    ctx.message("receive", "ping")\n\n@wf.node(after="send")\ndef receive(ctx):\n    assert ctx.inbox()[0].body == "ping"' }
+};
+
+const COMMANDS = [
+  ['new run', 'submit a run against a workflow', 'n'],
+  ['retry task', 'rerun the focused node', 't'],
+  ['move task', 'send the run to another node', 'm'],
+  ['cancel task', 'stop the running node', 'x'],
+  ['append log', 'add a note to the run log', 'l'],
+  ['rerun node', 'replay from this node', 'r'],
+  ['pause / resume run', 'hold the orchestrator', 'p'],
+  ['cancel run', 'stop every queued node', 'c'],
+  ['delete run', 'remove the run and its logs', 'd'],
+  ['edit run', 'change title, description, priority', 'e'],
+  ['open workflow library', 'python definitions', 'w'],
+  ['refresh', 'refetch from the daemon', '^r']
+];
+
+const KEYS = [['tab','focus'],['t','retry task'],['m','move task'],['x','cancel task'],['l','append log'],['n','new run'],['r','rerun node'],['p','pause/resume'],['c','cancel run'],['d','delete run'],['e','edit run'],['w','workflows'],['b','toggle list'],['?','keys']];
+
+class Component extends DCLogic {
+  state = {
+    selected: 'a4c81f20b91e',
+    pane: 0,
+    query: '',
+    wf: 'all',
+    extra: [],
+    overlay: null,
+    paletteQuery: '',
+    newWf: 'feature_build',
+    newTitle: '',
+    newDesc: '',
+    newPriority: 8,
+    libSel: 'feature_build',
+    listWidth: 540,
+    listCollapsed: false,
+    dragging: false,
+    ui: 1,
+    vw: 0,
+    mobileView: 'list'
+  };
+
+  rootRef = React.createRef();
+
+  // Read synchronously at render time — no mount timing, no observer, no stale state.
+  currentWidth() {
+    const el = this.rootRef.current || document.body.firstElementChild;
+    const w = el ? el.getBoundingClientRect().width : 0;
+    const raw = w || document.documentElement.clientWidth || window.innerWidth || 1440;
+    // getBoundingClientRect reports post-zoom px; compare layout px against the breakpoint
+    return raw / (this.state.ui || 1);
+  }
+
+  // Started lazily from renderVals, which always runs (unlike a hot-reloaded componentDidMount).
+  // Timers and ResizeObserver both freeze when the host throttles the frame, so the
+  // breakpoint is driven by matchMedia change events (which still fire), with the
+  // element measurement layered on top for when this DC is embedded in a narrow pane.
+  ensureWidthWatch() {
+    if (this._mql || typeof window.matchMedia !== 'function') return;
+    this._mql = window.matchMedia('(max-width: 760px)');
+    this._onMql = () => this.measure();
+    if (this._mql.addEventListener) this._mql.addEventListener('change', this._onMql);
+    else this._mql.addListener(this._onMql);
+    if (!this._widthTicker) this._widthTicker = setInterval(this.measure, 400);
+  }
+
+  measure = () => {
+    const w = this.currentWidth();
+    const viewportNarrow = !!(this._mql && this._mql.matches);
+    const next = viewportNarrow ? Math.min(w, 759) : w;
+    if (next && Math.abs(next - this.state.vw) > 0.5) this.setState({ vw: next });
+  };
+
+  UI_STEPS = [0.9, 1, 1.15, 1.3, 1.5];
+  SIZE_MAP = { compact: 0.9, default: 1, large: 1.15, 'x-large': 1.3, huge: 1.5 };
+
+  // The host pushes tweak edits as prop updates after mount, so react to changes, not just the initial value.
+  syncTextSizeProp() {
+    const key = this.props.textSize;
+    if (!key || key === this._lastTextSize) return;
+    this._lastTextSize = key;
+    const v = this.SIZE_MAP[key];
+    if (v && v !== this.state.ui) this.setState({ ui: v });
+  }
+
+  componentDidUpdate() { this.syncTextSizeProp(); }
+
+  stepUi(d) {
+    const i = this.UI_STEPS.indexOf(this.state.ui);
+    const n = Math.min(this.UI_STEPS.length - 1, Math.max(0, (i < 0 ? 1 : i) + d));
+    // manual stepping wins until the tweak itself changes again
+    this._lastTextSize = this.props.textSize;
+    this.setState({ ui: this.UI_STEPS[n] }, this.measure);
+  }
+
+  panesFor(run) {
+    return PANES.concat((PLUGINS[run.workflow] || []).map(p => p.name));
+  }
+
+  startDrag = (e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = this.state.listWidth;
+    const onMove = ev => {
+      const w = Math.min(Math.max(260, startW + ev.clientX - startX), Math.max(320, window.innerWidth - 340));
+      this.setState({ listWidth: w });
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      this.setState({ dragging: false });
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    this.setState({ dragging: true });
+  };
+
+  componentDidMount() {
+    this.syncTextSizeProp();
+    this.measure();
+    window.addEventListener('resize', this.measure);
+    this._tick = setInterval(() => {
+      if (this.props.streamLive === false) return;
+      if (this.state.selected !== 'a4c81f20b91e') return;
+      this.setState(s => {
+        const i = s.extra.length;
+        if (i >= STREAM.length) return { extra: [] };
+        return { extra: s.extra.concat([STREAM[i]]) };
+      });
+    }, 2600);
+    this._keys = (e) => {
+      if (e.key === 'Escape') return this.setState({ overlay: null });
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') { e.preventDefault(); return this.setState({ overlay: 'palette' }); }
+      if (e.target && /input|textarea/i.test(e.target.tagName)) return;
+      const k = e.key;
+      if (k === 'ArrowRight') { e.preventDefault(); return this.cycle(1); }
+      if (k === 'ArrowLeft') { e.preventDefault(); return this.cycle(-1); }
+      if (k === 'ArrowDown' || k === 'j') { e.preventDefault(); return this.move(1); }
+      if (k === 'ArrowUp' || k === 'k') { e.preventDefault(); return this.move(-1); }
+      if (k === 'n') return this.setState({ overlay: 'new' });
+      if (k === 'w') return this.setState({ overlay: 'library' });
+      if (k === 'b') return this.setState(s => ({ listCollapsed: !s.listCollapsed }));
+      if (k >= '1' && k <= '9') {
+        const i = Number(k) - 1;
+        const run = RUNS.find(r => r.id === this.state.selected) || RUNS[0];
+        if (i < this.panesFor(run).length) return this.setState({ pane: i });
+      }
+    };
+    window.addEventListener('keydown', this._keys);
+  }
+
+  componentWillUnmount() {
+    clearInterval(this._tick);
+    window.removeEventListener('keydown', this._keys);
+    window.removeEventListener('resize', this.measure);
+    clearInterval(this._widthTicker);
+    this._widthTicker = null;
+    if (this._mql && this._onMql) {
+      if (this._mql.removeEventListener) this._mql.removeEventListener('change', this._onMql);
+      else this._mql.removeListener(this._onMql);
+    }
+    this._mql = null;
+  }
+
+  cycle(d) {
+    const run = RUNS.find(r => r.id === this.state.selected) || RUNS[0];
+    const n = this.panesFor(run).length;
+    this.setState(s => ({ pane: (s.pane + d + n) % n }));
+  }
+
+  visible() {
+    const q = this.state.query.trim().toLowerCase();
+    return RUNS.filter(r =>
+      (this.state.wf === 'all' || r.workflow === this.state.wf) &&
+      (!q || (r.title + ' ' + r.id + ' ' + r.workflow + ' ' + r.status).toLowerCase().includes(q))
+    );
+  }
+
+  move(d) {
+    const list = this.visible();
+    const i = Math.max(0, list.findIndex(r => r.id === this.state.selected));
+    const n = Math.min(list.length - 1, Math.max(0, i + d));
+    if (list[n]) this.setState({ selected: list[n].id });
+  }
+
+  full(r) {
+    if (r.bars) return r;
+    const seed = r.id.charCodeAt(0) + r.id.charCodeAt(3);
+    const t = 180000 + (seed % 40) * 41000;
+    return Object.assign({}, r, {
+      priority: 4 + (seed % 6),
+      desc: r.title + ' — submitted from the CLI against ' + r.workflow + '.',
+      tokens: t.toLocaleString(),
+      cost: '$' + (t / 2200000).toFixed(4),
+      dur: (300 + (seed % 50) * 27) + 's',
+      session: '01a0' + (seed % 9000 + 1000).toString(16),
+      model: 'openrouter/qwen/qwen3.8-27b',
+      bars: [['prompt', 8 + seed % 12], ['product', 20 + seed % 30], ['architecture', 30 + seed % 40], ['engineering', 100], ['review', 12 + seed % 20], ['qa', 40 + seed % 45]],
+      nodes: [['prompt', 1, 'done', '—', '—'], ['product', 1, 'done', '—', '—'], ['architecture', 1, 'done', '—', '—'], ['engineering', 1, r.status === 'failed' ? 'failed' : 'done', '—', '—'], ['review', 1, r.status === 'completed' ? 'done' : 'cancelled', '—', '—'], ['qa', 1, r.status === 'completed' ? 'done' : 'cancelled', '—', '—'], ['gate', 0, 'queued', '-', '-']]
+    });
+  }
+
+  statusStyle(st, size) {
+    const base = (S[st] || S.queued) + ' font-size: ' + (size || 11) + 'px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; letter-spacing: .04em; text-transform: uppercase;';
+    return st === 'running' ? base + ' animation: ath-pulse 1.8s ease-in-out infinite;' : base;
+  }
+
+  renderVals() {
+    const st = this.state;
+    const list = this.visible();
+    const sel = this.full(RUNS.find(r => r.id === st.selected) || RUNS[0]);
+    const panes = this.panesFor(sel);
+    const paneIdx = Math.min(st.pane, panes.length - 1);
+    const plug = paneIdx >= PANES.length ? PLUGINS[sel.workflow][paneIdx - PANES.length] : null;
+    this.ensureWidthWatch();
+    // vw stays 0 until the first tick — treat unmeasured as wide so desktop never flashes mobile
+    const narrow = st.vw > 0 && st.vw < 760;
+    const cols = narrow
+      ? '12px minmax(110px, 1fr) minmax(0, 76px) 44px'
+      : '12px minmax(0, 108px) minmax(0, 104px) minmax(110px, 1fr) minmax(0, 84px) minmax(0, 92px) 46px';
+    const rowBase = 'display: grid; grid-template-columns: ' + cols + '; gap: 8px; padding: ' + (narrow ? '14px 12px' : '3px 12px') + '; cursor: pointer; align-items: center; font-size: 11.5px; color: var(--color-neutral-300); overflow: hidden;';
+    // 44px minimum touch targets once the layout goes single-pane
+    const tap = narrow ? 'min-height: 44px; display: inline-flex; align-items: center; justify-content: center; ' : '';
+    const tapSq = narrow ? tap + 'min-width: 44px; ' : '';
+    const hide = 'display: none;';
+    const cell = 'overflow: hidden; text-overflow: ellipsis; white-space: nowrap; ';
+
+    const raw = LOG_SEED.concat(sel.id === 'a4c81f20b91e' ? st.extra.map((l, i) => ['03:' + (44 + i * 3) + '.2', l[0], l[1], l[2]]) : []);
+    const logLines = raw.map(([t, src, msg, tone]) => ({
+      t, src, msg,
+      style: 'font-size: 11.5px; overflow-wrap: anywhere; color: ' + (tone === 'accent' ? 'var(--color-accent-400)' : tone === 'dim' ? 'var(--color-neutral-400)' : 'var(--color-neutral-300)') + ';'
+    }));
+
+    // Bars are derived from the NODES table so the two can never disagree.
+    const nodeTokens = sel.nodes.map(n => [n[0], (typeof n[3] === 'string' ? parseInt(n[3].replace(/[^0-9]/g, ''), 10) : n[3]) || 0]);
+    const barData = nodeTokens.filter(n => n[0] !== 'gate');
+    const maxBar = Math.max(1, ...barData.map(b => b[1]));
+
+    return {
+      runCount: RUNS.length,
+      activeCount: 1,
+      rowCount: list.length,
+      query: st.query,
+      onQuery: e => this.setState({ query: e.target.value }),
+      openNewRun: () => this.setState({ overlay: 'new' }),
+      openLibrary: () => this.setState({ overlay: 'library' }),
+      openPalette: () => this.setState({ overlay: 'palette' }),
+      closeOverlay: () => this.setState({ overlay: null }),
+      stop: e => e.stopPropagation(),
+
+      workflowFilters: ['all', 'feature_build', 'gamedev', 'claude_acp', 'docker_acp', 'projects'].map(w => ({
+        label: w,
+        onClick: () => this.setState({ wf: w }),
+        style: tap + 'font-family: inherit; font-size: 10.5px; padding: ' + (narrow ? '0 12px' : '3px 8px') + '; border-radius: 0; cursor: pointer; white-space: nowrap; background: ' +
+          (st.wf === w ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent') +
+          '; color: ' + (st.wf === w ? 'var(--color-accent-200)' : 'var(--color-neutral-500)') +
+          '; border: 1px solid ' + (st.wf === w ? 'var(--color-accent-600)' : 'var(--color-neutral-800)') + ';'
+      })),
+
+      rows: list.map(r => ({
+        id: r.id, workflow: r.workflow, title: r.title, status: r.status, node: r.node, age: r.age,
+        cursor: r.id === st.selected ? '>' : ' ',
+        // muted greys are tuned for the transparent row ground; the lifted selected row needs accent light steps
+        idStyle: narrow ? hide : cell + 'color: var(--color-' + (r.id === st.selected ? 'accent-200' : 'neutral-500') + ');',
+        wfStyle: narrow ? hide : cell + 'color: var(--color-accent-' + (r.id === st.selected ? '100' : '2-400') + ');',
+        nodeStyle: narrow ? hide : cell + 'color: var(--color-' + (r.id === st.selected ? 'accent-200' : 'neutral-500') + ');',
+        ageStyle: 'color: var(--color-' + (r.id === st.selected ? 'accent-200' : 'neutral-500') + '); text-align: right;',
+        onClick: () => this.setState({ selected: r.id, mobileView: 'detail' }),
+        statusStyle: this.statusStyle(r.status),
+        style: rowBase + (r.id === st.selected
+          ? ' background: var(--color-accent-800); color: var(--color-accent-100);'
+          : ' background: transparent;')
+      })),
+
+      paneLabel: '[' + (paneIdx + 1) + '/' + panes.length + '] ' + panes[paneIdx].toUpperCase(),
+      prevPane: () => this.cycle(-1),
+      nextPane: () => this.cycle(1),
+      paneDots: panes.map((p, i) => ({
+        name: p,
+        onClick: () => this.setState({ pane: i }),
+        wrapStyle: 'border: 0; background: transparent; padding: 0 2px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;' + (narrow ? ' min-height: 44px; min-width: 24px;' : ''),
+        style: 'display: block; width: 14px; height: 3px; background: ' +
+          (i === paneIdx ? 'var(--color-accent)' : i >= PANES.length ? 'var(--color-accent-800)' : 'var(--color-neutral-800)') + ';'
+      })),
+      isOverview: paneIdx === 0, isLog: paneIdx === 1, isAgent: paneIdx === 2, isGraph: paneIdx === 3, isMessages: paneIdx === 4,
+      isPlugin: !!plug,
+      plugin: plug ? {
+        title: plug.title, source: plug.source, note: plug.note, workflow: sel.workflow,
+        colA: plug.cols[0], colB: plug.cols[1], colC: plug.cols[2],
+        metrics: plug.metrics.map(([label, value]) => ({ label, value })),
+        rows: plug.rows.map(([a, b, c], i) => ({
+          a, b, c,
+          style: 'display: grid; grid-template-columns: minmax(80px, 1fr) minmax(0, 92px) minmax(0, 68px); gap: 8px; align-items: center; padding: 4px 8px; font-size: 11.5px; overflow: hidden; background: ' + (i % 2 ? 'color-mix(in srgb, var(--color-surface) 60%, var(--color-bg))' : 'var(--color-surface)') + ';'
+        }))
+      } : null,
+
+      headRowStyle: 'display: grid; grid-template-columns: ' + cols + '; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--color-accent-800); color: var(--color-accent-300); font-size: 10px; letter-spacing: .1em; background: color-mix(in srgb, var(--color-surface) 45%, var(--color-bg)); overflow: hidden;',
+      colId: narrow ? hide : '',
+      colWf: narrow ? hide : '',
+      colNode: narrow ? hide : '',
+
+      iconBtn: tapSq + 'background: transparent; border: 0; color: var(--color-neutral-400); cursor: pointer; font-family: inherit; font-size: 11px; padding: ' + (narrow ? '0 10px' : '4px 7px') + ';',
+      actionBtn: tap + 'font-family: inherit; font-size: 11px; padding: ' + (narrow ? '0 14px' : '4px 10px') + ';',
+      ghostBtn: tap + 'font-family: inherit; font-size: 11px; padding: ' + (narrow ? '0 14px' : '4px 10px') + '; background: transparent; color: var(--color-neutral-400); border: 1px solid var(--color-accent-800); border-radius: 0; cursor: pointer;',
+      searchInput: 'background: transparent; border: 0; outline: none; color: var(--color-text); font-family: inherit; font-size: 11px; width: 100%; ' + (narrow ? 'min-height: 40px;' : ''),
+      arrowBtn: tapSq + 'background: transparent; border: 0; color: var(--color-accent-400); cursor: pointer; font-family: inherit; font-size: 12px; padding: 0 4px;',
+      backBtn: tap + 'background: transparent; border: 1px solid var(--color-accent-800); color: var(--color-accent-200); cursor: pointer; font-family: inherit; font-size: 10px; padding: ' + (narrow ? '0 12px' : '3px 8px') + '; margin-right: 2px;',
+      paletteBtn: tap + 'gap: 6px; background: transparent; border: 1px solid var(--color-accent-800); border-radius: 0; padding: ' + (narrow ? '0 12px' : '2px 8px') + '; cursor: pointer; font-family: inherit;' + (narrow ? '' : ' display: inline-flex; align-items: center;'),
+
+      rootRef: this.rootRef,
+      // zoom is a live runtime value, so it belongs in a hole; height compensates for the scale
+      rootZoom: "zoom: " + st.ui + "; height: calc(100dvh / " + st.ui + "); overflow: hidden; display: flex; flex-direction: column; background: var(--color-bg); color: var(--color-text); font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12px; line-height: 1.5;",
+      uiLabel: Math.round(st.ui * 100) + '%',
+      uiUp: () => this.stepUi(1),
+      uiDown: () => this.stepUi(-1),
+
+      listVisible: narrow ? st.mobileView === 'list' : !st.listCollapsed,
+      detailVisible: narrow ? st.mobileView === 'detail' : true,
+      railVisible: !narrow && st.listCollapsed,
+      splitterVisible: !narrow && !st.listCollapsed,
+      collapseVisible: !narrow && !st.listCollapsed,
+      backVisible: narrow,
+      showList: () => this.setState({ mobileView: 'list' }),
+      listCollapsed: st.listCollapsed,
+      toggleList: () => this.setState(s => ({ listCollapsed: !s.listCollapsed })),
+      collapseGlyph: st.listCollapsed ? '❯' : '❮',
+      listStyle: narrow
+        ? 'flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0;'
+        : 'width: ' + st.listWidth + 'px; flex: none; display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid var(--color-accent-800);',
+      filterRowStyle: 'display: flex; align-items: center; gap: 5px; min-width: 0; ' + (narrow
+        ? 'flex: 1 1 100%; overflow-x: auto; padding-bottom: 2px;'
+        : 'flex-wrap: wrap;'),
+      footerStyle: 'display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 5px 12px; border-top: 1px solid var(--color-accent-800); background: color-mix(in srgb, var(--color-surface) 45%, var(--color-bg));',
+      startDrag: this.startDrag,
+      splitterStyle: 'width: 5px; flex: none; cursor: col-resize; background: ' + (st.dragging ? 'var(--color-accent-600)' : 'var(--color-neutral-800)') + ';',
+
+      sel: {
+        id: sel.id, status: sel.status, workflow: sel.workflow,
+        statusPill: this.statusStyle(sel.status, 10.5) + ' border: 1px solid var(--color-accent-800); border-radius: 0; padding: 1px 7px;',
+        agentTask: 'task 402 · engineering · ' + (sel.status === 'running' ? 'streaming' : 'finished'),
+        agentModel: 'engineering → claude (acp)',
+        metrics: [
+          { label: 'TOKENS', value: sel.tokens },
+          { label: 'COST', value: sel.cost },
+          { label: 'DURATION', value: sel.dur },
+          { label: 'PRIORITY', value: String(sel.priority) }
+        ],
+        tokenBars: barData.map(([node, v]) => ({
+          node, count: v ? v.toLocaleString() : '—',
+          // a zero-token node reads as an empty trough, never a solid block
+          blocks: (n => '█'.repeat(n) + '░'.repeat(24 - n))(v ? Math.max(1, Math.round(v / maxBar * 24)) : 0),
+          fill: 'display: block; white-space: nowrap; overflow: hidden; font-size: 11px; letter-spacing: -.02em; color: ' + (node === 'engineering' ? 'var(--color-accent)' : 'var(--color-accent-600)') + ';'
+        })),
+        meta: [
+          { label: 'RUN', value: sel.id },
+          { label: 'WORKFLOW', value: sel.workflow },
+          { label: 'TITLE', value: sel.title },
+          { label: 'STATUS', value: sel.status + ' · node ' + sel.node },
+          { label: 'AGE', value: sel.age },
+          { label: 'SESSION', value: sel.session },
+          { label: 'AGENTS', value: 'prompt → internal · product / architecture / review / qa → qwen3.8-27b · engineering → claude (acp)' },
+          { label: 'DESCRIPTION', value: sel.desc }
+        ],
+        nodeRows: sel.nodes.map(([node, att, status, tokens, dur], i) => ({
+          node, att: String(att), status, tokens, dur,
+          statusStyle: this.statusStyle(status),
+          style: 'display: grid; grid-template-columns: minmax(60px, 1fr) 34px minmax(0, 80px) minmax(0, 76px) minmax(0, 58px); gap: 6px; align-items: center; padding: 4px 8px; overflow: hidden; font-size: 11.5px; background: ' + (i % 2 ? 'color-mix(in srgb, var(--color-surface) 60%, var(--color-bg))' : 'var(--color-surface)') + ';'
+        }))
+      },
+
+      logCount: logLines.length,
+      logLines,
+      tailLabel: sel.status === 'running' ? '● tailing' : '○ complete',
+      tailStyle: sel.status === 'running'
+        ? 'color: var(--color-accent-300); font-size: 10px; animation: ath-pulse 1.8s ease-in-out infinite;'
+        : 'color: var(--color-neutral-500); font-size: 10px;',
+
+      agentTyping: sel.status === 'running',
+      agentBlocks: AGENT.map(b => ({
+        kind: b.kind, meta: b.meta,
+        wrap: 'border: 1px solid var(--color-accent-800); border-radius: 0; background: ' + (b.kind === 'tool' ? 'color-mix(in srgb, var(--color-surface) 60%, var(--color-bg))' : 'var(--color-surface)') + '; padding: 9px 11px;',
+        kindStyle: 'font-size: 10px; letter-spacing: .12em; color: ' + (b.kind === 'tool' ? 'var(--color-accent-2-400)' : b.kind === 'system' ? 'var(--color-neutral-600)' : 'var(--color-accent-300)') + ';',
+        bodyStyle: 'white-space: pre-wrap; overflow-wrap: anywhere; font-size: 11.5px; line-height: 1.65; color: ' + (b.kind === 'tool' ? 'var(--color-neutral-400)' : 'var(--color-neutral-300)') + ';',
+        body: b.body
+      })),
+
+      graphNodes: GRAPH.map((g, i) => ({
+        name: g.name, detail: g.detail, edge: g.edge, hasEdge: i < GRAPH.length - 1,
+        railArrow: g.name === 'engineering',
+        railJoin: g.name === 'engineering' || g.name === 'review' || g.name === 'qa',
+        railDown: g.name === 'engineering' || g.name === 'review',
+        railUp: g.name === 'review' || g.name === 'qa',
+        railLabel: g.name === 'review',
+        mark: g.state === 'done' ? '[x]' : g.state === 'active' ? '[*]' : g.state === 'failed' ? '[!]' : '[ ]',
+        markStyle: 'width: 26px; font-size: 11px; color: ' + (g.state === 'done' ? '#8fbfa4' : g.state === 'active' ? 'var(--color-accent)' : g.state === 'failed' ? '#d9868f' : 'var(--color-neutral-700)') + ';' + (g.state === 'active' ? ' animation: ath-pulse 1.8s ease-in-out infinite;' : ''),
+        onClick: () => this.setState({ pane: 1 }),
+        style: 'display: flex; align-items: center; gap: 8px; min-width: 0; width: 100%; max-width: 420px; box-sizing: border-box; padding: 6px 10px; border-radius: 0; cursor: pointer; font-size: 11.5px; color: var(--color-neutral-300); border: 1px solid ' +
+          (g.state === 'active' ? 'var(--color-accent-600)' : 'var(--color-neutral-800)') + '; background: ' +
+          (g.state === 'active' ? 'color-mix(in srgb, var(--color-accent) 12%, var(--color-surface))' : 'var(--color-surface)') + ';' +
+          (g.state === 'active' ? ' box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 30%, transparent);' : '')
+      })),
+      graphEdges: EDGES.map(([kind, desc]) => ({ kind, desc })),
+
+      messageCount: MESSAGES.length,
+      messages: MESSAGES,
+
+      keyHints: (this.props.showKeyHints === false || narrow ? [] : KEYS).map(([key, label]) => ({ key, label })),
+
+      showPalette: st.overlay === 'palette',
+      showNewRun: st.overlay === 'new',
+      showLibrary: st.overlay === 'library',
+
+      paletteQuery: st.paletteQuery,
+      onPaletteQuery: e => this.setState({ paletteQuery: e.target.value }),
+      paletteItems: COMMANDS
+        .filter(c => c[0].toLowerCase().includes(st.paletteQuery.trim().toLowerCase()))
+        .map(([name, hint, key]) => ({
+          name, hint, key,
+          onClick: () => this.setState({ overlay: name === 'new run' ? 'new' : name === 'open workflow library' ? 'library' : null }),
+          style: 'display: grid; grid-template-columns: minmax(0, 170px) minmax(0, 1fr) 40px; align-items: center; gap: 10px; padding: 6px 12px; cursor: pointer; font-size: 11.5px; border-top: 1px solid var(--color-accent-900);'
+        })),
+
+      workflowChoices: Object.keys(LIBRARY).map(name => ({
+        name,
+        onClick: () => this.setState({ newWf: name }),
+        style: 'font-family: inherit; font-size: 11px; padding: 4px 9px; border-radius: 0; cursor: pointer; background: ' +
+          (st.newWf === name ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent') +
+          '; color: ' + (st.newWf === name ? 'var(--color-accent-200)' : 'var(--color-neutral-500)') +
+          '; border: 1px solid ' + (st.newWf === name ? 'var(--color-accent-600)' : 'var(--color-neutral-800)') + ';'
+      })),
+      newTitle: st.newTitle,
+      newDesc: st.newDesc,
+      newPriority: st.newPriority,
+      onNewTitle: e => this.setState({ newTitle: e.target.value }),
+      onNewDesc: e => this.setState({ newDesc: e.target.value }),
+      onNewPriority: e => this.setState({ newPriority: Number(e.target.value) }),
+      submitNewRun: () => this.setState({ overlay: null, wf: 'all', query: '' }),
+
+      libraryList: Object.keys(LIBRARY).map(name => ({
+        name, nodes: LIBRARY[name].nodes, runs: LIBRARY[name].runs, file: LIBRARY[name].file,
+        onClick: () => this.setState({ libSel: name }),
+        style: 'padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--color-accent-900); background: ' + (st.libSel === name ? 'var(--color-neutral-900)' : 'transparent') + ';'
+      })),
+      libraryFile: LIBRARY[st.libSel].file,
+      librarySource: LIBRARY[st.libSel].src
+    };
+  }
+}
+</script>
+</body>
+</html>
