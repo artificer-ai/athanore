@@ -1,0 +1,19 @@
+{
+  "thoughts": ["The brief names one file; this is a small change."],
+  "text": [
+    "Read the brief and the file it names.",
+    "Drafted the change and left the tests green."
+  ],
+  "permissions": [
+    {
+      "title": "write docs/release-notes.md",
+      "options": [
+        { "kind": "reject_once", "option_id": "reject", "name": "Deny" },
+        { "kind": "allow_once", "option_id": "allow", "name": "Allow Once" },
+        { "kind": "allow_always", "option_id": "allow_always", "name": "Always Allow" }
+      ]
+    }
+  ],
+  "log": "draft: rewrote the release notes",
+  "usage": { "input": 1840, "output": 260 }
+}

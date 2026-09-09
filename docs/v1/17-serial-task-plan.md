@@ -3453,6 +3453,16 @@ CI `web` job runs Playwright (Chromium only).
 **Dev stack.** Already done (D68): `WITH_BROWSERS` defaults to 1 and the
 image ships chromium, because the driver's `qa` node drives Playwright.
 **Done.** CI green with the E2E job.
+**Status.** Done. `web/e2e/` is eleven tests in seven spec files over
+three fixture workflows of its own — `examples/msgtest` is T075's and
+does not exist yet (D178) — each on an `athanore serve` of its own, on a
+free port over a temporary root, with `FakeACPAgent` behind every
+façade. `./scripts/test.sh` runs the suite as well as the CI `web` job,
+because this repository has no runner and a check only CI performs never
+runs. The a11y gate is `@axe-core/playwright` at 100 on both states of
+the dashboard, which took three fixes in `web/src`: the run list's
+`listbox` is drawn only when it has rows, `Splitter` is the page's
+`main` landmark, and a selected row's muted columns clear AA contrast.
 
 ### T069 — Phase 4 checkpoint
 

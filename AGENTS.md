@@ -142,6 +142,14 @@ pnpm -C web gen:theme                      # regenerate theme.css from docs/v1/d
 docker compose --profile web up web        # Vite on 127.0.0.1:5173, from the host
 ```
 
+From T068a onward the gate also runs the Playwright suite, which starts
+an `athanore serve` per test with `FakeACPAgent` behind every agent:
+
+```sh
+pnpm -C web exec playwright test           # all of web/e2e
+pnpm -C web exec playwright test run.spec.ts --workers=1
+```
+
 From T008 onward (OpenAPI contract):
 
 ```sh

@@ -16,7 +16,7 @@ tests of the same behaviours.
 | API | httpx against the live app | Every endpoint, auth matrix (loopback plain / network bind with and without token / task token / expired task token), error shapes, 413, SSE replay and live, OpenAPI snapshot |
 | Plugins | a test workflow with one of each declaration | Manifest, scoping (404 on foreign run), action validation, node liveness, assets served, `on` handlers |
 | SPA unit | Vitest + Testing Library | Renderers per kind, ActionForm round-trips nested schemas and arrays, invalidation table precedence and coalescing, SSE wrapper reconnect and `resync`, keymap scoping |
-| E2E | Playwright against `athanore serve` with example workflows on `FakeACPAgent` | Submit → watch graph → answer permission → answer human_input → completion; reorder; pause/resume; server-down banner; keyboard shortcuts; inbox |
+| E2E | Playwright (Chromium) against `athanore serve` with example workflows on `FakeACPAgent` | Submit → watch graph → answer permission → answer human_input → completion; reorder; pause/resume; server-down banner; keyboard shortcuts; inbox with no run selected; a fan-out closed by a join rendering `k of n`; `@axe-core/playwright` on the dashboard (D178) |
 | Examples | pytest in `examples/` | Graph shapes, prompts inlined, models declared (from the MVP's `test_gamedev`, `test_agents`) |
 
 ## Contract tests

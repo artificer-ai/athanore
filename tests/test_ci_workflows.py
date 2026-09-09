@@ -23,6 +23,10 @@ ROOT = Path(__file__).resolve().parent.parent
 CI = ROOT / ".github" / "workflows" / "ci.yml"
 NIGHTLY = ROOT / ".github" / "workflows" / "nightly.yml"
 
+#: The Playwright the dev image bakes a chromium of (`docker/dev/Dockerfile`)
+#: and the one `web/package.json` pins, which must be the same one (T068a).
+PLAYWRIGHT_VERSION = "1.63.0"
+
 
 def load(path: Path) -> Workflow:
     return yaml.safe_load(path.read_text())
@@ -144,6 +148,76 @@ def test_web_job_runs_the_pnpm_half_of_the_gate(ci: Workflow) -> None:
         assert f"pnpm -C web {command}" in ran
 
 
+#: The Playwright command both the gate and the `web` job run (T068a).
+PLAYWRIGHT = "pnpm -C web exec playwright test"
+
+
+def test_web_job_runs_the_playwright_suite_on_chromium_only(ci: Workflow) -> None:
+    """T068a: "CI `web` job runs Playwright (Chromium only)".
+
+    The suite drives a real `athanore serve`, so the job needs the
+    Python environment as well as the node one — and it needs a browser,
+    which is installed for `chromium` and for nothing else.
+    """
+    job = ci["jobs"]["web"]
+    ran = commands(job)
+    assert "uv sync --all-packages --all-groups --all-extras" in ran
+    assert "playwright install --with-deps chromium" in ran
+    assert PLAYWRIGHT in ran
+    assert any(
+        step.get("uses", "").startswith("astral-sh/setup-uv") for step in steps(job)
+    )
+
+    # After the build, because the suite drives what the build produced.
+    named = [step.get("name") for step in steps(job)]
+    assert named.index("pnpm build") < named.index("pnpm e2e")
+
+
+def test_the_gate_runs_the_playwright_suite_too(ci: Workflow) -> None:
+    """`./scripts/test.sh` is the definition of green (D74).
+
+    A check only the runner performs is a check that first goes red on
+    somebody else's branch, and this repository has no runner to perform
+    it: the E2E suite would never run at all. So the gate runs it, and
+    the `web` job is that same command (D178).
+    """
+    gate = (ROOT / "scripts" / "test.sh").read_text()
+    assert PLAYWRIGHT in gate
+    assert PLAYWRIGHT in commands(ci["jobs"]["web"])
+
+
+def test_the_playwright_suite_and_its_browser_are_one_version() -> None:
+    """The revision the image ships and the one npm resolves are one.
+
+    `docker/dev/Dockerfile` bakes `playwright@$PLAYWRIGHT_VERSION`'s
+    chromium into `PLAYWRIGHT_BROWSERS_PATH` (D68); a `@playwright/test`
+    on a different minor would ask for a revision that is not there and
+    the gate would try to download one mid-run. Pinned exactly, not
+    ranged, for that reason.
+    """
+    package = json.loads((ROOT / "web" / "package.json").read_text())
+    pinned = package["devDependencies"]["@playwright/test"]
+    assert pinned == PLAYWRIGHT_VERSION, pinned
+
+    compose = yaml.safe_load((ROOT / "compose.yaml").read_text())
+    args = compose["services"]["dev"]["build"]["args"]
+    assert (
+        f"${{PLAYWRIGHT_VERSION:-{PLAYWRIGHT_VERSION}}}" == args["PLAYWRIGHT_VERSION"]
+    )
+    # The image ships the browser by default: the driver's `qa` node and
+    # this suite both need it (D68).
+    assert args["WITH_BROWSERS"] == "${WITH_BROWSERS:-1}"
+
+
+def test_the_playwright_config_is_chromium_only() -> None:
+    """One engine, in the image and on the runner (T068a)."""
+    config = (ROOT / "web" / "playwright.config.ts").read_text()
+    assert "testDir: './e2e'" in config
+    projects = config[config.index("projects:") :]
+    assert projects.count("name:") == 1
+    assert "'chromium'" in projects
+
+
 #: The SPA's coverage gate: 80 % of `web/src`, on all four metrics
 #: (`docs/v1/17-serial-task-plan.md` § T068, D177).
 WEB_COVERAGE_THRESHOLD = 80
@@ -180,8 +254,11 @@ def test_web_work_is_probe_guarded(ci: Workflow) -> None:
     probe, *rest = steps(job)[1:]
     assert probe["id"] == "probe"
     assert "GITHUB_OUTPUT" in probe["run"]
+    # The guard opens every condition. A step may add to it — the
+    # Playwright report is uploaded on failure and not otherwise — but
+    # none may run without it, which is the invariant.
     for step in rest:
-        assert step["if"] == "steps.probe.outputs.present == 'yes'"
+        assert step["if"].startswith("steps.probe.outputs.present == 'yes'"), step
 
 
 def test_contract_work_is_not_conditional(ci: Workflow) -> None:

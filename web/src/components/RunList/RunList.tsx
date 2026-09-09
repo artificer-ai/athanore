@@ -43,6 +43,13 @@ function Row({
   selected: boolean
   onSelect: (runId: string) => void
 }) {
+  // `--muted-foreground` is 4.43:1 on the selected row's accent tint,
+  // which is under AA for text this size; one step brighter clears it.
+  // The tint itself is the mock's and is not touched — these three
+  // columns are muted by the SPA's choice, not the mock's, so this is
+  // the half of the pair that may move (10 §Accessibility and quality).
+  const muted = selected ? 'text-[var(--color-neutral-400)]' : 'text-muted-foreground'
+
   return (
     <button
       type="button"
@@ -59,11 +66,11 @@ function Row({
           'border-l-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface))]',
       )}
     >
-      <span className="truncate text-muted-foreground">{row.shortId}</span>
+      <span className={cn('truncate', muted)}>{row.shortId}</span>
       <span className="truncate text-[var(--color-accent-2-400)]">{row.workflow}</span>
       <span className="truncate">{row.title}</span>
       <StatusPill status={row.status} tone={row.tone} className="justify-self-start" />
-      <span className="truncate text-muted-foreground">
+      <span className={cn('truncate', muted)}>
         {row.node}
         {row.pendingRequests > 0 && (
           <span
@@ -74,7 +81,7 @@ function Row({
           </span>
         )}
       </span>
-      <span className="text-right text-muted-foreground">{row.age}</span>
+      <span className={cn('text-right', muted)}>{row.age}</span>
     </button>
   )
 }
@@ -141,23 +148,27 @@ export function RunList({
         ))}
       </div>
 
-      <div
-        role="listbox"
-        aria-label="run rows"
-        className="text-row min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
-      >
+      {/* The `listbox` is drawn only when it has `option`s to hold: a
+          role that requires particular children and is given a status
+          paragraph instead is `aria-required-children`, and a screen
+          reader is told there is a list box with nothing in it rather
+          than the sentence that says why (10 §Accessibility and
+          quality). */}
+      <div className="text-row min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         {model.rows.length === 0 ? (
           <Empty model={model} />
         ) : (
-          model.rows.map((row, index) => (
-            <Row
-              key={row.id}
-              row={row}
-              zebra={index % 2 === 1}
-              selected={row.id === selected}
-              onSelect={onSelect}
-            />
-          ))
+          <div role="listbox" aria-label="run rows">
+            {model.rows.map((row, index) => (
+              <Row
+                key={row.id}
+                row={row}
+                zebra={index % 2 === 1}
+                selected={row.id === selected}
+                onSelect={onSelect}
+              />
+            ))}
+          </div>
         )}
       </div>
 

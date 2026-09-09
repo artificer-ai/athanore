@@ -33,6 +33,15 @@ configured() {  # configured <toml-table>
   grep -q "^\[$1\]" pyproject.toml 2>/dev/null && echo yes || echo no
 }
 
+# Is there a browser for the Playwright suite to drive? The dev image
+# ships one (WITH_BROWSERS=1, D68) and CI installs one, so this is `yes`
+# wherever the gate is meant to run; a checkout with neither skips the
+# step by name rather than spending a download on it mid-gate.
+browsers() {
+  local at="${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}"
+  compgen -G "$at/chromium*" >/dev/null 2>&1 && echo yes || echo no
+}
+
 sync_python
 
 step pytest        "$([ -d tests ] && echo yes || echo no)" \
@@ -50,6 +59,10 @@ if [ -f web/package.json ]; then
   step "web lint"      yes pnpm -C web lint
   step "web test"      yes pnpm -C web test
   step "web build"     yes pnpm -C web build
+  # The E2E suite drives the SPA the step above just built, served by a
+  # real `athanore serve` with FakeACPAgent behind every agent (T068a),
+  # so it comes last and after the build that produced its subject.
+  step "web e2e"       "$(browsers)" pnpm -C web exec playwright test
 else
   skipped+=("web (no web/ yet — T007)")
 fi

@@ -10,6 +10,14 @@
  * `localStorage`, so a width that survives a reload is a width that fits
  * the window it is reloaded into.
  *
+ * The two regions and the handle between them are the page's `main`
+ * landmark: 10 §Accessibility and quality asks for a clean axe run, and
+ * a document with no `main` fails `landmark-one-main` while everything
+ * between the header and the footer fails `region`. The element is here
+ * rather than around this component because both branches below are the
+ * whole of the app's body, and a wrapper would be one more flex box
+ * between the shell and the panels.
+ *
  * Collapsed, the list and the handle are replaced by the mock's 30 px
  * rail, which reads `RUNS n` sideways and expands the list again when it
  * is clicked. The `❮` that collapses it lives in the pane bar
@@ -47,7 +55,7 @@ export function Splitter({
 
   if (listCollapsed) {
     return (
-      <div className="flex min-h-0 flex-1 items-stretch">
+      <main className="flex min-h-0 flex-1 items-stretch">
         <button
           type="button"
           onClick={() => setListCollapsed(false)}
@@ -65,12 +73,12 @@ export function Splitter({
         </button>
 
         {detail}
-      </div>
+      </main>
     )
   }
 
   return (
-    <div className="flex min-h-0 flex-1 items-stretch">
+    <main className="flex min-h-0 flex-1 items-stretch">
       <Group
         id="layout"
         orientation="horizontal"
@@ -132,6 +140,6 @@ export function Splitter({
           {detail}
         </Panel>
       </Group>
-    </div>
+    </main>
   )
 }
