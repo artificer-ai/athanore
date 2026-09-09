@@ -173,6 +173,7 @@ function shell(
     onCloseOverlay?: () => void
     onFocusStream?: (taskId: number, pane: number | undefined) => void
     onOpenNode?: (node: string, pane: number | undefined) => void
+    onOpenAction?: (action: string) => void
     manifest?: PluginManifestEntry[]
   } = {},
 ) {
@@ -216,6 +217,9 @@ function shell(
           ? {}
           : { onFocusStream: over.onFocusStream })}
         {...(over.onOpenNode === undefined ? {} : { onOpenNode: over.onOpenNode })}
+        {...(over.onOpenAction === undefined
+          ? {}
+          : { onOpenAction: over.onOpenAction })}
       />
     </QueryClientProvider>,
   )
@@ -616,6 +620,114 @@ describe('App', () => {
     await userEvent.click(command('retry task'))
 
     expect(onOpenOverlay).toHaveBeenCalledExactlyOnceWith('pick-retry')
+  })
+})
+
+/* -------------------------------------------------------------------- */
+/* The plugin actions the manifest contributes to the palette (T070)     */
+/* -------------------------------------------------------------------- */
+
+/**
+ * `plugin: <workflow>`: the section T066a left empty
+ * (`overlays/pluginActions.ts`, 09 §Declarations).
+ *
+ * What is asserted here is the shell's half — that the rows come from
+ * the manifest under the selected run's ownership, and that selecting
+ * one opens the action overlay. The rows themselves are
+ * `overlays/__tests__/pluginActions.test.ts`'s.
+ */
+describe('the palette’s plugin actions', () => {
+  /** The selected run's workflow, with one action per relevant scope. */
+  const WITH_ACTIONS: PluginManifestEntry[] = [
+    ...MANIFEST,
+    {
+      workflow: 'feature_build',
+      actions: [
+        {
+          name: 'override',
+          title: 'Override secret word',
+          scope: 'run',
+          confirm: true,
+          schema: { type: 'object', properties: {} },
+        },
+        {
+          name: 'flag',
+          title: 'Flag this attempt',
+          scope: 'task',
+          confirm: false,
+          schema: { type: 'object', properties: {} },
+        },
+      ],
+    },
+    {
+      workflow: 'gamedev',
+      actions: [
+        {
+          name: 'reseed',
+          title: 'Reseed the dictionary',
+          scope: 'global',
+          confirm: false,
+          schema: { type: 'object', properties: {} },
+        },
+      ],
+    },
+  ]
+
+  it('lists the selected run’s workflow’s actions, and no other’s', () => {
+    shell(
+      { overlay: 'palette', run: 'aaaa1111bbbb' },
+      { manifest: WITH_ACTIONS },
+    )
+
+    const group = screen.getByRole('group', { name: 'plugin: feature_build' })
+    expect(within(group).getAllByRole('option')).toHaveLength(2)
+    // `gamedev` owns no run in this list, so its section is not drawn.
+    expect(
+      screen.queryByRole('group', { name: 'plugin: gamedev' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('opens the action overlay from a row', async () => {
+    const onOpenAction = vi.fn()
+    shell(
+      { overlay: 'palette', run: 'aaaa1111bbbb' },
+      { manifest: WITH_ACTIONS, onOpenAction },
+    )
+
+    await userEvent.click(command('Override secret word'))
+
+    expect(onOpenAction).toHaveBeenCalledExactlyOnceWith('feature_build:override')
+  })
+
+  it('disables a row the selection cannot satisfy, and opens nothing', async () => {
+    const onOpenAction = vi.fn()
+    shell(
+      { overlay: 'palette', run: 'aaaa1111bbbb' },
+      { manifest: WITH_ACTIONS, onOpenAction },
+    )
+
+    // `flag` is task-scoped and `?task=` names no attempt: the row is
+    // listed, because the palette is the app's index of itself, and it
+    // does nothing.
+    await userEvent.click(command('Flag this attempt'))
+
+    expect(onOpenAction).not.toHaveBeenCalled()
+  })
+
+  it('draws the action overlay only when `?overlay=action` says so', () => {
+    shell({ run: 'aaaa1111bbbb' }, { manifest: WITH_ACTIONS })
+    expect(screen.queryByTestId('plugin-action')).toBeNull()
+
+    cleanup()
+    shell(
+      { overlay: 'action', action: 'feature_build:override', run: 'aaaa1111bbbb' },
+      { manifest: WITH_ACTIONS },
+    )
+    expect(screen.getByTestId('plugin-action')).toBeInTheDocument()
+    expect(screen.getByTestId('action-runner')).toHaveAttribute(
+      'data-action',
+      'override',
+    )
   })
 })
 

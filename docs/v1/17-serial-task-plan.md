@@ -3504,6 +3504,42 @@ result toast. Actions also listed in the palette under `plugin: <title>`.
 flow.
 **Done.** Tests pass; snapshot updated.
 
+**Status.** Done. `POST /api/plugins/{wf}/actions/{name}` is **one**
+endpoint for the process (`mount_actions`), mounted beside the manifest
+and before the per-workflow routers, so it is in the committed snapshot
+and no plugin route can shadow it. It finds the action or 404s, validates
+`input` against the action's model — raising FastAPI's own
+`RequestValidationError`, so the 422 is the one shape of 08
+§Conventions and its `loc` paths are the *model's*, which is what lets
+the SPA put them beside the fields — resolves the context from the body's
+`scope` with the four ownership 404s of 09, refuses before the handler
+when the action's declared scope is not resolved (`no run in scope`,
+`no task in scope`, and the new `no node in scope`), and answers with
+whatever the handler returned. A `PluginError` keeps its own status
+under `code: "plugin_error"` (D181). In the SPA, `panes/kinds/Form.tsx`
+draws the named action from the manifest and fetches nothing else;
+`components/ActionRunner.tsx` is the form, the confirm dialog and the
+POST, and `confirm=true` holds the value while the dialog is up so that
+cancelling posts nothing. A landed call raises a toast, a refusal stays
+on the form. The palette lists every action of the builtins and the
+selected run's workflow under `plugin: <workflow>`, keyless and disabled
+where the selection cannot satisfy the scope, and a row opens the same
+runner in the `action` overlay (`?overlay=action&action=<wf>:<name>`),
+because a palette that lists what it cannot do is the stub the quality
+bar forbids (D181). Verified in Chromium against `./scripts/run.sh`
+with a workflow declaring `override` (run scope, `confirm`) and `reseed`
+(global, no model): the `OVERRIDE` pane is the sixth of six and draws the
+model's fields, `submit` opens `CONFIRM ACTION … it runs on run <id>`,
+`cancel` sends nothing, confirming posts once and toasts
+`Override secret word · done`, the palette shows `PLUGIN: DEMO` with both
+rows, and the global action closes its overlay reporting the string its
+handler returned. **That check also found D182**: the SPA's
+`script-src 'self'` refuses ajv's `new Function`, so *every* RJSF form in
+the served app — plugin actions, `form` requests, elicitations — drew
+correctly and submitted nothing. `script-src` now carries
+`'unsafe-eval'`; 12 §Plugins and 09 §Security say why, and
+`tests/api/test_static.py` asserts the directive on its own.
+
 ### T071 — Assets, `custom` panels, `window.athanore` (A5.2)
 
 **Do.** Server: `assets` resolved relative to the declaring module

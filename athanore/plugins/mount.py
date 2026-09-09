@@ -1,7 +1,8 @@
 """Turning declarations into live routes, a manifest, and subscriptions.
 
-09 §Mounting and §Wire contract. Three things happen here and nothing
-else does:
+09 §Mounting and §Wire contract. Four things happen here and nothing
+else does — the three of §Mounting, plus the one endpoint §Wire contract
+gives every action:
 
 - :func:`mount` builds one ``APIRouter`` per workflow at
   ``/api/plugins/{workflow}``, under ``Depends(operator_auth)``. **A
@@ -9,6 +10,12 @@ else does:
   routes are operator routes, they answer 401 on a bind that requires a
   token like every other operator route, and they say so in the
   document.
+- :func:`mount_actions` adds ``POST /api/plugins/{wf}/actions/{name}``,
+  the **one** endpoint every declared action is invoked through (09
+  §Mounting: "actions are one endpoint rather than a route each"). It
+  validates the body's ``input`` against the action's model, resolves a
+  context from the body's ``scope``, and returns whatever the handler
+  answered.
 - :func:`mount_manifest` adds ``GET /api/plugins``, the static list the
   SPA fetches at boot and again whenever ``/api/me`` reports a new
   ``started_at``. Builtins come first, under the ``_builtin`` workflow,
@@ -42,8 +49,10 @@ from collections.abc import AsyncIterator, Callable, Iterable, Sequence
 from contextlib import suppress
 from typing import Annotated, Any, get_type_hints
 
-from fastapi import APIRouter, Depends, FastAPI, Query, Request
+from fastapi import APIRouter, Depends, FastAPI, Path, Query, Request
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
+from pydantic import ValidationError as PydanticValidationError
 
 from athanore.api.deps import operator_auth
 from athanore.api.openapi import OPERATOR_BEARER, OPERATOR_RESPONSES, secure
@@ -51,18 +60,37 @@ from athanore.events import names
 from athanore.events.bus import EventBus, Subscription
 from athanore.events.model import Event
 from athanore.logging import get_logger
-from athanore.plugins.context import PluginContext, PluginHost, owns_run
-from athanore.plugins.decl import Handler, PanelKind, Placement, Route, Slot
+from athanore.plugins.context import (
+    NO_NODE,
+    NO_RUN,
+    NO_TASK,
+    PluginContext,
+    PluginHost,
+    owns_run,
+)
+from athanore.plugins.decl import (
+    Action,
+    Handler,
+    PanelKind,
+    Placement,
+    PluginError,
+    Route,
+    Slot,
+)
 from athanore.plugins.registry import BUILTIN_WORKFLOW, PluginSpec, manifest_entry
 
 __all__ = [
+    "ACTIONS_PATH",
     "MANIFEST_PATH",
+    "ActionCall",
     "ActionOut",
+    "ActionScope",
     "HandlerDispatch",
     "PanelOut",
     "PluginManifestEntry",
     "dispatch_handlers",
     "mount",
+    "mount_actions",
     "mount_manifest",
     "mount_plugins",
 ]
@@ -71,6 +99,10 @@ _log = get_logger(__name__)
 
 #: Where the manifest lives (08 §Plugins).
 MANIFEST_PATH = "/api/plugins"
+
+#: The one endpoint every action is invoked through, relative to
+#: :data:`MANIFEST_PATH` (08 §Plugins, 09 §Mounting).
+ACTIONS_PATH = "/{wf}/actions/{name}"
 
 
 class PanelOut(BaseModel):
@@ -122,6 +154,48 @@ class ActionOut(BaseModel):
     )
 
 
+class ActionScope(BaseModel):
+    """Where an action was invoked (08 §Plugins, 09 §Context and scopes).
+
+    The three ids a plugin *route* reads off its query string, sent in
+    the body because an action is a ``POST``. All three are optional
+    here: what an action needs resolved is the ``scope`` it declared,
+    and :func:`mount_actions` is what holds the body to it.
+    """
+
+    run_id: str | None = Field(
+        default=None, description="The run the action was invoked on."
+    )
+    task_id: int | None = Field(
+        default=None, description="The attempt the action was invoked on."
+    )
+    node: str | None = Field(
+        default=None, description="The node the action was invoked on."
+    )
+
+
+class ActionCall(BaseModel):
+    """The body of ``POST /api/plugins/{wf}/actions/{name}`` (08 §Plugins).
+
+    ``input`` is whatever the action's form produced, and it is
+    validated against the action's own model on arrival rather than
+    described here: the model is the plugin's, so no schema this
+    application generates could name it (09 §Declarations, "the model
+    **is** the form"). An action that declares none takes none, and
+    whatever was sent is ignored.
+    """
+
+    scope: ActionScope = Field(
+        default_factory=ActionScope,
+        description="The ids the handler's context is resolved from.",
+    )
+    input: Any = Field(
+        default=None,
+        description="The form's value. Validated against the action's model; "
+        "a misfit is the 422 of 08 §Conventions, naming each field.",
+    )
+
+
 class PluginManifestEntry(BaseModel):
     """What one workflow contributes to the UI (09 §Wire contract)."""
 
@@ -151,6 +225,11 @@ def mount_plugins(app: FastAPI, specs: Sequence[PluginSpec]) -> None:
     """
 
     mount_manifest(app)
+    # Before the per-workflow routers, so that a workflow which happens
+    # to declare a route at `/actions/...` cannot shadow the endpoint
+    # every action is invoked through — 08 §Plugins lists the two in
+    # that order for the same reason.
+    mount_actions(app)
     for spec in specs:
         mount(app, spec)
 
@@ -165,7 +244,8 @@ def mount(app: FastAPI, spec: PluginSpec) -> APIRouter:
     :class:`~athanore.plugins.context.PluginContext`.
 
     Actions are **not** mounted here: they are one endpoint,
-    ``POST /api/plugins/{wf}/actions/{name}``, and it is T070's.
+    ``POST /api/plugins/{wf}/actions/{name}``, and :func:`mount_actions`
+    is where it lives.
     """
 
     router = APIRouter(
@@ -221,6 +301,185 @@ def mount_manifest(app: FastAPI) -> APIRouter:
     secure(router, OPERATOR_BEARER)
     app.include_router(router, responses=OPERATOR_RESPONSES)
     return router
+
+
+def mount_actions(app: FastAPI) -> APIRouter:
+    """Add ``POST /api/plugins/{wf}/actions/{name}`` to ``app``.
+
+    **One endpoint, not a route per action** (09 §Mounting). The
+    workflow and the action are path parameters, the specs are read off
+    ``app.state.plugins`` per request like everywhere else in the API,
+    and the four steps 08 §Plugins fixes happen in this order:
+
+    1. **find the action**, or 404. A workflow this server does not
+       carry and an action it does not declare are the same answer —
+       there is nothing at this URL.
+    2. **validate ``input`` against the action's model**, or 422. The
+       failure is raised as FastAPI's own
+       :class:`~fastapi.exceptions.RequestValidationError`, so it is
+       rendered by the one handler that writes 08 §Conventions' 422 and
+       an operator sees the same ``{loc, msg, type}`` list an agent's
+       rejected submission carries. The ``loc`` paths are the *model's*,
+       not the request body's, because they are what the SPA maps onto
+       the form's fields (10 §Plugin renderers, D168).
+       **The server validates every time**: the browser having drawn the
+       form from the same schema is not a reason to trust what came
+       back (12 §Plugins).
+    3. **resolve the context from the body's ``scope``**, which is where
+       the 404s of 09 §Context and scopes are — a run of another
+       workflow, a run or task that does not exist, a task of another
+       run, a node the workflow has not got — and then hold the call to
+       the scope the action *declared*, so a ``run``-scoped handler is
+       never entered with no run in it.
+    4. **call the handler** and answer with what it returned. A
+       :class:`~athanore.plugins.decl.PluginError` it raises is the
+       ``{status, error, code: "plugin_error"}`` of 09 §Wire contract,
+       rendered by :data:`athanore.api.errors.DOMAIN_ERRORS` like any
+       other refusal from below the API.
+
+    The context is closed on the way out whatever happened, for the
+    reason the route dependency is a generator: the transcript service
+    starts a background flusher on its first append, and a request-scoped
+    one nobody closed would outlive the request.
+    """
+
+    router = APIRouter(prefix=MANIFEST_PATH, tags=["plugins"])
+
+    @router.post(
+        ACTIONS_PATH,
+        summary="Run one of a workflow's declared actions",
+        # The handler's own JSON, whatever shape it is: an action is a
+        # plugin's, so nothing this application generates can describe
+        # what comes back (09 §Builtins are plugins).
+        response_model=None,
+        dependencies=[Depends(operator_auth)],
+    )
+    async def run_action(
+        request: Request,
+        wf: Annotated[str, Path(description="The workflow that declared the action.")],
+        name: Annotated[str, Path(description="The action's name.")],
+        body: ActionCall,
+    ) -> Any:
+        """Validate the input, resolve the scope, run the handler.
+
+        The one way an action is invoked (09 §Wire contract). It answers
+        with whatever the handler returned, as JSON.
+        """
+
+        specs: Sequence[PluginSpec] = getattr(request.app.state, "plugins", None) or ()
+        action = _action(specs, wf, name)
+        value = _action_input(action, body.input)
+        host = PluginHost.from_app(request.app)
+        context = await host.context(
+            workflow=wf,
+            run_id=body.scope.run_id,
+            task_id=body.scope.task_id,
+            node=body.scope.node,
+        )
+        try:
+            _in_declared_scope(action, context)
+            result = action.fn(**_action_arguments(action, context, value))
+            return await result if inspect.isawaitable(result) else result
+        finally:
+            await context.aclose()
+
+    secure(router, OPERATOR_BEARER)
+    app.include_router(router, responses=OPERATOR_RESPONSES)
+    return router
+
+
+def _action(specs: Sequence[PluginSpec], workflow: str, name: str) -> Action:
+    """The action ``workflow`` declares under ``name``, or a 404.
+
+    Two refusals with one meaning: there is nothing at this URL. They
+    are separate sentences because the two mistakes are different ones
+    to make — a workflow that is not installed, and an action that is
+    not declared — and the operator reading the message is the one who
+    installed it.
+    """
+
+    spec = next((spec for spec in specs if spec.workflow == workflow), None)
+    if spec is None:
+        raise PluginError(404, f"no workflow {workflow!r} is registered here")
+    action = spec.action_named(name)
+    if action is None:
+        raise PluginError(
+            404,
+            f"workflow {workflow!r} declares no action {name!r}; it declares "
+            f"{sorted(one.name for one in spec.actions)}",
+        )
+    return action
+
+
+def _action_input(action: Action, payload: Any) -> BaseModel | None:
+    """``payload`` as the action's model, or the 422 that names the fields.
+
+    ``None`` for an action that declares no model: 09's "the model **is**
+    the form", and an action with no form takes no value. Whatever was
+    sent for one is ignored rather than refused — the SPA renders an
+    empty object for such an action, and a client that sent one anyway
+    has not done anything wrong.
+    """
+
+    if action.model is None:
+        return None
+    try:
+        return action.model.model_validate(payload)
+    except PydanticValidationError as exc:
+        # FastAPI's own, so `validation_error_handler` renders it: one
+        # 422 shape in this API, and the `loc` paths are the model's.
+        raise RequestValidationError(exc.errors()) from exc
+
+
+def _in_declared_scope(action: Action, context: PluginContext) -> None:
+    """Refuse before the handler if its scope is not resolved.
+
+    09 §Context and scopes: "handlers never get a partially-resolved
+    context", and an action's ``scope`` is what has to be resolved
+    before it can run. Reaching for a service would raise the same
+    refusal a moment later, from inside the handler, where the author
+    put no check because the declaration was supposed to be one — so it
+    is raised here, in the wording those services use.
+
+    A ``workflow`` or ``global`` action needs nothing resolved and is
+    never refused here.
+    """
+
+    if action.scope in (Slot.run, Slot.task, Slot.node) and context.run_id is None:
+        raise PluginError(400, NO_RUN)
+    if action.scope is Slot.task and context.task_id is None:
+        raise PluginError(400, NO_TASK)
+    if action.scope is Slot.node and context.node is None:
+        raise PluginError(400, NO_NODE)
+
+
+def _action_arguments(
+    action: Action, context: PluginContext, value: BaseModel | None
+) -> dict[str, Any]:
+    """What to call ``action.fn`` with: its ``ctx``, and its ``input``.
+
+    By name, so the two parameters 09 gives an action handler —
+    ``async def override(ctx: PluginContext, input: Override)`` — are
+    matched however the author ordered them. The context is found by its
+    annotation, the same way :func:`_endpoint` finds a route's; a
+    handler whose annotations this process cannot resolve falls back to
+    the first parameter, which is where 09 puts ``ctx``.
+    """
+
+    parameters = list(inspect.signature(action.fn).parameters.values())
+    hints = _hints(action.fn)
+    arguments: dict[str, Any] = {}
+    ctx_parameter: str | None = None
+    for parameter in parameters:
+        if hints.get(parameter.name, parameter.annotation) is PluginContext:
+            ctx_parameter = parameter.name
+        elif parameter.name == "input":
+            arguments[parameter.name] = value
+    if ctx_parameter is None and parameters and parameters[0].name != "input":
+        ctx_parameter = parameters[0].name
+    if ctx_parameter is not None:
+        arguments[ctx_parameter] = context
+    return arguments
 
 
 def _builtins_first(specs: Iterable[PluginSpec]) -> list[PluginSpec]:

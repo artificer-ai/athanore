@@ -128,13 +128,29 @@ Installing a workflow package is code execution on the server and in
 the operator's browser; the documentation says so. Mitigations that are
 free: plugin routes are scoped to their workflow, action input is
 validated server-side, assets are served by `StaticFiles` (no traversal),
-the manifest carries no secrets, and the SPA ships no inline scripts so a
-plain `script-src 'self'` CSP holds. The full policy is `default-src
-'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src
-'self'; img-src 'self' data:; connect-src 'self'` (React and the panel
-splitter set inline `style` attributes, which is why `style-src` is the
-one relaxation). Fonts are bundled (10), so nothing loads from a third
-party.
+the manifest carries no secrets, and the SPA ships no inline scripts so
+`script-src 'self'` holds — no third-party origin and no `<script>` an
+injection could write. The full policy is `default-src 'self';
+script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';
+font-src 'self'; img-src 'self' data:; connect-src 'self'`.
+
+Two relaxations, each forced by something the SPA is built out of and
+neither of them an origin:
+
+- `style-src 'unsafe-inline'` — React and the panel splitter set inline
+  `style` attributes.
+- `script-src 'unsafe-eval'` — RJSF validates with ajv8 (02 §Library
+  choices), and ajv compiles every schema, including the JSON Schema
+  meta-schema it checks a form's schema against, into a `new Function`.
+  Refused, ajv throws where it compiles and RJSF submits nothing, so no
+  form in the app can be answered at all: not a plugin action, not a
+  `form` request, not an elicitation (D182). It permits code built from
+  strings by scripts that already loaded; it does not permit a script to
+  load, which is the reach an injection needs. `'unsafe-inline'` for
+  scripts is **not** granted, and neither is `'wasm-unsafe-eval'` (D160
+  turned a highlighter down rather than ask for it).
+
+Fonts are bundled (10), so nothing loads from a third party.
 
 ## Beyond the LAN
 

@@ -281,8 +281,12 @@ describe('what it cannot draw', () => {
     expect(screen.queryByTestId('pane-placeholder')).not.toBeInTheDocument()
   })
 
-  it('renders a placeholder for a form, naming the action', () => {
+  it('draws a form panel from the manifest, and fetches nothing for it', async () => {
+    // The one kind whose `source` names an action rather than a URL: the
+    // schema is already in the manifest the host read, so the pane makes
+    // no request at all until the operator submits one (09 §Panel kinds).
     const urls = stubFetch({})
+    queryClient.setQueryData(manifestApiPluginsGetQueryKey(), MANIFEST)
     const form = paneOf(
       panel({ name: 'override', kind: 'form', source: 'override' }),
       'gamedev',
@@ -290,8 +294,29 @@ describe('what it cannot draw', () => {
 
     draw(form)
 
-    expect(screen.getByTestId('pane-placeholder')).toHaveTextContent('action override')
-    expect(urls).toEqual([])
+    expect(await screen.findByTestId('action-runner')).toHaveAttribute(
+      'data-action',
+      'override',
+    )
+    expect(screen.getByLabelText(/word/i)).toBeInTheDocument()
+    // The manifest is the only thing asked for, and even that only
+    // because the cache seeded above is refetched in the background:
+    // no `source` is fetched for a `form`, because it names no URL.
+    expect(urls.filter((url) => !url.endsWith('/api/plugins'))).toEqual([])
+  })
+
+  it('says so when a form panel names an action this server has not got', async () => {
+    queryClient.setQueryData(manifestApiPluginsGetQueryKey(), MANIFEST)
+    const form = paneOf(
+      panel({ name: 'ghost', kind: 'form', source: 'ghost' }),
+      'gamedev',
+    )
+
+    draw(form)
+
+    expect(await screen.findByTestId('pane-placeholder')).toHaveTextContent(
+      'workflow gamedev does not declare it',
+    )
   })
 
   it('renders an error card when the source answers 500', async () => {

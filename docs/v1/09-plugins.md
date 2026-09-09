@@ -311,7 +311,8 @@ its plugin JS runs in the operator's browser with the operator's token.
 That is one trust decision, made at install time, and the docs say so.
 Mitigations that are still worth having: plugin routes run under the same
 auth as everything else; assets are served with a strict CSP
-(`script-src 'self'`), no inline scripts; the manifest never carries
+(`script-src 'self' 'unsafe-eval'` — the one relaxation the form
+validator forces, 12 §Plugins), no inline scripts; the manifest never carries
 tokens; action inputs are validated server-side; a plugin cannot reach
 another workflow's runs.
 

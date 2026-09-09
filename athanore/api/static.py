@@ -72,13 +72,24 @@ __all__ = [
     "mount_spa",
 ]
 
-#: The content-security policy of 12 §Plugins, verbatim. `style-src` is
-#: the one relaxation: React and the panel splitter set inline `style`
-#: attributes. Fonts are bundled (10), so nothing loads from a third
-#: party and `'self'` is the whole allowance.
+#: The content-security policy of 12 §Plugins, verbatim. Two relaxations
+#: and no more, each forced by something the SPA is built out of:
+#:
+#: - ``style-src 'unsafe-inline'``: React and the panel splitter set
+#:   inline ``style`` attributes.
+#: - ``script-src 'unsafe-eval'``: RJSF validates with ajv8 (02 §Library
+#:   choices), and ajv compiles every schema — the operator's form and
+#:   the JSON Schema meta-schema it is checked against — into a
+#:   ``new Function``. Without it, ajv throws where it compiles, RJSF
+#:   reports "Form validation failed", and **no form in the app can be
+#:   submitted at all**: not a plugin action, not a `form` request, not
+#:   an elicitation (D182).
+#:
+#: Fonts are bundled (10), so nothing loads from a third party, and
+#: ``'self'`` is the whole allowance for every origin directive.
 CSP: Final[str] = (
     "default-src 'self'; "
-    "script-src 'self'; "
+    "script-src 'self' 'unsafe-eval'; "
     "style-src 'self' 'unsafe-inline'; "
     "font-src 'self'; "
     "img-src 'self' data:; "

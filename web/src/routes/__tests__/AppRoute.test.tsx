@@ -59,6 +59,9 @@ vi.mock('../../App', () => ({
         <button type="button" onClick={call('onOpenOverlay', 'library')}>
           open overlay
         </button>
+        <button type="button" onClick={call('onOpenAction', 'gamedev:override')}>
+          open action
+        </button>
         <button type="button" onClick={call('onCloseOverlay')}>
           close overlay
         </button>
@@ -167,6 +170,26 @@ describe('the overlays', () => {
 
   it('closes by writing the one parameter away, so back works on it', async () => {
     const router = mount('/?run=aaaa1111&overlay=library')
+
+    await press(router, 'close overlay', '?run=aaaa1111')
+  })
+
+  it('opens a plugin action as `?overlay=action&action=`', async () => {
+    // Which overlay is up and which action it is about are two facts,
+    // and `?overlay=` can only carry the first (T070).
+    const router = mount('/?run=aaaa1111&overlay=palette')
+
+    await press(
+      router,
+      'open action',
+      '?run=aaaa1111&overlay=action&action=gamedev%3Aoverride',
+    )
+  })
+
+  it('clears `?action=` when the overlay closes', async () => {
+    // The action overlay is the only thing that reads it — unlike
+    // `?task=`, which outlives the drawer as the agent pane's attempt.
+    const router = mount('/?run=aaaa1111&overlay=action&action=gamedev:override')
 
     await press(router, 'close overlay', '?run=aaaa1111')
   })

@@ -61,12 +61,14 @@ import {
   NewRun,
   Palette,
   Pickers,
+  PluginAction,
   TaskDrawer,
   buildPaletteActions,
   pauseDirection,
+  pluginPaletteActions,
   useRunOps,
 } from './overlays'
-import { BUILTIN_WORKFLOW, usePanes } from './panes'
+import { BUILTIN_WORKFLOW, actionsOf, useManifest, usePanes } from './panes'
 import type { AppSearch, Overlay } from './routes/search'
 import { usePrefs } from './store/prefs'
 import { useUi } from './store/ui'
@@ -89,6 +91,7 @@ export default function App({
   onFilterNode,
   onOpenNode,
   onOpenOverlay,
+  onOpenAction,
   onCloseOverlay,
   onFocusStream,
   onClearRun,
@@ -107,6 +110,15 @@ export default function App({
   onOpenNode?: ((node: string, pane: number | undefined) => void) | undefined
   /** Open an overlay by name; the graph's `open definition` opens one. */
   onOpenOverlay?: ((overlay: Overlay) => void) | undefined
+  /**
+   * Run a plugin's action: `?overlay=action&action=<workflow>:<name>`.
+   *
+   * One navigation, like every overlay command — writing the next
+   * overlay is what closes the palette (`overlays/actions.ts`) — and one
+   * parameter more, because which action it is about is not something
+   * `?overlay=` can say (10 §Layout).
+   */
+  onOpenAction?: ((action: string) => void) | undefined
   /** Close whichever overlay is up: `?overlay=` away (10 §Overlays). */
   onCloseOverlay?: (() => void) | undefined
   /**
@@ -155,12 +167,22 @@ export default function App({
   // still the selected one.
   const selected = useRuns().data?.find((run) => run.id === search.run)
   const runOps = useRunOps()
+  // The manifest the palette's plugin rows come from. Already cached —
+  // the pane host read it a moment ago — so this costs no request, and
+  // reading it here is what keeps the palette's catalogue in one place.
+  const { manifest } = useManifest()
 
   // The palette's rows are the app's own actions, so they are built here
   // rather than inside it: `refresh` is this tab's whole cache,
   // `toggle list` is the splitter's rail, and `append log` is the pane
   // cycle plus the caret — the shell is where all three are already in
   // hand (`overlays/actions.ts`).
+  //
+  // The manifest's actions join them under `plugin: <workflow>` (09
+  // §Declarations): what a workflow contributes is the *server's* to
+  // say, so the rows arrive from `GET /api/plugins` and are filtered by
+  // the same ownership rule the panes are — the builtins' and the
+  // selected run's workflow's (`panes/actions.ts`).
   const paletteActions = buildPaletteActions({
     runId: search.run,
     openOverlay: onOpenOverlay ?? NOTHING,
@@ -194,7 +216,13 @@ export default function App({
       if (search.run === undefined) return
       runOps.reorder(search.run, direction)
     },
-  })
+  }).concat(
+    pluginPaletteActions(
+      actionsOf(manifest, { runId: search.run, workflow: selected?.workflow }),
+      { runId: search.run, taskId: search.task },
+      onOpenAction ?? NOTHING,
+    ),
+  )
 
   // 10 §Keyboard, bound to exactly the model above. Fourteen of its keys
   // are the palette's rows and are dispatched on that catalogue's key
@@ -334,6 +362,16 @@ export default function App({
                 onFocusStream(taskId, agentPane < 0 ? undefined : agentPane)
               }
         }
+      />
+
+      {/* A plugin's action, from the palette: `?action=` says which one,
+          and the form it draws is the action's own model (09). */}
+      <PluginAction
+        open={search.overlay === 'action'}
+        action={search.action}
+        runId={search.run}
+        taskId={search.task}
+        onClose={onCloseOverlay ?? NOTHING}
       />
 
       <Keys open={search.overlay === 'keys'} onClose={onCloseOverlay ?? NOTHING} />

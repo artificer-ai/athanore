@@ -121,15 +121,46 @@ async def test_the_root_is_the_document_with_the_policy(serve, built: Path) -> N
 
 
 async def test_the_policy_is_the_one_12_states(serve, built: Path) -> None:
-    """12 §Plugins, verbatim: `style-src` is the only relaxation."""
+    """12 §Plugins, verbatim: two relaxations, and each of them forced."""
 
     response = await call(serve(built), "GET", "/")
 
     assert response.headers["content-security-policy"] == (
-        "default-src 'self'; script-src 'self'; "
+        "default-src 'self'; script-src 'self' 'unsafe-eval'; "
         "style-src 'self' 'unsafe-inline'; font-src 'self'; "
         "img-src 'self' data:; connect-src 'self'"
     )
+
+
+async def test_the_policy_lets_the_form_validator_compile(serve, built: Path) -> None:
+    """`script-src` carries `'unsafe-eval'`, and the SPA cannot do without it.
+
+    RJSF validates with ajv8 (02 §Library choices) and ajv compiles every
+    schema — the operator's form, and the JSON Schema meta-schema it is
+    checked against — into a `new Function`. Under a bare `script-src
+    'self'` that call is refused, ajv throws where it compiles, and RJSF
+    reports "Form validation failed" and submits nothing: no plugin
+    action, no `form` request and no elicitation can be answered from the
+    browser (D182). It is asserted on its own because the string above
+    would happily be corrected back the other way by somebody reading 12
+    and not this (the browser found it; jsdom evaluates under no policy
+    at all).
+    """
+
+    response = await call(serve(built), "GET", "/")
+    directives = dict(
+        (part.split(" ", 1) + [""])[:2]
+        for part in (
+            piece.strip()
+            for piece in response.headers["content-security-policy"].split(";")
+        )
+        if part
+    )
+
+    assert "'unsafe-eval'" in directives["script-src"]
+    # And nowhere else: `'unsafe-inline'` for scripts is the relaxation
+    # that would let an injected `<script>` run, and it is not here.
+    assert "'unsafe-inline'" not in directives["script-src"]
 
 
 async def test_an_asset_is_served_under_the_same_policy(serve, built: Path) -> None:

@@ -54,6 +54,7 @@ import {
   ChartPane,
   DashboardPane,
   ErrorCard,
+  FormPane,
   GraphRail,
   KvPane,
   Log,
@@ -327,20 +328,41 @@ export function renderKind(pane: Pane, data: unknown, ctx: RenderContext): Conte
         ? mismatch
         : { node: <DashboardPane data={dashboard} />, scrolls: false }
     }
-    case 'form':
+    case 'form': {
+      // The one kind whose `source` names an action rather than a URL
+      // (09 §Panel kinds). Registration refuses a `form` panel naming
+      // nothing (rule 4), so a panel with no source at all is a server
+      // this build was not written for.
+      if (source === undefined) {
+        return {
+          scrolls: false,
+          node: (
+            <PlaceholderCard
+              title="this form panel names no action"
+              detail={`registered by ${pane.workflow}`}
+            />
+          ),
+        }
+      }
       return {
         scrolls: false,
         node: (
-          <PlaceholderCard
-            title="this panel is an action form"
-            detail={
-              source === undefined
-                ? 'the form renderer is not built yet'
-                : `action ${source} · the form renderer is not built yet`
-            }
+          <FormPane
+            workflow={pane.workflow}
+            name={source}
+            selection={{
+              runId: ctx.scope.runId,
+              taskId: ctx.scope.taskId,
+              // A `node`-slot panel names the node it follows, and that
+              // is the only node a panel puts in an action's scope: the
+              // `?node=` of {@link RenderContext} is the event log's
+              // filter and deliberately not a scope.
+              ...(pane.panel.node == null ? {} : { node: pane.panel.node }),
+            }}
           />
         ),
       }
+    }
     case 'custom': {
       const element = pane.panel.element ?? undefined
       const renderer = element === undefined ? undefined : ELEMENT_RENDERERS[element]

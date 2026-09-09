@@ -18,6 +18,7 @@
  * and the same fan-out closed by a join.
  */
 import type {
+  ActionOut,
   GraphNode,
   GraphOut,
   PanelOut,
@@ -32,6 +33,31 @@ import type {
   TaskView,
 } from '../../api/gen/types.gen'
 import type { TableColumn } from '../kinds'
+
+/** An action with the manifest's defaults filled in (09 §Wire contract). */
+export function action(over: Partial<ActionOut> & { name: string }): ActionOut {
+  return {
+    title: over.name,
+    scope: 'run',
+    confirm: false,
+    // What `athanore/plugins/registry.py` publishes for an action that
+    // declares no model: an object with no properties, which RJSF draws
+    // as a form with nothing but its submit button.
+    schema: { type: 'object', properties: {} },
+    ...over,
+  }
+}
+
+/** The form of the action 09 §Declarations declares as its example. */
+export const OVERRIDE_SCHEMA: Record<string, unknown> = {
+  type: 'object',
+  title: 'Override',
+  required: ['word'],
+  properties: {
+    word: { type: 'string', title: 'word' },
+    reason: { type: 'string', title: 'reason', default: '' },
+  },
+}
 
 /** A panel with the manifest's defaults filled in. */
 export function panel(over: Partial<PanelOut> & { name: string }): PanelOut {
@@ -112,6 +138,19 @@ export const GAMEDEV_ENTRY: PluginManifestEntry = {
       kind: 'markdown',
       source: '/api/plugins/gamedev/leaderboard',
     }),
+  ],
+  // 09 §Declarations' own example, plus one action per scope the
+  // palette has a rule for: a `run` one that confirms, a `task` one,
+  // and a `global` one that needs no selection at all.
+  actions: [
+    action({
+      name: 'override',
+      title: 'Override secret word',
+      confirm: true,
+      schema: OVERRIDE_SCHEMA,
+    }),
+    action({ name: 'flag', title: 'Flag this attempt', scope: 'task' }),
+    action({ name: 'reseed', title: 'Reseed the dictionary', scope: 'global' }),
   ],
 }
 
