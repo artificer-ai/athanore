@@ -27,16 +27,18 @@ mean something had started guessing.
 
 **The credential.** ``ANTHROPIC_API_KEY``, or the credentials the
 adapter keeps under ``~/.claude`` (``claude setup-token``, or
-``/login``; ``CLAUDE_CONFIG_DIR`` moves the directory).
-``CLAUDE_CODE_OAUTH_TOKEN`` is deliberately **not** one of them: the
-façade scrubs ``CLAUDE_*`` from every agent's environment (20 §Finding
-4, 12 §Agents), so a token exported into this process never reaches the
-child and a skip that named it would be a lie.
+``/login``). Neither ``CLAUDE_CODE_OAUTH_TOKEN`` nor
+``CLAUDE_CONFIG_DIR`` is read here: the façade scrubs ``CLAUDE_*`` from
+every agent's environment (20 §Finding 4, 12 §Agents) and this
+example's seat sets no override, so a token exported into this process
+never reaches the child, and the child resolves ``~/.claude`` whatever
+this process's ``CLAUDE_CONFIG_DIR`` says. A check that honoured either
+would skip a machine that is logged in, or pass one whose run then dies
+on authentication instead.
 """
 
 from __future__ import annotations
 
-import os
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -47,15 +49,15 @@ import claude_acp
 def credentials_file() -> Path:
     """Where the adapter keeps the credentials `claude setup-token` writes.
 
-    ``CLAUDE_CONFIG_DIR`` is the adapter's own override and is honoured
-    here for the same reason the file is looked at at all: an agent whose
-    credentials are on disk needs no variable exported, and a smoke test
-    that only looked at the environment would skip on a machine that is
-    logged in.
+    The file is looked at at all because an agent whose credentials are
+    on disk needs no variable exported, and a check that only read the
+    environment would skip a machine that is logged in. It is
+    ``$HOME/.claude`` and nowhere else: ``HOME`` is inherited by the
+    child, ``CLAUDE_CONFIG_DIR`` is not (20 §Finding 4), so this is the
+    one path that is the same on both sides of the spawn.
     """
 
-    home = os.environ.get("CLAUDE_CONFIG_DIR") or str(Path.home() / ".claude")
-    return Path(home) / ".credentials.json"
+    return Path.home() / ".claude" / ".credentials.json"
 
 
 async def test_claude_completes_a_live_run_and_records_real_token_counts(
