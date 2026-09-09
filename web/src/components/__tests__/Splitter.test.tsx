@@ -96,6 +96,33 @@ describe('Splitter', () => {
     expect(pixels('aria-valuemax')).toBeCloseTo(GROUP_WIDTH - MIN_DETAIL_WIDTH, 0)
   })
 
+  it('keeps the width the operator settled on', async () => {
+    splitter()
+    const handle = screen.getByRole('separator')
+    handle.focus()
+
+    // A resize key is a user interaction like the pointer: the group
+    // moves the boundary and reports the layout it moved to.
+    await userEvent.keyboard('{ArrowLeft}')
+
+    const stored = usePrefs.getState().listWidth
+    expect(stored).toBeLessThan(GROUP_WIDTH - MIN_DETAIL_WIDTH)
+    expect(stored).toBeGreaterThanOrEqual(MIN_LIST_WIDTH)
+    expect(stored).not.toBe(DEFAULT_LIST_WIDTH)
+  })
+
+  it('leaves the stored width alone when the operator did not move it', () => {
+    // The initial mount lays the group out and reports it, as a window
+    // resize and a remount do. None of the three is the operator, and a
+    // narrow window must not quietly rewrite a width chosen on a wide
+    // one.
+    usePrefs.setState({ listWidth: 400 })
+    const { rerender } = splitter()
+    rerender(<Splitter count={35} list={<p>the runs</p>} detail={<p>the pane</p>} />)
+
+    expect(usePrefs.getState().listWidth).toBe(400)
+  })
+
   it('collapses to the rail, which reports the count sideways', () => {
     usePrefs.setState({ listCollapsed: true })
     splitter()

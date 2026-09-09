@@ -6,7 +6,12 @@ import { manifestApiPluginsGetQueryKey } from '../../api/gen/@tanstack/react-que
 import type { Me } from '../../api/gen/types.gen'
 import { usePrefs } from '../../store/prefs'
 import { useUi } from '../../store/ui'
-import { clearRefreshOn, queryKeys, registerRefreshOn } from '../invalidate'
+import {
+  COALESCE_WINDOW_MS,
+  clearRefreshOn,
+  queryKeys,
+  registerRefreshOn,
+} from '../invalidate'
 import {
   DOWN_AFTER_FAILURES,
   EVENT_NAMES,
@@ -152,6 +157,49 @@ describe('EventFeed', () => {
       expect(latest().listeners.has('plugin.demo.counted')).toBe(true)
     })
 
+    it('subscribes a plugin name once, on the stream that is open', () => {
+      const { feed, latest } = feedOn(queryClient)
+      feed.start()
+
+      registerRefreshOn(['plugin.demo.counted'], [['panel', 'counter']])
+      registerRefreshOn(['plugin.demo.counted'], [['panel', 'other']])
+      // A name the feed already listens to is not added a second time
+      // either: two listeners would handle every frame twice.
+      registerRefreshOn(['task.done'], [['panel', 'progress']])
+
+      expect(latest().listeners.get('plugin.demo.counted')).toHaveLength(1)
+      expect(latest().listeners.get('task.done')).toHaveLength(1)
+    })
+
+    it('carries a plugin name it learned onto the next connection', () => {
+      const { feed, opened, latest } = feedOn(queryClient)
+      feed.start()
+      registerRefreshOn(['plugin.demo.counted'], [['panel', 'counter']])
+
+      latest().fail()
+      vi.advanceTimersByTime(RECONNECT_MIN_MS)
+
+      expect(opened[1]?.listeners.has('plugin.demo.counted')).toBe(true)
+    })
+
+    it('does nothing when asked to reconnect before it was started', () => {
+      const { feed, opened } = feedOn(queryClient)
+
+      feed.reconnectNow()
+
+      expect(opened).toHaveLength(0)
+    })
+
+    it('does nothing when asked to reconnect after it was stopped', () => {
+      const { feed, opened } = feedOn(queryClient)
+      feed.start()
+      feed.stop()
+
+      feed.reconnectNow()
+
+      expect(opened).toHaveLength(1)
+    })
+
     it('closes the stream and stops retrying when it is stopped', () => {
       const { feed, latest, opened } = feedOn(queryClient)
       feed.start()
@@ -258,6 +306,27 @@ describe('EventFeed', () => {
       latest().fail()
       vi.advanceTimersByTime(RECONNECT_MIN_MS)
       expect(opened[1]?.url).toBe('/api/events')
+    })
+
+    it('drops the invalidations it had collected but not yet sent', () => {
+      const invalidate = vi
+        .spyOn(queryClient, 'invalidateQueries')
+        .mockResolvedValue(undefined)
+      const { feed, latest } = feedOn(queryClient)
+      feed.start()
+      latest().open()
+      latest().frame(
+        'log.appended',
+        { name: 'log.appended', run_id: 'r1', data: {} },
+        '41',
+      )
+
+      latest().frame(RESYNC, { reason: 'replay_capped' })
+      vi.advanceTimersByTime(COALESCE_WINDOW_MS * 4)
+
+      // One call, with no filter: the whole cache. The pending key was
+      // dropped rather than invalidated a second time behind it.
+      expect(invalidate).toHaveBeenCalledExactlyOnceWith()
     })
   })
 
@@ -382,6 +451,43 @@ describe('EventFeed', () => {
 
       expect(refetch).toHaveBeenLastCalledWith({
         queryKey: manifestApiPluginsGetQueryKey(),
+      })
+    })
+
+    it('says nothing more when the refetch fails because it went away again', async () => {
+      queryClient.setQueryData(meQueryOptions().queryKey, LOOPBACK)
+      const refetch = vi
+        .spyOn(queryClient, 'refetchQueries')
+        .mockRejectedValue(new Error('the server went away again'))
+      const { feed, latest } = feedOn(queryClient)
+      feed.start()
+      latest().open()
+
+      latest().fail()
+      vi.advanceTimersByTime(RECONNECT_MIN_MS)
+      latest().open()
+      await vi.waitFor(() => expect(refetch).toHaveBeenCalled())
+
+      // The stream is about to report it by itself; an unhandled
+      // rejection here would be the only thing wrong with that.
+      expect(feed.status).toBe('open')
+    })
+
+    it('leaves the manifest alone when this tab never knew when the server started', async () => {
+      // Nothing seeded `/api/me`: `started_at` is unknown on both sides
+      // of the reconnect, and unknown is not a restart (01 §Real data).
+      const refetch = vi.spyOn(queryClient, 'refetchQueries').mockResolvedValue(undefined)
+      const { feed, latest } = feedOn(queryClient)
+      feed.start()
+      latest().open()
+
+      latest().fail()
+      vi.advanceTimersByTime(RECONNECT_MIN_MS)
+      latest().open()
+      await vi.waitFor(() => expect(refetch).toHaveBeenCalled())
+
+      expect(refetch).toHaveBeenCalledExactlyOnceWith({
+        queryKey: meQueryOptions().queryKey,
       })
     })
 

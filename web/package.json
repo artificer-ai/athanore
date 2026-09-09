@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "lint": "oxlint --deny-warnings",
-    "test": "vitest run",
+    "test": "vitest run --coverage",
     "gen": "uv run --project .. ../scripts/dump_openapi.py && openapi-ts",
     "gen:theme": "node scripts/gen-theme.mjs"
   },
@@ -54,6 +54,7 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.0",
+    "@vitest/coverage-v8": "5.0.0",
     "jsdom": "^30.0.1",
     "oxlint": "^1.79.0",
     "typescript": "~6.0.2",

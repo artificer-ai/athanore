@@ -132,6 +132,12 @@ jobs:
         if: steps.probe.outputs.present == 'yes'
         run: pnpm -C web lint
 
+      # `vitest run --coverage`, with the 80 % gate of 13 §Frontend and
+      # T068 in `web/vite.config.ts`. The threshold is configured rather
+      # than added here as a step of its own so that this job and
+      # `./scripts/test.sh` (D74) apply the same one: both run this
+      # command, and a gate only one of them enforced would be a gate
+      # nobody noticed slipping (D177).
       - name: pnpm test
         if: steps.probe.outputs.present == 'yes'
         run: pnpm -C web test

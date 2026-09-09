@@ -1,5 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -165,13 +172,15 @@ function shell(
     onOpenOverlay?: (overlay: Overlay) => void
     onCloseOverlay?: () => void
     onFocusStream?: (taskId: number, pane: number | undefined) => void
+    onOpenNode?: (node: string, pane: number | undefined) => void
+    manifest?: PluginManifestEntry[]
   } = {},
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { staleTime: 5000, retry: false } },
   })
   queryClient.setQueryData(listRunsApiRunsGetQueryKey(), over.runs ?? RUNS)
-  queryClient.setQueryData(manifestApiPluginsGetQueryKey(), MANIFEST)
+  queryClient.setQueryData(manifestApiPluginsGetQueryKey(), over.manifest ?? MANIFEST)
   queryClient.setQueryData(listWorkflowsApiWorkflowsGetQueryKey(), WORKFLOWS)
   queryClient.setQueryData(
     getSourceApiWorkflowsNameSourceGetQueryKey({ path: { name: 'feature_build' } }),
@@ -206,6 +215,7 @@ function shell(
         {...(over.onFocusStream === undefined
           ? {}
           : { onFocusStream: over.onFocusStream })}
+        {...(over.onOpenNode === undefined ? {} : { onOpenNode: over.onOpenNode })}
       />
     </QueryClientProvider>,
   )
@@ -606,6 +616,163 @@ describe('App', () => {
     await userEvent.click(command('retry task'))
 
     expect(onOpenOverlay).toHaveBeenCalledExactlyOnceWith('pick-retry')
+  })
+})
+
+/* -------------------------------------------------------------------- */
+/* The run operations behind the palette's own rows                      */
+/* -------------------------------------------------------------------- */
+
+/**
+ * The four rows that call an endpoint rather than opening something
+ * (`overlays/runOps.ts`, 08 §Runs).
+ *
+ * `useRunOps` is tested on its own; what is asserted here is the shell's
+ * half — which run each row is bound to, and that a row with no run
+ * selected posts nothing rather than a request with `undefined` in the
+ * path.
+ */
+describe('the run operations', () => {
+  beforeEach(freshTab)
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  /** The POSTs made so far, in order. */
+  function posted(): string[] {
+    return vi
+      .mocked(fetch)
+      .mock.calls.map(([input]) => input as unknown as Request)
+      .filter((request) => request.method === 'POST')
+      .map((request) => new URL(request.url, 'http://localhost').pathname)
+  }
+
+  it.each([
+    ['pause / resume run', `/api/runs/aaaa1111bbbb/pause`],
+    ['cancel run', `/api/runs/aaaa1111bbbb/cancel`],
+    ['move run up', `/api/runs/aaaa1111bbbb/position`],
+    ['move run down', `/api/runs/aaaa1111bbbb/position`],
+  ])('runs %s against the selected run', async (name, path) => {
+    shell({ overlay: 'palette', run: 'aaaa1111bbbb' })
+
+    await userEvent.click(command(name))
+
+    await waitFor(() => {
+      expect(posted()).toEqual([path])
+    })
+  })
+
+  it('resumes the run the list says is paused', async () => {
+    // One key over two endpoints: the run's own status picks the call
+    // (04 §Operator operations), and the status comes off `GET /api/runs`.
+    shell(
+      { overlay: 'palette', run: 'aaaa1111bbbb' },
+      { runs: [{ ...RUNS[0]!, status: 'paused' }] },
+    )
+
+    await userEvent.click(command('pause / resume run'))
+
+    await waitFor(() => {
+      expect(posted()).toEqual(['/api/runs/aaaa1111bbbb/resume'])
+    })
+  })
+
+  it.each(['pause / resume run', 'cancel run', 'move run up', 'move run down'])(
+    'posts nothing for %s with no run selected',
+    async (name) => {
+      shell({ overlay: 'palette' })
+
+      await userEvent.click(command(name))
+
+      expect(posted()).toEqual([])
+    },
+  )
+})
+
+/* -------------------------------------------------------------------- */
+/* The graph pane's two handovers                                        */
+/* -------------------------------------------------------------------- */
+
+/**
+ * 10 §Graph pane: a row "jumps to the log pane filtered to that node",
+ * and `open definition` opens the library.
+ *
+ * Both are the graph rail's clicks and the shell's answers. The shell's
+ * half is the one thing neither `GraphRail.test.tsx` nor the route can
+ * assert: **which** pane index the node goes with, which is the log
+ * pane of *this* selection's cycle rather than a number written down.
+ */
+describe('the graph pane’s handovers', () => {
+  /** A cycle whose log pane is second and whose graph pane is third. */
+  const WITH_GRAPH: PluginManifestEntry[] = [
+    {
+      workflow: '_builtin',
+      panels: [
+        { name: 'overview', slot: 'run', placement: 'pane', scope: 'run', kind: 'custom' },
+        { name: 'log', slot: 'run', placement: 'pane', scope: 'run', kind: 'custom' },
+        {
+          name: 'graph',
+          slot: 'run',
+          placement: 'pane',
+          scope: 'run',
+          kind: 'custom',
+          element: 'ath-run-graph',
+        },
+      ],
+    },
+  ]
+
+  /** The same cycle with no log pane in it at all. */
+  const WITHOUT_LOG: PluginManifestEntry[] = [
+    {
+      workflow: '_builtin',
+      panels: (WITH_GRAPH[0]?.panels ?? []).filter((entry) => entry.name !== 'log'),
+    },
+  ]
+
+  beforeEach(freshTab)
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('hands a clicked node the index of this cycle’s log pane', async () => {
+    const onOpenNode = vi.fn()
+    shell(
+      { run: 'aaaa1111bbbb', pane: 2 },
+      { manifest: WITH_GRAPH, onOpenNode },
+    )
+
+    fireEvent.click(await screen.findByTestId('graph-row'))
+
+    // The log is the second pane of the manifest above, and the index is
+    // looked up rather than assumed (09 §Builtins are plugins).
+    expect(onOpenNode).toHaveBeenCalledExactlyOnceWith('prepare', 1)
+  })
+
+  it('hands over no pane at all when the cycle has no log pane', async () => {
+    const onOpenNode = vi.fn()
+    shell(
+      { run: 'aaaa1111bbbb', pane: 1 },
+      { manifest: WITHOUT_LOG, onOpenNode },
+    )
+
+    fireEvent.click(await screen.findByTestId('graph-row'))
+
+    expect(onOpenNode).toHaveBeenCalledExactlyOnceWith('prepare', undefined)
+  })
+
+  it('opens the workflow library from `open definition`', async () => {
+    const onOpenOverlay = vi.fn()
+    shell(
+      { run: 'aaaa1111bbbb', pane: 2 },
+      { manifest: WITH_GRAPH, onOpenOverlay },
+    )
+
+    fireEvent.click(await screen.findByTestId('graph-open-definition'))
+
+    expect(onOpenOverlay).toHaveBeenCalledExactlyOnceWith('library')
   })
 })
 

@@ -17,7 +17,14 @@ import type { RequestView } from '../../api/gen/types.gen'
 import { request } from '../../panes/__tests__/fixtures'
 import { queryKeys } from '../../realtime/invalidate'
 import { usePrefs } from '../../store/prefs'
-import { BASE_TITLE, notificationBody, titleFor, useAttention } from '../attention'
+import {
+  BASE_TITLE,
+  notificationBody,
+  notificationsAvailable,
+  requestNotificationPermission,
+  titleFor,
+  useAttention,
+} from '../attention'
 
 let queryClient: QueryClient
 let raised: { title: string; body: string | undefined }[]
@@ -169,5 +176,57 @@ describe('the desktop notification', () => {
 
   it('names the node and the question, which is what is worth reading', () => {
     expect(notificationBody(AND_ANOTHER)).toBe('review · permission: run the gate')
+  })
+})
+
+/**
+ * The permission prompt, which is owed to a click and is asked for from
+ * the settings toggle and from nowhere else (10 §Attention).
+ */
+describe('asking the browser for permission', () => {
+  it('says no on a browser with no Notification API at all', async () => {
+    vi.stubGlobal('Notification', undefined)
+    // `'Notification' in window` is what the check reads, and stubbing
+    // it to `undefined` leaves the key there; deleting it is the state
+    // an older browser is actually in.
+    Reflect.deleteProperty(window, 'Notification')
+
+    expect(notificationsAvailable()).toBe(false)
+    expect(await requestNotificationPermission()).toBe(false)
+  })
+
+  it('does not ask again once permission has been granted', async () => {
+    stubNotification('granted')
+
+    expect(await requestNotificationPermission()).toBe(true)
+    expect(Notification.requestPermission).not.toHaveBeenCalled()
+  })
+
+  it('does not ask again once permission has been denied', async () => {
+    stubNotification('denied')
+
+    // A browser that was told no does not offer a second prompt, and
+    // asking would be a no-op the operator cannot see.
+    expect(await requestNotificationPermission()).toBe(false)
+    expect(Notification.requestPermission).not.toHaveBeenCalled()
+  })
+
+  it('asks when nobody has decided yet, and reports the answer', async () => {
+    stubNotification('default')
+    vi.mocked(Notification.requestPermission).mockResolvedValue('granted')
+
+    expect(await requestNotificationPermission()).toBe(true)
+    expect(Notification.requestPermission).toHaveBeenCalledOnce()
+  })
+
+  it('reads a refusal to be asked as a refusal', async () => {
+    stubNotification('default')
+    // Older browsers take a callback instead and reject the promise
+    // form.
+    vi.mocked(Notification.requestPermission).mockRejectedValue(
+      new TypeError('not a function'),
+    )
+
+    expect(await requestNotificationPermission()).toBe(false)
   })
 })

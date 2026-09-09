@@ -38,6 +38,7 @@ import {
   orderRequests,
   pendingCount,
   requestState,
+  requestsError,
   toolCallSummary,
 } from '../kinds'
 import { REQUESTS_RUN, REQUEST_LIST, STALE_REQUEST, request } from './fixtures'
@@ -435,5 +436,46 @@ describe('the pane with nothing to draw', () => {
     const card = await screen.findByTestId('pane-error')
     expect(card).toHaveTextContent('no such run')
     expect(card).toHaveTextContent(`/api/runs/${REQUESTS_RUN}/requests`)
+  })
+})
+
+/**
+ * What the pane says when `GET /api/runs/{id}/requests` refused: the
+ * message and, when the body carried one, the stable code the pane draws
+ * beside it (08 §Conventions).
+ */
+describe('a refused list', () => {
+  it('reads the message and the code together', () => {
+    expect(requestsError({ error: 'no such run', code: 'not_found' })).toEqual({
+      message: 'no such run',
+      code: 'not_found',
+    })
+  })
+
+  it('keeps the code of a refusal whose message was an Error', () => {
+    const refusal = Object.assign(new TypeError('Failed to fetch'), {
+      code: 'not_found',
+    })
+
+    expect(requestsError(refusal)).toEqual({
+      message: 'Failed to fetch',
+      code: 'not_found',
+    })
+  })
+
+  it('reads a bare string, with no code to report', () => {
+    expect(requestsError('502 Bad Gateway')).toEqual({ message: '502 Bad Gateway' })
+  })
+
+  it.each([
+    ['nothing at all', undefined],
+    ['an empty body', {}],
+    ['an empty message', { error: '', code: '' }],
+    ['an Error with no message', new Error('')],
+    ['whitespace', '   '],
+  ])('falls back for %s', (_case, thrown) => {
+    expect(requestsError(thrown)).toEqual({
+      message: 'the requests could not be loaded',
+    })
   })
 })

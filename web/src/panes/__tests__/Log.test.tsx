@@ -24,7 +24,15 @@ import { createAppQueryClient } from '../../api/client'
 import { listRunsApiRunsGetQueryKey } from '../../api/gen/@tanstack/react-query.gen'
 import type { RunStatus } from '../../api/gen/types.gen'
 import { useUi } from '../../store/ui'
-import { Log, asLog, isProse, logAuthor, logLines, type LogRow } from '../kinds'
+import {
+  Log,
+  appendError,
+  asLog,
+  isProse,
+  logAuthor,
+  logLines,
+  type LogRow,
+} from '../kinds'
 import { panelQueryKey } from '../source'
 import { EVENT_LOG, LOG_RUN, logRun } from './fixtures'
 
@@ -441,5 +449,38 @@ describe('the composer', () => {
     expect(screen.getByTestId('log-append')).toBeDisabled()
     await user.click(screen.getByTestId('log-append'))
     expect(calls).toHaveLength(0)
+  })
+})
+
+/**
+ * What the composer says when the note was refused. The generated client
+ * throws the parsed body — `{error, code}` (08 §Conventions) — rather
+ * than an `Error`, so both are read and neither is assumed, and the
+ * fallback exists because the operator wrote that note and this is the
+ * only copy of it.
+ */
+describe('a refused note', () => {
+  it('reads the API’s one error shape', () => {
+    expect(appendError({ error: 'the run has ended', code: 'conflict' })).toBe(
+      'the run has ended',
+    )
+  })
+
+  it('reads an Error, which is what a transport failure is', () => {
+    expect(appendError(new TypeError('Failed to fetch'))).toBe('Failed to fetch')
+  })
+
+  it('reads a bare string', () => {
+    expect(appendError('502 Bad Gateway')).toBe('502 Bad Gateway')
+  })
+
+  it.each([
+    ['nothing at all', undefined],
+    ['an empty body', {}],
+    ['an empty message', { error: '' }],
+    ['an Error with no message', new Error('')],
+    ['whitespace', '   '],
+  ])('falls back for %s rather than saying nothing', (_case, thrown) => {
+    expect(appendError(thrown)).toBe('the note was not appended')
   })
 })

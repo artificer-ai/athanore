@@ -8,8 +8,10 @@ import {
   Invalidator,
   clearRefreshOn,
   keysFor,
+  panelsRefreshingOn,
   queryKeys,
   registerRefreshOn,
+  subscribeRefreshOn,
   type AthanoreEvent,
 } from '../invalidate'
 
@@ -125,6 +127,62 @@ describe('the invalidation table', () => {
 
       expect(keysFor(event('plugin.demo.counted'))).toEqual([])
     })
+
+    it('matches a panel’s `refresh_on` glob against the name that arrived', () => {
+      // `refresh_on` is a list of globs (09 §Wire contract), matched the
+      // same first-exact-then-glob way the table's own rows are — but
+      // over the registrations, where an exact one is not exclusive.
+      registerRefreshOn(['task.*'], [['panel', 'progress']])
+
+      expect(names(keysFor(event('task.done', { run_id: 'r1', task_id: 7 })))).toContain(
+        JSON.stringify(['panel', 'progress']),
+      )
+    })
+
+    it('refreshes two panels that spelled the same event differently', () => {
+      registerRefreshOn(['task.done'], [['panel', 'exact']])
+      registerRefreshOn(['task.*'], [['panel', 'globbed']])
+
+      expect(names(panelsRefreshingOn('task.done'))).toEqual(
+        names([
+          ['panel', 'exact'],
+          ['panel', 'globbed'],
+        ]),
+      )
+    })
+
+    it('joins a name that is already registered rather than replacing it', () => {
+      // "a name that is already a row joins it" (10 §Realtime and
+      // caching): two panels of one manifest can watch one event.
+      registerRefreshOn(['log.appended'], [['panel', 'words']])
+      registerRefreshOn(['log.appended'], [['panel', 'budget']])
+      registerRefreshOn(['log.appended'], [['panel', 'words']])
+
+      expect(names(panelsRefreshingOn('log.appended'))).toEqual(
+        names([
+          ['panel', 'words'],
+          ['panel', 'budget'],
+        ]),
+      )
+    })
+
+    it('tells the feed which names are registered, now and on every change', () => {
+      const heard: string[][] = []
+      const unsubscribe = subscribeRefreshOn((registered) => {
+        heard.push([...registered])
+      })
+
+      // A browser's `EventSource` delivers a named frame only to a
+      // listener for that name, so the feed has to be told (`sse.ts`).
+      expect(heard).toEqual([[]])
+
+      registerRefreshOn(['plugin.demo.counted'], [['panel', 'counter']])
+      expect(heard.at(-1)).toEqual(['plugin.demo.counted'])
+
+      unsubscribe()
+      registerRefreshOn(['plugin.demo.tocked'], [['panel', 'clock']])
+      expect(heard).toHaveLength(2)
+    })
   })
 })
 
@@ -197,6 +255,64 @@ describe('the coalescer', () => {
     invalidator.dispose()
     vi.advanceTimersByTime(COALESCE_WINDOW_MS * 4)
 
+    expect(invalidate).not.toHaveBeenCalled()
+  })
+
+  it('flushes early when it is asked to, and lets the window lapse', () => {
+    const invalidator = new Invalidator(queryClient)
+
+    invalidator.handle(event('log.appended', { run_id: 'r1' }))
+    invalidator.flush()
+    expect(invalidated()).toEqual([JSON.stringify(queryKeys.log('r1'))])
+
+    // The timer the window opened was cleared, not left to fire on an
+    // empty set a second time.
+    vi.advanceTimersByTime(COALESCE_WINDOW_MS * 4)
+    expect(invalidate).toHaveBeenCalledTimes(1)
+  })
+
+  it('coalesces a burst of stream events into one refetch per panel', () => {
+    // A panel that asked for `task.stream` outright is refreshed at the
+    // stream's own rate — that is what asking for it means — but the
+    // window still collapses a tick of them into one.
+    registerRefreshOn(['task.stream'], [['panel', 'progress']])
+    const invalidator = new Invalidator(queryClient)
+
+    for (let seq = 1; seq <= 5; seq += 1) {
+      invalidator.handle(
+        event('task.stream', { task_id: 7, data: { seq_from: seq, seq_to: seq } }),
+      )
+    }
+    vi.advanceTimersByTime(COALESCE_WINDOW_MS)
+
+    expect(invalidated()).toEqual([JSON.stringify(['panel', 'progress'])])
+  })
+
+  it('leaves a panel that only globbed `task.*` out of the stream’s rate', () => {
+    // Two or three of these arrive per second per streaming task; a
+    // panel refreshing on `task.*` did not ask for that (10 §Realtime).
+    registerRefreshOn(['task.*'], [['panel', 'progress']])
+    const invalidator = new Invalidator(queryClient)
+
+    invalidator.handle(
+      event('task.stream', { task_id: 7, data: { seq_from: 1, seq_to: 1 } }),
+    )
+    vi.advanceTimersByTime(COALESCE_WINDOW_MS)
+
+    expect(invalidate).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ['no task id', { data: { seq_from: 1, seq_to: 1 } }],
+    ['a payload that is not a stream page', { task_id: 7, data: { chunks: [] } }],
+  ])('appends nothing for a task.stream carrying %s', (_case, fields) => {
+    const append = vi.spyOn(Invalidator.prototype, 'appendStream')
+    const invalidator = new Invalidator(queryClient)
+
+    invalidator.handle(event('task.stream', fields))
+    vi.advanceTimersByTime(COALESCE_WINDOW_MS)
+
+    expect(append).not.toHaveBeenCalled()
     expect(invalidate).not.toHaveBeenCalled()
   })
 })
@@ -307,6 +423,72 @@ describe('the transcript', () => {
     await invalidator.appendStream(7, 2)
     invalidator.flush()
 
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.stream(7) })
+  })
+
+  it('leaves the cached page alone when the fetch brought nothing new', async () => {
+    const held = page([1, 2], 2)
+    queryClient.setQueryData(queryKeys.stream(7), held)
+    stubStream(page([1, 2], 2))
+
+    await new Invalidator(queryClient).appendStream(7, 3)
+
+    // The same object, so nothing downstream re-renders on a page the
+    // viewer already had.
+    expect(queryClient.getQueryData<StreamOut>(queryKeys.stream(7))).toBe(held)
+  })
+
+  it('marks the transcript stale when the server refused the page', async () => {
+    queryClient.setQueryData(queryKeys.stream(7), page([1], 1))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ error: 'no such task', code: 'not_found' }), {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+      ),
+    )
+    const invalidator = new Invalidator(queryClient)
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue()
+
+    await invalidator.appendStream(7, 2)
+    invalidator.flush()
+
+    // Stale rather than wrong: the view refetches it whole.
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.stream(7) })
+  })
+
+  it('marks the transcript stale when the fetch itself threw', async () => {
+    queryClient.setQueryData(queryKeys.stream(7), page([1], 1))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => {
+        throw new TypeError('Failed to fetch')
+      }),
+    )
+    const invalidator = new Invalidator(queryClient)
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue()
+
+    await invalidator.appendStream(7, 2)
+    invalidator.flush()
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.stream(7) })
+  })
+
+  it('marks a page it cannot merge stale rather than fetching one', async () => {
+    // An infinite query, say: the shape is not a `StreamOut` and merging
+    // into it would corrupt it. Slower and still correct.
+    queryClient.setQueryData(queryKeys.stream(7), { pages: [], pageParams: [] })
+    const fetchMock = stubStream(page([2], 2))
+    const invalidator = new Invalidator(queryClient)
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries').mockResolvedValue()
+
+    await invalidator.appendStream(7, 2)
+    invalidator.flush()
+
+    expect(fetchMock).not.toHaveBeenCalled()
     expect(invalidate).toHaveBeenCalledWith({ queryKey: queryKeys.stream(7) })
   })
 

@@ -6,7 +6,7 @@
  * reached by in `PaneRenderer`, so a shape the document changes fails
  * here as a `null` rather than as a render nobody looked at.
  */
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -23,6 +23,7 @@ import {
   asKv,
   asLog,
   asMarkdown,
+  asOverview,
   asTable,
   compareValues,
   extent,
@@ -32,6 +33,24 @@ import {
   rowTime,
 } from '../kinds'
 import { SAMPLES } from './fixtures'
+
+/**
+ * shiki is a lazy chunk and a grammar loader; what the block does with
+ * the HTML it gets back is this file's business, and loading a real
+ * grammar to find out is not. `null` is the state the block starts in
+ * for real too, so the default is the truth of a first paint.
+ */
+const { highlighted } = vi.hoisted(() => ({
+  highlighted: { html: null as string | null },
+}))
+vi.mock('../../lib/highlight', () => ({
+  highlight: () => Promise.resolve(highlighted.html),
+  tokenize: () => Promise.resolve(null),
+}))
+
+beforeEach(() => {
+  highlighted.html = null
+})
 
 /** A narrowed sample, or a failure that names the kind that drifted. */
 function narrowed<T>(kind: string, value: T | null): T {
@@ -58,6 +77,26 @@ describe('markdown', () => {
     expect(block).toHaveTextContent('assert fps > 55')
   })
 
+  it('swaps in shiki’s own markup once the grammar has loaded', async () => {
+    highlighted.html = '<pre><span style="color:#ff7b72">assert</span></pre>'
+    render(<MarkdownPane text={'```python\nassert fps > 55\n```'} />)
+
+    const block = await screen.findByTestId('code-block')
+    await waitFor(() => {
+      expect(block).toHaveAttribute('data-highlighted', 'true')
+    })
+    expect(block.querySelector('span')).toHaveStyle({ color: '#ff7b72' })
+  })
+
+  it('draws a backticked word inline, not as a block', () => {
+    render(<MarkdownPane text={'run `athanore serve` to start it'} />)
+
+    // No language and no newline: an inline span, and no frame around
+    // it. A fenced block is the other branch, above.
+    expect(screen.getByText('athanore serve').tagName).toBe('CODE')
+    expect(screen.queryByTestId('code-block')).toBeNull()
+  })
+
   it('refuses anything that is not a string', () => {
     expect(asMarkdown({ text: 'no' })).toBeNull()
   })
@@ -73,6 +112,12 @@ describe('kv', () => {
     expect(screen.getByText('3')).toBeInTheDocument()
     // Absent is `—`, never a zero (01 §Real data only).
     expect(screen.getByText('—')).toBeInTheDocument()
+  })
+
+  it('says so rather than drawing an empty list', () => {
+    render(<KvPane data={narrowed('kv', asKv({}))} />)
+
+    expect(screen.getByRole('status')).toHaveTextContent('nothing to show')
   })
 
   it('refuses a list, which is the log kind’s shape', () => {
@@ -303,5 +348,132 @@ describe('values', () => {
     expect(compareValues(9, 10)).toBeLessThan(0)
     expect(compareValues('9', '10')).toBeGreaterThan(0)
     expect(compareValues(null, 1)).toBeGreaterThan(0)
+  })
+})
+
+/* -------------------------------------------------------------------- */
+/* The narrowing functions                                               */
+/* -------------------------------------------------------------------- */
+
+/**
+ * What each kind's narrowing function refuses.
+ *
+ * 09 §Panel kinds ends with "Unknown `kind` renders a placeholder card,
+ * never a crash", and the same promise covers a *declared* kind whose
+ * data does not match: `null` here is the mismatch card in
+ * `panes/content.tsx`, and a narrowing function that let a bad shape
+ * through would move the failure into a renderer, where it is a white
+ * screen instead.
+ *
+ * Every case is a shape a plugin can plausibly send — a row that is not
+ * an object, a metric with no label, a point that is `Infinity` — not an
+ * invented one, because what is being asserted is that the guard is the
+ * shape 09 writes down and not merely *a* guard.
+ */
+describe('the shapes 09 declares', () => {
+  describe('log', () => {
+    it('keeps the three optional fields the builtin adds', () => {
+      expect(
+        asLog([
+          { ts: 't', text: 'plain' },
+          { ts: 't', text: 'full', level: 'dim', source: 'qa/user', node: 'qa' },
+        ]),
+      ).toEqual([
+        { ts: 't', text: 'plain' },
+        { ts: 't', text: 'full', level: 'dim', source: 'qa/user', node: 'qa' },
+      ])
+    })
+
+    it.each([
+      ['a row that is not an object', ['just a line']],
+      ['a row with no ts', [{ text: 'x' }]],
+      ['a ts that is not a string', [{ ts: 1, text: 'x' }]],
+      ['a text that is not a string', [{ ts: 't', text: 17 }]],
+    ])('refuses %s', (_case, data) => {
+      expect(asLog(data)).toBeNull()
+    })
+  })
+
+  describe('chart', () => {
+    it.each([
+      ['a series that is not an object', { series: ['fps'] }],
+      ['a series with no name', { series: [{ points: [] }] }],
+      ['points that are not a list', { series: [{ name: 'fps', points: {} }] }],
+      ['a point that is not a pair', { series: [{ name: 'fps', points: [[1]] }] }],
+      [
+        'a point that is not finite',
+        { series: [{ name: 'fps', points: [[1, Number.POSITIVE_INFINITY]] }] },
+      ],
+    ])('refuses %s', (_case, data) => {
+      expect(asChart(data)).toBeNull()
+    })
+
+    it('draws a kind it has never heard of as a line', () => {
+      // A `kind` a later version adds draws as a line rather than as
+      // nothing: the points are still points.
+      expect(asChart({ series: [], kind: 'candlestick' })?.kind).toBe('line')
+      expect(asChart({ series: [], kind: 'bar' })?.kind).toBe('bar')
+    })
+
+    it('gives an empty chart an axis rather than dividing by nothing', () => {
+      expect(extent([], 0)).toEqual([0, 1])
+      expect(extent([{ name: 'fps', points: [] }], 1)).toEqual([0, 1])
+    })
+  })
+
+  describe('dashboard', () => {
+    it.each([
+      ['a metric that is not an object', { metrics: ['TOKENS'] }],
+      ['a metric with no label', { metrics: [{ value: 12 }] }],
+      ['a label that is not a string', { metrics: [{ label: 4, value: 12 }] }],
+      [
+        'a table it cannot draw',
+        { metrics: [], table: { columns: [{ label: 'no key' }], rows: [] } },
+      ],
+    ])('refuses %s', (_case, data) => {
+      expect(asDashboard(data)).toBeNull()
+    })
+  })
+
+  describe('the overview’s own shape', () => {
+    const DASHBOARD = { metrics: [{ label: 'TOKENS', value: 12 }] }
+
+    it('narrows a missing `meta` to an empty grid, not to a mismatch', () => {
+      // A server that stopped sending `meta` is still sending the tiles
+      // and the nodes, and drawing those beats an error card (D140).
+      expect(asOverview(DASHBOARD)).toEqual({ ...DASHBOARD, note: undefined, meta: {} })
+    })
+
+    it('refuses a `meta` that is present and is not an object', () => {
+      expect(asOverview({ ...DASHBOARD, meta: 'the run' })).toBeNull()
+    })
+
+    it('refuses anything the dashboard kind refuses', () => {
+      expect(asOverview({ metrics: 'none' })).toBeNull()
+    })
+  })
+
+  describe('a cell’s value', () => {
+    it('prints what is not a number as itself', () => {
+      expect(formatValue(true)).toBe('true')
+      expect(formatValue(false)).toBe('false')
+      expect(formatValue({ a: 1 })).toBe('{"a":1}')
+      expect(formatValue([1, 2])).toBe('[1,2]')
+    })
+
+    it('prints a number that is not a number as the source sent it', () => {
+      // Never a zero and never an invented value (01 §Real data only).
+      expect(formatValue(Number.POSITIVE_INFINITY)).toBe('Infinity')
+      expect(formatValue(Number.NaN)).toBe('NaN')
+    })
+
+    it('sorts an absent value last, whichever side it is on', () => {
+      // A `null` cell is `—`, and a column sorted ascending puts the
+      // rows that have a value first.
+      expect(compareValues(null, 3)).toBe(1)
+      expect(compareValues(undefined, 'a')).toBe(1)
+      expect(compareValues(3, null)).toBe(-1)
+      expect(compareValues(null, undefined)).toBe(0)
+    })
   })
 })

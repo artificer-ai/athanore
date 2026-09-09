@@ -235,6 +235,63 @@ describe('the map', () => {
     expect(handled).toBe(true)
     nothingHappened(ran)
   })
+
+  it('leaves a chord nothing in the map claims', () => {
+    const { actions, ran } = catalogue()
+    mount(actions)
+
+    // `^z` is the browser's undo and nothing of this app's: taken and
+    // dropped, it would be a keystroke the operator lost.
+    const handled = fireEvent.keyDown(document.body, { key: 'z', ctrlKey: true })
+    expect(handled).toBe(true)
+    nothingHappened(ran)
+  })
+
+  it('leaves a chord whose key is not one character', () => {
+    const { actions, ran } = catalogue()
+    mount(actions)
+
+    // `^↓` is not a keycap this app writes down, and `^ArrowDown` is not
+    // a spelling of one: `capOf` answers `null` rather than inventing it.
+    const handled = fireEvent.keyDown(document.body, { key: 'ArrowDown', ctrlKey: true })
+    expect(handled).toBe(true)
+    nothingHappened(ran)
+  })
+
+  it('takes the same chord from the meta key, for a mac', () => {
+    const { actions } = catalogue()
+    mount(actions)
+
+    fireEvent.keyDown(document.body, { key: 'p', metaKey: true })
+
+    expect(spies.openPalette).toHaveBeenCalledOnce()
+  })
+
+  it('leaves a key something nearer has already dealt with', () => {
+    // A Radix dialog consuming `esc`, a composer consuming `⏎`.
+    const { actions, ran } = catalogue()
+    mount(actions)
+
+    const event = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    })
+    event.preventDefault()
+    window.dispatchEvent(event)
+
+    nothingHappened(ran)
+  })
+
+  it('stops listening once the component is unmounted', () => {
+    const { actions, ran } = catalogue()
+    const { unmount } = mount(actions)
+
+    unmount()
+    fireEvent.keyDown(document.body, { key: 'n' })
+
+    expect(ran).toEqual([])
+  })
 })
 
 /* -------------------------------------------------------------------- */
@@ -319,6 +376,58 @@ describe('inside an input', () => {
 
     fireEvent.keyDown(filter(), { key: 'r', ctrlKey: true })
     expect(ran).toEqual(['refresh'])
+  })
+
+  it('suppresses them inside a rich editor’s own markup', () => {
+    const { actions, ran } = catalogue()
+    mount(actions)
+
+    // `closest`, so a keystroke from a node *inside* an editable region
+    // counts as typing too — which is where the caret usually is.
+    const inside = document.createElement('strong')
+    screen.getByLabelText('a document').append(inside)
+    fireEvent.keyDown(inside, { key: 'n' })
+
+    nothingHappened(ran)
+  })
+
+  it('suppresses them where the browser alone reports editability', () => {
+    const { actions, ran } = catalogue()
+    mount(actions)
+
+    // A browser sets `isContentEditable` on every node of an editable
+    // subtree, inherited included; jsdom implements neither that
+    // property nor contenteditable, so it is stated here.
+    const editor = list()
+    Object.defineProperty(editor, 'isContentEditable', {
+      configurable: true,
+      value: true,
+    })
+    fireEvent.keyDown(editor, { key: 'n' })
+
+    nothingHappened(ran)
+  })
+
+})
+
+describe('a keystroke that came from no element at all', () => {
+  it('is nobody’s typing, and belongs to no region', () => {
+    const { actions, ran } = catalogue()
+    mount(actions)
+
+    // A key pressed on the page has `document.body` as its target; this
+    // is the synthetic case, and the map answers it by what it can see.
+    for (const key of ['n', 'Enter', 'a']) {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key, cancelable: true }))
+    }
+
+    // `n` is the app's own and runs. `⏎` and `a` are both scoped to
+    // somewhere — the run list, a request panel — and a target that is
+    // in neither is in neither, so they do nothing rather than firing
+    // from wherever the last focus happened to be.
+    expect(ran).toEqual(['new-run'])
+    expect(spies.focusDetail).not.toHaveBeenCalled()
+    expect(allow).not.toHaveBeenCalled()
   })
 })
 
