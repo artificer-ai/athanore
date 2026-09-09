@@ -87,7 +87,68 @@ back to `engineering` where it is not.
 ## Live smoke (manual, documented)
 
 `tests/smoke/` keeps opt-in scripts against real pi and Claude ACP
-adapters (`ATHANORE_SMOKE=1`), never run in CI.
+adapters (`ATHANORE_SMOKE=1`), never run in CI. They are the **only**
+place in the tree where a model is actually called; everything else runs
+on `FakeACPAgent`, which is the only agent CI runs.
+
+```sh
+./scripts/dev.sh "uv run pytest -q tests/smoke"                    # skipped
+ATHANORE_SMOKE=1 ./scripts/dev.sh "uv run pytest -q tests/smoke"   # real
+ATHANORE_SMOKE=1 ./scripts/dev.sh "uv run pytest -q tests/smoke/test_pi.py"
+```
+
+Each script starts a `Server` on an ephemeral port over a temporary
+`root_path`, registers one example workflow, submits one run, waits for
+it to complete, and asserts the thing a live run proves and a fake
+cannot — a `[stats]` line carrying **token counts a vendor reported**:
+
+```text
+[stats] node=implement attempt=1 ok — model=openrouter/qwen/qwen3.8-27b,
+tokens=11,064 in / 703 out / 11,767 total, tools=4 calls, cost=$0.0065,
+24s, session=01a086a1
+```
+
+Nothing asserts what the model *said*. The checks are the run's status,
+the token pair on both sides being real (a measurement nothing made is
+the `n` marker, never a zero — §Stats entry in 05), and 05's three
+destinations agreeing: the work-log line, the `agent.stats` event, and
+the run's summed `stats`.
+
+| Script | Workflow | Seat | Credential |
+|---|---|---|---|
+| `test_pi.py` | `docker_acp` | pi through `scripts/agent.sh` | `OPENROUTER_API_KEY` |
+| `test_claude.py` | `claude_acp` | `@agentclientprotocol/claude-agent-acp` | `ANTHROPIC_API_KEY`, or `~/.claude/.credentials.json` |
+
+The two one-agent examples rather than `msgtest`, which runs no agents
+and so can write no stats line at all (D189).
+
+Credentials go in the shell that starts compose, never in `.env`
+(`AGENTS.md` §Commands). `CLAUDE_CODE_OAUTH_TOKEN` is **not** a
+credential these scripts can use: the façade scrubs `CLAUDE_*` from
+every agent's environment (20 §Finding 4), so it never reaches the
+child. `claude setup-token` — or `claude`, then `/login` — writes
+`~/.claude/.credentials.json` on the `athanore-claude` volume instead,
+and that is what the dev stack authenticates with.
+
+A credential that is missing, or an adapter that is not on `PATH`, is a
+**skip naming it**, never a transport failure a minute in. Two knobs:
+
+- `ATHANORE_SMOKE=1` — the switch. Anything else and every test in the
+  directory skips.
+- `ATHANORE_SMOKE_TIMEOUT` — seconds a whole run may take before the
+  test gives up, default 900. Raise it for a slow local model.
+
+Everything else about the run is decided by the scripts, because an
+unattended live run has to decide it: every other `ATHANORE_*` is
+cleared before the server is built — `ATHANORE_AGENT_COMMAND` above all,
+which would silently put `FakeACPAgent` behind a test whose whole
+purpose is that it is not there — and `permission_policy` is forced to
+`auto_allow`, since `claude_acp`'s seat is `ask` and there is nobody
+here to answer a request.
+
+What each run leaves behind stays there: `output/docker-acp-sandbox` in
+the checkout (git-ignored), and `claude_acp`'s scratch repository under
+the temporary `root_path`.
 
 ## CI
 

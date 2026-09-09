@@ -3765,6 +3765,15 @@ sandbox image was built (D188).
 completion, assert a stats line with real token counts. Document in
 13 §Live smoke how to run them.
 **Done.** Skipped in CI; pass locally against installed adapters.
+**Status.** Done. The two scripts submit `docker_acp` and `claude_acp`,
+the examples' two one-agent seats, rather than `msgtest`, which runs no
+agents and so can write no stats line (D189). A `tests/smoke/conftest.py`
+holds the switch, the cleared-and-restated environment, the server, the
+wait and the stats reader; the assertion is a `[stats]` line whose token
+pair is two numbers a vendor reported, agreeing with the `agent.stats`
+event and the run's summed `stats`. A missing credential or an adapter
+that is not installed is a skip that names it. 13 §Live smoke is the
+procedure.
 
 ### T078 — README, docs final pass, deprecation aliases (A6.3)
 
