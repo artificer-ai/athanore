@@ -3639,6 +3639,30 @@ dir with one `.js`. `tests/plugins/test_suite.py`: manifest complete;
 route and action 404 on a foreign run; node liveness flips with task
 state; `on` fires after commit; asset served with CSP.
 **Done.** Tests pass; coverage of `plugins` ≥ 90 %.
+**Status.** Done.
+
+`tests/plugins/fixture_wf.py` is the reference plugin: a two-node
+workflow declaring a panel of **every** kind in **every** slot and both
+placements, the eight routes those kinds' data shapes call for (09 gives
+each kind one shape, and a route returns one shape), a `POST` route for
+the custom element, a task-scoped `action` whose model nests, an `on`,
+and `assets/playfield.js`. `fixture_workflow(name)` is a factory, so a
+second copy under another name is what "a foreign run" is asserted
+against, and the `plugin.<workflow>.*` names it publishes are derived
+from the name it was built with.
+
+`tests/plugins/test_suite.py` asserts the whole manifest as a literal —
+panels in declaration order, the action's `$ref`-into-`$defs` schema,
+the one asset URL — then fetches every `source` the manifest names, at
+the scope its `slot` calls for, and checks each body against the shape
+09 §Panel kinds promises for its `kind`. Node liveness is asserted the
+way the SPA computes it: the static manifest entry plus the run's
+`/graph`, yielding the `Verdict` pane on a run that has been through
+`judge` and none on a run still queued. `on` fires after commit is the
+handler reading the run *back out of the store* and publishing the
+`completed` status and terminal output it found there. Coverage of
+`athanore/plugins` from `tests/plugins` alone is 91 % (94 % excluding
+`discovery.py`, whose suite is `tests/cli/test_discovery.py`).
 
 ---
 
