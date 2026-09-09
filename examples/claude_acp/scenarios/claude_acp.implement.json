@@ -1,0 +1,7 @@
+{
+  "text": [
+    "a.py now reads `x = 2`; nothing else in the directory was touched."
+  ],
+  "log": "claude_acp: edited a.py, the single line x = 1 is now x = 2.",
+  "usage": { "input": 900, "output": 60 }
+}

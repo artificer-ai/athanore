@@ -19,6 +19,12 @@ coverage.xml
 # on first use by scripts/_lib.sh; .env.example is the committed one.
 .env
 
+# What the examples make. `gamedev` writes one HTML file per game here,
+# and `claude_acp` and `docker_acp` keep their scratch projects under it;
+# an untracked scratch directory is a dirty checkout, which is what the
+# driver's `prepare` refuses to branch from (AGENTS.md).
+/output/
+
 # Local server state. `operator_token` lives in .athanore/token and is
 # refused in athanore.toml (12 §Auth).
 athanore.db

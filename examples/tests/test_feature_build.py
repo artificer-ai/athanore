@@ -540,6 +540,8 @@ def test_the_distribution_advertises_the_workflow() -> None:
         if entry.dist is not None and entry.dist.name == DISTRIBUTION
     }
     assert advertised == {
+        "claude_acp": "claude_acp:wf",
+        "docker_acp": "docker_acp:wf",
         "feature_build": "feature_build:wf",
         "gamedev": "gamedev:wf",
         "msgtest": "msgtest:wf",
@@ -559,11 +561,13 @@ def test_the_programmatic_host_registers_every_example_on_its_pool(
 ) -> None:
     """`examples/__main__.py` is 04 §Programmatic host's form, built.
 
-    Its four registrations are that section's own four lines:
-    `feature_build` and `gamedev` share the capacity-1 `local` pool
-    because they share the one model, `projects` runs on `cloud` because
-    its seats are a hosted service, and `msgtest` names no pool at all
-    and so lands on the default one.
+    Its registrations are that section's own four lines plus the two
+    vendor-adapter examples, each on the pool its adapter belongs to:
+    `feature_build`, `gamedev` and `docker_acp` share the capacity-1
+    `local` pool because they share the one model, `projects` and
+    `claude_acp` run on `cloud` because their seats are a hosted
+    service, and `msgtest` names no pool at all and so lands on the
+    default one.
     """
 
     for key in [name for name in os.environ if name.startswith("ATHANORE_")]:
@@ -582,7 +586,9 @@ def test_the_programmatic_host_registers_every_example_on_its_pool(
     assert list(server.workflows) == [
         "feature_build",
         "gamedev",
+        "docker_acp",
         "projects",
+        "claude_acp",
         "msgtest",
     ]
     assert server.engine.pools.snapshot() == {

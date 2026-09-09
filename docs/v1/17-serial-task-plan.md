@@ -3751,6 +3751,12 @@ stack's sandbox rather than a new image — `command=["./scripts/agent.sh",
 `public_url` set for the container. No `examples/docker/` image of its
 own: `docker/dev` already is that image.
 **Done.** Both import and finalize under `examples/tests`.
+**Status.** Done. Both are workflows as well as seats — `claude_acp` is
+`implement → wrap`, whose verdict is the file and not the agent's word,
+and `docker_acp` is the one node that dispatches into the dev stack —
+advertised in the `athanore.workflows` group and registered by
+`examples/__main__.py` on the pool each adapter belongs to. No second
+sandbox image was built (D188).
 
 ### T077 — Live smoke scripts (A6.2)
 
