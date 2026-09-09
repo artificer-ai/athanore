@@ -39,8 +39,6 @@ ensure_env() {
   _env_default UID "$(id -u)"
   _env_default GID "$(id -g)"
   _env_default DOCKER_GID "${docker_gid:-999}"
-  # The v0 checkout that drives the build (D67); a sibling by default.
-  _env_default MAIN_CHECKOUT "$(cd "$ROOT/.." && pwd)/athanore"
   # Bind-mount sources have to exist, or docker creates them as
   # root-owned directories.
   mkdir -p "$HOME/.pi/agent/sessions"
