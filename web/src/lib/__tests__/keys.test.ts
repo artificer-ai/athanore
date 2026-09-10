@@ -7,10 +7,21 @@
  * table exists to prevent — a binding in the spec that nobody
  * transcribed — because a test that walked the table would agree with
  * whatever the table happened to say.
+ *
+ * `capLabel` is the other half and is checked against the table rather
+ * than against the quotation: it is how a cap is *drawn*, which 10
+ * states about the map and not in it (D207).
  */
 import { describe, expect, it } from 'vitest'
 
-import { FOOTER_HINTS, KEY_BINDINGS, KEY_GROUPS, bindingsOf } from '../keys'
+import {
+  capLabel,
+  FOOTER_HINTS,
+  KEY_BINDINGS,
+  KEY_GROUPS,
+  SHIFT_CAP,
+  bindingsOf,
+} from '../keys'
 
 /**
  * 10 §Keyboard, quoted.
@@ -139,5 +150,30 @@ describe('the keyboard map', () => {
       [['b'], 'toggle list'],
       [['?'], 'keys'],
     ])
+  })
+})
+
+describe('capLabel', () => {
+  it('draws the one capital of the map with a shift chip', () => {
+    // The table binds `D` and the three views draw `⇧D`: a bare capital
+    // in an all-lowercase interface reads as `d`, which is the request
+    // panel's deny and reaches nothing else (D51, D207).
+    expect(capLabel('D')).toBe('⇧D')
+    expect(SHIFT_CAP).toBe('⇧')
+  })
+
+  it('changes `D` and nothing else the table draws', () => {
+    const relabelled = [...tableKeys()].filter((key) => capLabel(key) !== key)
+
+    expect(relabelled).toEqual(['D'])
+  })
+
+  it('leaves every other notation of the map alone', () => {
+    for (const cap of ['^p', '^r', '?', '⏎', 'esc', 'tab', '1–9', 'd', '—']) {
+      expect(capLabel(cap), `capLabel(\`${cap}\`)`).toBe(cap)
+    }
+    for (const arrow of ['↑', '↓', '←', '→']) {
+      expect(capLabel(arrow), `capLabel(\`${arrow}\`)`).toBe(arrow)
+    }
   })
 })

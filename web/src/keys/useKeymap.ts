@@ -133,6 +133,11 @@ export function isTyping(target: EventTarget | null): boolean {
  * `^p` rather than `Ctrl+p` because that is how 10 §Keyboard, the footer
  * strip and the palette's key column all write it, and the point of one
  * notation is that the table is dispatched on directly.
+ *
+ * This is the *dispatch* column — `event.key` — and what the footer
+ * strip, the `?` overlay and the palette *draw* is `capLabel` of it
+ * (`lib/keys.ts`), so `D` is bound and `⇧D` is shown without a second
+ * table to keep in step (D207).
  */
 export function capOf(event: KeyboardEvent): string | null {
   if (event.altKey) return null

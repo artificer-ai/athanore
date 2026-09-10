@@ -38,6 +38,7 @@ import { Dialog, VisuallyHidden } from 'radix-ui'
 import { useRef } from 'react'
 
 import { useKeyOwner } from '../keys'
+import { capLabel } from '../lib/keys'
 import { groupActions, type PaletteAction } from './actions'
 import { OverlayClose } from './OverlayPanel'
 
@@ -142,7 +143,10 @@ export function Palette({
                     <Command.Item
                       key={action.id}
                       value={action.name}
-                      keywords={[action.hint, action.key]}
+                      // Both spellings of the cap: the operator who
+                      // types `D` finds the row, and so does the one
+                      // who reads `⇧D` off the strip and types `⇧`.
+                      keywords={[action.hint, action.key, capLabel(action.key)]}
                       disabled={action.disabled}
                       onSelect={action.run}
                       className="text-row grid cursor-pointer grid-cols-[minmax(0,170px)_minmax(0,1fr)_40px] items-center gap-[10px] border-t border-[var(--color-neutral-900)] px-[12px] py-[6px] data-[disabled=true]:cursor-default data-[disabled=true]:opacity-45 data-[selected=true]:bg-[var(--color-neutral-900)] max-md:min-h-[32px]"
@@ -154,7 +158,7 @@ export function Palette({
                         {action.hint}
                       </span>
                       <span className="text-hint text-[var(--color-accent-300)]">
-                        {action.key}
+                        {capLabel(action.key)}
                       </span>
                     </Command.Item>
                   ))}

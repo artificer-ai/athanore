@@ -17,7 +17,7 @@
  */
 import type { ReactNode } from 'react'
 
-import { FOOTER_HINTS } from '../lib/keys'
+import { capLabel, FOOTER_HINTS } from '../lib/keys'
 
 /** A keycap chip: neutral-900 on a neutral-800 rule, accent-300 text. */
 function Kbd({ children }: { children: ReactNode }) {
@@ -37,7 +37,7 @@ export function Footer({ onOpenPalette }: { onOpenPalette: () => void }) {
           className="inline-flex items-center gap-[5px] max-md:hidden"
         >
           {hint.keys.map((key) => (
-            <Kbd key={key}>{key}</Kbd>
+            <Kbd key={key}>{capLabel(key)}</Kbd>
           ))}
           <span className="text-hint text-muted-foreground">{hint.label}</span>
         </span>
