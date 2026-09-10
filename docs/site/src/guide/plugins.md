@@ -27,7 +27,7 @@ async def words(ctx: PluginContext, limit: int = 50) -> dict[str, Any]:
     return {"columns": [{"key": "word", "label": "Word"}], "rows": rows}
 
 
-@wf.action("override", scope="run", title="Override secret word", confirm=True)
+@wf.action("override", scope="task", title="Override secret word", confirm=True)
 async def override(ctx: PluginContext, input: Override) -> dict[str, Any]:
     await ctx.services.log.append(f"override: {input.word} ({input.reason})")
     return {"ok": True}
@@ -85,10 +85,15 @@ forbidden: it is not yours to know about.
 
 `PluginContext` carries the ids, the resolved run and task rows when
 they are in scope, the same narrow services a node body gets, and the
-operator operations. In workflow or global scope there is no run and no
-task, so the four run-scoped services refuse where they are reached for,
-while listing your workflow's runs, publishing your own events and the
-operator operations — which take explicit ids — all work.
+operator operations. Each service says which ids it needs. `log`,
+`stream`, `submissions` and `requests` belong to the *attempt* in scope
+and refuse without a task — so the `override` action above is
+`scope="task"`, because it appends to an attempt's work log. `run.get`,
+`run.detail`, `run.log_entries` and `run.events` need only a run. In
+workflow or global scope there is neither, and all of those refuse where
+they are reached for, while listing your workflow's runs, publishing
+your own events and the operator operations — which take explicit ids —
+work in every scope.
 
 Your handler takes `ctx` explicitly. It is never injected by parameter
 name, because a node's parameters already mean edges and one meaning per

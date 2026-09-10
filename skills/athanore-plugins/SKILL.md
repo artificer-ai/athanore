@@ -40,7 +40,7 @@ async def words(ctx: PluginContext, limit: int = 50) -> dict[str, Any]:
     return {"columns": [{"key": "word", "label": "Word"}], "rows": rows}
 
 
-@wf.action("override", scope="run", title="Override secret word", confirm=True)
+@wf.action("override", scope="task", title="Override secret word", confirm=True)
 async def override(ctx: PluginContext, input: Override) -> dict[str, Any]:
     await ctx.services.log.append(f"override: {input.word} ({input.reason})")
     return {"ok": True}
@@ -57,8 +57,12 @@ async def done(ctx: PluginContext, event: Any) -> None:
 The route mounts under the workflow's own prefix; `ctx` is resolved
 from the request's `run_id`, `task_id` and `node` query parameters, and
 `limit` is an ordinary query parameter with a default. The action's
-pydantic model *is* its form. The panel is a plain call, not a
-decorator, because it declares data and has no function to wrap.
+pydantic model *is* its form, and it is `scope="task"` because it
+writes an attempt's work log. The panel is a plain call, not a
+decorator, because it declares data and has no function to wrap. This
+is the interface half only: before `athanore serve` accepts it, give it
+a start node (the `athanore-workflows` skill) and create the `./static`
+directory `assets=` names, or drop that argument.
 
 ## The rules an agent gets wrong first
 
@@ -69,10 +73,14 @@ decorator, because it declares data and has no function to wrap.
   its actions validate only against its runs, its routes mount under
   its name. An id belonging to another workflow is a 404, never a 403:
   it is not yours to know about.
-- **In workflow or global scope there is no run and no task.** The four
-  run-scoped services raise where they are reached for; listing your
-  workflow's runs, publishing your own events and the operator
-  operations — which take explicit ids — all work.
+- **Each service says which ids it needs, and refuses without them.**
+  `log`, `stream`, `submissions` and `requests` belong to the *attempt*
+  in scope and raise without a task, so an action that writes the work
+  log is `scope="task"`, not `"run"`; `run.get`, `run.detail`,
+  `run.log_entries` and `run.events` need only a run. In workflow or
+  global scope there is neither. Listing your workflow's runs,
+  publishing your own events and the operator operations — which take
+  explicit ids — work in every scope.
 - **The panel `kind` fixes what its `source` returns**: prose for
   `markdown`, a mapping for `kv`, columns and rows for `table`,
   timestamped lines for `log`, series for `chart`, metric tiles for

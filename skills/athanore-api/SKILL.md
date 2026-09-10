@@ -39,7 +39,9 @@ npx @hey-api/openapi-ts -i http://127.0.0.1:4002/openapi.json -o src/api/gen
 ```
 
 With no server running yet, `reference/openapi.json` in this directory
-is the same document, byte for byte, and takes the place of the URL.
+takes the place of the URL: the same document, minus the plugin routes a
+running server mounts (`/api/plugins/_builtin/...` and each served
+workflow's own).
 
 ## The rules an agent gets wrong first
 
