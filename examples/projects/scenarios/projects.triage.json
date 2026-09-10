@@ -1,7 +1,0 @@
-{
-  "thoughts": ["The task names a CLI flag, and only one project has a CLI."],
-  "text": ["Listed the projects and read enough of each README to decide."],
-  "log": "triage: routed to `reporter` — the task asks for a flag on `report list`, which is that project's CLI. `ledger` is a library with no command line and `atlas` is a static site.",
-  "submit": { "project": "reporter" },
-  "usage": { "input": 900, "output": 140 }
-}

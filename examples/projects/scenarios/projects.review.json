@@ -1,6 +1,0 @@
-{
-  "text": ["Reviewed the branch diff in the project."],
-  "log": "review: approve. `_rows()` is shared by both formats, the flag is documented in the command's help, and nothing else in the module moved.",
-  "submit": { "verdict": "approve", "feedback": "" },
-  "usage": { "input": 5200, "output": 260 }
-}

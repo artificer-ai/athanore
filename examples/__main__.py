@@ -1,78 +1,42 @@
-"""Serve the example workflows: ``python -m examples``, from the checkout.
+"""A host for the example adapters, so they can be run and looked at.
 
-This is the **programmatic form** of 11 §Server: a :class:`athanore.Server`
-built in Python, handed the workflows and the pools they run on, and told
-to serve. It replaces the MVP's ``python -m workflow``.
+`examples/` is the vendor half of 02 §Small core: nothing in `athanore/`
+may know about pi, Claude or Docker, so the adapters that do live here.
+They are ACP agent classes rather than workflows with much shape — the
+worked examples of `05 §User-land adapters`, and the integration test bed
+`examples/tests` drives.
 
-``athanore serve`` is the other way to run exactly these workflows, and it
-needs no arguments — ``athanore-examples`` advertises them in the
-``athanore.workflows`` entry-point group, so discovery finds them and
-``athanore.toml``'s ``[pools]`` / ``[workflows]`` tables place them (09
-§Discovery). What this file is for is the case that has no command line:
-a host that builds a server out of its own configuration, in its own
-process, beside its own code.
+Run it from the checkout::
 
-The one thing it decides that a command line cannot is the pool. The
-registrations below are 04 §Programmatic host's own four lines, plus the
-two vendor-adapter examples, each on the pool its adapter belongs to:
+    uv run python -m examples
 
-- ``feature_build``, ``gamedev`` and ``docker_acp`` share the capacity-1
-  ``local`` pool. Every seat of the three runs on one model (``MODEL`` in
-  each package), and the LAN alternative to it answers a single request
-  at a time: the model would serialize the agents anyway, and a pool does
-  that queueing in the scheduler instead of in a socket timeout. Sharing
-  the pool is what makes it one queue rather than three that each think
-  they are alone — and ``docker_acp``'s agent is that same pi, dispatched
-  into the dev stack's container rather than spawned on the host.
-- ``projects`` and ``claude_acp`` run on ``cloud``, capacity 8. Their
-  seats are Claude Code over ACP — a hosted service that answers several
-  requests at once — and ``projects``' product stage fans out one branch
-  per deliverable, so the branches are the thing worth running in
-  parallel. Eight is the capacity 02 §Settings gives that pool in its
-  worked ``athanore.toml``. ``claude_acp`` is one short run of one agent;
-  what it must not do is queue behind the local model, because it is the
-  check that says whether the other adapter works at all.
-- ``msgtest`` is registered on no pool at all, which puts it on the
-  default one. It runs no agents; what it waits for is a person, and a
-  ``human_input`` gives its worker slot back for the duration of the wait
-  (04 §Waiting) — so it needs no capacity of its own and cannot starve
-  anything of theirs.
+The pools are the point of the arrangement, and the reason this is a
+programmatic host rather than `athanore serve` (04 §Programmatic host):
 
-Everything else — the bind, the database, the public URL — comes from the
-environment and ``athanore.toml`` (``ATHANORE_*``, 02 §Settings), because a
-programmatic host that re-implemented settings parsing would be a second
-place to configure a deployment.
+- ``docker_acp`` runs on ``local``, capacity 1. It spawns a sibling
+  container per agent, and two of those competing for one machine's
+  memory is a throughput choice that goes the wrong way.
+- ``claude_acp`` runs on ``cloud``, capacity 8. Its work is a request to
+  somebody else's machine, so the cap is about how many of those to have
+  in flight, not about this one.
 """
 
 from __future__ import annotations
 
+from athanore import Pool, Server
 from claude_acp import wf as claude_acp
 from docker_acp import wf as docker_acp
 
-from athanore import Pool, Server
-from feature_build import wf as feature_build
-from gamedev import wf as gamedev
-from msgtest import wf as msgtest
-from projects import wf as projects
-
 
 def build() -> Server:
-    """The server this module serves: the registrations and nothing else.
-
-    Separate from :func:`main` so that it can be built and inspected
-    without binding a socket, which is what ``examples/tests`` does and
-    what a host embedding these workflows would do.
-    """
+    """The server, with each adapter on the pool its work belongs to."""
 
     local = Pool("local", capacity=1)
     cloud = Pool("cloud", capacity=8)
+
     server = Server()
-    server.register(feature_build, local)
-    server.register(gamedev, local)
     server.register(docker_acp, local)
-    server.register(projects, cloud)
     server.register(claude_acp, cloud)
-    server.register(msgtest)
     return server
 
 

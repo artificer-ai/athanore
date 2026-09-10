@@ -1,5 +1,0 @@
-{
-  "text": ["Committed the change set in the project and left the tree clean."],
-  "log": "git: committed 9c31ae4 'report list: add --json' in reporter. Working tree clean.",
-  "usage": { "input": 1800, "output": 120 }
-}

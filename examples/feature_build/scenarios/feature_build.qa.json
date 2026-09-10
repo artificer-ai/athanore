@@ -1,6 +1,0 @@
-{
-  "text": ["Exercised the command itself, empty and populated."],
-  "log": "qa: approve. Ran `report list --json` against an empty database (`[]`, exit 0) and against three rows (an array of three objects with the table's columns). `report list` unchanged.",
-  "submit": { "verdict": "approve", "feedback": "" },
-  "usage": { "input": 3100, "output": 240 }
-}

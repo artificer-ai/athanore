@@ -1,6 +1,0 @@
-{
-  "text": ["Read the whole file and checked it against the design."],
-  "log": "review: approve. One file, no local assets, no CDN. The CONST table matches the design, the input listeners are attached once at boot, the particle array is capped, and the delta is clamped. Nothing a browser check will not settle.",
-  "submit": { "verdict": "approve", "feedback": "" },
-  "usage": { "input": 5800, "output": 300 }
-}
