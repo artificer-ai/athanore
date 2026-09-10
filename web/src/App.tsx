@@ -50,7 +50,7 @@
  * palette's rows and (T067) the `n` and `w` keys.
  */
 import { useQueryClient } from '@tanstack/react-query'
-import { useRef } from 'react'
+import { useEffect } from 'react'
 
 import { Detail } from './components/Detail'
 import { Footer } from './components/Footer'
@@ -156,10 +156,34 @@ export default function App({
   const panes = usePanes(search.run, { index: search.pane, onChange: onSelectPane })
   const queryClient = useQueryClient()
   const toggleListCollapsed = usePrefs((state) => state.toggleListCollapsed)
+  const listCollapsed = usePrefs((state) => state.listCollapsed)
   const setFontSize = usePrefs((state) => state.setFontSize)
   const focusLogComposer = useUi((state) => state.focusLogComposer)
-  const setFocus = useUi((state) => state.setFocus)
-  const detail = useRef<HTMLElement | null>(null)
+  const focusedRun = useUi((state) => state.focusedRun)
+  const focusRun = useUi((state) => state.focusRun)
+  const blurRun = useUi((state) => state.blurRun)
+
+  // Whether a run is held *for this render*: `⏎` picked one up, it is
+  // still the selection, its row is still in the filtered list, the
+  // viewport is still wide enough for that list to be on screen, and
+  // `b` has not collapsed it to the rail — `Splitter` does not mount
+  // `RunList` at all when it is collapsed, so a held run would be as
+  // invisible there as it is below the breakpoint (D204 (2)). Derived
+  // rather than trusted, so the frame between a filter keystroke and
+  // the effect below is never drawn with a mode the operator cannot
+  // see.
+  const runFocused =
+    focusedRun !== null &&
+    focusedRun === search.run &&
+    !narrow &&
+    !listCollapsed &&
+    runs.rows.some((row) => row.id === focusedRun)
+
+  // ...and the housekeeping that follows it, so a stale id cannot spring
+  // back the next time that run is selected.
+  useEffect(() => {
+    if (focusedRun !== null && !runFocused) blurRun()
+  }, [focusedRun, runFocused, blurRun])
 
   // Which pane the log is, in *this* selection's cycle: the manifest
   // decides how many panes there are and a plugin's `log` panel is not
@@ -266,19 +290,36 @@ export default function App({
       else panes.prev()
     },
     jumpPane: panes.jump,
-    // `⏎ focus detail`: the region the keystrokes go to (`store/ui.ts`)
-    // and the element that holds the browser's focus, which are two
-    // halves of one move.
-    focusDetail: () => {
-      setFocus('detail')
-      detail.current?.focus()
+    runFocused,
+    // `⏎ focus run`: pick the selected run up, or put the held one
+    // down. There is nothing to pick up with no run selected, and no
+    // list to move it in below the breakpoint or behind the collapsed
+    // rail (D204 (2)) — where `inList()` still answers `true` for the
+    // body, so the guard has to be here rather than in the keymap.
+    toggleRunFocus: () => {
+      if (narrow || listCollapsed || search.run === undefined) return
+      if (runFocused) blurRun()
+      else focusRun(search.run)
+    },
+    // `↑`/`↓`/`j`/`k`, while one is held: one swap per press, against
+    // the true dispatch neighbour, through the endpoint the palette's
+    // two keyless rows already call (`overlays/runOps.ts`, D204 (4)).
+    moveRun: (delta) => {
+      if (!runFocused || search.run === undefined) return
+      runOps.reorder(search.run, delta < 0 ? 'up' : 'down')
     },
     openPalette: onOpenPalette,
-    // `esc close`: there is nothing to close with no overlay up, and a
-    // navigation that rewrote the same search would be one entry of
-    // history per keystroke.
+    // `esc close`: the overlay first, because it is the nearer thing —
+    // and while one is up the arrows are suppressed anyway — then a held
+    // run. With neither there is nothing to close, and a navigation that
+    // rewrote the same search would be one entry of history per
+    // keystroke.
     close: () => {
-      if (search.overlay !== undefined) onCloseOverlay?.()
+      if (search.overlay !== undefined) {
+        onCloseOverlay?.()
+        return
+      }
+      if (runFocused) blurRun()
     },
   })
 
@@ -302,11 +343,15 @@ export default function App({
         // is no stack — the splitter draws both.
         stacked={narrow ? (search.run === undefined ? 'list' : 'detail') : undefined}
         list={
-          <RunList model={runs} selected={search.run} onSelect={onSelectRun} />
+          <RunList
+            model={runs}
+            selected={search.run}
+            focusedRun={runFocused ? search.run : undefined}
+            onSelect={onSelectRun}
+          />
         }
         detail={
           <Detail
-            ref={detail}
             panes={panes}
             taskId={search.task}
             node={search.node}

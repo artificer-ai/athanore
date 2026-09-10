@@ -23,12 +23,13 @@
  * reports on the toast what it stopped, which is the `note` only that
  * endpoint fills.
  *
- * **Reorder has no key, and says so.** 10 §Keyboard is exhaustive and
- * T067 binds exactly it, so there is no key to invent for
- * `reorder(run, direction)`; the two palette rows carry `—` in the key
- * column rather than a key this app does not have (D175). The New Run
- * overlay's POSITION is the same op with `{index: 0}` (D57), and these
- * two are how a run already in the list moves.
+ * **Reorder's palette rows still carry no key, and say so.** They print
+ * `—` in the key column rather than a key of their own (D175), because
+ * the keyboard's way to this call is a *mode* and not a command: `⏎`
+ * picks the selected run up and `↑`/`↓` then move it, which is no row a
+ * palette can list (10 §Keyboard, D204 (3)). The New Run overlay's
+ * POSITION is the same op with `{index: 0}` (D57), and these three are
+ * how a run already in the list moves.
  *
  * Everything here refreshes rather than waiting: `run.paused`,
  * `run.resumed`, `run.cancelled`, `run.reordered` and `run.deleted` all
@@ -87,9 +88,18 @@ export type RunOps = {
 export function useRunOps(): RunOps {
   const queryClient = useQueryClient()
 
-  /** Refresh the list and the run: both carry the status and the place. */
-  const settle = (runId: string, note: string) => {
-    toast(note)
+  /**
+   * Refresh the list and the run: both carry the status and the place.
+   *
+   * `id` names the toast, for the one operation an operator repeats
+   * fast: holding `↓` on a focused run posts a swap per keypress, and
+   * without an id that is a stack of eight toasts saying eight
+   * positions. With one, there is one toast, reporting the last place
+   * the server settled on (D204 (4)).
+   */
+  const settle = (runId: string, note: string, id?: string) => {
+    if (id === undefined) toast(note)
+    else toast(note, { id })
     void queryClient.invalidateQueries({ queryKey: queryKeys.runs() })
     void queryClient.invalidateQueries({ queryKey: queryKeys.run(runId) })
   }
@@ -149,7 +159,11 @@ export function useRunOps(): RunOps {
       // the honest thing to report: a run already at the top is a no-op
       // and still a 200 (08 §Runs), and saying "moved" would be a claim
       // the server did not make.
-      settle(variables.path.run_id, `position ${String(data.position)}`)
+      settle(
+        variables.path.run_id,
+        `position ${String(data.position)}`,
+        `run-position-${variables.path.run_id}`,
+      )
     },
     onError: (error) => {
       refuse(error, RUN_OP_FALLBACKS.reorder)

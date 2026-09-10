@@ -20,7 +20,7 @@ import { FOOTER_HINTS, KEY_BINDINGS, KEY_GROUPS, bindingsOf } from '../keys'
  */
 const SPEC = [
   '`↑`/`↓` or `j`/`k` select, `←`/`→` cycle panes, `1`–`9` jump, `⏎` focus',
-  'detail, `tab` focus, `t` retry task, `m` move task, `x` cancel task, `l`',
+  'run, `tab` focus, `t` retry task, `m` move task, `x` cancel task, `l`',
   'append log, `n` new run, `r` rerun node, `p` pause/resume, `c` cancel run,',
   '`D` (shift) delete run (with confirm), `e` edit run, `w` workflows, `b`',
   'toggle list, `?` keys, `^p` palette, `^r` refresh, `esc` close.',
@@ -69,6 +69,21 @@ describe('the keyboard map', () => {
     for (const key of tableKeys()) {
       expect(spec, `the table draws \`${key}\``).toContain(key)
     }
+  })
+
+  it('draws `⏎` as focus run, and the four caps it changes the meaning of', () => {
+    // 10 §Keyboard: "`⏎` picks the highlighted run up so that `↑`/`↓` …
+    // move it in the dispatch order instead of moving the selection".
+    // No new keycap: the move is the select row's four caps under a
+    // condition, which is what `note` is for (D204 (3)).
+    const focus = KEY_BINDINGS.find((binding) => binding.id === 'focus-run')
+    const move = KEY_BINDINGS.find((binding) => binding.id === 'move-run')
+
+    expect(focus?.keys).toEqual(['⏎'])
+    expect(focus?.label).toBe('focus run')
+    expect(move?.keys).toEqual(['↑', '↓', 'j', 'k'])
+    expect(move?.note).toBe('while a run is focused')
+    expect(KEY_BINDINGS.some((binding) => binding.id === 'focus-detail')).toBe(false)
   })
 
   it('binds delete to D, never to the mock’s d', () => {

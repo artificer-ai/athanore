@@ -30,6 +30,41 @@ test('the palette moves a queued run up the dispatch list', async ({ dashboard }
   await expect(dashboard.page.getByText(/^position \d+$/)).toBeVisible()
 })
 
+test('`⏎` picks a run up and `↑` moves it, until `esc` puts it down', async ({
+  dashboard,
+}) => {
+  const page = dashboard.page
+  await dashboard.open()
+  for (const title of ['first', 'second', 'third']) {
+    await dashboard.submitOverApi('hold', title)
+  }
+  await expect.poll(() => dashboard.titles()).toEqual(['first', 'second', 'third'])
+
+  await dashboard.select('third')
+  await page.keyboard.press('Enter')
+  await expect(dashboard.row('third')).toHaveAttribute('data-run-focused', 'true')
+  // Colour is never the only signal: the list's footer strip says which
+  // mode the arrows are in (10 §Accessibility and quality, D204 (5)).
+  await expect(page.getByTestId('list-hints')).toContainText('↑↓ move run')
+
+  await page.keyboard.press('ArrowUp')
+  await expect.poll(() => dashboard.titles()).toEqual(['first', 'third', 'second'])
+  // The selection is the run, so it travelled with it, and the run is
+  // still held: one press is one swap.
+  await expect(dashboard.row('third')).toHaveAttribute('aria-selected', 'true')
+  await expect(dashboard.row('third')).toHaveAttribute('data-run-focused', 'true')
+
+  await page.keyboard.press('Escape')
+  await expect(dashboard.row('third')).toHaveAttribute('data-run-focused', 'false')
+  await expect(page.getByTestId('list-hints')).toContainText('⏎ focus run')
+
+  // ...and the assertion that proves the mode is a mode: the same key
+  // now moves the cursor and leaves the dispatch order alone.
+  await page.keyboard.press('ArrowUp')
+  await expect(dashboard.row('first')).toHaveAttribute('aria-selected', 'true')
+  await expect.poll(() => dashboard.titles()).toEqual(['first', 'third', 'second'])
+})
+
 test('`p` pauses a queued run and resumes it', async ({ dashboard }) => {
   await dashboard.open()
   await dashboard.submitOverApi('hold', 'holds the worker')

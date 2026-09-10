@@ -3,7 +3,8 @@
  * `docs/v1/10-frontend.md` §Keyboard behind it.
  *
  * That section is exhaustive and this hook binds exactly it: `↑`/`↓` or
- * `j`/`k` select, `←`/`→` cycle panes, `1`–`9` jump, `⏎` focus detail,
+ * `j`/`k` select — or move the focused run, while one is held — `←`/`→`
+ * cycle panes, `1`–`9` jump, `⏎` focus run,
  * `tab` focus, `t` retry task, `m` move task, `x` cancel task, `l`
  * append log, `n` new run, `r` rerun node, `p` pause/resume, `c` cancel
  * run, `D` (shift) delete run, `e` edit run, `w` workflows, `b` toggle
@@ -42,7 +43,18 @@
  * taking it would leave a keyboard-only operator unable to reach the
  * header's filter, the pane bar or a request's buttons — which 10
  * §Accessibility and quality does not allow. The mock binds every other
- * key of the map and not this one.
+ * key of the map and not this one. It is also how the detail pane is
+ * reached: `⏎` used to send the keyboard there and now picks a run up
+ * instead (D204 (1)).
+ *
+ * **A held run changes two keys and no others.** While `runFocused`,
+ * `↑`/`↓` and `j`/`k` call `moveRun` rather than `select`; everything
+ * else in the map does what it always does. Those four caps are not
+ * scoped to the run list, exactly as `select` is not — the mode is
+ * explicit and drawn on the row it is about — so they fire from
+ * wherever the plain keys apply. `⏎` keeps the list scope it has always
+ * had, because the list is where a run is picked up from, and `esc`
+ * puts one down from anywhere, as `esc` always has.
  */
 import { useEffect, useRef } from 'react'
 
@@ -76,8 +88,15 @@ export type KeymapHandlers = {
   cyclePane: (delta: number) => void
   /** `1`–`9`: the pane at this zero-based index, if there is one. */
   jumpPane: (index: number) => void
-  /** `⏎`: hand the keyboard to the detail pane. */
-  focusDetail: () => void
+  /**
+   * Whether a run is held, which is what `↑`/`↓` and `j`/`k` dispatch
+   * on. The shell decides it; the map only reads it.
+   */
+  runFocused: boolean
+  /** `⏎`: pick the selected run up, or put the held one down. */
+  toggleRunFocus: () => void
+  /** `↑`/`↓`/`j`/`k`, while a run is held: move it one place. */
+  moveRun: (delta: -1 | 1) => void
   /** `^p`: the command palette. */
   openPalette: () => void
   /** `esc`: close whatever is open. */
@@ -135,7 +154,7 @@ function actionFor(
 /**
  * Whether `⏎` is the run list's, which is the only place it is bound.
  *
- * "`⏎` focus detail" is what the run list's own footer strip advertises,
+ * "`⏎` focus run" is what the run list's own footer strip advertises,
  * and that is the scope: from a run row, from the list's chrome, and
  * from the page itself, where nothing has claimed the keyboard and the
  * list is the region a fresh page starts on (`store/ui.ts`). Enter
@@ -143,13 +162,12 @@ function actionFor(
  * run`, a composer, a pane's own control.
  *
  * It **does** cancel the keystroke, run row or not. A row is a
- * `<button>`, so an uncancelled Enter would also click it — and moving
- * focus inside the same handler suppresses that click anyway, which
- * would make "does Enter select?" depend on which element happened to
- * hold focus. `↑`/`↓` and `j`/`k` are what select a run, and they write
- * `?run=` directly; the row is an `option` in a `listbox`, where
- * selection follows the cursor and Enter is not the activation key. So
- * Enter does one thing here, and does it from everywhere in the region.
+ * `<button>`, so an uncancelled Enter would also click it, and "does
+ * Enter select?" would depend on which element happened to hold focus.
+ * `↑`/`↓` and `j`/`k` are what select a run, and they write `?run=`
+ * directly; the row is an `option` in a `listbox`, where selection
+ * follows the cursor and Enter is not the activation key. So Enter does
+ * one thing here, and does it from everywhere in the region.
  */
 function inList(target: EventTarget | null): boolean {
   if (target === document.body || target === document.documentElement) return true
@@ -216,12 +234,14 @@ export function handleKey(event: KeyboardEvent, handlers: KeymapHandlers): boole
     case 'ArrowDown':
     case 'j':
       event.preventDefault()
-      handlers.select(1)
+      if (handlers.runFocused) handlers.moveRun(1)
+      else handlers.select(1)
       return true
     case 'ArrowUp':
     case 'k':
       event.preventDefault()
-      handlers.select(-1)
+      if (handlers.runFocused) handlers.moveRun(-1)
+      else handlers.select(-1)
       return true
     case 'ArrowRight':
       event.preventDefault()
@@ -234,7 +254,7 @@ export function handleKey(event: KeyboardEvent, handlers: KeymapHandlers): boole
     case 'Enter':
       if (!inList(event.target)) return false
       event.preventDefault()
-      handlers.focusDetail()
+      handlers.toggleRunFocus()
       return true
     default:
       break

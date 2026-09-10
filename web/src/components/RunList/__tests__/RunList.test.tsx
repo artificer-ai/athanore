@@ -44,12 +44,14 @@ function list(over: {
   rows?: RunRow[]
   model?: Partial<RunListModel>
   selected?: string
+  focusedRun?: string
   onSelect?: (runId: string) => void
 } = {}) {
   return render(
     <RunList
       model={model(over.rows ?? [row()], over.model)}
       selected={over.selected}
+      focusedRun={over.focusedRun}
       onSelect={over.onSelect ?? (() => {})}
     />,
   )
@@ -74,7 +76,7 @@ describe('RunList', () => {
     }
     expect(screen.getByTestId('rows-shown')).toHaveTextContent('2 shown')
     expect(screen.getByText('↑↓ select')).toBeInTheDocument()
-    expect(screen.getByText('⏎ focus detail')).toBeInTheDocument()
+    expect(screen.getByText('⏎ focus run')).toBeInTheDocument()
   })
 
   it('shortens the run id to eight characters and keeps the whole one', () => {
@@ -162,6 +164,59 @@ describe('RunList', () => {
     expect(unselected).toHaveClass('border-l-transparent')
   })
 
+  it('draws the focused row in the second accent, and no other row', () => {
+    list({ rows: [row({ id: 'A' }), row({ id: 'B' })], selected: 'B', focusedRun: 'B' })
+
+    const [other, held] = rows()
+    expect(held).toHaveAttribute('data-run-focused', 'true')
+    // The mode is chrome and not fill: the left border and an inset
+    // ring in the second accent, over the selection's own tint.
+    expect(held).toHaveClass(
+      'border-l-[var(--color-accent-2-400)]',
+      'inset-ring-1',
+      'inset-ring-[var(--color-accent-2-400)]',
+    )
+    // The fill is the selected row's, unchanged. It has to be: the
+    // status pill paints `text-status-*` straight onto it, and a lighter
+    // tint takes `fail` and `muted` under AA (10 §Accessibility and
+    // quality, D204 (5)).
+    expect(held).toHaveClass(
+      'bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface))]',
+    )
+    // The selection's border is replaced, not layered under it.
+    expect(held).not.toHaveClass('border-l-[var(--color-accent)]')
+    // It is still the selected run: `⏎` picks the selection up, and
+    // `aria-selected` is what a screen reader is told (D204 (2)).
+    expect(held).toHaveAttribute('aria-selected', 'true')
+
+    expect(other).toHaveAttribute('data-run-focused', 'false')
+    expect(other).toHaveClass('border-l-transparent')
+  })
+
+  it('swaps the strip’s two hints while a run is held, in a live region', () => {
+    const { rerender } = list({ rows: [row({ id: 'A' })], selected: 'A' })
+
+    expect(screen.getByText('↑↓ select')).toBeInTheDocument()
+    expect(screen.getByText('⏎ focus run')).toBeInTheDocument()
+
+    rerender(
+      <RunList
+        model={model([row({ id: 'A' })])}
+        selected="A"
+        focusedRun="A"
+        onSelect={() => {}}
+      />,
+    )
+
+    const strip = screen.getByTestId('list-hints')
+    expect(strip).toHaveAttribute('role', 'status')
+    expect(within(strip).getByText('↑↓ move run')).toBeInTheDocument()
+    expect(within(strip).getByText('⏎/esc done')).toBeInTheDocument()
+    expect(screen.queryByText('↑↓ select')).toBeNull()
+    // `n shown` is not part of the mode, so it stays out of the region.
+    expect(strip).not.toHaveTextContent('shown')
+  })
+
   it('hands a clicked row back to the route, which writes ?run=', async () => {
     const onSelect = vi.fn()
     list({ rows: [row({ id: 'A' }), row({ id: 'B' })], onSelect })
@@ -181,14 +236,16 @@ describe('RunList', () => {
   it('says it is still asking rather than showing an empty list', () => {
     list({ rows: [], model: { isPending: true, total: null, active: null } })
 
-    expect(screen.getByRole('status')).toHaveTextContent('loading runs')
+    // The strip's hints are a live region too, so the empty state is
+    // named rather than taken as "the one status on screen".
+    expect(screen.getByText('loading runs…')).toHaveAttribute('role', 'status')
     expect(screen.getByTestId('rows-shown')).toHaveTextContent('0 shown')
   })
 
   it('says a failed request failed rather than reading as no runs', () => {
     list({ rows: [], model: { isError: true, total: null, active: null } })
 
-    expect(screen.getByRole('status')).toHaveTextContent('could not load runs')
+    expect(screen.getByText('could not load runs')).toHaveAttribute('role', 'status')
   })
 
   it('tells an empty server from a filter that matched nothing', () => {

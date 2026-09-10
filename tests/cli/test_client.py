@@ -540,8 +540,13 @@ def test_an_api_error_is_one(capsys: pytest.CaptureFixture[str]) -> None:
     assert "body.title: field required" in err
 
 
-def test_a_usage_mistake_is_two(capsys: pytest.CaptureFixture[str]) -> None:
-    assert main(["no-such-verb"]) == EXIT_USAGE
+def test_a_usage_mistake_is_two(stub: Stub, capsys: pytest.CaptureFixture[str]) -> None:
+    # Named at the stub rather than left on the default loopback server:
+    # the alias check is a real `GET /api/workflows`, so a developer with
+    # an Athanore of their own on 4002 would otherwise have that one
+    # answer it — and answer 401, which is exit 1.
+    stub.route("/api/workflows", Reply(body=[]))
+    assert main(["--url", stub.url, "no-such-verb"]) == EXIT_USAGE
     # T054's bare-workflow alias reports the unknown first word, because
     # it is the thing that knows a word can be a verb *or* a registered
     # workflow; click's own "No such command" would name only one of them.

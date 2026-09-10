@@ -85,7 +85,15 @@ of TOML nobody executes.
   `window − 340`, collapsible with `b` to a 30 px vertical rail reading
   `RUNS n`): grid columns RUN · WORKFLOW · TITLE · STATUS · NODE · AGE.
   Selected row gets a flat accent tint (`color-mix(accent 12%, surface)`)
-  and a 2 px accent left border. Footer strip: `n shown · ↑↓ select · ⏎ focus detail`.
+  and a 2 px accent left border; the row `⏎` has focused keeps that tint
+  and takes the second accent in its chrome — a 2 px `accent-2-400` left
+  border and a 1 px inset ring of the same colour — so the two modes are
+  told apart without the column shifting and without moving the ground
+  the status pill is painted on (§Status colours, §Accessibility and
+  quality, D204 (5)). Footer strip: `n shown · ↑↓ select · ⏎ focus run`,
+  and while a run is focused `n shown · ↑↓ move run · ⏎/esc done`; the
+  pair of hints is a live region, so the mode is announced as well as
+  drawn.
 - **Detail** (right): pane bar with the collapse toggle, `◀ PANE (i/n) ▶`,
   one 14×3 px dot per pane (accent = current, accent-800 = plugin pane,
   neutral-800 = builtin), then `run <id>` and a status pill.
@@ -253,7 +261,7 @@ close button (`aria-label="close"`) there in place of its `esc …` hint;
 ## Keyboard
 
 Exactly the mock's map, which is the TUI's: `↑`/`↓` or `j`/`k` select,
-`←`/`→` cycle panes, `1`–`9` jump, `⏎` focus detail, `tab` focus, `t`
+`←`/`→` cycle panes, `1`–`9` jump, `⏎` focus run, `tab` focus, `t`
 retry task, `m` move task, `x` cancel task, `l` append log, `n` new run,
 `r` rerun node, `p` pause/resume, `c` cancel run, `D` (shift) delete run
 (with confirm), `e` edit run, `w` workflows, `b` toggle list, `?` keys,
@@ -268,8 +276,22 @@ itself stays the browser's: a handler that took it would leave a
 keyboard-only operator unable to reach the header's `/` input, the
 workflow chips, the pane bar or a request's own buttons, which
 §Accessibility and quality forbids. The two regions follow the browser's
-focus instead, and `⏎` is what sends attention to the detail pane
-(D176, D179).
+focus instead, and `tab` is the only way attention reaches the detail
+pane (D176, D179, D204 (1)).
+
+`⏎` **focuses a run**: it picks the highlighted run up so that `↑`/`↓`
+— and `j`/`k`, which are the same binding — move it in the dispatch
+order instead of moving the selection, one swap per press, through
+`POST /api/runs/{id}/position` with `{direction: -1 | 1}` (08 §Runs).
+`⏎` again or `esc` puts it down. A run can only be focused while it is
+the selected run, while its row is in the list on screen, and at `md`
+and above: changing the selection, filtering the row away, deleting the
+run, collapsing the list to its rail with `b` or narrowing the window
+past the breakpoint all put it down, so the arrow keys never move a run
+nobody can see. Every other key of the map
+does exactly what it always does while a run is held. The swap is
+against the run's true dispatch neighbour, which an active filter may be
+hiding: the toast reports the position the server settled on (D204).
 
 The pane index is clamped to the selected run's pane count when the
 selection changes (plugin panes differ per workflow).
@@ -359,9 +381,15 @@ attributes.
   under Playwright: the score is the share of the rules axe evaluated on
   the page that passed, and **no violation may be `serious` or
   `critical`** whatever that share says (D178, D179). The floor holds in
-  four states of that page, because they are four documents: the empty
-  dashboard, the loaded one, the loaded one at `xlarge`, and the loaded
-  one at 390×844 — both of its narrow regions (D197).
+  five states of that page, because they are five documents: the empty
+  dashboard, the loaded one, the loaded one at `xlarge`, the loaded one
+  at 390×844 — both of its narrow regions (D197) — and the run list with
+  a `failed` run picked up by `⏎`, which is the only state that draws a
+  focused row and so the only one that measures what a status pill sits
+  on inside that mode (D204 (5)). The pointer is moved off the row
+  before axe walks it: `hover:bg-*` outranks a row's own tint, so a row
+  still under the cursor that a click selected is measured on its hover
+  colour rather than on the tint the assertion is about.
 - Touch targets in the narrow chrome are at least 24×24 CSS px (WCAG
   2.5.8); the visual size stays the mock's. `web/e2e/mobile.spec.ts`
   drives the five flows of 21 §Touch operation with `tap()` alone and

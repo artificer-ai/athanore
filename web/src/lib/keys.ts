@@ -57,9 +57,11 @@ export type KeyBinding = {
 /**
  * 10 §Keyboard, transcribed.
  *
- * Nothing is added and nothing is left out. The two sentences that
- * follow the list in 10 are {@link KEY_NOTES}, because they are rules
- * about the map rather than rows in it.
+ * Nothing is added and nothing is left out. The sentences that follow
+ * the list in 10 are {@link KEY_NOTES}, because they are rules about the
+ * map rather than rows in it — including the paragraph that says what
+ * `↑`/`↓` mean while a run is focused, which is one binding's condition
+ * and not a keycap of its own (D204 (3)).
  */
 export const KEY_BINDINGS: readonly KeyBinding[] = [
   {
@@ -68,6 +70,14 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     label: 'select',
     group: 'navigate',
     note: '',
+    footer: false,
+  },
+  {
+    id: 'move-run',
+    keys: ['↑', '↓', 'j', 'k'],
+    label: 'move run',
+    group: 'navigate',
+    note: 'while a run is focused',
     footer: false,
   },
   {
@@ -87,9 +97,9 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     footer: false,
   },
   {
-    id: 'focus-detail',
+    id: 'focus-run',
     keys: ['⏎'],
-    label: 'focus detail',
+    label: 'focus run',
     group: 'navigate',
     note: '',
     footer: false,
@@ -215,11 +225,13 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
  *
  * They are as much a part of "every binding" as the rows: an operator
  * who cannot find why `t` did nothing while they were typing a title has
- * not been told the map.
+ * not been told the map, and neither has one who cannot find why `↑`
+ * moved a run instead of the cursor.
  */
 export const KEY_NOTES: readonly string[] = [
   'shortcuts are suppressed inside inputs',
   'the pane index is clamped to the selected run’s pane count',
+  '⏎ picks the selected run up; ↑↓ then move it in the dispatch list, and ⏎ or esc puts it down',
 ]
 
 /** The footer strip's chips, in the map's order (10 §Layout). */

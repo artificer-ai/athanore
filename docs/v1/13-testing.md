@@ -27,6 +27,25 @@ tests of the same behaviours.
   generated from it; a test asserts every emitted name is in the enum.
 - Error codes are an enum on both sides.
 
+## The machine a test runs on
+
+A test asserts what the code does, never what the developer's machine is
+configured to do. Two things follow, both enforced rather than asked for
+(D205):
+
+- **The shell configures nothing.** The rootdir `conftest.py` drops every
+  environment name that can reach `AthanoreSettings` — one
+  `ATHANORE_<FIELD>` per field, the legacy `ARTIFICER_*` fallbacks, and
+  the CLI's `ATHANORE_URL` / `ATHANORE_TOKEN` — before each test, in
+  `tests/` and `examples/tests/` alike. The names the harness itself
+  reads (`ATHANORE_IN_CONTAINER`, `ATHANORE_TEST_PG_URL`,
+  `ATHANORE_TEST_PG_REQUIRED`, `ATHANORE_SMOKE`) are not configuration
+  and survive. A test that wants one sets it with `monkeypatch.setenv`.
+- **No test talks to a server it did not start.** Loopback is shared with
+  whatever the developer is running — an Athanore of their own on 4002
+  above all — so a test that reaches for a default URL names a stub, a
+  port it bound itself, or an ASGI transport.
+
 ## Fakes
 
 - `FakeACPAgent`: a Python script speaking ACP over stdio, driven by a

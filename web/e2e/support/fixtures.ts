@@ -31,7 +31,7 @@ export const RUN_TIMEOUT = 30_000
 export const NARROW_VIEWPORT = { width: 390, height: 844 }
 
 /** The workflows `support/server.ts` registers (`../workflows.py`). */
-export type FixtureWorkflow = 'probe' | 'spread' | 'hold' | 'plugged'
+export type FixtureWorkflow = 'probe' | 'spread' | 'hold' | 'flop' | 'plugged'
 
 /**
  * How a control is activated: with a mouse, or with a finger.
