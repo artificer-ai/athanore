@@ -412,7 +412,7 @@ def declare(wf: Workflow) -> None:
         raise PluginError(404, f"no schedule {schedule_id!r}")
 
     wf.panel(
-        "schedules",
+        "cron",
         slot="global",
         kind="custom",
         element="athanore-cron",
