@@ -46,6 +46,14 @@ INDEX = """<!doctype html>
 ASSET = "export const built = true;\n"
 
 
+#: The policy an application built from default settings serves. These
+#: tests assert *consistency* — that the document, an asset and a font all
+#: carry the same header — so they compare against this rather than
+#: against `static.CSP`, which is the no-CDN shape and only one of the
+#: three an install can have (D211).
+DEFAULT_POLICY = static.policy(AthanoreSettings(root_path=Path("/nonexistent")))
+
+
 def write_build(dist: Path) -> None:
     """Write a `dist` a build wrote. Blocking, so an async test threads it."""
 
@@ -118,7 +126,7 @@ async def test_the_root_is_the_document_with_the_policy(serve, built: Path) -> N
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     assert '<div id="root">' in response.text
-    assert response.headers["content-security-policy"] == static.CSP
+    assert response.headers["content-security-policy"] == DEFAULT_POLICY
 
 
 async def test_plugin_cdns_widen_only_where_code_is_fetched_from(
@@ -156,6 +164,44 @@ async def test_no_plugin_cdns_is_the_policy_every_install_had(
     assert response.headers["content-security-policy"] == static.CSP
 
 
+async def test_the_default_ships_three_cdns_and_still_closes_connect_src(
+    serve, built: Path
+) -> None:
+    """D211: a library works with no config; where it may *talk* does not.
+
+    The default is a curated list rather than `https:` because
+    `script-src 'self'` is also the backstop against an injected
+    `<script src>` — panels render markdown from plugins and agents — and
+    SRI does not help there.
+    """
+
+    response = await call(serve(built), "GET", "/")
+    directives = dict(
+        (part.split(" ", 1) + [""])[:2]
+        for part in (
+            piece.strip()
+            for piece in response.headers["content-security-policy"].split(";")
+        )
+        if part
+    )
+
+    for name in ("script-src", "style-src", "font-src"):
+        assert "https://cdn.jsdelivr.net" in directives[name]
+    assert directives["connect-src"] == "'self'"
+    assert "https:" not in directives["script-src"].split()
+
+
+async def test_a_bare_scheme_opens_it_to_any_origin(serve, built: Path) -> None:
+    """Supported, and one entry rather than a fork of the validator."""
+
+    response = await call(serve(built, plugin_cdns=["https:"]), "GET", "/")
+
+    assert (
+        "script-src 'self' 'unsafe-eval' https:;"
+        in (response.headers["content-security-policy"])
+    )
+
+
 @pytest.mark.parametrize(
     "entry",
     [
@@ -179,9 +225,13 @@ def test_a_plugin_cdn_that_is_not_a_bare_origin_is_refused(entry: str) -> None:
 
 
 async def test_the_policy_is_the_one_12_states(serve, built: Path) -> None:
-    """12 §Plugins, verbatim: two relaxations, and each of them forced."""
+    """12 §Plugins, verbatim: two relaxations, and each of them forced.
 
-    response = await call(serve(built), "GET", "/")
+    With `plugin_cdns` emptied, which is the policy the section describes
+    and the one an install that wants nothing third-party keeps (D211).
+    """
+
+    response = await call(serve(built, plugin_cdns=[]), "GET", "/")
 
     assert response.headers["content-security-policy"] == (
         "default-src 'self'; script-src 'self' 'unsafe-eval'; "
@@ -227,7 +277,7 @@ async def test_an_asset_is_served_under_the_same_policy(serve, built: Path) -> N
     assert response.status_code == 200
     assert response.text == ASSET
     assert "javascript" in response.headers["content-type"]
-    assert response.headers["content-security-policy"] == static.CSP
+    assert response.headers["content-security-policy"] == DEFAULT_POLICY
 
 
 async def test_a_client_route_falls_back_to_the_document(serve, built: Path) -> None:
@@ -243,7 +293,7 @@ async def test_head_of_the_root_is_the_same_answer(serve, built: Path) -> None:
     response = await call(serve(built), "HEAD", "/")
 
     assert response.status_code == 200
-    assert response.headers["content-security-policy"] == static.CSP
+    assert response.headers["content-security-policy"] == DEFAULT_POLICY
 
 
 def test_the_packaged_default_is_the_wheels_dist() -> None:
@@ -344,7 +394,7 @@ async def test_without_a_build_the_root_says_how_to_build(serve, unbuilt: Path) 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/html")
     assert "pnpm -C web build" in response.text
-    assert response.headers["content-security-policy"] == static.CSP
+    assert response.headers["content-security-policy"] == DEFAULT_POLICY
 
 
 async def test_without_a_build_the_api_is_untouched(serve, unbuilt: Path) -> None:
@@ -442,12 +492,17 @@ async def test_plugin_assets_are_served_from_their_directory(
     (assets / "panel.js").write_text(ASSET)
     app = serve(built)
 
-    static.mount_plugin_assets(app, "gamedev", assets)
+    # `create_app` passes settings here, so the test does too: without
+    # them the mount falls back to the no-CDN policy and the assertion
+    # below would be comparing two different installs.
+    static.mount_plugin_assets(
+        app, "gamedev", assets, AthanoreSettings(root_path=Path("/nonexistent"))
+    )
     response = await call(app, "GET", "/plugins/gamedev/static/panel.js")
 
     assert response.status_code == 200
     assert response.text == ASSET
-    assert response.headers["content-security-policy"] == static.CSP
+    assert response.headers["content-security-policy"] == DEFAULT_POLICY
 
 
 async def test_a_missing_assets_directory_is_refused_at_registration(
@@ -509,4 +564,4 @@ async def test_every_bundled_font_is_a_file_the_server_serves(serve) -> None:
         response = await call(app, "GET", f"/assets/{font.name}")
 
         assert response.status_code == 200, font.name
-        assert response.headers["content-security-policy"] == static.CSP
+        assert response.headers["content-security-policy"] == DEFAULT_POLICY

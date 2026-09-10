@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable, Mapping
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -37,6 +38,7 @@ from athanore.api import static
 from athanore.engine import Engine
 from athanore.plugins.decl import PLACEMENTS, PanelKind, Slot
 from athanore.plugins.registry import collect
+from athanore.settings import AthanoreSettings
 from athanore.store.rows import EventRow
 from athanore.store.uow import Store
 from tests.plugins.fixture_wf import (
@@ -157,6 +159,14 @@ PANELS: list[dict[str, Any]] = [
 
 
 # -- helpers ----------------------------------------------------------------
+
+
+#: The policy an application built from default settings serves. These
+#: tests assert *consistency* — that the document, an asset and a font all
+#: carry the same header — so they compare against this rather than
+#: against `static.CSP`, which is the no-CDN shape and only one of the
+#: three an install can have (D211).
+DEFAULT_POLICY = static.policy(AthanoreSettings(root_path=Path("/nonexistent")))
 
 
 async def submit(
@@ -844,7 +854,7 @@ async def test_the_asset_is_served_under_the_workflows_prefix_with_the_policy(
     response = await client.get(ASSET_URL)
 
     assert response.status_code == 200
-    assert response.headers["content-security-policy"] == static.CSP
+    assert response.headers["content-security-policy"] == DEFAULT_POLICY
     assert f'customElements.define("{ELEMENT}"' in response.text
 
 

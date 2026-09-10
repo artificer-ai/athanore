@@ -399,9 +399,19 @@ build step, which is the point — and, with `'self'` as the whole
 allowance, no way to reach a library. `plugin_cdns` (02 §Settings) is the
 deployment's answer: origins listed there are added to `script-src`,
 `style-src` and `font-src`, so a pane MAY load React or a charting
-library from a CDN. It is empty by default and turning it on is the
-operator's decision, not the plugin's — a plugin MUST NOT require it
-without saying so.
+library from a CDN. It defaults to three immutable, versioned CDNs —
+jsDelivr, unpkg, esm.sh — so a plugin works with no configuration at all;
+`[]` restores the airtight policy and `["https:"]` opens it to any
+origin. A pane SHOULD pin an exact version and SHOULD carry a
+`integrity=` hash: the version says which file, the hash says it is the
+same file, and a CDN is a party that can serve different bytes at one
+URL.
+
+The default is a curated list rather than `https:` for a reason that is
+not about CDNs at all: `script-src 'self'` is also what stops an injected
+`<script src>` reaching any code, and panels render markdown from plugins
+and agents. An `integrity=` hash does not help there. Three named origins
+keep the backstop; a scheme source removes it.
 
 `connect-src` is **not** widened and MUST NOT be. A CDN script runs with
 `window.athanore` in reach, which carries the operator's credential and

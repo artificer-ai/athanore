@@ -48,6 +48,14 @@ from athanore.workflow import Workflow
 MODULE = "customElements.define('gd-playfield', class extends HTMLElement {});\n"
 
 
+#: The policy an application built from default settings serves. These
+#: tests assert *consistency* — that the document, an asset and a font all
+#: carry the same header — so they compare against this rather than
+#: against `static.CSP`, which is the no-CDN shape and only one of the
+#: three an install can have (D211).
+DEFAULT_POLICY = static.policy(AthanoreSettings(root_path=Path("/nonexistent")))
+
+
 def gamedev(assets: str | Path | None) -> Workflow:
     """A one-node workflow with a `custom` panel and the assets behind it."""
 
@@ -116,7 +124,7 @@ async def test_an_asset_carries_the_content_security_policy(
         response = await client.get("/plugins/gamedev/static/vendor/helper.js")
 
     assert response.status_code == 200
-    assert response.headers["content-security-policy"] == static.CSP
+    assert response.headers["content-security-policy"] == DEFAULT_POLICY
 
 
 async def test_a_workflow_that_ships_nothing_has_nothing_mounted(
