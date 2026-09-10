@@ -87,8 +87,11 @@ class SandboxAgent(ACPAgent):
     command = [str(AGENT_SH), "claude"]
     cwd = str(CHECKOUT)
     permission_policy = "auto_allow"
-    #: An unattended build must never block on a dialog it cannot answer.
-    elicitation_policy = "decline"
+    # TEMPORARY (permission smoke test, 2026-09-10): "ask" so a form-mode
+    # elicitation reaches the operator's request panel instead of being
+    # declined. Put this back to "decline" before any unattended run —
+    # an unattended build must never block on a dialog it cannot answer.
+    elicitation_policy = "ask"
     timeout = AGENT_TIMEOUT
 
 
