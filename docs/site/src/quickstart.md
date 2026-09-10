@@ -66,10 +66,11 @@ athanore show <run>                 # output: {'greeting': 'HELLO WORLD'}
 requests` shows the question. Answering it wakes the body, `greet`
 returns `shout("world")`, `shout` runs and the run completes.
 
-Every read verb takes `--json`, so this composes with `jq`:
+`--json` is a global flag — it goes before the verb, like `--url` and
+`--token` — and every read verb honours it, so this composes with `jq`:
 
 ```sh
-athanore ls --json | jq '.[] | {id, status, node}'
+athanore --json ls | jq '.[] | {id, status, node}'
 ```
 
 ## ...or from the browser

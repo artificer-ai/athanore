@@ -87,13 +87,14 @@ when it is registered rather than resolved by precedence later.
 
 ## JSON out
 
-Every read verb takes `--json`, so the command line composes with `jq`
-rather than growing a query language:
+`--json` is a global flag: it goes before the verb, alongside `--url` and
+`--token`, and every read verb honours it, so the command line composes
+with `jq` rather than growing a query language:
 
 ```sh
-athanore ls --json | jq -r '.[] | select(.status == "failed") | .id'
-athanore show "$RUN" --json | jq '.tasks[] | {node, status, attempt}'
-athanore requests --json | jq 'length'
+athanore --json ls | jq -r '.[] | select(.status == "failed") | .id'
+athanore --json show "$RUN" | jq '.tasks[] | {node, status, attempt}'
+athanore --json requests | jq 'length'
 ```
 
 On a terminal the same verbs print a table.
