@@ -25,13 +25,22 @@ from __future__ import annotations
 from athanore import Pool, Server
 from workflows.feature import wf as feature
 from workflows.feature.cron import start_ticker
+from workflows.rps import wf as rps
 
 
 def build() -> Server:
-    """The server, with `feature` on a capacity-1 pool."""
+    """The server: `feature` on the checkout, `rps` well away from it.
+
+    Two pools because they cap two different things. `checkout` is the
+    working tree — one of it, so one run at a time. `play` is nothing at
+    all: `rps` touches no file and spends most of its life parked on a
+    person, and a game waiting for a throw has no business holding the
+    slot the build needs.
+    """
 
     server = Server()
     server.register(feature, Pool("checkout", capacity=1))
+    server.register(rps, Pool("play", capacity=4))
     return server
 
 
