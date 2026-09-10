@@ -73,6 +73,7 @@ from .agents import (
     QAAgent,
     ReviewerAgent,
 )
+from .cron import declare as declare_cron
 from .files import declare as declare_files
 from .models import Brief, PlanDoc, QAVerdict, ReviewVerdict, TaskReport
 from .sandbox import (
@@ -92,6 +93,7 @@ __all__ = ["MAX_ATTEMPTS", "MAX_LOOPS", "wf"]
 # is how `files.declare` gets an element to name (09 §Escape hatch).
 wf = Workflow("feature", assets="./static")
 declare_files(wf)
+declare_cron(wf)
 
 #: Loop-backs to `implement` per lane, and in total, before rule 3 ends
 #: the run. Three and six are v0's numbers, kept because they were tuned

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from athanore import Pool, Server
 from workflows.feature import wf as feature
+from workflows.feature.cron import start_ticker
 
 
 def build() -> Server:
@@ -34,10 +35,30 @@ def build() -> Server:
     return server
 
 
-def main() -> None:
-    """Build the server and serve until it is stopped."""
+def _start_scheduler(server: Server) -> None:
+    """Start the crontab's minute loop, and drop the handle.
 
-    build().serve()
+    Nothing cancels it: the task lives as long as the loop does, and the
+    loop ends when the process does. Holding the handle would only be
+    worth it if something here could stop the scheduler without stopping
+    the server, and nothing can.
+    """
+
+    start_ticker(server)
+
+
+def main() -> None:
+    """Build the server, start the scheduler, and serve until stopped.
+
+    ``on_start`` is where the crontab's minute loop begins. It has to be
+    here rather than in the plugin, because 09's four declarations are a
+    route, an action, a panel and an event handler — none of them a
+    clock, and an ``on`` handler on a quiet server never fires at all.
+    The callback runs on the server's own loop once the socket is bound,
+    and starts a task rather than waiting on one.
+    """
+
+    build().serve(on_start=_start_scheduler)
 
 
 if __name__ == "__main__":
