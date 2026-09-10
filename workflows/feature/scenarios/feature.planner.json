@@ -1,0 +1,10 @@
+{
+  "text": ["Read the specs and the code, wrote the plan and committed it on the branch."],
+  "log": "planner: filed the plan for this task and committed it.",
+  "submit": {
+    "plan": "docs/plans/T083-example.md",
+    "summary": "The approach, in two or three sentences.",
+    "files": ["athanore/example.py", "tests/test_example.py"]
+  },
+  "usage": { "input": 210000, "output": 4800 }
+}

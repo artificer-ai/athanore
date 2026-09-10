@@ -1,0 +1,10 @@
+{
+  "text": ["Read the request against AGENTS.md and the documents it touches."],
+  "log": "prompt: rewrote the request as an outcome, and named what it is not.",
+  "submit": {
+    "description": "What must be true when this is done, stated as the outcome, with the documents and modules it touches named.",
+    "out_of_scope": ["What a reader might assume is included and is not"],
+    "open_questions": ["What the request does not settle"]
+  },
+  "usage": { "input": 14000, "output": 300 }
+}
