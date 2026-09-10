@@ -623,7 +623,18 @@ export function GraphCanvas({
               nodeTypes={NODE_TYPES}
               colorMode="dark"
               fitView
-              fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
+              /* The fit gets its own floor, because `getViewportForBounds`
+                 clamps the zoom it solves to `fitViewOptions.minZoom ??
+                 minZoom`. Below the breakpoint there is no pan, no pinch
+                 and no controls, so a fit floored at the interaction floor
+                 would put the top and bottom of a tall graph — eight ranks
+                 is `examples/feature_build` — out of reach for good. The
+                 picture shrinks instead (D206 (7)). */
+              fitViewOptions={{
+                padding: 0.15,
+                maxZoom: 1,
+                minZoom: narrow ? 0.05 : 0.4,
+              }}
               minZoom={0.4}
               maxZoom={1.6}
               nodesDraggable={false}

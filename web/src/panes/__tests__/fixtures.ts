@@ -798,8 +798,9 @@ export function graphNode(
  *
  * `engineering` is the node in flight and the node both loops point back
  * at, so this one fixture carries the `attempt n · elapsed` detail, the
- * `●` glyph with its pulse, the `◀` arrow, the rail that spans three
- * rows and the single `loop` label at the middle of it.
+ * `●` glyph with its pulse, and the two back edges that bow out to the
+ * right of the column — one taken and one not, so both the `loop` label
+ * and the dashed arrow of an edge this run never took are drawn.
  */
 export const LINEAR_GRAPH: GraphOut = {
   nodes: [
@@ -896,8 +897,8 @@ export function linearRun(over: Partial<RunDetail> = {}): RunDetail {
  *
  * Both branches carry the **same** `from_task`, which is what 08 §Graph
  * semantics says two branches of one fan-out do — so a renderer that
- * grouped by `from_task` alone would draw one sub-list here instead of
- * two.
+ * grouped by `from_task` alone would draw one branch chip here instead
+ * of two.
  */
 export const FANOUT_GRAPH: GraphOut = {
   nodes: [

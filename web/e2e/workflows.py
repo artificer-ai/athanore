@@ -1,6 +1,6 @@
 """The workflows the Playwright suite drives (T068a, 13 §Pyramid).
 
-Five of them, and between them they are every shape the E2E specs need:
+Six of them, and between them they are every shape the E2E specs need:
 
 - :data:`probe` is the run the suite watches from `submit` to
   `completed` — an agent that asks for permission to make a tool call,
@@ -27,6 +27,14 @@ Five of them, and between them they are every shape the E2E specs need:
   row is drawn over the selection's tint, and the pill on it is
   transparent, so `fail` is the tone that decides whether the two are
   compatible (`a11y.spec.ts`, D204 (5)).
+
+- :data:`ladder` is a chain of eight nodes, and its only job is to be
+  tall. Eight ranks do not fit a 320 px canvas at the zoom the
+  interaction floor allows, so it is what proves that the graph pane's
+  fit has a floor of its own below the ``md`` breakpoint, where there is
+  no pan and no zoom to recover a clipped picture with (D206 (7),
+  `mobile.spec.ts`). Nothing in it waits, so a run of it is complete by
+  the time the graph is read.
 
 - :data:`plugged` is the plugin host of 09 §Escape hatch: a workflow
   that ships a static ES module (``static/playfield.js``) and declares a
@@ -55,6 +63,7 @@ __all__ = [
     "PLAYFIELD_WORD",
     "flop",
     "hold",
+    "ladder",
     "plugged",
     "probe",
     "spread",
@@ -189,6 +198,53 @@ def _flop() -> Workflow:
     return wf
 
 
+def _ladder() -> Workflow:
+    """Eight nodes in a line, so the graph is eight ranks tall.
+
+    Every node names the next one and returns it, which is the whole of
+    it: nothing waits, nothing asks, nothing fans out. What the spec
+    reads is the height — eight ranks is taller than a 320 px canvas can
+    draw at the zoom the interaction floor allows, so this is the
+    workflow that says whether the fit has a floor of its own.
+    """
+
+    wf = Workflow("ladder")
+
+    @wf.node(start=True)
+    async def intake(sort):
+        return sort
+
+    @wf.node()
+    async def sort(weigh):
+        return weigh
+
+    @wf.node()
+    async def weigh(mix):
+        return mix
+
+    @wf.node()
+    async def mix(heat):
+        return heat
+
+    @wf.node()
+    async def heat(cool):
+        return cool
+
+    @wf.node()
+    async def cool(pack):
+        return pack
+
+    @wf.node()
+    async def pack(label):
+        return label
+
+    @wf.node()
+    async def label():
+        return "labelled"
+
+    return wf
+
+
 def _plugged() -> Workflow:
     """A workflow that ships a web component, and a pane that mounts it.
 
@@ -228,11 +284,12 @@ def _plugged() -> Workflow:
     return wf
 
 
-#: The five, built at import: ``athanore serve <file>:<attr>`` resolves
+#: The six, built at import: ``athanore serve <file>:<attr>`` resolves
 #: an attribute and refuses anything that is not a :class:`Workflow`
 #: already (11 §Server), so a factory would never be reached.
 probe = _probe()
 spread = _spread()
 hold = _hold()
 flop = _flop()
+ladder = _ladder()
 plugged = _plugged()

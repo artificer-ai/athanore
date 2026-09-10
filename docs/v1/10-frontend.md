@@ -233,7 +233,10 @@ and the wheel belongs to the pane. Nodes are not draggable: their
 positions are derived from the response, so a dragged node would snap
 back on the next invalidation. Below the `md` breakpoint the canvas is a
 fitted picture with no pan, no zoom and no controls, and the `EDGES`
-block underneath carries the detail (21 §Narrow layout).
+block underneath carries the detail (21 §Narrow layout). The fit has a
+zoom floor of its own there, far under the one the zoom buttons stop at:
+with no gesture to recover a clipped picture with, a graph taller than
+the canvas shrinks rather than losing its ends (D206 (7)).
 
 Clicking a node jumps to the log pane filtered to that node; right-click
 offers rerun here / move task here (move is disabled for join nodes).

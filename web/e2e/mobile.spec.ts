@@ -26,6 +26,9 @@ test.use({ viewport: NARROW_VIEWPORT, hasTouch: true, isMobile: true })
 
 const TITLE = 'answer me with a thumb'
 
+/** The run of the eight-rank fixture, read on the graph canvas. */
+const TALL_TITLE = 'eight rungs on a thumb'
+
 /** WCAG 2.5.8, which 21 §Regions, narrow asks of the narrow chrome. */
 const TOUCH_TARGET = 24
 
@@ -311,6 +314,51 @@ test('the graph canvas is a fitted picture below the breakpoint', async ({
   if (canvasBox !== null && edgesBox !== null) {
     expect(edgesBox.y, 'EDGES sits under the canvas').toBeGreaterThanOrEqual(
       canvasBox.y + canvasBox.height,
+    )
+  }
+
+  await noHorizontalScroll(page)
+})
+
+test('a tall graph is fitted whole below the breakpoint, not clipped', async ({
+  dashboard,
+}) => {
+  const page = dashboard.page
+  await dashboard.open()
+  // `ladder` is eight ranks (`./workflows.py`), which is taller than a
+  // 320 px canvas can draw at the zoom the pane's interaction floor
+  // allows. Below the breakpoint there is nothing to recover a clipped
+  // picture with — no pan, no pinch, no controls — so the fit carries a
+  // floor of its own and the whole graph shrinks to fit (D206 (7)).
+  await dashboard.submit('ladder', TALL_TITLE, 'tap')
+  await dashboard.row(TALL_TITLE).tap()
+  await page.locator('[data-pane="graph"][role="radio"]').tap()
+
+  const first = dashboard.graphRow('intake')
+  const last = dashboard.graphRow('label')
+  await expect(first).toBeVisible({ timeout: RUN_TIMEOUT })
+  await expect(last).toBeVisible()
+
+  const canvasBox = await page.locator('.react-flow').boundingBox()
+  expect(canvasBox, 'the canvas has no box').not.toBeNull()
+  if (canvasBox === null) return
+  for (const [which, card] of [
+    ['the first', first],
+    ['the last', last],
+  ] as const) {
+    const box = await card.boundingBox()
+    expect(box, `${which} card has no box`).not.toBeNull()
+    if (box === null) continue
+    // Half a pixel of tolerance: the canvas draws through a fractional
+    // CSS transform, and what is being asserted is a whole card inside
+    // the frame rather than a rounding.
+    expect(box.y, `${which} card's top edge`).toBeGreaterThanOrEqual(canvasBox.y - 0.5)
+    expect(box.y + box.height, `${which} card's bottom edge`).toBeLessThanOrEqual(
+      canvasBox.y + canvasBox.height + 0.5,
+    )
+    expect(box.x, `${which} card's left edge`).toBeGreaterThanOrEqual(canvasBox.x - 0.5)
+    expect(box.x + box.width, `${which} card's right edge`).toBeLessThanOrEqual(
+      canvasBox.x + canvasBox.width + 0.5,
     )
   }
 

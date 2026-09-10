@@ -47,7 +47,7 @@ export type ElementContent = { node: ReactNode; scrolls: boolean }
 
 /**
  * What an element is drawn for: the scope its attributes come from, and
- * the two navigations the graph rail performs.
+ * the two navigations the graph canvas performs.
  *
  * A subset of `panes/content.tsx`'s `RenderContext` rather than the
  * whole of it, because a renderer is handed what an element can use —
@@ -70,7 +70,7 @@ export type ElementRenderer = (ctx: ElementContext) => ElementContent
  * The table itself, keyed by tag and not by workflow.
  *
  * A tag is a name for a renderer, so a plugin declaring `ath-run-graph`
- * means the graph rail: 09 gives the element vocabulary no namespace,
+ * means the graph canvas: 09 gives the element vocabulary no namespace,
  * and a second table per workflow would make one tag two things.
  */
 const RENDERERS = new Map<string, ElementRenderer>()

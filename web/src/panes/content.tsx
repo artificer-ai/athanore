@@ -42,8 +42,8 @@
  *   filter and markdown that a plugin's list of lines is not (10 §Panes
  *   item 2). {@link BUILTIN_RENDERERS} is the whole of that, and it is
  *   keyed by the panel's name on `_builtin` alone. The `custom` panels
- *   the core ships — the agent stream, the requests pane, the graph rail
- *   — go through `src/plugins/registry.ts` instead, keyed by their tag
+ *   the core ships — the agent stream, the requests pane, the graph
+ *   canvas — go through `src/plugins/registry.ts` instead, keyed by their tag
  *   and not by their workflow, because an element is a tag this build
  *   knows how to draw and a plugin declaring the same one means it. That
  *   is the same table a plugin's tag is looked up in, and the same one
