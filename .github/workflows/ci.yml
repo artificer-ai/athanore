@@ -231,16 +231,18 @@ jobs:
 
       # `pnpm gen` dumps the document and then runs the codegen, so the
       # explicit dump is only there to do it in an environment `uv sync`
-      # has just prepared.
+      # has just prepared. `gen_skills.py` reads the snapshot the dump
+      # above writes, so it runs after it (D213).
       - name: regenerate
         run: |
           uv sync --all-packages --all-groups --all-extras
           uv run --no-sync scripts/dump_openapi.py
           pnpm -C web install --frozen-lockfile
           pnpm -C web gen
+          uv run --no-sync scripts/gen_skills.py
 
       - name: snapshot and client are fresh
-        run: git diff --exit-code tests/snapshots web/src/api/gen
+        run: git diff --exit-code tests/snapshots web/src/api/gen skills
 
   # The Phase 4 checkpoint (T069): the wheel carries the SPA and a clean
   # install serves it. Nothing else in the gate covers that join —

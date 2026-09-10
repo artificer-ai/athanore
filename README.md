@@ -194,6 +194,7 @@ web/             SPA source (Vite + React + TypeScript), builds into athanore/we
 examples/        user-land workflows and vendor adapters (uv workspace member)
 tests/           Python tests
 docs/v1/         the design documents; docs/plans/ the per-task plans
+skills/          agent skills: one per surface, pointing into docs/v1/ and the tree
 ```
 
 See [`docs/v1/02-architecture.md`](docs/v1/02-architecture.md) for the
@@ -233,6 +234,10 @@ a workspace member and registers them as entry points.
   SHOULD carry their RFC 2119 meanings.
 - [`docs/v1/15-decisions.md`](docs/v1/15-decisions.md) — every decision
   and its reason.
+- [`skills/README.md`](skills/README.md) — five agent skills, one per
+  surface you can build against. Each is a pointer into the documents
+  above rather than a second copy of them, and installing one is a
+  symlink into your agent's skills directory.
 - [`AGENTS.md`](AGENTS.md) — how to work in this repository. Read it before
   changing anything, human or agent.
 - [`DESIGN.md`](DESIGN.md) — where the MVP's design document went.

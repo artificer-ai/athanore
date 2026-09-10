@@ -303,16 +303,29 @@ def test_contract_job_checks_the_generated_client_is_fresh(ci: Workflow) -> None
     ran = commands(ci["jobs"]["contract"])
     assert "scripts/dump_openapi.py" in ran
     assert "pnpm -C web gen" in ran
-    assert "git diff --exit-code tests/snapshots web/src/api/gen" in ran
+    assert "scripts/gen_skills.py" in ran
+    assert "git diff --exit-code tests/snapshots web/src/api/gen skills" in ran
+
+
+def test_the_skills_are_regenerated_after_the_snapshot_they_read(
+    ci: Workflow,
+) -> None:
+    """`gen_skills.py` renders the route table out of the committed
+    snapshot (D213), so a job that regenerated the skills first would
+    diff them against the document of the previous commit."""
+    ran = commands(ci["jobs"]["contract"])
+    assert ran.index("scripts/dump_openapi.py") < ran.index("scripts/gen_skills.py")
 
 
 def test_the_contract_jobs_generators_exist() -> None:
-    """What the job regenerates, and what it then diffs (T008)."""
+    """What the job regenerates, and what it then diffs (T008, D213)."""
     assert (ROOT / "scripts" / "dump_openapi.py").is_file()
+    assert (ROOT / "scripts" / "gen_skills.py").is_file()
     assert (ROOT / "web" / "openapi-ts.config.ts").is_file()
     assert "gen" in json.loads((ROOT / "web" / "package.json").read_text())["scripts"]
     assert (ROOT / "tests" / "snapshots" / "openapi.json").is_file()
     assert (ROOT / "web" / "src" / "api" / "gen" / "index.ts").is_file()
+    assert (ROOT / "skills" / "README.md").is_file()
 
 
 #: The packaging check both the gate and the `package` job run (T069).
