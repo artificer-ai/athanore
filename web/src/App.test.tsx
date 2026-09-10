@@ -241,6 +241,15 @@ function rows() {
   )
 }
 
+/** The POSTs made so far, in order. */
+function posted(): string[] {
+  return vi
+    .mocked(fetch)
+    .mock.calls.map(([input]) => input as unknown as Request)
+    .filter((request) => request.method === 'POST')
+    .map((request) => new URL(request.url, 'http://localhost').pathname)
+}
+
 /**
  * A fresh tab: no client state left over, and a server that answers.
  *
@@ -813,15 +822,6 @@ describe('the run operations', () => {
     vi.unstubAllGlobals()
   })
 
-  /** The POSTs made so far, in order. */
-  function posted(): string[] {
-    return vi
-      .mocked(fetch)
-      .mock.calls.map(([input]) => input as unknown as Request)
-      .filter((request) => request.method === 'POST')
-      .map((request) => new URL(request.url, 'http://localhost').pathname)
-  }
-
   it.each([
     ['pause / resume run', `/api/runs/aaaa1111bbbb/pause`],
     ['cancel run', `/api/runs/aaaa1111bbbb/cancel`],
@@ -1213,6 +1213,29 @@ describe('the keyboard map', () => {
     shell({ run: 'aaaa1111bbbb' })
     expect(useUi.getState().focusedRun).toBeNull()
     wideViewport()
+  })
+
+  it('drops a held run when `b` collapses the list to the rail', () => {
+    shell({ run: 'aaaa1111bbbb' })
+
+    fireEvent.keyDown(screen.getByRole('region', { name: 'runs' }), { key: 'Enter' })
+    expect(useUi.getState().focusedRun).toBe('aaaa1111bbbb')
+
+    // `b` unmounts the whole list (`Splitter`), so the held row, its
+    // tint and the strip's `↑↓ move run` hint all leave the screen —
+    // and a run nobody can see is not under the arrow keys (D204 (2)).
+    fireEvent.keyDown(document.body, { key: 'b' })
+    expect(usePrefs.getState().listCollapsed).toBe(true)
+    expect(screen.queryByRole('region', { name: 'runs' })).toBeNull()
+    expect(useUi.getState().focusedRun).toBeNull()
+
+    fireEvent.keyDown(document.body, { key: 'ArrowUp' })
+    expect(posted()).toEqual([])
+
+    // ...and there is nothing to pick up again while it stays collapsed,
+    // even though `inList()` still answers `true` for the body.
+    fireEvent.keyDown(document.body, { key: 'Enter' })
+    expect(useUi.getState().focusedRun).toBeNull()
   })
 
   it('is off while the operator is typing into the `/` input', () => {

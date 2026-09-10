@@ -284,8 +284,9 @@ order instead of moving the selection, one swap per press, through
 `⏎` again or `esc` puts it down. A run can only be focused while it is
 the selected run, while its row is in the list on screen, and at `md`
 and above: changing the selection, filtering the row away, deleting the
-run or narrowing the window past the breakpoint all put it down, so the
-arrow keys never move a run nobody can see. Every other key of the map
+run, collapsing the list to its rail with `b` or narrowing the window
+past the breakpoint all put it down, so the arrow keys never move a run
+nobody can see. Every other key of the map
 does exactly what it always does while a run is held. The swap is
 against the run's true dispatch neighbour, which an active filter may be
 hiding: the toast reports the position the server settled on (D204).

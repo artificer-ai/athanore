@@ -156,6 +156,7 @@ export default function App({
   const panes = usePanes(search.run, { index: search.pane, onChange: onSelectPane })
   const queryClient = useQueryClient()
   const toggleListCollapsed = usePrefs((state) => state.toggleListCollapsed)
+  const listCollapsed = usePrefs((state) => state.listCollapsed)
   const setFontSize = usePrefs((state) => state.setFontSize)
   const focusLogComposer = useUi((state) => state.focusLogComposer)
   const focusedRun = useUi((state) => state.focusedRun)
@@ -163,15 +164,19 @@ export default function App({
   const blurRun = useUi((state) => state.blurRun)
 
   // Whether a run is held *for this render*: `⏎` picked one up, it is
-  // still the selection, its row is still in the filtered list, and the
-  // viewport is still wide enough for that list to be on screen (D204
-  // (2)). Derived rather than trusted, so the frame between a filter
-  // keystroke and the effect below is never drawn with a mode the
-  // operator cannot see.
+  // still the selection, its row is still in the filtered list, the
+  // viewport is still wide enough for that list to be on screen, and
+  // `b` has not collapsed it to the rail — `Splitter` does not mount
+  // `RunList` at all when it is collapsed, so a held run would be as
+  // invisible there as it is below the breakpoint (D204 (2)). Derived
+  // rather than trusted, so the frame between a filter keystroke and
+  // the effect below is never drawn with a mode the operator cannot
+  // see.
   const runFocused =
     focusedRun !== null &&
     focusedRun === search.run &&
     !narrow &&
+    !listCollapsed &&
     runs.rows.some((row) => row.id === focusedRun)
 
   // ...and the housekeeping that follows it, so a stale id cannot spring
@@ -288,9 +293,11 @@ export default function App({
     runFocused,
     // `⏎ focus run`: pick the selected run up, or put the held one
     // down. There is nothing to pick up with no run selected, and no
-    // list to move it in below the breakpoint (D204 (2)).
+    // list to move it in below the breakpoint or behind the collapsed
+    // rail (D204 (2)) — where `inList()` still answers `true` for the
+    // body, so the guard has to be here rather than in the keymap.
     toggleRunFocus: () => {
-      if (narrow || search.run === undefined) return
+      if (narrow || listCollapsed || search.run === undefined) return
       if (runFocused) blurRun()
       else focusRun(search.run)
     },
