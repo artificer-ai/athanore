@@ -42,7 +42,21 @@ const KONVA_SRI =
   'sha384-5U3OBfaiWyVahgxO5gAPyCYQLRCh1teOWSUspbn2eNUbC8kq/3mdveFod0sZAhGt'
 
 const TOOLS = ['select', 'box', 'ellipse', 'arrow', 'line', 'pen', 'text']
-const COLOURS = ['#e8e6e3', '#7dd3fc', '#fca5a5', '#fcd34d', '#86efac']
+/**
+ * The palette, six across. Row one is the greys from white to black, so
+ * the extremes are where a hand expects them; the rest are three ramps.
+ *
+ * Black is in it because it is what a hand reaches for — but the canvas
+ * is the app's dark background, so black draws black-on-near-black. It
+ * is here for a sketch destined for somewhere lighter, not because it
+ * will read on screen.
+ */
+const COLOURS = [
+  '#ffffff', '#e8e6e3', '#a8a29e', '#57534e', '#292524', '#000000',
+  '#fecaca', '#fca5a5', '#f87171', '#ef4444', '#dc2626', '#991b1b',
+  '#fde68a', '#fcd34d', '#fbbf24', '#86efac', '#22c55e', '#15803d',
+  '#bae6fd', '#7dd3fc', '#38bdf8', '#a5b4fc', '#c084fc', '#a855f7',
+]
 const SIZES = [2, 4, 8]
 
 /** The upload cap, mirrored from `body_limit` so the message can say so. */
@@ -74,7 +88,7 @@ function konva() {
 class AthanoreSketch extends HTMLElement {
   connectedCallback() {
     this.tool = 'box'
-    this.colour = COLOURS[0]
+    this.colour = COLOURS[1]
     this.size = SIZES[1]
 
     this.attachShadow({ mode: 'open' })
@@ -96,7 +110,18 @@ class AthanoreSketch extends HTMLElement {
                  border: 1px solid var(--ath-border); border-radius: 5px;
                  padding: 3px 8px; cursor: pointer; min-height: 24px; }
         button.save { color: var(--ath-accent); border-color: var(--ath-accent); }
-        .swatch { width: 20px; height: 20px; padding: 0; border-radius: 50%; }
+        .picker { position: relative; display: inline-flex; }
+        .current { width: 26px; height: 22px; padding: 0;
+                   /* A ring in the border colour, so a white swatch and a
+                      black one are both visible against the chrome. */
+                   box-shadow: inset 0 0 0 1px var(--ath-border); }
+        .grid { position: absolute; top: calc(100% + 4px); left: 0; z-index: 5;
+                display: grid; grid-template-columns: repeat(6, 20px); gap: 4px;
+                padding: 6px; background: var(--ath-surface);
+                border: 1px solid var(--ath-border); border-radius: 8px;
+                box-shadow: 0 6px 20px rgb(0 0 0 / 0.45); }
+        .swatch { width: 20px; height: 20px; padding: 0; border-radius: 4px;
+                  border: none; box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18); }
         [aria-pressed="true"] { outline: 2px solid var(--ath-accent);
                                 outline-offset: 1px; }
         .nib { width: 26px; }
@@ -107,7 +132,11 @@ class AthanoreSketch extends HTMLElement {
       </style>
       <div class="bar">
         <span class="tools"></span>
-        <span class="colours"></span>
+        <span class="picker">
+          <button class="current" type="button" aria-haspopup="true"
+                  aria-expanded="false" aria-label="colour"></button>
+          <div class="grid" role="listbox" aria-label="colours" hidden></div>
+        </span>
         <span class="nibs"></span>
         <button class="del" type="button">delete</button>
         <button class="clear" type="button">clear</button>
@@ -119,7 +148,7 @@ class AthanoreSketch extends HTMLElement {
       <p class="note" hidden></p>`
 
     this.buttons('.tools', TOOLS, (v) => v, (v) => { this.tool = v; this.retool() })
-    this.buttons('.colours', COLOURS, () => '', (v) => { this.colour = v }, 'swatch')
+    this.picker()
     this.buttons('.nibs', SIZES, (v) => String(v), (v) => { this.size = v }, 'nib')
     this.shadowRoot.querySelector('.del')
       .addEventListener('click', () => this.remove_())
@@ -129,6 +158,60 @@ class AthanoreSketch extends HTMLElement {
       .addEventListener('click', () => this.save())
 
     this.start().catch((err) => this.say(String(err.message ?? err), 'bad'))
+  }
+
+  /**
+   * The colour trigger and its grid.
+   *
+   * A popover rather than a row because twenty-four swatches inline is a
+   * toolbar that wraps to three lines on a tablet, which is the width
+   * this pane is used at.
+   */
+  picker() {
+    const trigger = this.shadowRoot.querySelector('.current')
+    const grid = this.shadowRoot.querySelector('.grid')
+    for (const value of COLOURS) {
+      const swatch = document.createElement('button')
+      swatch.type = 'button'
+      swatch.className = 'swatch'
+      swatch.style.background = value
+      swatch.setAttribute('role', 'option')
+      swatch.setAttribute('aria-label', value)
+      swatch.addEventListener('click', () => {
+        this.colour = value
+        this.open(false)
+        this.marks()
+        trigger.focus()
+      })
+      grid.append(swatch)
+    }
+    trigger.addEventListener('click', () => this.open(grid.hidden))
+    // `esc` from inside the grid closes it and nothing else: the app's
+    // own `esc` would otherwise unwind a run selection behind an open
+    // popover the operator was looking at (D209).
+    this.shadowRoot.querySelector('.picker').addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || grid.hidden) return
+      e.stopPropagation()
+      this.open(false)
+      trigger.focus()
+    })
+    // A click anywhere else closes it. `composedPath` because a click
+    // inside this shadow root is retargeted to the host by the time the
+    // document sees it — the same retargeting that made typing fire
+    // hotkeys (D210).
+    this.away = (e) => {
+      if (!grid.hidden && !e.composedPath().includes(this.shadowRoot.querySelector('.picker'))) {
+        this.open(false)
+      }
+    }
+    document.addEventListener('pointerdown', this.away)
+  }
+
+  open(show) {
+    const grid = this.shadowRoot.querySelector('.grid')
+    grid.hidden = !show
+    this.shadowRoot.querySelector('.current')
+      .setAttribute('aria-expanded', String(show))
   }
 
   buttons(holder, values, label, pick, cls = 'tool') {
@@ -151,13 +234,20 @@ class AthanoreSketch extends HTMLElement {
   marks() {
     for (const [sel, values, current] of [
       ['.tool', TOOLS, this.tool],
-      ['.swatch', COLOURS, this.colour],
       ['.nib', SIZES, this.size],
     ]) {
       this.shadowRoot.querySelectorAll(sel).forEach((b, i) => {
         b.setAttribute('aria-pressed', String(values[i] === current))
       })
     }
+    const trigger = this.shadowRoot.querySelector('.current')
+    if (trigger !== null) {
+      trigger.style.background = this.colour
+      trigger.title = `colour ${this.colour}`
+    }
+    this.shadowRoot.querySelectorAll('.swatch').forEach((b, i) => {
+      b.setAttribute('aria-selected', String(COLOURS[i] === this.colour))
+    })
   }
 
   async start() {
@@ -193,6 +283,7 @@ class AthanoreSketch extends HTMLElement {
   }
 
   disconnectedCallback() {
+    if (this.away) document.removeEventListener('pointerdown', this.away)
     this.observer?.disconnect()
     this.stage?.destroy()
   }
