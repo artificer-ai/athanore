@@ -317,6 +317,7 @@ SPA ─POST /api/requests/{id}/answer {option_id | value}─▶ api.requests
 | `permission_policy` | unset | Optional global override of the class default |
 | `agent_command` | unset | Env/CLI only, never TOML: replaces every `ACPAgent.command` at spawn; for running examples on `FakeACPAgent` (05, 13) |
 | `cors_origins` | [] | Dev only |
+| `plugin_cdns` | [] | Origins a plugin pane may fetch scripts, styles and fonts from, on top of `'self'`. Empty is the airtight policy (D211) |
 | `log_format` | `pretty` in TTY, `json` otherwise | |
 | `stream_flush_interval` | 0.4s | Agent stream batching |
 | `run_migrations` | true | `Server.start()` migrates before it serves; false leaves the schema to `athanore db upgrade` (11) |

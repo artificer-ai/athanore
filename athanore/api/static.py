@@ -46,7 +46,7 @@ wildcard default would undo the loopback-first posture for everyone else.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -62,6 +62,7 @@ from athanore.api.errors import ApiError, ErrorCode
 from athanore.settings import AthanoreSettings
 
 __all__ = [
+    "CDN_DIRECTIVES",
     "CSP",
     "DIST",
     "RESERVED_PREFIXES",
@@ -71,6 +72,7 @@ __all__ = [
     "install_cors",
     "mount_plugin_assets",
     "mount_spa",
+    "policy",
 ]
 
 #: The content-security policy of 12 §Plugins, verbatim. Two relaxations
@@ -96,6 +98,37 @@ CSP: Final[str] = (
     "img-src 'self' data:; "
     "connect-src 'self'"
 )
+
+#: The directives ``plugin_cdns`` widens: where code, styling and faces
+#: may be *fetched from*. ``connect-src`` is not among them, and that is
+#: the whole containment: a CDN script runs, but may only talk back to
+#: this server, so the worst a bad one can do is break a pane rather than
+#: post the operator's data somewhere (D211).
+CDN_DIRECTIVES: Final[tuple[str, ...]] = ("script-src", "style-src", "font-src")
+
+
+def policy(settings: AthanoreSettings | None = None) -> str:
+    """:data:`CSP`, with any ``plugin_cdns`` folded into the fetch directives.
+
+    With none configured this returns :data:`CSP` unchanged, which is the
+    airtight policy every install had before the setting existed —
+    turning it on is a deployment's decision and not a plugin author's
+    (09 §Escape hatch).
+
+    The origins are already validated to be bare ``scheme://host[:port]``
+    by :class:`~athanore.settings.AthanoreSettings`, so joining them into
+    a header here cannot smuggle a second directive.
+    """
+
+    origins = list(settings.plugin_cdns) if settings is not None else []
+    if not origins:
+        return CSP
+    extra = " " + " ".join(origins)
+    return "; ".join(
+        part + extra if part.split(" ", 1)[0] in CDN_DIRECTIVES else part
+        for part in CSP.split("; ")
+    )
+
 
 #: Where `pnpm -C web build` writes and what the wheel ships as package
 #: data (10 §Build). Read at mount time rather than closed over at import
@@ -144,17 +177,25 @@ pnpm -C web build</pre>
 
 
 class PolicyFiles(StaticFiles):
-    """`StaticFiles` that puts :data:`CSP` on everything it serves.
+    """`StaticFiles` that puts the policy on everything it serves.
 
     The header goes on here rather than in a middleware because it
     belongs to *these* responses: the API's JSON is not a document a
     policy means anything for, and a policy on every response would be a
     claim about routes this module does not own.
+
+    ``policy`` is passed in rather than read from the module, because it
+    depends on ``settings.plugin_cdns`` and a process may serve more than
+    one application — the tests do.
     """
+
+    def __init__(self, *args: Any, policy: str = CSP, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self.policy = policy
 
     async def get_response(self, path: str, scope: Scope) -> Response:
         response = await super().get_response(path, scope)
-        response.headers["content-security-policy"] = CSP
+        response.headers["content-security-policy"] = self.policy
         return response
 
 
@@ -187,12 +228,12 @@ class PluginAssets(PolicyFiles):
             ).response()
 
 
-def _unbuilt() -> HTMLResponse:
+def _unbuilt(policy_header: str = CSP) -> HTMLResponse:
     """The build-the-SPA page, under the same policy as the SPA itself."""
 
     return HTMLResponse(
         UNBUILT_PAGE,
-        headers={"content-security-policy": CSP, "cache-control": "no-store"},
+        headers={"content-security-policy": policy_header, "cache-control": "no-store"},
     )
 
 
@@ -232,11 +273,16 @@ class SPA:
     an ordinary state rather than a startup failure.
     """
 
-    def __init__(self, directory: Path, unmatched: ASGIApp) -> None:
+    def __init__(
+        self, directory: Path, unmatched: ASGIApp, policy_header: str = CSP
+    ) -> None:
         #: What the router did before — a 404 for HTTP, a close for a
         #: websocket. Anything this app does not answer goes back to it.
         self.unmatched = unmatched
-        self.files = PolicyFiles(directory=directory, check_dir=False)
+        self.policy = policy_header
+        self.files = PolicyFiles(
+            directory=directory, check_dir=False, policy=policy_header
+        )
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
@@ -261,10 +307,14 @@ class SPA:
         if asset is not None:
             return asset
         index = await _static_or_none(self.files, "index.html", request.scope)
-        return index if index is not None else _unbuilt()
+        return index if index is not None else _unbuilt(self.policy)
 
 
-def mount_spa(app: FastAPI, directory: Path | None = None) -> SPA:
+def mount_spa(
+    app: FastAPI,
+    directory: Path | None = None,
+    settings: AthanoreSettings | None = None,
+) -> SPA:
     """Serve the built SPA from ``directory`` (default :data:`DIST`) at ``/``.
 
     Installed as `app.router.default`, so every route — including the
@@ -272,12 +322,21 @@ def mount_spa(app: FastAPI, directory: Path | None = None) -> SPA:
     the SPA answers only for a path nothing else claimed.
     """
 
-    spa = SPA(DIST if directory is None else directory, app.router.default)
+    spa = SPA(
+        DIST if directory is None else directory,
+        app.router.default,
+        policy(settings),
+    )
     app.router.default = spa
     return spa
 
 
-def mount_plugin_assets(app: FastAPI, workflow: str, directory: Path) -> Mount:
+def mount_plugin_assets(
+    app: FastAPI,
+    workflow: str,
+    directory: Path,
+    settings: AthanoreSettings | None = None,
+) -> Mount:
     """Serve one workflow's asset directory at ``/plugins/{workflow}/static``.
 
     The seam 09 §Escape hatch describes and T071 fills: a workflow that
@@ -295,7 +354,7 @@ def mount_plugin_assets(app: FastAPI, workflow: str, directory: Path) -> Mount:
 
     mount = Mount(
         f"/plugins/{workflow}/static",
-        app=PluginAssets(directory=directory),
+        app=PluginAssets(directory=directory, policy=policy(settings)),
         name=f"plugin-assets:{workflow}",
     )
     app.router.routes.append(mount)

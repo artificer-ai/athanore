@@ -392,7 +392,22 @@ That is one trust decision, made at install time, and the docs say so.
 Mitigations that are still worth having: plugin routes run under the same
 auth as everything else; assets are served with a strict CSP
 (`script-src 'self' 'unsafe-eval'` — the one relaxation the form
-validator forces, 12 §Plugins), no inline scripts; the manifest never carries
+validator forces, 12 §Plugins), no inline scripts;
+
+A plugin author writing a `custom` pane has one file of browser JS and no
+build step, which is the point — and, with `'self'` as the whole
+allowance, no way to reach a library. `plugin_cdns` (02 §Settings) is the
+deployment's answer: origins listed there are added to `script-src`,
+`style-src` and `font-src`, so a pane MAY load React or a charting
+library from a CDN. It is empty by default and turning it on is the
+operator's decision, not the plugin's — a plugin MUST NOT require it
+without saying so.
+
+`connect-src` is **not** widened and MUST NOT be. A CDN script runs with
+`window.athanore` in reach, which carries the operator's credential and
+`ops`; leaving `connect-src` at `'self'` means such a script may talk
+only to this server, so the worst a compromised one can do is fail to
+render (D211). the manifest never carries
 tokens; action inputs are validated server-side; a plugin cannot reach
 another workflow's runs.
 

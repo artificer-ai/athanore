@@ -10,12 +10,14 @@ from __future__ import annotations
 
 import ipaddress
 import os
+import re
 import tomllib
 import warnings
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import urlparse
 
-from pydantic import BaseModel, Field, SecretStr, model_validator
+from pydantic import BaseModel, Field, SecretStr, field_validator, model_validator
 from pydantic.fields import FieldInfo
 from pydantic_settings import (
     BaseSettings,
@@ -138,6 +140,13 @@ class _TomlSource(TomlConfigSettingsSource):
         }
 
 
+#: A bare host with an optional port: letters, digits, dots, dashes.
+#: Deliberately no `_`, no userinfo and no brackets — a CSP source is a
+#: host, and everything else in that grammar is a way of smuggling one
+#: directive inside another.
+_HOST = re.compile(r"^[A-Za-z0-9.-]+(?::\d{1,5})?$")
+
+
 class AthanoreSettings(BaseSettings):
     """Typed configuration with documented defaults (02 §Configuration)."""
 
@@ -162,11 +171,55 @@ class AthanoreSettings(BaseSettings):
     permission_policy: Literal["ask", "auto_allow", "auto_deny"] | None = None
     agent_command: str | list[str] | None = None
     cors_origins: list[str] = Field(default_factory=list)
+    #: Origins a plugin's `custom` pane may load scripts, styles and
+    #: fonts from, on top of ``'self'`` (09 §Escape hatch, D211). Empty by
+    #: default, which is the airtight policy every install had before the
+    #: setting existed: turning it on is a deployment's decision, not a
+    #: plugin author's. ``connect-src`` is deliberately *not* widened —
+    #: a CDN script may run, but may only talk back to this server.
+    plugin_cdns: list[str] = Field(default_factory=list)
     log_format: Literal["pretty", "json"] | None = None
     stream_flush_interval: float = 0.4
     run_migrations: bool = True
     forwarded_allow_ips: str | None = None
     retention: Retention = Field(default_factory=Retention)
+
+    @field_validator("plugin_cdns")
+    @classmethod
+    def _origins_only(cls, values: list[str]) -> list[str]:
+        """Each entry must be a bare ``https://host[:port]`` origin.
+
+        A CSP is a header built by joining strings, so an entry carrying
+        a space, a semicolon or a quote is a directive the operator did
+        not write. Parsing it as a URL and rebuilding it from the parts
+        is what makes that impossible rather than merely unlikely — and
+        it refuses a path, which CSP would ignore and an author would
+        assume was honoured.
+        """
+
+        cleaned: list[str] = []
+        for value in values:
+            parsed = urlparse(value.strip())
+            if parsed.scheme not in ("https", "http") or not parsed.netloc:
+                raise ValueError(
+                    f"plugin_cdns entries are origins like "
+                    f"'https://cdn.jsdelivr.net'; {value!r} is not one"
+                )
+            if parsed.path not in ("", "/") or parsed.query or parsed.fragment:
+                raise ValueError(
+                    f"a plugin_cdns entry is an origin, with no path: {value!r}"
+                )
+            # `urlparse` takes everything up to the first `/` as the
+            # netloc, so `https://x.net; script-src *` parses "cleanly"
+            # with the injection sitting inside the host. The host has to
+            # be checked as a host.
+            if not _HOST.match(parsed.netloc):
+                raise ValueError(
+                    f"{parsed.netloc!r} is not a host[:port]; a plugin_cdns "
+                    f"entry may not carry a space, a quote or a semicolon"
+                )
+            cleaned.append(f"{parsed.scheme}://{parsed.netloc}")
+        return cleaned
 
     @model_validator(mode="after")
     def _compute_derived_defaults(self) -> AthanoreSettings:
