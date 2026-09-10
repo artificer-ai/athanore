@@ -3,11 +3,22 @@
  * (`docs/v1/10-frontend.md` §Panes item 1, and the mock's `isOverview`
  * block in `docs/v1/design/Athanore.dc.html`).
  *
- * Four sections in the mock's order — the STATS tiles with the per-node
- * token bars under them, the two-column `kv` meta grid, the NODES table,
- * and the OUTPUTS list a fanned-out run adds — followed by whatever
- * `placement="card"` panels the manifest contributed (09 §Slots), which
- * the pane host hands in as `cards`.
+ * Five sections, the mock's four in its order with one inserted — the
+ * STATS tiles with the per-node token bars under them, the two-column
+ * `kv` meta grid, the full-width TITLE and DESCRIPTION block, the NODES
+ * table, and the OUTPUTS list a fanned-out run adds — followed by
+ * whatever `placement="card"` panels the manifest contributed (09
+ * §Slots), which the pane host hands in as `cards`.
+ *
+ * **The block is where 10 §Panes' TITLE and DESCRIPTION went** (15,
+ * D208). They are meta fields like the other six, but the grid that
+ * draws those is `repeat(auto-fit, minmax(240px, 1fr))` — the right
+ * shape for a run id or an age, the wrong one for a description, which
+ * is written in a textarea (10 §Overlays) and can be a paragraph. In a
+ * 240 px column it wrapped into a narrow stack that pushed NODES down
+ * the pane while the pane's width sat empty beside it, so the two get a
+ * section of their own where each label sits over its value and the
+ * value has the pane's full width.
  *
  * **Two sources, and neither is a second opinion of the other.** The
  * tiles, the bars, the meta and the node rows all come from the
@@ -34,6 +45,7 @@ import { KvPane } from './KvPane'
 import { MetricGrid } from './MetricGrid'
 import { formatValue } from './format'
 import {
+  formatAbout,
   formatCount,
   formatMeta,
   formatMetric,
@@ -280,6 +292,7 @@ export function Overview({
 
   const metrics = data.metrics.map(formatMetric)
   const meta = formatMeta(data.meta)
+  const about = formatAbout(data.meta)
   const columns = data.table?.columns ?? []
   const rows = data.table?.rows ?? []
   const bars = tokenBars(rows, detail?.current_nodes ?? [])
@@ -298,6 +311,31 @@ export function Overview({
       {Object.keys(meta).length > 0 && (
         <Section testId="overview-meta">
           <KvPane data={meta} />
+        </Section>
+      )}
+
+      {about !== null && (
+        <Section testId="overview-about">
+          <dl className="flex flex-col gap-[10px]">
+            {about.title !== null && (
+              <div>
+                <dt className="text-hint tracking-[0.1em] text-muted-foreground">
+                  TITLE
+                </dt>
+                <dd className="text-body [overflow-wrap:anywhere] text-[var(--color-neutral-300)]">
+                  {about.title}
+                </dd>
+              </div>
+            )}
+            <div>
+              <dt className="text-hint tracking-[0.1em] text-muted-foreground">
+                DESCRIPTION
+              </dt>
+              <dd className="text-body [overflow-wrap:anywhere] text-[var(--color-neutral-300)]">
+                {about.description}
+              </dd>
+            </div>
+          </dl>
         </Section>
       )}
 

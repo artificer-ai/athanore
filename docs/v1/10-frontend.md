@@ -137,9 +137,12 @@ the pane host reads the manifest and has no list of its own.
 1. **overview** — `STATS` metric tiles (TOKENS, COST, DURATION, POSITION)
    in a 1 px-gapped grid; per-node token bars (accent for the active
    node, accent-700 otherwise); a two-column `kv` meta grid (RUN,
-   WORKFLOW, TITLE, STATUS · node, AGE, SESSION, AGENTS, DESCRIPTION);
-   the `NODES` table (NODE · ATT · STATUS · TOKENS · DUR) with zebra rows;
-   plugin panels with `placement="card"` append below. Field sources:
+   WORKFLOW, STATUS · node, AGE, SESSION, AGENTS); under it a full-width
+   TITLE and DESCRIPTION block, each label over its value and ungridded,
+   so a description that runs to a paragraph has the pane's width rather
+   than a grid column (15, D208); the `NODES` table (NODE · ATT · STATUS
+   · TOKENS · DUR) with zebra rows; plugin panels with
+   `placement="card"` append below. Field sources:
    TOKENS/COST are `RunDetail.stats` sums over every attempt including
    failed ones (they were paid for); DURATION is `finished − created` or
    `now − created`; POSITION is `position + 1` of `count`; STATUS shows
@@ -147,7 +150,8 @@ the pane host reads the manifest and has no list of its own.
    AGE is `now − created` humanised; SESSION is the `session_id` from the
    stats entry of the focused task (the most recent agent attempt),
    shortened to 8 characters, omitted when no agent has run; AGENTS is the
-   count of tasks carrying a stats entry; DESCRIPTION is the run's, or `—`.
+   count of tasks carrying a stats entry; the block's second row,
+   DESCRIPTION, is the run's, or `—`.
    Token bars scale to the largest node total in the run. When a run had
    more than one terminal branch, an `OUTPUTS` list (node · value preview)
    follows the NODES table (04 §Routing edge cases).
