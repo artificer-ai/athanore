@@ -11,6 +11,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import App from './App'
+import { narrowViewport, wideViewport } from './lib/__tests__/fixtures'
 import {
   getGraphApiRunsRunIdGraphGetQueryKey,
   getRunApiRunsRunIdGetQueryKey,
@@ -174,6 +175,7 @@ function shell(
     onFocusStream?: (taskId: number, pane: number | undefined) => void
     onOpenNode?: (node: string, pane: number | undefined) => void
     onOpenAction?: (action: string) => void
+    onClearRun?: () => void
     manifest?: PluginManifestEntry[]
   } = {},
 ) {
@@ -220,6 +222,7 @@ function shell(
         {...(over.onOpenAction === undefined
           ? {}
           : { onOpenAction: over.onOpenAction })}
+        {...(over.onClearRun === undefined ? {} : { onClearRun: over.onClearRun })}
       />
     </QueryClientProvider>,
   )
@@ -611,6 +614,64 @@ describe('App', () => {
     shell({ overlay: 'palette', run: 'aaaa1111bbbb' })
 
     expect(command('retry task')).not.toHaveAttribute('aria-disabled', 'true')
+  })
+
+  describe('below the breakpoint', () => {
+    beforeEach(() => {
+      narrowViewport()
+    })
+
+    afterEach(() => {
+      wideViewport()
+    })
+
+    it('shows the run list, and no splitter, while `?run=` is unset', () => {
+      shell()
+
+      expect(screen.getByRole('region', { name: 'runs' })).toBeInTheDocument()
+      expect(screen.queryByRole('region', { name: 'detail' })).toBeNull()
+      expect(screen.queryByRole('separator', { name: 'resize run list' })).toBeNull()
+      // The header and the footer are the same two regions at any width.
+      expect(screen.getByRole('banner')).toBeInTheDocument()
+      expect(screen.getByRole('contentinfo')).toBeInTheDocument()
+    })
+
+    it('shows the detail, and no list, while `?run=` is set', () => {
+      shell({ run: 'aaaa1111bbbb' })
+
+      expect(screen.getByRole('region', { name: 'detail' })).toBeInTheDocument()
+      expect(screen.queryByRole('region', { name: 'runs' })).toBeNull()
+      expect(screen.getByTestId('selected-run')).toHaveTextContent('aaaa1111bbbb')
+    })
+
+    it('goes back to the list by clearing `?run=`, from the pane bar', async () => {
+      const onClearRun = vi.fn()
+      shell({ run: 'aaaa1111bbbb' }, { onClearRun })
+
+      await userEvent.click(screen.getByRole('button', { name: 'back to runs' }))
+      expect(onClearRun).toHaveBeenCalledOnce()
+      // The collapse toggle has no meaning without a split, and the two
+      // are never on screen together.
+      expect(screen.queryByRole('button', { name: 'hide run list' })).toBeNull()
+    })
+
+    it('leaves the list geometry alone: no rail, and the prefs untouched', () => {
+      usePrefs.setState({ listCollapsed: true, listWidth: 420 })
+      shell()
+
+      expect(screen.getByRole('region', { name: 'runs' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'show run list' })).toBeNull()
+      expect(usePrefs.getState().listCollapsed).toBe(true)
+      expect(usePrefs.getState().listWidth).toBe(420)
+    })
+
+    it('keeps the keyboard map bound: `↓` still selects', async () => {
+      const onSelectRun = vi.fn()
+      shell({}, { onSelectRun })
+
+      await userEvent.keyboard('{ArrowDown}')
+      expect(onSelectRun).toHaveBeenCalledWith('aaaa1111bbbb')
+    })
   })
 
   it('opens a picker on the selected run', async () => {

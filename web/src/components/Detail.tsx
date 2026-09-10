@@ -39,6 +39,7 @@ export function Detail({
   onFilterNode,
   onOpenNode,
   onOpenLibrary,
+  onBack,
 }: {
   /**
    * The region itself, so that `⏎` can hand it the keyboard (T067). It
@@ -58,6 +59,12 @@ export function Detail({
   onOpenNode?: ((node: string) => void) | undefined
   /** Open the workflow library: the graph pane's `open definition`. */
   onOpenLibrary?: (() => void) | undefined
+  /**
+   * Clear `?run=`: the pane bar's back control, below the breakpoint
+   * (21 §Narrow layout). It is passed through rather than acted on
+   * here, because the bar is where the left slot is.
+   */
+  onBack?: (() => void) | undefined
 }) {
   const focused = useUi((s) => s.focus === 'detail')
   const setFocus = useUi((s) => s.setFocus)
@@ -76,7 +83,7 @@ export function Detail({
       onFocusCapture={() => setFocus('detail')}
       className="flex h-full min-h-0 min-w-0 flex-1 flex-col focus:outline-none"
     >
-      <PaneBar panes={panes} />
+      <PaneBar panes={panes} onBack={onBack} />
 
       {/* The panel is `PaneRenderer`'s; what the host owns is the three
           states in which there is no panel to draw. */}

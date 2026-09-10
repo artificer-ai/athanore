@@ -23,6 +23,14 @@
  * is clicked. The `❮` that collapses it lives in the pane bar
  * (`./Detail`), where the mock puts it. Both write `listCollapsed`, which
  * is also where `b` binds in T067.
+ *
+ * **Stacked**, below the breakpoint, none of that is drawn: `stacked`
+ * says which single region the middle is, the shell having read it off
+ * `?run=` (21 §Narrow layout, D194). Neither `listWidth` nor
+ * `listCollapsed` is written or cleared there — a phone visit leaves the
+ * desktop geometry exactly as the operator left it — and the group is
+ * not mounted at all, because 260 px of list and 340 px of detail do not
+ * both fit in a phone.
  */
 import { useRef, type ReactNode } from 'react'
 import { Group, Panel, Separator } from 'react-resizable-panels'
@@ -40,11 +48,17 @@ export function Splitter({
   count,
   list,
   detail,
+  stacked,
 }: {
   /** Run rows on screen: what the collapsed rail reports. */
   count: number
   list: ReactNode
   detail: ReactNode
+  /**
+   * The one region to draw, below the breakpoint, or nothing at or
+   * above it. `App` decides: it is `?run=` that says which (D194).
+   */
+  stacked?: 'list' | 'detail' | undefined
 }) {
   const listWidth = usePrefs((s) => s.listWidth)
   const listCollapsed = usePrefs((s) => s.listCollapsed)
@@ -52,6 +66,18 @@ export function Splitter({
   const setListCollapsed = usePrefs((s) => s.setListCollapsed)
   const listElement = useRef<HTMLDivElement | null>(null)
   const detailElement = useRef<HTMLDivElement | null>(null)
+
+  // Narrow first: a `listCollapsed` the operator set on a desktop says
+  // nothing about a viewport that has no list *and* detail to choose
+  // between, and the rail is the collapsed half of a split that is not
+  // drawn here.
+  if (stacked !== undefined) {
+    return (
+      <main data-stacked={stacked} className="flex min-h-0 min-w-0 flex-1 items-stretch">
+        {stacked === 'list' ? list : detail}
+      </main>
+    )
+  }
 
   if (listCollapsed) {
     return (

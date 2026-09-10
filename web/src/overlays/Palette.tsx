@@ -39,6 +39,7 @@ import { useRef } from 'react'
 
 import { useKeyOwner } from '../keys'
 import { groupActions, type PaletteAction } from './actions'
+import { OverlayClose } from './OverlayPanel'
 
 /** The dialog's accessible name, and cmdk's label for the listbox. */
 export const PALETTE_TITLE = 'command palette'
@@ -104,7 +105,7 @@ export function Palette({
             restoreFocusTo.current?.focus()
             restoreFocusTo.current = null
           }}
-          className="text-body fixed top-[12vh] left-1/2 z-50 w-[min(560px,92vw)] -translate-x-1/2 overflow-hidden rounded-lg border border-[var(--color-neutral-800)] bg-[var(--color-surface)] text-foreground shadow-[var(--shadow-lg)]"
+          className="text-body fixed top-[12vh] left-1/2 z-50 w-[min(560px,92vw)] -translate-x-1/2 overflow-hidden rounded-lg border border-[var(--color-neutral-800)] bg-[var(--color-surface)] text-foreground shadow-[var(--shadow-lg)] max-md:top-[8px] max-md:w-[calc(100vw-16px)] max-md:max-w-[calc(100vw-16px)]"
         >
           <VisuallyHidden.Root asChild>
             <Dialog.Title>{PALETTE_TITLE}</Dialog.Title>
@@ -121,10 +122,11 @@ export function Palette({
                 aria-label={PALETTE_TITLE}
                 className="text-body flex-1 bg-transparent text-foreground outline-none placeholder:text-[var(--color-neutral-500)]"
               />
-              <span className="text-hint text-muted-foreground">esc</span>
+              <span className="text-hint text-muted-foreground max-md:hidden">esc</span>
+              <OverlayClose />
             </div>
 
-            <Command.List className="max-h-[300px] overflow-auto">
+            <Command.List className="max-h-[300px] overflow-auto max-md:max-h-[calc(100dvh-90px)]">
               <Command.Empty className="text-row px-[12px] py-[10px] text-muted-foreground">
                 no command matches
               </Command.Empty>
@@ -143,7 +145,7 @@ export function Palette({
                       keywords={[action.hint, action.key]}
                       disabled={action.disabled}
                       onSelect={action.run}
-                      className="text-row grid cursor-pointer grid-cols-[minmax(0,170px)_minmax(0,1fr)_40px] items-center gap-[10px] border-t border-[var(--color-neutral-900)] px-[12px] py-[6px] data-[disabled=true]:cursor-default data-[disabled=true]:opacity-45 data-[selected=true]:bg-[var(--color-neutral-900)]"
+                      className="text-row grid cursor-pointer grid-cols-[minmax(0,170px)_minmax(0,1fr)_40px] items-center gap-[10px] border-t border-[var(--color-neutral-900)] px-[12px] py-[6px] data-[disabled=true]:cursor-default data-[disabled=true]:opacity-45 data-[selected=true]:bg-[var(--color-neutral-900)] max-md:min-h-[32px]"
                     >
                       <span className="text-[var(--color-neutral-300)]">
                         {action.name}

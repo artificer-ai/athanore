@@ -14,32 +14,68 @@
  * The bar opens with the mock's `❮`, which collapses the run list to the
  * rail `Splitter` draws in its place; collapsed, the rail's own `❯` is
  * the way back, so the two are never on screen together.
+ *
+ * Below the breakpoint that slot holds a back control instead (21
+ * §Narrow layout): there is no split to collapse, and the detail is
+ * standing where the run list was, so `←` clearing `?run=` is the way
+ * back to it. The `◀`/`▶` buttons and the dots stay — they are the touch
+ * route through the pane cycle — and grow to the 24×24 px hit area WCAG
+ * 2.5.8 asks of a touch target, the dots by way of a transparent box
+ * around the 14×3 px bar rather than by drawing a bigger bar.
  */
 import { RadioGroup } from 'radix-ui'
 
 import { statusTone, StatusPill } from '../components/RunList'
+import { useIsNarrow } from '../lib/useIsNarrow'
 import { cn } from '../lib/utils'
 import { usePrefs } from '../store/prefs'
 import type { PaneModel } from './usePanes'
 
-export function PaneBar({ panes }: { panes: PaneModel }) {
+/** The touch target of WCAG 2.5.8, on the controls narrow chrome has. */
+const TOUCH = 'max-md:min-h-[24px] max-md:min-w-[24px]'
+
+export function PaneBar({
+  panes,
+  onBack,
+}: {
+  panes: PaneModel
+  /**
+   * Clear `?run=`: the back control's whole action, below the
+   * breakpoint. Absent at a width where the slot is the collapse
+   * toggle, and absent in a shell that passes no handler.
+   */
+  onBack?: (() => void) | undefined
+}) {
   const listCollapsed = usePrefs((s) => s.listCollapsed)
   const setListCollapsed = usePrefs((s) => s.setListCollapsed)
+  const narrow = useIsNarrow()
   const run = panes.run
   const empty = panes.panes.length === 0
 
   return (
     <div className="bg-chrome flex flex-none flex-wrap items-center gap-x-[10px] gap-y-[6px] border-b border-border px-[12px] py-[6px]">
-      {!listCollapsed && (
+      {narrow ? (
         <button
           type="button"
-          onClick={() => setListCollapsed(true)}
-          aria-label="hide run list"
-          title="hide run list (b)"
-          className="text-hint rounded-lg border border-border px-[6px] py-px text-muted-foreground hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)]"
+          onClick={onBack}
+          aria-label="back to runs"
+          title="back to runs"
+          className={`text-hint flex items-center justify-center rounded-lg border border-border px-[6px] py-px text-muted-foreground hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)] ${TOUCH}`}
         >
-          ❮
+          ←
         </button>
+      ) : (
+        !listCollapsed && (
+          <button
+            type="button"
+            onClick={() => setListCollapsed(true)}
+            aria-label="hide run list"
+            title="hide run list (b)"
+            className="text-hint rounded-lg border border-border px-[6px] py-px text-muted-foreground hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)]"
+          >
+            ❮
+          </button>
+        )
       )}
 
       <button
@@ -47,7 +83,7 @@ export function PaneBar({ panes }: { panes: PaneModel }) {
         disabled={empty}
         onClick={panes.prev}
         aria-label="previous pane"
-        className="text-body px-[4px] text-[var(--color-accent-400)] hover:text-[var(--color-accent-200)] disabled:text-[var(--color-neutral-700)]"
+        className={`text-body px-[4px] text-[var(--color-accent-400)] hover:text-[var(--color-accent-200)] disabled:text-[var(--color-neutral-700)] ${TOUCH}`}
       >
         ◀
       </button>
@@ -62,7 +98,7 @@ export function PaneBar({ panes }: { panes: PaneModel }) {
         disabled={empty}
         onClick={panes.next}
         aria-label="next pane"
-        className="text-body px-[4px] text-[var(--color-accent-400)] hover:text-[var(--color-accent-200)] disabled:text-[var(--color-neutral-700)]"
+        className={`text-body px-[4px] text-[var(--color-accent-400)] hover:text-[var(--color-accent-200)] disabled:text-[var(--color-neutral-700)] ${TOUCH}`}
       >
         ▶
       </button>
@@ -74,24 +110,39 @@ export function PaneBar({ panes }: { panes: PaneModel }) {
         onValueChange={(value) => panes.jump(Number(value))}
         className="ml-[4px] flex gap-[4px]"
       >
-        {panes.panes.map((pane, index) => (
-          <RadioGroup.Item
-            key={pane.id}
-            value={String(index)}
-            title={pane.name}
-            aria-label={pane.name}
-            data-pane={pane.name}
-            data-builtin={pane.builtin}
-            className={cn(
-              'h-[3px] w-[14px] rounded-lg',
-              index === panes.index
-                ? 'bg-[var(--color-accent)]'
-                : pane.builtin
-                  ? 'bg-[var(--color-neutral-800)]'
-                  : 'bg-[var(--color-accent-800)]',
-            )}
-          />
-        ))}
+        {panes.panes.map((pane, index) => {
+          // The mock's colours: accent for the current pane, accent-800
+          // for a plugin's, neutral-800 for a builtin's.
+          const colour =
+            index === panes.index
+              ? 'bg-[var(--color-accent)]'
+              : pane.builtin
+                ? 'bg-[var(--color-neutral-800)]'
+                : 'bg-[var(--color-accent-800)]'
+          return (
+            <RadioGroup.Item
+              key={pane.id}
+              value={String(index)}
+              title={pane.name}
+              aria-label={pane.name}
+              data-pane={pane.name}
+              data-builtin={pane.builtin}
+              className={cn(
+                'h-[3px] w-[14px] rounded-lg',
+                colour,
+                // Narrow, the item *is* the hit area and the bar inside
+                // it is the mark: 3 px of height is not something a
+                // finger can find (WCAG 2.5.8).
+                'max-md:flex max-md:h-[24px] max-md:w-[24px] max-md:items-center max-md:justify-center max-md:bg-transparent',
+              )}
+            >
+              <span
+                aria-hidden
+                className={cn('hidden h-[3px] w-[14px] rounded-lg max-md:block', colour)}
+              />
+            </RadioGroup.Item>
+          )
+        })}
       </RadioGroup.Root>
 
       <div className="flex-1" />

@@ -3,7 +3,14 @@
  * header, run list, detail, footer.
  *
  * The list and the detail pane sit either side of `Splitter`, which owns
- * the width between them and the rail the list collapses to.
+ * the width between them and the rail the list collapses to. Below the
+ * breakpoint there is no width between them: `useIsNarrow` says the
+ * viewport is a phone's, and the middle is one region — the list while
+ * `?run=` is unset, the detail while it is set (21 §Narrow layout,
+ * D194). Selection is already a search parameter, so the stacked
+ * navigation is a render decision and not new state, and `onClearRun` —
+ * which the delete confirm already had — is what the pane bar's back
+ * control writes.
  *
  * Everything that makes this view *this view* comes in on `search`: the
  * shell owns no selection state of its own, and `onSelectRun` hands a
@@ -53,6 +60,7 @@ import { ServerDownBanner } from './components/ServerDownBanner'
 import { Splitter } from './components/Splitter'
 import { useAttention } from './components/attention'
 import { useKeymap } from './keys'
+import { useIsNarrow } from './lib/useIsNarrow'
 import {
   DeleteRun,
   EditRun,
@@ -141,6 +149,10 @@ export default function App({
 }) {
   const runs = useRunListModel()
   useAttention()
+  // Which layout this is. The one thing the CSS cannot say for us: the
+  // two regions are two subtrees, and below the breakpoint exactly one
+  // of them is mounted (D194).
+  const narrow = useIsNarrow()
   const panes = usePanes(search.run, { index: search.pane, onChange: onSelectPane })
   const queryClient = useQueryClient()
   const toggleListCollapsed = usePrefs((state) => state.toggleListCollapsed)
@@ -285,6 +297,10 @@ export default function App({
 
       <Splitter
         count={runs.rows.length}
+        // The stacked middle of 21 §Narrow layout: `?run=` unset is the
+        // list, `?run=` set is the detail, and at `md` and above there
+        // is no stack — the splitter draws both.
+        stacked={narrow ? (search.run === undefined ? 'list' : 'detail') : undefined}
         list={
           <RunList model={runs} selected={search.run} onSelect={onSelectRun} />
         }
@@ -310,6 +326,11 @@ export default function App({
                     onOpenOverlay('library')
                   }
             }
+            // The back control of 21 §Narrow layout, in the pane bar's
+            // left slot below the breakpoint: it clears `?run=` through
+            // the same write the delete confirm uses, so "back to the
+            // list" and "nothing is selected" are one state.
+            onBack={onClearRun}
           />
         }
       />

@@ -63,6 +63,66 @@ globalThis.EventSource ??= InertEventSource as unknown as typeof EventSource
  */
 Element.prototype.scrollIntoView ??= function scrollIntoView() {}
 
+/**
+ * jsdom implements no `window.matchMedia`, and the SPA asks it which of
+ * its two layouts it is drawing (`lib/useIsNarrow.ts`) — without this,
+ * rendering the shell throws.
+ *
+ * It answers `(min-width: Npx)` and `(max-width: Npx)` off
+ * `window.innerWidth`, which jsdom does keep (1024 by default, so every
+ * test that says nothing is a desktop test), and re-answers on `resize`.
+ * A test that wants the narrow layout sets `window.innerWidth` and
+ * dispatches one, which is what `narrowViewport()` does
+ * (`lib/__tests__/fixtures.ts`).
+ */
+const WIDTH_QUERY = /\((min|max)-width:\s*(\d+)px\)/
+
+function matches(query: string): boolean {
+  const parsed = WIDTH_QUERY.exec(query)
+  if (parsed === null) return false
+  const px = Number(parsed[2])
+  return parsed[1] === 'min' ? window.innerWidth >= px : window.innerWidth <= px
+}
+
+class WidthQueryList extends EventTarget implements Partial<MediaQueryList> {
+  readonly media: string
+
+  constructor(media: string) {
+    super()
+    this.media = media
+  }
+
+  get matches(): boolean {
+    return matches(this.media)
+  }
+}
+
+/**
+ * One list per query string, and one `resize` listener for all of them.
+ *
+ * A real `matchMedia` may hand back a new object per call, but a caller
+ * that reads the query on every render (`useIsNarrow`'s `narrowNow`)
+ * would then leave a `resize` listener behind per render, since nothing
+ * removes one it never sees. Sharing the list makes the shim's cost flat
+ * in the number of *queries* rather than in the number of calls.
+ */
+const lists = new Map<string, WidthQueryList>()
+
+function installWidthQueries(): typeof matchMedia {
+  window.addEventListener('resize', () => {
+    for (const list of lists.values()) list.dispatchEvent(new Event('change'))
+  })
+  return ((query: string) => {
+    const existing = lists.get(query)
+    if (existing !== undefined) return existing
+    const list = new WidthQueryList(query)
+    lists.set(query, list)
+    return list
+  }) as typeof matchMedia
+}
+
+globalThis.matchMedia ??= installWidthQueries()
+
 afterEach(cleanup)
 
 /**

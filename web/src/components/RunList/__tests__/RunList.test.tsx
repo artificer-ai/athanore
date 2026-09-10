@@ -1,8 +1,9 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { RunStatus, RunSummary } from '../../../api/gen/types.gen'
+import { narrowViewport, wideViewport } from '../../../lib/__tests__/fixtures'
 import { useUi } from '../../../store/ui'
 import { RunList } from '../RunList'
 import { toRow, type RunListModel, type RunRow } from '../useRunList'
@@ -196,5 +197,73 @@ describe('RunList', () => {
 
     list({ rows: [], model: { total: 12 } })
     expect(screen.getByText('no runs match the filter')).toBeInTheDocument()
+  })
+
+  describe('below the breakpoint', () => {
+    beforeEach(() => {
+      narrowViewport()
+    })
+
+    afterEach(() => {
+      wideViewport()
+    })
+
+    it('draws each row as two lines: title and pill over the four facts', () => {
+      list({
+        rows: [
+          row({
+            title: 'rebuild run detail as a web pane set',
+            current_nodes: ['review'],
+          }),
+        ],
+      })
+
+      const [only] = rows()
+      expect(only).toHaveAttribute('data-narrow')
+      expect(within(only!).getByTestId('narrow-title')).toHaveTextContent(
+        'rebuild run detail as a web pane set',
+      )
+      expect(within(only!).getByText('running')).toBeInTheDocument()
+      const meta = within(only!).getByTestId('narrow-meta')
+      expect(meta).toHaveTextContent('01JD5XAB')
+      expect(meta).toHaveTextContent('feature_build')
+      expect(meta).toHaveTextContent('review')
+      expect(meta).toHaveTextContent('4m')
+    })
+
+    it('calls an untitled run by its id, which the grid leaves to the RUN column', () => {
+      list({ rows: [row({ title: '' })] })
+
+      expect(screen.getByTestId('narrow-title')).toHaveTextContent('01JD5XAB')
+    })
+
+    it('keeps the ⚠ beside the node, and the whole id in the title attribute', () => {
+      list({
+        rows: [
+          row({ id: 'A', current_nodes: ['review'], pending_requests: 2 }),
+          row({ id: 'B', current_nodes: ['qa'], pending_requests: 0 }),
+        ],
+      })
+
+      expect(within(rows()[0]!).getByTestId('narrow-meta')).toHaveTextContent('⚠')
+      expect(within(rows()[1]!).getByTestId('narrow-meta')).not.toHaveTextContent('⚠')
+      expect(screen.getByTitle('2 waiting on you')).toBeInTheDocument()
+      expect(rows()[0]).toHaveAttribute('title', 'A')
+    })
+
+    it('selects on a tap exactly as the grid does on a click', async () => {
+      const onSelect = vi.fn()
+      list({ rows: [row({ id: 'A' }), row({ id: 'B' })], onSelect })
+
+      await userEvent.click(rows()[1]!)
+      expect(onSelect).toHaveBeenCalledWith('B')
+      expect(rows()[1]).toHaveAttribute('aria-selected', 'false')
+    })
+
+    it('keeps `n shown` in the footer strip', () => {
+      list({ rows: [row(), row({ id: 'B' })] })
+
+      expect(screen.getByTestId('rows-shown')).toHaveTextContent('2 shown')
+    })
   })
 })

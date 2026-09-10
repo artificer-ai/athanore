@@ -92,6 +92,26 @@ of TOML nobody executes.
 - **Footer**: key-hint chips (accent-tinted keycaps) and the
   `^p palette` button.
 
+That layout is the one at Tailwind's `md` (768 px) and above. Below it —
+"narrow" — the SPA keeps the same four regions and shows **one** middle
+region at a time: the run list while `?run=` is unset, the detail pane
+while it is set, with the pane bar's left slot carrying a back control
+(`aria-label="back to runs"`) that clears it. The splitter is not
+mounted there and `listWidth` / `listCollapsed` are inert, kept rather
+than cleared; the run list's rows become two lines; the header wraps,
+with the chips and the `/` filter as a strip that scrolls horizontally
+within itself; the footer drops the keycaps and keeps the palette
+button; interactive chrome carries a 24×24 px hit area (WCAG 2.5.8). The
+keyboard map stays fully bound at every width. 21 §Narrow layout is
+normative for all of it, D194 for the breakpoint, and the shell reads
+the width through one `matchMedia` hook (`lib/useIsNarrow.ts`) so the
+CSS's breakpoint and JavaScript's cannot drift.
+
+At 390 px the header's first block occupies two lines of its own — the
+brand, version and counts, then `＋ new run`, `workflows` and the
+text-size button — with the filter strip below them, because nothing in
+it is dropped or shrunk to make one line of it (D201).
+
 ## Panes (cycle order)
 
 Builtins first, then the selected run's plugin panes (09). `←`/`→` cycle
@@ -220,6 +240,16 @@ surface panel, 1 px neutral-800 border, 8 px radius, `--shadow-lg`.
   of nodes.
 - **Keys** (`?`): the footer chips, expanded.
 
+Below the breakpoint every one of them is capped to the viewport less an
+8 px backdrop margin in both directions, with its content scrolling
+inside the panel and never the page; the palette runs the width of the
+screen, new run / edit span it with the chip group wrapping, and the
+workflow library and the task drawer become full-screen sheets — the
+library stacking its two columns, list over source viewer. Because a
+sheet leaves no backdrop to tap, every overlay header carries a real
+close button (`aria-label="close"`) there in place of its `esc …` hint;
+`esc` and the backdrop keep working everywhere (21 §Overlays, narrow).
+
 ## Keyboard
 
 Exactly the mock's map, which is the TUI's: `↑`/`↓` or `j`/`k` select,
@@ -328,7 +358,14 @@ attributes.
   `web/e2e/a11y.spec.ts` rather than by Lighthouse, which does not run
   under Playwright: the score is the share of the rules axe evaluated on
   the page that passed, and **no violation may be `serious` or
-  `critical`** whatever that share says (D178, D179).
+  `critical`** whatever that share says (D178, D179). The floor holds in
+  four states of that page, because they are four documents: the empty
+  dashboard, the loaded one, the loaded one at `xlarge`, and the loaded
+  one at 390×844 — both of its narrow regions (D197).
+- Touch targets in the narrow chrome are at least 24×24 CSS px (WCAG
+  2.5.8); the visual size stays the mock's. `web/e2e/mobile.spec.ts`
+  drives the five flows of 21 §Touch operation with `tap()` alone and
+  asserts no horizontal page scroll in any of them.
 
 ## Auth in the browser
 

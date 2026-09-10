@@ -23,6 +23,15 @@
  * outline rather than the accent one, because there is one primary
  * button in the app (10 §Components).
  *
+ * Below the breakpoint the strip wraps (21 §Narrow layout): the brand,
+ * the version, the counts and the three controls above, and the workflow
+ * chips and the `/` filter below them as one horizontally scrollable
+ * row. Nothing is dropped and nothing shrinks — the strip scrolls
+ * *itself*, which is the one horizontal scroll 21 allows, and the page
+ * never does. The wrapper around `RunFilters` is `display: contents` at
+ * `md` and above, so the two controls stay direct children of this flex
+ * box there and the desktop strip is the same box it was.
+ *
  * {@link FontSizeMenu} sits beside them: the header is the one chrome
  * that is always on screen, which is why the type-size chooser lives
  * here rather than behind a settings overlay the SPA does not have
@@ -42,6 +51,14 @@ const VERSION = __APP_VERSION__
 
 /** A count the server has not given yet (02 §Real data only). */
 const UNKNOWN = '—'
+
+/**
+ * The touch target of WCAG 2.5.8 on the narrow chrome's controls.
+ *
+ * A minimum and not a size: at 12 px the two header buttons already
+ * clear it, and this is what keeps them clearing it at `small`.
+ */
+const TOUCH = 'max-md:min-h-[24px] max-md:min-w-[24px]'
 
 /**
  * The type-size chooser: an icon-only button opening a popover with the
@@ -153,14 +170,22 @@ export function Header({
 
       <div className="flex-1" />
 
-      <RunFilters workflows={runs.workflows} />
+      {/* `contents` above the breakpoint: the chips and the `/` box are
+          the header's own flex children there, and this element draws
+          nothing. Below it they are one strip on a line of their own
+          (`basis-full`), scrolling sideways within itself — `order-last`
+          because the two buttons stay above it whatever the wrap does.
+          The scrollbar is hidden, not the scrolling. */}
+      <div className="contents max-md:order-last max-md:flex max-md:basis-full max-md:items-center max-md:gap-[8px] max-md:overflow-x-auto max-md:pb-[2px] max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden">
+        <RunFilters workflows={runs.workflows} />
+      </div>
 
       {/* The one primary button in the app: outlined with the accent as
           border and text, never as a fill (10 §Components, §Tokens). */}
       <button
         type="button"
         onClick={onNewRun}
-        className="text-meta cursor-pointer rounded-lg border border-[var(--color-accent-700)] px-[10px] py-[4px] text-[var(--color-accent-200)] hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-900)]"
+        className={`text-meta cursor-pointer rounded-lg border border-[var(--color-accent-700)] px-[10px] py-[4px] text-[var(--color-accent-200)] hover:border-[var(--color-accent)] hover:bg-[var(--color-accent-900)] ${TOUCH}`}
       >
         <span aria-hidden>＋ </span>new run
       </button>
@@ -170,7 +195,7 @@ export function Header({
       <button
         type="button"
         onClick={onOpenLibrary}
-        className="text-meta cursor-pointer rounded-lg border border-border px-[10px] py-[4px] text-[var(--color-neutral-400)] hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)]"
+        className={`text-meta cursor-pointer rounded-lg border border-border px-[10px] py-[4px] text-[var(--color-neutral-400)] hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)] ${TOUCH}`}
       >
         workflows
       </button>

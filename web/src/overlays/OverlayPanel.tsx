@@ -22,6 +22,15 @@
  * after the panel does (`./NewRun.tsx`) and rewriting them is not this
  * task; the three overlays that have nothing to thread share it here
  * rather than making three more copies (D175).
+ *
+ * **Narrow** (21 §Overlays, narrow), the panel is capped to the viewport
+ * less the backdrop margin in both directions, and whatever is inside it
+ * scrolls rather than the page: an overlay that does not fit a phone is
+ * an overlay a phone cannot use, and a `100vw` panel with an 8 px margin
+ * is the widest one that still reads as a dialog over the app. A `sheet`
+ * takes the whole screen instead — the task drawer is a screenful of one
+ * attempt, and the library is two columns stacked, so a margin around
+ * either would be a frame around a page.
  */
 import { Dialog } from 'radix-ui'
 import { useRef, type ReactNode, type RefObject } from 'react'
@@ -30,6 +39,26 @@ import { useKeyOwner } from '../keys'
 
 /** Where the panel sits: near the top like a palette, or centred. */
 export type OverlayPlacement = 'top' | 'centre'
+
+/**
+ * The narrow caps of 21 §Overlays: the viewport less an 8 px backdrop
+ * margin on each side. Written as literals, because Tailwind reads
+ * these files as text and a class name assembled out of a constant is
+ * a class name it never generates.
+ *
+ * They are a second table beside {@link PLACEMENTS} rather than more
+ * words in it, because a sheet takes neither: two `max-md:top-…` rules
+ * of equal weight in one class attribute are decided by the order
+ * Tailwind emitted them in, which is not a thing this file should be
+ * relying on.
+ */
+const NARROW: Record<OverlayPlacement, string> = {
+  // 8 px down, so the cap has to leave 8 px under it as well.
+  top: 'max-md:top-[8px] max-md:max-h-[calc(100dvh-24px)]',
+  centre: 'max-md:max-h-[calc(100dvh-16px)]',
+}
+
+const NARROW_WIDTH = 'max-md:max-w-[calc(100vw-16px)]'
 
 /**
  * Where the panel sits and how tall it may get.
@@ -41,9 +70,20 @@ export type OverlayPlacement = 'top' | 'centre'
  */
 const PLACEMENTS: Record<OverlayPlacement, string> = {
   top: 'top-[12vh] left-1/2 -translate-x-1/2 max-h-[76vh]',
-  centre:
-    'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 max-h-[calc(100dvh-48px)]',
+  centre: 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 max-h-[calc(100dvh-48px)]',
 }
+
+/**
+ * The full-screen sheet of 21 §Overlays, narrow: no margin, no corner
+ * radius and no centring transform.
+ *
+ * The height is `inset-0` and not `100dvh`: pinning all four edges is
+ * the one measurement of the viewport that cannot disagree with itself,
+ * and it is the viewport the panel is actually in rather than the one
+ * `dvh` reports.
+ */
+const SHEET =
+  'max-md:inset-0 max-md:max-h-none max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none'
 
 export function OverlayDialog({
   open,
@@ -51,6 +91,7 @@ export function OverlayDialog({
   testId,
   width,
   placement = 'centre',
+  sheet = false,
   focusRef,
   children,
 }: {
@@ -61,6 +102,12 @@ export function OverlayDialog({
   /** The panel's width utility, which differs per overlay. */
   width: string
   placement?: OverlayPlacement
+  /**
+   * Below the breakpoint, take the whole screen instead of sitting in
+   * the middle of it (21 §Overlays, narrow). Nothing changes at `md`
+   * and above.
+   */
+  sheet?: boolean
   /**
    * What takes focus when the panel opens. Defaults to the panel, which
    * is what a dialog with nothing to type in wants.
@@ -115,7 +162,7 @@ export function OverlayDialog({
             restoreFocusTo.current?.focus()
             restoreFocusTo.current = null
           }}
-          className={`text-body fixed z-50 flex flex-col overflow-hidden rounded-lg border border-[var(--color-neutral-800)] bg-[var(--color-surface)] text-foreground shadow-[var(--shadow-lg)] ${PLACEMENTS[placement]} ${width}`}
+          className={`text-body fixed z-50 flex flex-col overflow-hidden rounded-lg border border-[var(--color-neutral-800)] bg-[var(--color-surface)] text-foreground shadow-[var(--shadow-lg)] ${PLACEMENTS[placement]} ${width} ${sheet ? SHEET : `${NARROW[placement]} ${NARROW_WIDTH}`}`}
         >
           {children}
         </Dialog.Content>
@@ -157,7 +204,32 @@ export function OverlayHeader({
       )}
       <div className="flex-1" />
       {children}
-      <span className="text-hint whitespace-nowrap text-muted-foreground">{hint}</span>
+      <span className="text-hint whitespace-nowrap text-muted-foreground max-md:hidden">
+        {hint}
+      </span>
+      <OverlayClose />
     </div>
+  )
+}
+
+/**
+ * The close affordance every overlay carries below the breakpoint (21
+ * §Overlays, narrow).
+ *
+ * The hint it stands in for — `esc close`, `esc cancel` — names a key a
+ * touch device has not got, and a full-screen sheet has no backdrop left
+ * to tap; so narrow gets a real button, sized to WCAG 2.5.8's 24 px, and
+ * the desktop strip is untouched. It is Radix's `Close`, so it goes out
+ * through the same `onOpenChange` `esc` and the backdrop do and no
+ * overlay has to be handed its own `onClose` twice.
+ */
+export function OverlayClose() {
+  return (
+    <Dialog.Close
+      aria-label="close"
+      className="hidden min-h-[24px] min-w-[24px] items-center justify-center rounded-lg border border-[var(--color-neutral-800)] text-[var(--color-neutral-400)] max-md:inline-flex"
+    >
+      <span aria-hidden>✕</span>
+    </Dialog.Close>
   )
 }

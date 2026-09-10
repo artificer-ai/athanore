@@ -185,12 +185,14 @@ fluid, not a second fixed design. Strips that manage their own overflow
 
 ### Regions, narrow
 
-- **Header**: wraps to two rows — brand, version, counts and the two
-  buttons; then the workflow chips and the `/` filter as a horizontally
-  scrollable strip. Nothing is dropped: `＋ new run` and `workflows`
-  stay visible as touch targets. Interactive controls in the narrow
-  chrome MUST have hit areas of at least 24×24 CSS px (WCAG 2.5.8);
-  visual size may stay the mock's.
+- **Header**: wraps — brand, version, counts and the two buttons; then
+  the workflow chips and the `/` filter as a horizontally scrollable
+  strip. As implemented (D201 (1)) that is three rows at 390 px, not
+  two: the chrome measures about 500 px against 362 px of usable width,
+  so it takes two lines of its own above the filter strip. Nothing is
+  dropped: `＋ new run` and `workflows` stay visible as touch targets.
+  Interactive controls in the narrow chrome MUST have hit areas of at
+  least 24×24 CSS px (WCAG 2.5.8); visual size may stay the mock's.
 - **Run list**: the six-column grid gives way to a two-line row —
   line 1: TITLE (the run id when untitled) and the STATUS pill;
   line 2: `run id · workflow · node · age` in `text-meta`, with the `⚠`

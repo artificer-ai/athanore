@@ -23,8 +23,24 @@ const BUILTIN_WORKFLOW = '_builtin'
 /** How long a run of the fixture workflows may take to reach a state. */
 export const RUN_TIMEOUT = 30_000
 
+/**
+ * The viewport the mobile gate is pinned to: one iPhone-class screen,
+ * with `hasTouch` and `isMobile`, and every activation a `tap()` (D197,
+ * `../mobile.spec.ts`).
+ */
+export const NARROW_VIEWPORT = { width: 390, height: 844 }
+
 /** The workflows `support/server.ts` registers (`../workflows.py`). */
 export type FixtureWorkflow = 'probe' | 'spread' | 'hold' | 'plugged'
+
+/**
+ * How a control is activated: with a mouse, or with a finger.
+ *
+ * The mobile spec passes `tap` everywhere, because a `click()` that
+ * passes says nothing about whether a touch device can operate the app
+ * (D197); every other spec takes the default.
+ */
+export type Gesture = 'click' | 'tap'
 
 export class Dashboard {
   readonly page: Page
@@ -82,14 +98,28 @@ export class Dashboard {
 
   // -- submitting ------------------------------------------------------
 
-  /** Submit a run the way an operator does: the New Run overlay. */
-  async submit(workflow: FixtureWorkflow, title: string): Promise<void> {
-    await this.page.getByRole('button', { name: 'new run', exact: true }).click()
+  /**
+   * Submit a run the way an operator does: the New Run overlay.
+   *
+   * The title is typed rather than activated whichever gesture is
+   * asked for — an on-screen keyboard into a focused input is how a
+   * phone types, and 21 §Touch operation says so in as many words.
+   */
+  async submit(
+    workflow: FixtureWorkflow,
+    title: string,
+    by: Gesture = 'click',
+  ): Promise<void> {
+    const act = async (target: Locator) => {
+      if (by === 'tap') await target.tap()
+      else await target.click()
+    }
+    await act(this.page.getByRole('button', { name: 'new run', exact: true }))
     const panel = this.page.getByTestId('new-run')
     await expect(panel).toBeVisible()
-    await panel.getByRole('radio', { name: workflow, exact: true }).click()
+    await act(panel.getByRole('radio', { name: workflow, exact: true }))
     await panel.locator('#new-run-title').fill(title)
-    await panel.getByRole('button', { name: 'submit run' }).click()
+    await act(panel.getByRole('button', { name: 'submit run' }))
     await expect(panel).toBeHidden()
     await expect(this.row(title)).toBeVisible()
   }
@@ -202,16 +232,67 @@ export class Dashboard {
    * state, because the locator a spec found a *pending* request with
    * stops matching the moment it is answered.
    */
-  async answer(card: Locator, optionId: string): Promise<Locator> {
+  async answer(
+    card: Locator,
+    optionId: string,
+    by: Gesture = 'click',
+  ): Promise<Locator> {
     const id = await card.getAttribute('data-request')
     if (id === null) throw new Error('that is not a request card')
-    await card.locator(`[data-testid="request-option"][data-option="${optionId}"]`).click()
+    const option = card.locator(
+      `[data-testid="request-option"][data-option="${optionId}"]`,
+    )
+    if (by === 'tap') await option.tap()
+    else await option.click()
     await expect(
       this.page.locator(
         `[data-testid="request-card"][data-request="${id}"][data-state="pending"]`,
       ),
     ).toHaveCount(0, { timeout: RUN_TIMEOUT })
     return this.request(id)
+  }
+
+  // -- narrow chrome ---------------------------------------------------
+
+  /**
+   * Open the palette the way a phone does: the footer button, tapped.
+   *
+   * `^p` is the desktop route and stays bound at every width; the button
+   * is the one 21 §Narrow layout leaves in the footer, and the palette
+   * behind it is the touch route to every operator action (D176).
+   */
+  async tapPalette(): Promise<Locator> {
+    await this.page.getByRole('button', { name: 'palette' }).tap()
+    const palette = this.page.getByTestId('palette')
+    await expect(palette).toBeVisible()
+    return palette
+  }
+
+  /** Run one palette command by touch: the button, then the row. */
+  async tapCommand(name: string): Promise<void> {
+    const palette = await this.tapPalette()
+    await palette.locator(`[cmdk-item][data-value="${name}"]`).tap()
+    await expect(palette).toBeHidden()
+  }
+
+  /** The pane bar's back control, below the breakpoint (21 §Narrow). */
+  back(): Locator {
+    return this.page.getByRole('button', { name: 'back to runs' })
+  }
+
+  /** The pane bar's `▶`: the touch route through the pane cycle. */
+  nextPane(): Locator {
+    return this.page.getByRole('button', { name: 'next pane' })
+  }
+
+  /** What the pane bar says the current pane is, `NAME (i/n)`. */
+  paneLabel(): Locator {
+    return this.page.getByTestId('pane-label')
+  }
+
+  /** The close affordance every overlay's header carries when narrow. */
+  overlayClose(panel: Locator): Locator {
+    return panel.getByRole('button', { name: 'close' })
   }
 
   // -- the type scale --------------------------------------------------
