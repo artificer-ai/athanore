@@ -172,12 +172,25 @@ class AthanoreSettings(BaseSettings):
     agent_command: str | list[str] | None = None
     cors_origins: list[str] = Field(default_factory=list)
     #: Origins a plugin's `custom` pane may load scripts, styles and
-    #: fonts from, on top of ``'self'`` (09 §Escape hatch, D211). Empty by
-    #: default, which is the airtight policy every install had before the
-    #: setting existed: turning it on is a deployment's decision, not a
-    #: plugin author's. ``connect-src`` is deliberately *not* widened —
-    #: a CDN script may run, but may only talk back to this server.
-    plugin_cdns: list[str] = Field(default_factory=list)
+    #: fonts from, on top of ``'self'`` (09 §Escape hatch, D211).
+    #:
+    #: Three immutable, versioned CDNs by default, so a plugin author gets
+    #: a library without a build step and without every install needing an
+    #: `athanore.toml`. ``[]`` restores the airtight policy; a bare
+    #: ``"https:"`` opens it to any origin, which is supported and not
+    #: recommended — `'self'` plus these three is what keeps an injected
+    #: ``<script src>`` from reaching code, and that backstop is worth
+    #: more than the convenience of a fourth CDN.
+    #:
+    #: ``connect-src`` is deliberately never widened: a CDN script may
+    #: run, but may only talk back to this server.
+    plugin_cdns: list[str] = Field(
+        default_factory=lambda: [
+            "https://cdn.jsdelivr.net",
+            "https://unpkg.com",
+            "https://esm.sh",
+        ]
+    )
     log_format: Literal["pretty", "json"] | None = None
     stream_flush_interval: float = 0.4
     run_migrations: bool = True
@@ -199,7 +212,15 @@ class AthanoreSettings(BaseSettings):
 
         cleaned: list[str] = []
         for value in values:
-            parsed = urlparse(value.strip())
+            bare = value.strip()
+            # `https:` alone is a CSP *scheme source*: any origin over
+            # that scheme. Supported so "allow everything" is one entry
+            # rather than a fork of this function, and left un-parsed
+            # because there is no host in it to check.
+            if bare in ("https:", "http:"):
+                cleaned.append(bare)
+                continue
+            parsed = urlparse(bare)
             if parsed.scheme not in ("https", "http") or not parsed.netloc:
                 raise ValueError(
                     f"plugin_cdns entries are origins like "
