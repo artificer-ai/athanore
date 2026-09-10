@@ -28,7 +28,7 @@
  *   rather than `0 · 0s` (01 §Real data only).
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createAppQueryClient } from '../../api/client'
@@ -557,6 +557,136 @@ describe('panning and zooming', () => {
     expect(screen.queryByTestId('rf__controls')).toBeNull()
     expect(screen.getAllByTestId('graph-legend-row')).not.toHaveLength(0)
     expect(cards()).not.toHaveLength(0)
+  })
+})
+
+/* -------------------------------------------------------------------- */
+/* Which of the two layouts the pane draws                               */
+/* -------------------------------------------------------------------- */
+
+/**
+ * A `ResizeObserver` that reports what a test tells it to.
+ *
+ * `src/test-setup.ts` installs one that observes nothing, which is the
+ * truth of jsdom — and it is why every other case in this file gets the
+ * layout the viewport implies. These cases are about the other input:
+ * the pane's own width, which in a browser is the viewport minus the run
+ * list, minus the splitter, divided by the pane cycle.
+ */
+class MeasuringResizeObserver implements ResizeObserver {
+  static width = 0
+  static readonly live = new Set<MeasuringResizeObserver>()
+
+  readonly callback: ResizeObserverCallback
+  readonly targets: Element[] = []
+
+  constructor(callback: ResizeObserverCallback) {
+    this.callback = callback
+  }
+
+  observe(target: Element): void {
+    MeasuringResizeObserver.live.add(this)
+    this.targets.push(target)
+    this.report()
+  }
+
+  unobserve(): void {}
+
+  disconnect(): void {
+    MeasuringResizeObserver.live.delete(this)
+  }
+
+  /**
+   * The observed boxes, with their real elements.
+   *
+   * React Flow observes its own container through the same global, and
+   * reads the element back out of the entry, so a stand-in that reported
+   * a bare rectangle would break the library rather than the pane.
+   */
+  report(): void {
+    this.callback(
+      this.targets.map(
+        (target) =>
+          ({
+            target,
+            contentRect: { width: MeasuringResizeObserver.width },
+          }) as ResizeObserverEntry,
+      ),
+      this,
+    )
+  }
+}
+
+/** Draw the pane in a box `width` px wide, whatever the window says. */
+function drawInPane(width: number) {
+  MeasuringResizeObserver.width = width
+  const real = globalThis.ResizeObserver
+  globalThis.ResizeObserver =
+    MeasuringResizeObserver as unknown as typeof ResizeObserver
+  try {
+    act(() => {
+      draw()
+    })
+  } finally {
+    globalThis.ResizeObserver = real
+  }
+}
+
+/** `stacked` or `split`, as the pane itself reports it. */
+function layoutDrawn(): string | null {
+  return screen.getByTestId('graph-frame').getAttribute('data-layout')
+}
+
+describe('the layout follows the pane, not the window', () => {
+  afterEach(() => {
+    MeasuringResizeObserver.live.clear()
+  })
+
+  it('stacks a pane too narrow for both columns, above the breakpoint', () => {
+    // A 900 px window leaves the pane about this much once the run list
+    // and the splitter have taken their share. The CSS breakpoint calls
+    // that a desktop; the pane is not one (D206 (10)).
+    drawInPane(460)
+
+    expect(layoutDrawn()).toBe('stacked')
+    // Which is the same pane the phone gets: a fitted picture, the EDGES
+    // block underneath, and nothing to pan with.
+    expect(screen.queryByTestId('rf__controls')).toBeNull()
+    expect(cards()).not.toHaveLength(0)
+    expect(screen.getAllByTestId('graph-legend-row')).not.toHaveLength(0)
+  })
+
+  it('splits a pane with room for both, below the breakpoint', () => {
+    // The other direction, and the reason this is measured rather than
+    // queried: `b` hides the run list, which hands the pane the window.
+    narrowViewport()
+    drawInPane(700)
+
+    expect(layoutDrawn()).toBe('split')
+    expect(screen.getByTestId('rf__controls')).toBeInTheDocument()
+  })
+
+  it('splits at the width the two columns need, and stacks a pixel under it', () => {
+    // 320 (the canvas basis) + 26 (the gutter) + 210 (the aside's).
+    drawInPane(556)
+    expect(layoutDrawn()).toBe('split')
+
+    cleanup()
+    drawInPane(555)
+    expect(layoutDrawn()).toBe('stacked')
+  })
+
+  it('falls back to the window until the pane has been measured', () => {
+    // The first paint happens before the observer's first callback, and
+    // a hidden pane never reports a width at all.
+    narrowViewport()
+    draw()
+    expect(layoutDrawn()).toBe('stacked')
+
+    cleanup()
+    wideViewport()
+    draw()
+    expect(layoutDrawn()).toBe('split')
   })
 })
 

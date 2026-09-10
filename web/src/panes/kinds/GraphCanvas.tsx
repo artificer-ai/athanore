@@ -22,9 +22,12 @@
  * **The shape is `./graph.ts`.** Where every card sits, how tall it is,
  * which chips it draws, which handles an edge leaves and arrives on and
  * what the detail line says are all decided there, without a DOM; this
- * file paints them. Nothing here measures anything: every node carries
+ * file paints them. Nothing here measures a *node*: every node carries
  * an explicit `width` and `height`, which is what React Flow calls
- * measured (D206 (4)).
+ * measured (D206 (4)). The one box this file does measure is the pane
+ * itself, because which of the two layouts it draws is a fact about how
+ * much room the pane has and not about how wide the window is (D206
+ * (10)).
  *
  * **Three requests, all of them the app's own cache entries.** The graph
  * is the generated query, so it is the entry `run.*` and `task.*`
@@ -68,6 +71,7 @@ import {
 import type { GraphNode } from '../../api/gen/types.gen'
 import { toneClass, tonePulses, useNow } from '../../components/RunList'
 import { actionError } from '../../lib/errors'
+import { useElementWidth } from '../../lib/useElementWidth'
 import { useIsNarrow } from '../../lib/useIsNarrow'
 import { cn } from '../../lib/utils'
 import { PlaceholderCard } from './cards'
@@ -290,6 +294,20 @@ const GraphNodeCard = memo(function GraphNodeCard({
  */
 const NODE_TYPES = { athanore: GraphNodeCard }
 
+/**
+ * The narrowest pane that can hold the canvas and the EDGES block side by
+ * side: the canvas's flex basis (320 px, a 208 px card and room to
+ * breathe), the 26 px gutter, and the aside's (210 px). D206 (10).
+ *
+ * Below it the two columns become one, because neither can shrink any
+ * further and be worth drawing — a 118 px canvas is half a card, and the
+ * cards do not scroll into reach, they are clipped. This is a width of
+ * the *pane*, not of the window: at Tailwind's `md` with the run list
+ * shown the pane is around 330 px, which is why the breakpoint alone
+ * cannot answer this.
+ */
+const SPLIT_WIDTH = 556
+
 /** What the right-click menu is open on, and where it was opened. */
 type Menu = { node: GraphNode; x: number; y: number }
 
@@ -478,7 +496,17 @@ export function GraphCanvas({
   const { data: graph, isError, error } = useGraph(runId)
   const { data: source } = useSource(workflow)
   const queryClient = useQueryClient()
+
+  // Which of the two layouts this pane draws is a question about the
+  // *pane*, not the viewport: the run list, the splitter and the pane
+  // cycle all take width off it, so a 900 px window leaves ~460 px here
+  // and a 768 px one with the run list hidden leaves ~740 px. Until the
+  // observer has answered, the viewport is the best guess available, and
+  // it is the right one at both ends — a phone is stacked and a desktop
+  // pane is not.
+  const [measure, paneWidth] = useElementWidth()
   const narrow = useIsNarrow()
+  const stacked = paneWidth === null ? narrow : paneWidth < SPLIT_WIDTH
 
   // The elapsed half of `attempt n · elapsed` is `now − started`, and the
   // finest unit it prints is a second — the same reason the run list's
@@ -610,14 +638,34 @@ export function GraphCanvas({
       ) : graph === undefined ? (
         <Status>loading the graph…</Status>
       ) : (
-        /* At `md` and above the canvas fills the pane and the aside
-           scrolls beside it; below it the canvas is a fitted picture of
-           fixed height with the EDGES block underneath, and the pane
-           scrolls as one (21 §Narrow layout). */
-        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-[14px] pb-[18px] md:flex-row md:items-stretch md:gap-x-[26px] md:overflow-hidden">
-          <div className="h-[320px] flex-none md:h-auto md:min-h-0 md:min-w-0 md:flex-1">
+        /* Wide enough for both columns, the canvas fills the pane and the
+           aside scrolls beside it; stacked, the canvas is a fitted
+           picture of fixed height with the EDGES block underneath, and
+           the pane scrolls as one (21 §Narrow layout, D206 (10)). */
+        <div
+          ref={measure}
+          data-testid="graph-frame"
+          data-layout={stacked ? 'stacked' : 'split'}
+          className={
+            stacked
+              ? 'flex min-h-0 flex-1 flex-col overflow-y-auto px-[14px] pb-[18px]'
+              : 'flex min-h-0 flex-1 flex-row items-stretch gap-x-[26px] overflow-hidden px-[14px] pb-[18px]'
+          }
+        >
+          <div
+            className={
+              stacked
+                ? 'h-[320px] flex-none'
+                : 'h-auto min-h-0 min-w-0 flex-[2_1_320px]'
+            }
+          >
             <ReactFlow<GraphFlowNode>
-              key={runId}
+              /* `fitView` is solved once, when the nodes are first
+                 measured, and a container that changes size afterwards
+                 does not re-solve it. Both the run and the layout change
+                 what the right fit is — the two layouts do not even share
+                 a floor — so both are in the key. */
+              key={`${runId ?? ''}/${stacked ? 'stacked' : 'split'}`}
               nodes={layout.nodes}
               edges={layout.edges}
               nodeTypes={NODE_TYPES}
@@ -625,15 +673,15 @@ export function GraphCanvas({
               fitView
               /* The fit gets its own floor, because `getViewportForBounds`
                  clamps the zoom it solves to `fitViewOptions.minZoom ??
-                 minZoom`. Below the breakpoint there is no pan, no pinch
-                 and no controls, so a fit floored at the interaction floor
+                 minZoom`. Stacked there is no pan, no pinch and no
+                 controls, so a fit floored at the interaction floor
                  would put the top and bottom of a tall graph — eight ranks
                  is `examples/feature_build` — out of reach for good. The
                  picture shrinks instead (D206 (7)). */
               fitViewOptions={{
                 padding: 0.15,
                 maxZoom: 1,
-                minZoom: narrow ? 0.05 : 0.4,
+                minZoom: stacked ? 0.05 : 0.4,
               }}
               minZoom={0.4}
               maxZoom={1.6}
@@ -645,8 +693,8 @@ export function GraphCanvas({
               zoomOnScroll={false}
               zoomOnDoubleClick={false}
               preventScrolling={false}
-              panOnDrag={!narrow}
-              zoomOnPinch={!narrow}
+              panOnDrag={!stacked}
+              zoomOnPinch={!stacked}
               aria-label={
                 workflow === undefined ? 'workflow graph' : `workflow graph for ${workflow}`
               }
@@ -661,11 +709,17 @@ export function GraphCanvas({
                 setMenu(null)
               }}
             >
-              {!narrow && <Controls showInteractive={false} position="bottom-left" />}
+              {!stacked && <Controls showInteractive={false} position="bottom-left" />}
             </ReactFlow>
           </div>
 
-          <div className="flex flex-none flex-col md:w-[300px] md:overflow-y-auto">
+          <div
+            className={
+              stacked
+                ? 'flex flex-none flex-col'
+                : 'flex min-w-0 max-w-[300px] flex-[1_1_210px] flex-col overflow-y-auto'
+            }
+          >
             <Aside
               legend={legend}
               {...(source?.file === undefined ? {} : { file: source.file })}

@@ -231,12 +231,21 @@ contents when the run is opened and refits when the selection changes;
 `<Controls>` carries zoom in / out / fit as real buttons, dragging pans,
 and the wheel belongs to the pane. Nodes are not draggable: their
 positions are derived from the response, so a dragged node would snap
-back on the next invalidation. Below the `md` breakpoint the canvas is a
-fitted picture with no pan, no zoom and no controls, and the `EDGES`
-block underneath carries the detail (21 §Narrow layout). The fit has a
-zoom floor of its own there, far under the one the zoom buttons stop at:
-with no gesture to recover a clipped picture with, a graph taller than
-the canvas shrinks rather than losing its ends (D206 (7)).
+back on the next invalidation.
+
+**Two columns while the pane can hold two, one when it cannot.** The
+canvas and the `EDGES` block sit side by side above 556 px of pane — the
+canvas's 320 px basis, the 26 px gutter, and the aside's 210 px — and
+below it they stack: the canvas becomes a fitted picture of fixed height
+with no pan, no zoom and no controls, the `EDGES` block goes underneath,
+and the pane scrolls as one (21 §Narrow layout). That threshold is a
+width of the **pane**, measured, not of the window: the run list, the
+splitter and the pane cycle all take width off it, so a 900 px window
+leaves this pane around 460 px and the `md` breakpoint alone gets the
+answer wrong (D206 (10)). The fit has a zoom floor of its own when
+stacked, far under the one the zoom buttons stop at: with no gesture to
+recover a clipped picture with, a graph taller than the canvas shrinks
+rather than losing its ends (D206 (7)).
 
 Clicking a node jumps to the log pane filtered to that node; right-click
 offers rerun here / move task here (move is disabled for join nodes).
