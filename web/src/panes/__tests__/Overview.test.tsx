@@ -26,6 +26,7 @@ import {
   Overview,
   PREVIEW_LENGTH,
   asOverview,
+  formatAbout,
   formatCost,
   formatCount,
   formatSeconds,
@@ -177,12 +178,10 @@ describe('the kv meta grid', () => {
   it('draws 10 §Panes’ fields, humanising AGE and cutting SESSION to 8', () => {
     draw(OVERVIEW_SOURCE, { detail: runDetail() })
 
-    const meta = within(screen.getByTestId('overview-meta'))
+    const grid = screen.getByTestId('overview-meta')
+    const meta = within(grid)
     expect(meta.getByText('RUN').nextSibling).toHaveTextContent(OVERVIEW_RUN)
     expect(meta.getByText('WORKFLOW').nextSibling).toHaveTextContent('feature_build')
-    expect(meta.getByText('TITLE').nextSibling).toHaveTextContent(
-      'Rebuild run detail as a web pane set',
-    )
     // The run status and the node it is in, joined by the route.
     expect(meta.getByText('STATUS').nextSibling).toHaveTextContent(
       'running · engineering',
@@ -190,32 +189,134 @@ describe('the kv meta grid', () => {
     expect(meta.getByText('AGE').nextSibling).toHaveTextContent('4m')
     expect(meta.getByText('SESSION').nextSibling).toHaveTextContent('01a02310')
     expect(meta.getByText('AGENTS').nextSibling).toHaveTextContent('4')
-    expect(meta.getByText('DESCRIPTION').nextSibling).toHaveTextContent(
-      'Port the TUI pane cycle to the web app.',
-    )
+    // …and not the two the grid is the wrong shape for: they are the
+    // block's now, which is the whole of this change (15, D208).
+    expect(meta.queryByText('TITLE')).toBeNull()
+    expect(meta.queryByText('DESCRIPTION')).toBeNull()
+    const fields = [...grid.querySelectorAll('dt')].map((key) => key.textContent)
+    expect(fields).toEqual(['RUN', 'WORKFLOW', 'STATUS', 'AGE', 'SESSION', 'AGENTS'])
   })
 
   it('omits SESSION and AGENTS entirely when no agent has run', () => {
     draw(IDLE_OVERVIEW_SOURCE, { detail: runDetail({ status: 'queued' }) })
 
-    const meta = within(screen.getByTestId('overview-meta'))
+    const grid = screen.getByTestId('overview-meta')
+    const meta = within(grid)
     expect(meta.queryByText('SESSION')).toBeNull()
     expect(meta.queryByText('AGENTS')).toBeNull()
     // …and the fields that are facts about every run are still there.
     expect(meta.getByText('AGE').nextSibling).toHaveTextContent('1m')
+    const fields = [...grid.querySelectorAll('dt')].map((key) => key.textContent)
+    expect(fields).toEqual(['RUN', 'WORKFLOW', 'STATUS', 'AGE'])
+  })
+
+  it('is not drawn at all for a source whose meta held only those two', () => {
+    // The grid's guard is `Object.keys(meta).length > 0`, and after the
+    // move a meta of TITLE and DESCRIPTION formats to nothing — so the
+    // pane draws no section rather than `KvPane`'s "nothing to show".
+    draw({
+      ...OVERVIEW_SOURCE,
+      meta: { TITLE: 'only a title', DESCRIPTION: 'and a description' },
+    })
+
+    expect(screen.queryByTestId('overview-meta')).toBeNull()
+    expect(screen.getByTestId('overview-about')).toBeInTheDocument()
+  })
+})
+
+describe('the title and description block', () => {
+  it('draws both, labelled, from what the route sent', () => {
+    draw(OVERVIEW_SOURCE, { detail: runDetail() })
+
+    const about = within(screen.getByTestId('overview-about'))
+    expect(about.getByText('TITLE').nextSibling).toHaveTextContent(
+      'Rebuild run detail as a web pane set',
+    )
+    // Whole: the block is a layout, and nothing about the values changed.
+    expect(about.getByText('DESCRIPTION').nextSibling).toHaveTextContent(
+      'Port the TUI pane cycle to the web app.',
+    )
+  })
+
+  it('is a dl of its own, and its rows are not the grid’s', () => {
+    draw(OVERVIEW_SOURCE, { detail: runDetail() })
+
+    const block = screen.getByTestId('overview-about')
+    // Not `KvPane`: the whole point is that these two are out of the
+    // 240 px grid, so the block cannot be that grid drawn twice.
+    expect(within(block).queryByTestId('pane-kv')).toBeNull()
+    const lists = block.querySelectorAll('dl')
+    expect(lists).toHaveLength(1)
+    // Each key is a term and its value the description of it — the same
+    // pairing `KvPane` and the OUTPUTS list announce, one axis turned.
+    for (const key of block.querySelectorAll('dt')) {
+      expect(key.nextElementSibling?.tagName).toBe('DD')
+    }
+  })
+
+  it('sits under the meta grid and above NODES', () => {
+    const { container } = draw(OVERVIEW_SOURCE, { detail: runDetail() })
+
+    const sections = [...container.querySelectorAll('section')].map(
+      (section) =>
+        section.dataset['testid'] ?? section.getAttribute('aria-label') ?? '',
+    )
+    expect(sections).toEqual(['STATS', 'overview-meta', 'overview-about', 'NODES'])
   })
 
   it('keeps DESCRIPTION as a dash for a run that has none', () => {
-    // 10 §Panes: "DESCRIPTION is the run's, or `—`" — the one meta field
-    // the grid draws whether or not the route sent it, and the route
-    // sends it only for a run the operator wrote one for.
+    // 10 §Panes: "DESCRIPTION is the run's, or `—`" — the one field the
+    // block draws whether or not the route sent it, and the route sends
+    // it only for a run the operator wrote one for.
     draw(IDLE_OVERVIEW_SOURCE, { detail: runDetail({ status: 'queued' }) })
 
-    const grid = screen.getByTestId('overview-meta')
-    expect(within(grid).getByText('DESCRIPTION').nextSibling).toHaveTextContent('—')
-    // Last, where 10 lists it, and after the fields the route did send.
-    const fields = [...grid.querySelectorAll('dt')].map((key) => key.textContent)
-    expect(fields).toEqual(['RUN', 'WORKFLOW', 'TITLE', 'STATUS', 'AGE', 'DESCRIPTION'])
+    const about = within(screen.getByTestId('overview-about'))
+    expect(about.getByText('TITLE').nextSibling).toHaveTextContent('append log')
+    expect(about.getByText('DESCRIPTION').nextSibling).toHaveTextContent('—')
+    // …and the grid has no DESCRIPTION key at all any more.
+    const grid = within(screen.getByTestId('overview-meta'))
+    expect(grid.queryByText('DESCRIPTION')).toBeNull()
+  })
+
+  it('drops the TITLE row when the source sent no title', () => {
+    // An absent field is absent, not dashed: 10 gives the dash to
+    // DESCRIPTION and to nothing else.
+    draw({
+      ...OVERVIEW_SOURCE,
+      meta: { RUN: OVERVIEW_RUN, DESCRIPTION: 'only a description' },
+    })
+
+    const about = within(screen.getByTestId('overview-about'))
+    expect(about.queryByText('TITLE')).toBeNull()
+    expect(about.getByText('DESCRIPTION').nextSibling).toHaveTextContent(
+      'only a description',
+    )
+  })
+
+  it('is absent entirely when the source sent neither', () => {
+    // An `overview`-kind panel a plugin declares need not be about a run
+    // at all, and two dashes under it would be invented (01 §Real data).
+    draw({ ...OVERVIEW_SOURCE, meta: { RUN: OVERVIEW_RUN, WORKFLOW: 'w' } })
+
+    expect(screen.queryByTestId('overview-about')).toBeNull()
+    const grid = within(screen.getByTestId('overview-meta'))
+    expect(grid.getByText('RUN').nextSibling).toHaveTextContent(OVERVIEW_RUN)
+    expect(grid.getByText('WORKFLOW').nextSibling).toHaveTextContent('w')
+  })
+
+  it('does not cut a long description', () => {
+    // The block has the pane's width so a paragraph can use it; a clamp
+    // on the way there would undo the whole change.
+    const description = `${'a description far past the preview limit. '.repeat(8)}end.`
+    expect(description.length).toBeGreaterThan(PREVIEW_LENGTH)
+    draw({
+      ...OVERVIEW_SOURCE,
+      meta: { ...OVERVIEW_SOURCE.meta, DESCRIPTION: description },
+    })
+
+    expect(
+      within(screen.getByTestId('overview-about')).getByText('DESCRIPTION').nextSibling,
+    ).toHaveTextContent(description)
   })
 })
 
@@ -351,6 +452,26 @@ describe('the field rules', () => {
   it('cuts a long output value to a preview', () => {
     expect(preview('x'.repeat(200))).toHaveLength(PREVIEW_LENGTH + 1)
     expect(preview('a\n  b')).toBe('a b')
+  })
+
+  it('reads TITLE and DESCRIPTION out of the meta, or neither', () => {
+    // The block's whole reading rule: the dash belongs to DESCRIPTION,
+    // an absent title drops its row, and a meta with neither key draws
+    // no block rather than two invented fields.
+    expect(formatAbout({})).toBeNull()
+    expect(formatAbout({ RUN: OVERVIEW_RUN })).toBeNull()
+    expect(formatAbout({ TITLE: 'a title' })).toEqual({
+      title: 'a title',
+      description: '—',
+    })
+    expect(formatAbout({ DESCRIPTION: 'a description' })).toEqual({
+      title: null,
+      description: 'a description',
+    })
+    expect(formatAbout({ TITLE: 'a title', DESCRIPTION: 'a description' })).toEqual({
+      title: 'a title',
+      description: 'a description',
+    })
   })
 
   it('finds the latest attempt of a node, and none for one with no row', () => {

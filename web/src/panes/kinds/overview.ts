@@ -33,7 +33,8 @@ export const PREVIEW_LENGTH = 120
 /** What a field with nothing behind it reads as, as everywhere else. */
 const DASH = '—'
 
-/** The one meta field the grid keeps a row for when it is empty. */
+/** The two meta fields the grid is the wrong shape for (10 §Panes). */
+const TITLE_KEY = 'TITLE'
 const DESCRIPTION_KEY = 'DESCRIPTION'
 
 /**
@@ -107,15 +108,18 @@ export function formatMetric(metric: Metric): Metric {
  * Key order is the source's own, which is the order 10 lists the fields
  * in, so a field this build has no rule for still lands in its place.
  *
- * DESCRIPTION is the one field the grid draws whether or not the source
- * sent it: 10 §Panes says it "is the run's, or `—`", against the SESSION
- * and AGENTS beside it, which it says are omitted until an agent has
- * run. So a run nobody wrote a description for keeps the row and reads
- * `—`, and it lands last, where 10 lists it (15, D161).
+ * **TITLE and DESCRIPTION are deliberately not here** — a function
+ * called `formatMeta` that drops two of the meta keys is a thing to put
+ * back by accident. They are {@link formatAbout}'s, because the grid
+ * they used to sit in is `minmax(240px, 1fr)` wide and a description is
+ * written in a textarea and can be a paragraph (15, D208); the block
+ * that draws them has the pane's whole width.
  */
 export function formatMeta(meta: Record<string, unknown>): Record<string, string> {
   const out: Record<string, string> = {}
   for (const [key, value] of Object.entries(meta)) {
+    if (key === TITLE_KEY || key === DESCRIPTION_KEY) continue
+
     if (key === 'AGE') {
       out[key] =
         typeof value === 'number' && Number.isFinite(value)
@@ -130,8 +134,42 @@ export function formatMeta(meta: Record<string, unknown>): Record<string, string
       out[key] = formatValue(value)
     }
   }
-  if (!(DESCRIPTION_KEY in out)) out[DESCRIPTION_KEY] = DASH
   return out
+}
+
+/** The two fields the grid is the wrong shape for (10 §Panes). */
+export type RunAbout = {
+  /** The run's title, or `null` when the source sent none. */
+  title: string | null
+  /** The run's description, or `—` (10 §Panes, D161). */
+  description: string
+}
+
+/**
+ * The full-width TITLE and DESCRIPTION block, or nothing at all.
+ *
+ * DESCRIPTION is the one field drawn whether or not the source sent it:
+ * 10 §Panes says it "is the run's, or `—`", against the SESSION and
+ * AGENTS beside it, which it says are omitted until an agent has run.
+ * TITLE is not dashed — 10 gives the dash to DESCRIPTION and to nothing
+ * else, and the builtin's route always sends TITLE, so an absent one
+ * came from a panel that meant not to have one, and its row is dropped.
+ *
+ * `null` when the source sent **neither** key: an `overview`-kind panel
+ * a plugin declares need not be about a run at all (09 §Panel kinds),
+ * and drawing `TITLE —` and `DESCRIPTION —` under one would be this
+ * renderer inventing two fields nobody sent (01 §Real data only).
+ *
+ * Both values go through `formatValue` and nothing else — no preview,
+ * no truncation, no re-wrapping. The block is a layout, not a formatter.
+ */
+export function formatAbout(meta: Record<string, unknown>): RunAbout | null {
+  const hasTitle = TITLE_KEY in meta
+  if (!hasTitle && !(DESCRIPTION_KEY in meta)) return null
+  return {
+    title: hasTitle ? formatValue(meta[TITLE_KEY]) : null,
+    description: DESCRIPTION_KEY in meta ? formatValue(meta[DESCRIPTION_KEY]) : DASH,
+  }
 }
 
 /** One per-node token bar: what it says, how long it is, and its colour. */

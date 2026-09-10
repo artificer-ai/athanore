@@ -64,6 +64,7 @@ export {
   MIN_BAR_PERCENT,
   PREVIEW_LENGTH,
   SESSION_LENGTH,
+  formatAbout,
   formatCost,
   formatCount,
   formatMeta,
@@ -74,6 +75,7 @@ export {
   preview,
   tokenBars,
   type OutputLine,
+  type RunAbout,
   type TokenBar,
 } from './overview'
 export {
