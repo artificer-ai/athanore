@@ -90,11 +90,6 @@ class WidthQueryList extends EventTarget implements Partial<MediaQueryList> {
   constructor(media: string) {
     super()
     this.media = media
-    // One listener per list, dropped with the list: jsdom builds a new
-    // window per test file, and nothing here outlives it.
-    window.addEventListener('resize', () => {
-      this.dispatchEvent(new Event('change'))
-    })
   }
 
   get matches(): boolean {
@@ -102,8 +97,31 @@ class WidthQueryList extends EventTarget implements Partial<MediaQueryList> {
   }
 }
 
-globalThis.matchMedia ??= ((query: string) =>
-  new WidthQueryList(query)) as typeof matchMedia
+/**
+ * One list per query string, and one `resize` listener for all of them.
+ *
+ * A real `matchMedia` may hand back a new object per call, but a caller
+ * that reads the query on every render (`useIsNarrow`'s `narrowNow`)
+ * would then leave a `resize` listener behind per render, since nothing
+ * removes one it never sees. Sharing the list makes the shim's cost flat
+ * in the number of *queries* rather than in the number of calls.
+ */
+const lists = new Map<string, WidthQueryList>()
+
+function installWidthQueries(): typeof matchMedia {
+  window.addEventListener('resize', () => {
+    for (const list of lists.values()) list.dispatchEvent(new Event('change'))
+  })
+  return ((query: string) => {
+    const existing = lists.get(query)
+    if (existing !== undefined) return existing
+    const list = new WidthQueryList(query)
+    lists.set(query, list)
+    return list
+  }) as typeof matchMedia
+}
+
+globalThis.matchMedia ??= installWidthQueries()
 
 afterEach(cleanup)
 

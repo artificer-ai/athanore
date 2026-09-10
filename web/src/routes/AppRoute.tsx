@@ -107,8 +107,11 @@ export function AppRoute() {
         })
       }}
       onClearRun={() => {
-        // The delete confirm, once the run is gone: a selection that no
-        // longer exists would point the detail pane at a 404, and
+        // Nothing is selected any more. Two callers say that: the
+        // delete confirm, once the run is gone — a selection that no
+        // longer exists would point the detail pane at a 404 — and the
+        // pane bar's narrow back control, for which "back to the list"
+        // *is* "nothing is selected" (21 §Narrow layout). Either way
         // `?node=` and `?task=` were about that run too.
         void navigate({
           search: (prev) => ({

@@ -115,11 +115,23 @@ test('the five touch flows: list, detail, panes, an answer, a new run', async ({
   const count = Number(/\((\d+)\/(\d+)\)/.exec(label ?? '')?.[2])
   expect(count).toBeGreaterThan(1)
   await tappable(dashboard.nextPane())
+  // Every dot is a hit area in its own right: the 14×3 px bar is the
+  // mark, and the box around it is what a finger lands on (D201 (4)).
+  const dots = page.locator('[data-pane][role="radio"]')
+  await expect(dots).toHaveCount(count)
+  for (const dot of await dots.all()) {
+    await tappable(dot)
+  }
+  // Measured on every pane, not only where the cycle wraps: 21 §Narrow
+  // layout says no horizontal scroll in *any* of these flows, and each
+  // pane draws different content into the same width.
+  await noHorizontalScroll(page)
   for (let i = 2; i <= count; i += 1) {
     await dashboard.nextPane().tap()
     await expect(dashboard.paneLabel()).toHaveText(
       new RegExp(`\\(${String(i)}/${String(count)}\\)`),
     )
+    await noHorizontalScroll(page)
   }
   await dashboard.nextPane().tap()
   await expect(dashboard.paneLabel()).toHaveText(new RegExp(`\\(1/${String(count)}\\)`))
