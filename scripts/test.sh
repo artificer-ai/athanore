@@ -52,6 +52,18 @@ step pyright       "$(configured tool.pyright)" \
   uv run --no-sync pyright
 step lint-imports  "$(configured tool.importlinter)" \
   uv run --no-sync lint-imports
+# The documentation site (D214). Mandatory, and probed for its config
+# the way every step above is probed for its table — a checkout without
+# one names the skip rather than failing. Not the Playwright case:
+# Playwright is probed for a 100 MB browser a bare checkout may not
+# have, and mkdocs is already in the environment `sync_python` prepared.
+# D178's reason applies at full force: this repository has no runner, so
+# a docs build only `ci.yml` performs is one that first goes red in
+# front of a reader. `--strict` is the check — mkdocs' validation levels
+# are warnings, and without it a build "succeeds" over a broken link, a
+# missing anchor or a page nothing links to.
+step docs          "$([ -f docs/site/mkdocs.yml ] && echo yes || echo no)" \
+  uv run --no-sync mkdocs build --strict -f docs/site/mkdocs.yml
 
 if [ -f web/package.json ]; then
   pnpm -C web install --frozen-lockfile

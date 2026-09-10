@@ -173,7 +173,8 @@ the temporary `root_path`.
 
 GitHub Actions: `uv sync`, ruff, pyright, import-linter, pytest (SQLite),
 pnpm typecheck/lint/vitest, build SPA, Playwright, OpenAPI snapshot check,
-the packaging check (`scripts/check_wheel.py`: the SPA built, then `uv
+the documentation site build (`mkdocs build --strict`, D214), the
+packaging check (`scripts/check_wheel.py`: the SPA built, then `uv
 build`, then the wheel installed into a clean venv and asked for `/` —
 10 §Build, D180), `pip-audit`, `pnpm audit`. The two audits run last in
 their job, and are the only checks `./scripts/test.sh` does not run:
@@ -188,6 +189,15 @@ matches nothing is exit 5 rather than a pass. Coverage gates:
 statements, branches, functions and lines, configured in
 `web/vite.config.ts` so that `pnpm -C web test` — which is what both the
 gate and CI run — applies it (D177).
+
+`.github/workflows/pages.yml` publishes the documentation site to GitHub
+Pages on every push to `main`. It is a **publisher, not a check**:
+nothing gates on its outcome, which is why the same `mkdocs build
+--strict` is a job of `ci.yml` and a step of `./scripts/test.sh` (D214).
+The freshness of the generated reference under `docs/site/src/reference/`
+belongs to the `pytest` step and to the `contract` job's `git diff
+--exit-code`, beside the OpenAPI snapshot, the generated client and the
+skills.
 
 ## Definition of done for a feature
 

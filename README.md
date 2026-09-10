@@ -194,6 +194,7 @@ web/             SPA source (Vite + React + TypeScript), builds into athanore/we
 examples/        user-land workflows and vendor adapters (uv workspace member)
 tests/           Python tests
 docs/v1/         the design documents; docs/plans/ the per-task plans
+docs/site/       the published documentation site (MkDocs Material)
 skills/          agent skills: one per surface, pointing into docs/v1/ and the tree
 ```
 
@@ -209,7 +210,7 @@ gate an agent runs:
 
 ```sh
 ./scripts/test.sh                          # the gate: ruff, pyright, import-linter,
-                                           # pytest, the SPA suites, the contract check
+                                           # pytest, the docs build, the SPA suites
 ./scripts/run.sh                           # serve the app on 127.0.0.1:4002
 ./scripts/dev.sh                           # a shell in the container
 ./scripts/dev.sh "uv run pytest -q -k settings"
@@ -221,6 +222,7 @@ Or directly, with uv and pnpm on the host:
 uv sync --all-packages --all-groups --all-extras
 uv run pytest -q
 uv run ruff check . && uv run pyright && uv run lint-imports
+uv run mkdocs build --strict -f docs/site/mkdocs.yml
 pnpm -C web install && pnpm -C web test && pnpm -C web build
 ```
 
@@ -229,6 +231,14 @@ a workspace member and registers them as entry points.
 
 ## Documentation
 
+- [`docs/site/`](docs/site/) — the documentation site: install,
+  quickstart, writing a workflow, dispatching agents, plugins, the CLI,
+  the HTTP and SSE reference, deployment. Start here if you are *using*
+  Athanore rather than building it; its reference section is generated
+  from the code. Read it with `uv run mkdocs serve -f
+  docs/site/mkdocs.yml`. `.github/workflows/pages.yml` publishes it to
+  GitHub Pages on every push to `main`, which — as above — is waiting on
+  this repository having a remote to push to.
 - [`docs/v1/README.md`](docs/v1/README.md) — the twenty design documents,
   in reading order. They are the specification, not a description: MUST and
   SHOULD carry their RFC 2119 meanings.

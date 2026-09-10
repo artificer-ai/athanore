@@ -37,6 +37,14 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
+# The documentation site (`docs/site/`). A group of its own rather than
+# more names in `dev`, so `uv sync --group docs` is a sentence; the gate
+# and every CI job sync `--all-groups`, so both are already covered
+# (D214).
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+]
 dev = [
     "freezegun",
     "hypothesis",

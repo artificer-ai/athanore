@@ -231,8 +231,9 @@ jobs:
 
       # `pnpm gen` dumps the document and then runs the codegen, so the
       # explicit dump is only there to do it in an environment `uv sync`
-      # has just prepared. `gen_skills.py` reads the snapshot the dump
-      # above writes, so it runs after it (D213).
+      # has just prepared. `gen_skills.py` and `gen_docs.py` both read
+      # the snapshot the dump above writes, so they run after it (D213,
+      # D214).
       - name: regenerate
         run: |
           uv sync --all-packages --all-groups --all-extras
@@ -240,9 +241,12 @@ jobs:
           pnpm -C web install --frozen-lockfile
           pnpm -C web gen
           uv run --no-sync scripts/gen_skills.py
+          uv run --no-sync scripts/gen_docs.py
 
       - name: snapshot and client are fresh
-        run: git diff --exit-code tests/snapshots web/src/api/gen skills
+        run: >
+          git diff --exit-code
+          tests/snapshots web/src/api/gen skills docs/site/src/reference
 
   # The Phase 4 checkpoint (T069): the wheel carries the SPA and a clean
   # install serves it. Nothing else in the gate covers that join —
@@ -289,3 +293,28 @@ jobs:
       # builds but does not serve.
       - name: build the wheel and serve it from a clean venv
         run: uv run --no-sync scripts/check_wheel.py
+
+  # The documentation site (D214). The same `mkdocs build --strict` the
+  # gate runs, so a pull request that breaks a link, an anchor or the nav
+  # is red here as well as locally. No probe: the config exists as of
+  # this change, and a check that can silently skip itself is not one.
+  #
+  # `.github/workflows/pages.yml` publishes the site on every push to
+  # main. That workflow is a publisher rather than a check — nothing
+  # gates on its outcome — which is why the build is a job here too.
+  docs:
+    name: docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: uv sync
+        run: uv sync --all-packages --all-groups --all-extras
+
+      - name: mkdocs build
+        run: uv run --no-sync mkdocs build --strict -f docs/site/mkdocs.yml

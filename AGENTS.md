@@ -126,7 +126,17 @@ uv run pytest -q                           # Python tests
 uv run ruff check . && uv run ruff format --check .
 uv run pyright                             # strict on graph, engine, store
 uv run lint-imports                        # layering contracts (from T005)
+uv run mkdocs build --strict -f docs/site/mkdocs.yml   # the docs site, as the gate builds it
+uv run mkdocs serve -f docs/site/mkdocs.yml            # 127.0.0.1:8000, live reload
+uv run scripts/gen_docs.py                 # the site's generated reference
 ```
+
+There is no compose service for the docs site and none is wanted: every
+service uses host networking, so `./scripts/dev.sh "uv run mkdocs serve
+-f docs/site/mkdocs.yml"` is reachable at `127.0.0.1:8000` from the
+host. `docs/site/` is the published site, for whoever is *using*
+Athanore; `docs/v1/` is the specification and is deliberately not
+published (D214).
 
 `./scripts/test.sh` runs exactly this set, skipping the steps whose
 config does not exist yet and naming what it skipped. **It is the

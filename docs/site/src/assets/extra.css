@@ -1,0 +1,41 @@
+/* Material's own variables, set from the SPA's palette.
+ *
+ * The four colours and two font names below are copied from the
+ * operator interface's design tokens (`nocturne.css` in the repository).
+ * This is a borrow, not a binding: that system is normative for the SPA
+ * and web/src/styles/theme.css is generated from it, while this file is
+ * hand-written and small on purpose. A second theme pipeline for a
+ * documentation site would be machinery with no second consumer.
+ */
+
+[data-md-color-scheme="slate"] {
+  --md-default-bg-color: #161826;
+  --md-default-bg-color--light: #1b1d2d;
+  --md-default-fg-color: #e9e9ed;
+  --md-default-fg-color--light: #b9b9c4;
+  --md-default-fg-color--lighter: #7e7e8c;
+  --md-default-fg-color--lightest: #2c2e3e;
+
+  --md-primary-fg-color: #161826;
+  --md-primary-bg-color: #e9e9ed;
+
+  --md-accent-fg-color: #9184d9;
+  --md-typeset-a-color: #9184d9;
+
+  --md-code-bg-color: #232532;
+  --md-code-fg-color: #e9e9ed;
+  --md-code-hl-comment-color: #7e7e8c;
+
+  --md-footer-bg-color: #161826;
+  --md-footer-bg-color--dark: #12131f;
+}
+
+/* Nocturne is a monospace interface; the site is not, but its tables
+ * are dense reference material and read better tightened up. */
+.md-typeset table:not([class]) {
+  font-size: 0.72rem;
+}
+
+.md-typeset table:not([class]) code {
+  white-space: nowrap;
+}

@@ -1,0 +1,64 @@
+# Publish the documentation site to GitHub Pages, on every push to main.
+#
+# Two things a reader needs and cannot see from the YAML below. The build
+# command is the gate's, verbatim (`./scripts/test.sh`'s `docs` step and
+# `ci.yml`'s `docs` job run the same line), so this workflow publishes
+# what the gate already checked and never gets a second opinion of its
+# own. And publishing needs *Settings → Pages → Source: GitHub Actions*
+# turned on once, on a repository that does not exist yet — this checkout
+# has no git remote, and `docs/site/mkdocs.yml`'s `site_url` names the
+# one it is expected to get (D214).
+#
+# Not release tags: the site documents the code on main, and this project
+# tags rarely enough that a tag-only site would be months stale.
+name: pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# `cancel-in-progress: false` is deliberate and is the documented Pages
+# pattern: cancelling a deployment mid-flight can leave the site half
+# published.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+          enable-cache: true
+
+      - name: uv sync
+        run: uv sync --all-packages --all-groups --all-extras
+
+      - name: mkdocs build
+        run: uv run --no-sync mkdocs build --strict -f docs/site/mkdocs.yml
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/site/build
+
+  deploy:
+    name: deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

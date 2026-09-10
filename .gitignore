@@ -58,6 +58,11 @@ athanore/web/dist/*
 !athanore/web/dist/
 !athanore/web/dist/.gitkeep
 
+# The built docs site (`site_dir` in docs/site/mkdocs.yml). The `build/`
+# rule at the top of this file already matches it; it is named here
+# because a reader looking for where the site goes should find it.
+docs/site/build/
+
 # Scott's scratch TODO: wants that are deliberately not spec. Ignored
 # rather than untracked so it can be edited *during* a run — `feature`
 # refuses a dirty checkout with `git status --porcelain`, which counts

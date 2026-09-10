@@ -1,0 +1,120 @@
+# The documentation site: what someone who has just installed Athanore
+# reads. Built by `./scripts/test.sh` with `--strict`, and published to
+# GitHub Pages by `.github/workflows/pages.yml` on every push to main
+# (D214).
+#
+# `strict: true` plus the `validation:` block below is what makes that
+# gate step worth having: a broken internal link, a missing anchor and a
+# page that is not in the nav are all warnings, and `strict` makes a
+# warning a non-zero exit.
+#
+# No `!!python/name:` tags anywhere in this file. `tests/test_docs_site.py`
+# reads it with `yaml.safe_load`, and a config only mkdocs can parse is a
+# config no test can check.
+site_name: Athanore
+site_description: Code-defined AI agent workflows over the Agent Client Protocol
+site_author: Athanore
+
+# The one guess in this file, and it is written down as one in D214:
+# this checkout has no git remote, so the owner is taken from the
+# operator's git identity. A real remote is a two-line change here.
+site_url: https://scrussell24.github.io/athanore/
+repo_url: https://github.com/scrussell24/athanore
+repo_name: scrussell24/athanore
+# No per-page "edit this page" links until the remote above is real.
+edit_uri: ""
+
+docs_dir: src
+site_dir: build
+strict: true
+
+# Every one of these defaults to `info` or `warn`, which is a line in a
+# build log nobody reads. Raised to `warn` here and promoted to a failure
+# by `strict: true` above — mkdocs' own levels are `warn`, `info` and
+# `ignore`, so `strict` is what turns them into a non-zero exit rather
+# than an `error` level that does not exist.
+validation:
+  nav:
+    omitted_files: warn
+    not_found: warn
+  links:
+    absolute_links: warn
+    unrecognized_links: warn
+    anchors: warn
+
+theme:
+  name: material
+  language: en
+  # Dark only. A light theme is out of scope, and the palette below is
+  # borrowed from the SPA's design system (docs/v1/design/nocturne.css)
+  # through src/assets/extra.css rather than generated from it.
+  palette:
+    scheme: slate
+    primary: black
+    accent: deep purple
+  font:
+    text: Inter
+    code: JetBrains Mono
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - toc.follow
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+
+plugins:
+  - search
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tabbed:
+      alternate_style: true
+
+extra_css:
+  - assets/extra.css
+
+hooks:
+  - hooks/openapi.py
+
+# Explicit and complete: `nav.omitted_files: error` above means a page
+# added under src/ and left out of this list fails the build.
+#
+# The last entry is the only place the design documents are named
+# anywhere in this site, and it is here rather than in a page precisely
+# so that "no page names them" is an exact test (D214).
+nav:
+  - Home: index.md
+  - Install: install.md
+  - Quickstart: quickstart.md
+  - Guide:
+      - Writing a workflow: guide/workflows.md
+      - Dispatching agents: guide/agents.md
+      - Asking a human: guide/human-in-the-loop.md
+      - Runs, retries and capacity: guide/runs.md
+      - Writing a plugin: guide/plugins.md
+      - The command line: guide/cli.md
+      - Driving the API: guide/http-api.md
+      - Deployment: guide/deployment.md
+  - Reference:
+      - Python API: reference/python-api.md
+      - Node options: reference/node-options.md
+      - Agents: reference/agents.md
+      - Events: reference/events.md
+      - Plugins: reference/plugins.md
+      - Command line: reference/cli.md
+      - HTTP API: reference/http-api.md
+      - Error codes: reference/errors.md
+      - Settings: reference/settings.md
+  - Design documents: https://github.com/scrussell24/athanore/tree/main/docs/v1
