@@ -1,0 +1,227 @@
+# Dispatching agents
+
+An agent is a class. It carries its own command line, its own prompt, the
+model it wants, its policies and its timeout, and a node body awaits it:
+
+```python
+from athanore import ACPAgent, NonRetryable, Workflow
+from pydantic import BaseModel
+
+wf = Workflow("review")
+
+
+class Verdict(BaseModel):
+    ship: bool
+    why: str
+
+
+class Reviewer(ACPAgent):
+    command = ["npx", "-y", "pi-acp@0.0.33"]
+    system_prompt = "You review one branch of one repository. ..."
+    model = "anthropic/claude-sonnet-4"
+    output_model = Verdict
+
+
+@wf.node(start=True, timeout=1800)
+async def review(merge, rework):
+    result = await Reviewer(cwd="/srv/checkout").run(
+        "Review the branch named in the work log."
+    )
+    if not result.ok:
+        raise NonRetryable(result.error)
+    verdict: Verdict = result.output
+    return merge if verdict.ship else rework
+
+
+@wf.node()
+async def merge():
+    ...
+
+
+@wf.node()
+async def rework():
+    ...
+```
+
+Everything a subclass can set — on `Agent`, on `ACPAgent`, and the fields
+of the result a run returns — is in [Agents](../reference/agents.md).
+
+## The engine never sees the agent
+
+A node body awaits an agent the way it would await anything else. The
+engine treats the body as an opaque coroutine; it does not know agents
+exist. That is what keeps the failure story simple: an agent that goes
+wrong is an exception or a result your body inspects, and the engine's
+retry policy applies to the attempt, not to the agent.
+
+## Prompts are inlined text
+
+`system_prompt` is a Python string on the class. There is no template
+language and no prompt directory. What the agent actually receives is
+that string, then your `run()` argument as the assignment, then a task
+block the façade adds: which task this is, which node of which workflow,
+which run — and how to reach its own task.
+
+Sections with nothing to say are left out, so an agent with no
+`system_prompt` opens on its assignment.
+
+## Structured submissions
+
+`output_model` is the contract. Declare a pydantic model and the agent is
+told to submit an object of that shape; the API validates what arrives
+and refuses anything else with the errors and the schema, which the agent
+can read and fix inside the same turn. Only valid payloads are stored,
+the latest valid one wins, and the history is kept.
+
+`result.output` is therefore an instance of your model, or your body
+never got there. Without an `output_model`, whatever JSON was submitted
+is stored as it arrived.
+
+A submission is a *value*. An agent cannot transition the task, choose a
+node, or reopen a run. It answers; your body routes.
+
+## How an agent reaches its task
+
+An agent needs four things: read its task, append to the work log, submit
+a result, and — if you turned it on — ask you a question. Those are one
+HTTP surface, reached through whichever of three adapters the agent can
+use:
+
+- **MCP**, when the agent advertises an HTTP MCP client. The façade hands
+  it an in-process MCP server, and `submit_result`'s input schema *is*
+  your `output_model`'s schema, so the model sees it as a tool
+  definition and a rejection comes back as a tool result.
+- **Native**, when the harness has its own tool registry and an adapter
+  for it is installed. The adapter reads the task URL and token from the
+  environment the façade exports.
+- **HTTP**, for everything else. The prompt carries the request lines,
+  with the token in a header.
+
+`tooling="auto"` picks MCP when it is advertised and HTTP otherwise. In
+the first two the token never appears in prompt text, and so never
+reaches the model provider.
+
+## Results, and what raises
+
+`run()` returns a result rather than raising for outcomes your body might
+reasonably route around. A refusal, a cancellation or a truncated turn
+come back as a failed result with `error` set, so a body can decide;
+`result.ok` is the short form of asking. The common shape is exactly the
+one above: convert it to `NonRetryable` if you know a retry is pointless,
+or return a different edge if you would rather route around it.
+
+Timeouts, transport failures and a missing or invalid submission raise
+`AgentError`. Both paths record a statistics entry.
+
+## Permissions and elicitations
+
+When an agent asks to run a tool, `permission_policy` decides what
+happens. The default, `ask`, opens a request and shows it to you with the
+agent's own options, and the agent blocks until you answer.
+`auto_allow` and `auto_deny` choose by kind rather than by position, and
+`permission_timeout` with `permission_timeout_action` bounds the wait.
+
+Form-mode elicitations become a request with the agent's schema, and the
+answer is validated against it before it goes back. URL-mode
+elicitations are declined.
+
+These waits do *not* release the worker slot: the agent process is alive
+and holding resources. Only a node's own `human_input` does that.
+
+`ask_policy="http"` is off by default and lets an agent ask you a
+question directly. Leave it off for anything unattended — a chatty model
+can stall a pipeline that had nobody watching it.
+
+## Statistics
+
+One entry is recorded per run, on every exit path, as a `[stats]` line in
+the work log and an event on the stream: the node and attempt, the
+outcome, the model the provider reported, input and output tokens, tool
+calls, cost, duration, session id, and — when they happened — repair
+turns and denied permissions.
+
+Fields that cannot be determined are left out. Nothing is estimated and
+nothing is zero-filled: an absent token count means the provider did not
+report one, which is a different fact from zero.
+
+## Testing without a model
+
+The package ships doubles so that a workflow's tests never call a model.
+Point the node at one the way you would inject anything else:
+
+```python
+from athanore import Workflow
+from athanore.testing import MockAgent
+
+wf = Workflow("review")
+
+REVIEWER = None          # the agent class a test replaces
+
+
+def reviewer():
+    return REVIEWER() if REVIEWER else Reviewer()
+
+
+@wf.node(start=True)
+async def review(merge, rework):
+    result = await reviewer().run("Review the branch.")
+    return merge if result.output["ship"] else rework
+```
+
+```python
+from athanore.testing import MockAgent
+
+import myproject.flows as flows
+
+
+def use_a_double():
+    flows.REVIEWER = lambda: MockAgent(output={"ship": True, "why": "clean"})
+```
+
+`MockAgent` runs no subprocess. `output=` is the shortest double;
+`submit=` makes the real round trip to the submission endpoint with the
+real task token, so a rejection is a real rejection; `log=` and
+`stream=` write to the work log and the transcript; `fail=` raises the
+`AgentError` a body has to route around. Each takes a value or a
+zero-argument callable, so an agent run twice in one body can be
+scripted by closing over a counter. `StatsMockAgent` records a
+statistics entry the way the real façade does.
+
+For the tests that *are* about the wire, `scenario()` scripts
+`fake_acp.py` — a real subprocess speaking the protocol over stdio — and
+returns the `command` an `ACPAgent` runs, down to text chunks, tool
+calls, permission requests, elicitations and usage. Setting
+`agent_command` (the `ATHANORE_AGENT_COMMAND` environment variable)
+replaces the command on *every* agent at spawn, which is how a whole
+workflow runs end to end with no model in the loop.
+
+## Vendor adapters
+
+Nothing in the package depends on pi, on Claude Code or on Docker. An
+adapter is a subclass in your own project:
+
+```python
+from athanore import ACPAgent
+
+
+class ClaudeAgent(ACPAgent):
+    command = ["npx", "-y", "@agentclientprotocol/claude-agent-acp@0.5.0"]
+    model = "claude-sonnet-4"
+
+
+class SandboxedAgent(ACPAgent):
+    """The same agent, in a container that is the guardrail."""
+
+    command = ["./scripts/agent.sh", "pi"]
+    permission_policy = "auto_allow"
+```
+
+Pin the adapter version rather than floating it: an agent command is code
+you are choosing to run.
+
+## Next
+
+- [Asking a human](human-in-the-loop.md) — the request object these
+  policies open.
+- [Agents](../reference/agents.md) — every attribute and every field,
+  generated from the code.

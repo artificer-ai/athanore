@@ -50,10 +50,24 @@ def _translate_legacy_db_url(value: str) -> str:
 
 
 class Retention(BaseModel):
-    """Retention windows, pruned by a background job (07 §Retention)."""
+    """Retention windows, pruned by a background job (07 §Retention).
 
-    events_days: int = 30
-    stream_days: int = 14
+    Every field carries a ``description``. It is what the published
+    settings reference renders (`docs/site/src/reference/settings.md`),
+    so the table in 02 §Configuration and the wording here are edited
+    together (D214).
+    """
+
+    events_days: int = Field(
+        default=30,
+        description="How many days an event is kept before the retention job "
+        "prunes it.",
+    )
+    stream_days: int = Field(
+        default=14,
+        description="How many days a stream chunk is kept before the retention "
+        "job prunes it.",
+    )
 
 
 class _LegacyEnvSource(PydanticBaseSettingsSource):
@@ -148,7 +162,17 @@ _HOST = re.compile(r"^[A-Za-z0-9.-]+(?::\d{1,5})?$")
 
 
 class AthanoreSettings(BaseSettings):
-    """Typed configuration with documented defaults (02 §Configuration)."""
+    """Typed configuration with documented defaults (02 §Configuration).
+
+    Every field carries a ``description``, worded from the Notes column
+    of 02 §Configuration, and the two fields whose default is computed in
+    :meth:`_compute_derived_defaults` say what leaving them unset
+    resolves to. The descriptions are what the published settings
+    reference renders (`docs/site/src/reference/settings.md`), which is
+    why there is no second table to keep in step: 02 is the
+    specification, this is what a reader is shown, and they are edited
+    together (D214).
+    """
 
     model_config = SettingsConfigDict(
         env_prefix="ATHANORE_",
@@ -156,21 +180,84 @@ class AthanoreSettings(BaseSettings):
         extra="ignore",
     )
 
-    root_path: Path = Field(default_factory=Path.cwd)
-    db_url: str | None = None
-    host: str = "127.0.0.1"
-    port: int = 4002
-    public_url: str | None = None
-    operator_token: SecretStr | None = None
-    require_token: bool = False
-    body_limit: int = 1_048_576
-    sse_replay_cap: int = 5000
-    workers: int = 1
-    max_retries: int = 3
-    agent_timeout: float = 10800
-    permission_policy: Literal["ask", "auto_allow", "auto_deny"] | None = None
-    agent_command: str | list[str] | None = None
-    cors_origins: list[str] = Field(default_factory=list)
+    root_path: Path = Field(
+        default_factory=Path.cwd,
+        description="The directory everything else is anchored to: the "
+        "database, the `.athanore/` state directory, `athanore.toml`, and a "
+        "workflow's default project directories. Unset, it is the working "
+        "directory the process was started in.",
+    )
+    db_url: str | None = Field(
+        default=None,
+        description="The SQLAlchemy URL of the store. Unset, it resolves to "
+        "`sqlite+aiosqlite:///{root_path}/athanore.db`; a Postgres install "
+        "sets `postgresql+asyncpg://...` and needs the `postgres` extra.",
+    )
+    host: str = Field(
+        default="127.0.0.1",
+        description="The interface to bind. A loopback bind needs no operator "
+        "credential; binding anywhere else requires an operator token.",
+    )
+    port: int = Field(default=4002, description="The port to bind.")
+    public_url: str | None = Field(
+        default=None,
+        description="The base URL agents and plugins are told to reach this "
+        "server at. Unset, it resolves to `http://{host}:{port}`; set it when "
+        "agents run in a container or on another machine.",
+    )
+    operator_token: SecretStr | None = Field(
+        default=None,
+        description="The operator credential, sent as a bearer token. Needed "
+        "only for a non-loopback host or with `require_token`; `athanore token "
+        "rotate` generates one into `.athanore/token`. Refused in "
+        "`athanore.toml`.",
+    )
+    require_token: bool = Field(
+        default=False,
+        description="Force operator authentication even on a loopback bind — "
+        "for a reverse proxy sitting in front of one.",
+    )
+    body_limit: int = Field(
+        default=1_048_576,
+        description="The largest request body accepted, in bytes. Beyond it "
+        "the API answers 413.",
+    )
+    sse_replay_cap: int = Field(
+        default=5000,
+        description="The most events replayed to a client reconnecting with a "
+        "cursor before it is told to resynchronise instead.",
+    )
+    workers: int = Field(
+        default=1,
+        description="The capacity of the default pool: how many attempts run "
+        "at once when a workflow names no pool of its own.",
+    )
+    max_retries: int = Field(
+        default=3,
+        description="How many times a failed attempt is retried before the "
+        "task is dead-lettered. A node overrides it per node.",
+    )
+    agent_timeout: float = Field(
+        default=10800,
+        description="How long one agent run may take, in seconds, before the "
+        "engine cancels it. A node overrides it per node.",
+    )
+    permission_policy: Literal["ask", "auto_allow", "auto_deny"] | None = Field(
+        default=None,
+        description="A global override of every agent class's permission "
+        "policy. Unset, each class keeps its own.",
+    )
+    agent_command: str | list[str] | None = Field(
+        default=None,
+        description="Replaces every `ACPAgent.command` at spawn — the hook "
+        "that runs a workflow against a fake agent. Environment and CLI only; "
+        "refused in `athanore.toml`.",
+    )
+    cors_origins: list[str] = Field(
+        default_factory=list,
+        description="Browser origins allowed to call the API cross-site. For "
+        "development; empty is the default and the right value in production.",
+    )
     #: Origins a plugin's `custom` pane may load scripts, styles and
     #: fonts from, on top of ``'self'`` (09 §Escape hatch, D211).
     #:
@@ -189,13 +276,39 @@ class AthanoreSettings(BaseSettings):
             "https://cdn.jsdelivr.net",
             "https://unpkg.com",
             "https://esm.sh",
-        ]
+        ],
+        description="Origins a plugin's custom pane may load scripts, styles "
+        "and fonts from, on top of `'self'`. An empty list is the airtight "
+        'policy; `["https:"]` opens it to any origin over that scheme. '
+        "`connect-src` is never widened, so a CDN script may run but may only "
+        "talk back to this server.",
     )
-    log_format: Literal["pretty", "json"] | None = None
-    stream_flush_interval: float = 0.4
-    run_migrations: bool = True
-    forwarded_allow_ips: str | None = None
-    retention: Retention = Field(default_factory=Retention)
+    log_format: Literal["pretty", "json"] | None = Field(
+        default=None,
+        description="How the log is rendered. Unset, it resolves to `pretty` "
+        "when stderr is a terminal and `json` when it is not.",
+    )
+    stream_flush_interval: float = Field(
+        default=0.4,
+        description="How long agent output is batched before it is flushed to "
+        "the task stream, in seconds.",
+    )
+    run_migrations: bool = Field(
+        default=True,
+        description="Whether the server migrates the schema before it serves. "
+        "False leaves that to `athanore db upgrade`.",
+    )
+    forwarded_allow_ips: str | None = Field(
+        default=None,
+        description="Which proxies' `X-Forwarded-*` headers uvicorn trusts, "
+        "as a comma-separated list of addresses or `*`. Unset, none are "
+        "trusted.",
+    )
+    retention: Retention = Field(
+        default_factory=Retention,
+        description="How long events and stream chunks are kept before the "
+        "retention job prunes them.",
+    )
 
     @field_validator("plugin_cdns")
     @classmethod

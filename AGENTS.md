@@ -99,6 +99,8 @@ side of the boundary it is on.
 
 ```sh
 ./scripts/run.sh                           # serve the app on 127.0.0.1:4002
+./scripts/docs.sh                          # serve the docs on 127.0.0.1:8000
+./scripts/docs.sh build                    # ...or build them, as the gate does
 ./scripts/test.sh                          # the gate
 ./scripts/test.sh -k settings              # arguments reach pytest
 ./scripts/dev.sh "uv run ruff check ."     # any one command, in the container
@@ -126,7 +128,18 @@ uv run pytest -q                           # Python tests
 uv run ruff check . && uv run ruff format --check .
 uv run pyright                             # strict on graph, engine, store
 uv run lint-imports                        # layering contracts (from T005)
+uv run mkdocs build --strict -f docs/site/mkdocs.yml   # the docs site, as the gate builds it
+uv run mkdocs serve -f docs/site/mkdocs.yml            # 127.0.0.1:8000, live reload
+uv run scripts/gen_docs.py                 # the site's generated reference
 ```
+
+There is no compose service for the docs site and none is wanted:
+`./scripts/docs.sh` hands the work to the container like every other
+wrapper, and every service uses host networking, so the site it serves
+is at `127.0.0.1:8000` from the host whichever side you start it from.
+`docs/site/` is the published site, for whoever is *using*
+Athanore; `docs/v1/` is the specification and is deliberately not
+published (D214).
 
 `./scripts/test.sh` runs exactly this set, skipping the steps whose
 config does not exist yet and naming what it skipped. **It is the

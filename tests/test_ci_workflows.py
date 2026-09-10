@@ -5,6 +5,13 @@ is that same set of checks on a runner. Nothing here runs CI — there is
 no remote to run it on — but drift between the two is exactly the kind
 of thing nobody notices until a release, so the correspondence is
 asserted rather than remembered.
+
+`pages.yml` is the one file here that is not a check: it publishes the
+documentation site on every push to `main`, and nothing gates on its
+outcome. That is precisely why the same `mkdocs build --strict` is also
+a job of `ci.yml` and a step of the gate (D214) — a publisher is not a
+verdict, and a build first observed failing in front of a reader is one
+nobody checked.
 """
 
 import json
@@ -26,6 +33,12 @@ Workflow = dict[Any, Any]
 ROOT = Path(__file__).resolve().parent.parent
 CI = ROOT / ".github" / "workflows" / "ci.yml"
 NIGHTLY = ROOT / ".github" / "workflows" / "nightly.yml"
+PAGES = ROOT / ".github" / "workflows" / "pages.yml"
+
+#: The documentation site build, run in three places and spelled once
+#: (D214): the gate's `docs` step, `ci.yml`'s `docs` job, and the
+#: `pages` workflow that publishes what they checked.
+DOCS_BUILD = "mkdocs build --strict -f docs/site/mkdocs.yml"
 
 #: The Playwright the dev image bakes a chromium of (`docker/dev/Dockerfile`)
 #: and the one `web/package.json` pins, which must be the same one (T068a).
@@ -55,17 +68,23 @@ def nightly() -> Workflow:
     return load(NIGHTLY)
 
 
-def test_workflows_parse(ci: Workflow, nightly: Workflow) -> None:
+@pytest.fixture(scope="module")
+def pages() -> Workflow:
+    return load(PAGES)
+
+
+def test_workflows_parse(ci: Workflow, nightly: Workflow, pages: Workflow) -> None:
     assert ci["name"] == "CI"
     assert nightly["name"] == "nightly"
+    assert pages["name"] == "pages"
     # Either spelling of the trigger block will do; a workflow with
     # neither never runs.
-    for workflow in (ci, nightly):
+    for workflow in (ci, nightly, pages):
         assert workflow.get("on", workflow.get(True))
 
 
-def test_ci_jobs_are_python_web_contract_and_package(ci: Workflow) -> None:
-    assert list(ci["jobs"]) == ["python", "web", "contract", "package"]
+def test_ci_jobs_are_python_web_contract_package_and_docs(ci: Workflow) -> None:
+    assert list(ci["jobs"]) == ["python", "web", "contract", "package", "docs"]
 
 
 def test_python_matrix_covers_the_supported_floor(ci: Workflow) -> None:
@@ -304,28 +323,104 @@ def test_contract_job_checks_the_generated_client_is_fresh(ci: Workflow) -> None
     assert "scripts/dump_openapi.py" in ran
     assert "pnpm -C web gen" in ran
     assert "scripts/gen_skills.py" in ran
-    assert "git diff --exit-code tests/snapshots web/src/api/gen skills" in ran
+    assert "scripts/gen_docs.py" in ran
+    diff = " ".join(ran.split())
+    assert (
+        "git diff --exit-code tests/snapshots web/src/api/gen skills "
+        "docs/site/src/reference" in diff
+    )
 
 
-def test_the_skills_are_regenerated_after_the_snapshot_they_read(
-    ci: Workflow,
+@pytest.mark.parametrize("script", ["scripts/gen_skills.py", "scripts/gen_docs.py"])
+def test_the_generated_trees_are_rebuilt_after_the_snapshot_they_read(
+    ci: Workflow, script: str
 ) -> None:
-    """`gen_skills.py` renders the route table out of the committed
-    snapshot (D213), so a job that regenerated the skills first would
-    diff them against the document of the previous commit."""
+    """Both front ends render the route table out of the committed
+    snapshot (D213, D214), so a job that regenerated either one first
+    would diff it against the document of the previous commit."""
     ran = commands(ci["jobs"]["contract"])
-    assert ran.index("scripts/dump_openapi.py") < ran.index("scripts/gen_skills.py")
+    assert ran.index("scripts/dump_openapi.py") < ran.index(script)
 
 
 def test_the_contract_jobs_generators_exist() -> None:
-    """What the job regenerates, and what it then diffs (T008, D213)."""
+    """What the job regenerates, and what it then diffs (T008, D213, D214)."""
     assert (ROOT / "scripts" / "dump_openapi.py").is_file()
     assert (ROOT / "scripts" / "gen_skills.py").is_file()
+    assert (ROOT / "scripts" / "gen_docs.py").is_file()
     assert (ROOT / "web" / "openapi-ts.config.ts").is_file()
     assert "gen" in json.loads((ROOT / "web" / "package.json").read_text())["scripts"]
     assert (ROOT / "tests" / "snapshots" / "openapi.json").is_file()
     assert (ROOT / "web" / "src" / "api" / "gen" / "index.ts").is_file()
     assert (ROOT / "skills" / "README.md").is_file()
+    assert (ROOT / "docs" / "site" / "mkdocs.yml").is_file()
+
+
+# --------------------------------------------------------------------------
+# The documentation site (D214)
+# --------------------------------------------------------------------------
+
+
+def test_docs_job_builds_the_site_the_way_the_gate_does(ci: Workflow) -> None:
+    """One build command, in the gate and on the runner (D74, D178).
+
+    This repository has no runner, so a docs build only `ci.yml`
+    performed would be one that first went red in front of a reader —
+    and `pages.yml`, which publishes, is not a check.
+    """
+    ran = commands(ci["jobs"]["docs"])
+    assert "uv sync --all-packages --all-groups --all-extras" in ran
+    assert DOCS_BUILD in ran
+    assert DOCS_BUILD in (ROOT / "scripts" / "test.sh").read_text()
+
+
+def test_docs_work_is_not_conditional(ci: Workflow) -> None:
+    """The config exists as of D214; a check that can skip itself is not one."""
+    for step in steps(ci["jobs"]["docs"]):
+        assert "if" not in step, step.get("name", step.get("uses"))
+
+
+def test_pages_publishes_on_every_push_to_main(pages: Workflow) -> None:
+    """Not release tags: the site documents the code on `main`, and this
+    project tags rarely enough that a tag-only site would be stale for
+    months. `workflow_dispatch` so a publish can be forced."""
+    assert pages["name"] == "pages"
+    # YAML 1.1 reads a bare `on:` as the boolean True, so the trigger
+    # block is under one key or the other.
+    triggers: Workflow = pages.get("on") or pages[True]
+    assert triggers["push"]["branches"] == ["main"]
+    assert "workflow_dispatch" in triggers
+
+
+def test_pages_has_the_permissions_a_deployment_needs(pages: Workflow) -> None:
+    assert pages["permissions"]["pages"] == "write"
+    assert pages["permissions"]["id-token"] == "write"
+    assert pages["permissions"]["contents"] == "read"
+
+
+def test_pages_does_not_cancel_a_deployment_in_flight(pages: Workflow) -> None:
+    """The documented Pages pattern: cancelling mid-flight can leave the
+    site half published."""
+    assert pages["concurrency"]["group"] == "pages"
+    assert pages["concurrency"]["cancel-in-progress"] is False
+
+
+def test_pages_builds_what_the_gate_built_and_uploads_it(pages: Workflow) -> None:
+    build = pages["jobs"]["build"]
+    assert DOCS_BUILD in commands(build)
+    upload = next(
+        step
+        for step in steps(build)
+        if step.get("uses", "").startswith("actions/upload-pages-artifact")
+    )
+    assert upload["with"]["path"] == "docs/site/build"
+
+    deploy = pages["jobs"]["deploy"]
+    assert deploy["needs"] == "build"
+    assert deploy["environment"]["name"] == "github-pages"
+    assert any(
+        step.get("uses", "").startswith("actions/deploy-pages")
+        for step in steps(deploy)
+    )
 
 
 #: The packaging check both the gate and the `package` job run (T069).

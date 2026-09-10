@@ -324,6 +324,13 @@ SPA ─POST /api/requests/{id}/answer {option_id | value}─▶ api.requests
 | `forwarded_allow_ips` | unset | Passed to uvicorn: which proxies' `X-Forwarded-*` to trust (12 §Beyond the LAN) |
 | `retention` | events 30d, stream chunks 14d | 07 |
 
+Every field of `AthanoreSettings` and `Retention` also carries a
+pydantic `description`, worded from the Notes column above, and the
+published settings reference is generated from those descriptions
+(D214). The table here is the specification and the model is what a
+reader is shown, so the two are edited together rather than one being a
+copy of the other.
+
 Legacy names (`ARTIFICER_HOST`, `ARTIFICER_PORT`, `ARTIFICER_DB`) are read
 with a deprecation warning for one minor version, and only when the
 `ATHANORE_*` name is unset. `ARTIFICER_DB` was a filesystem path in v0, so

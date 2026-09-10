@@ -25,15 +25,15 @@ broken text as well as against the tree.
 
 from __future__ import annotations
 
-import importlib.util
 import re
-import sys
 import textwrap
 from pathlib import Path
 from types import ModuleType
 
 import pytest
 import yaml
+
+from tests._generators import load_script
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
@@ -227,19 +227,12 @@ def generator() -> ModuleType:
 
     `scripts/` is dev machinery rather than a package, so there is no
     import to do. Loading the real file is the point: the renderer under
-    test is the one CI runs, not a copy of it.
+    test is the one CI runs, not a copy of it. The loader is shared with
+    `tests/test_docs_site.py`, which loads this script's sibling front
+    end over the same renderer.
     """
 
-    path = ROOT / "scripts" / "gen_skills.py"
-    spec = importlib.util.spec_from_file_location("gen_skills", path)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    try:
-        spec.loader.exec_module(module)
-    finally:
-        del sys.modules[spec.name]
-    return module
+    return load_script("gen_skills")
 
 
 def skill_files() -> list[Path]:
