@@ -108,6 +108,13 @@ export type Invalidation = (event: AthanoreEvent) => QueryKey[]
  *   the run list come from `GET /api/runs`, refetched on
  *   `run.*`/`task.*`". A run list whose NODE and STATUS cells only moved
  *   on `run.*` would sit frozen for the whole of a long run (D155).
+ * - `request.*` carries `runs` and `run` for the same reason, and it is
+ *   the one the table missed: `GET /api/runs` answers with
+ *   `pending_requests`, which is what draws the `⚠` on a row. A request
+ *   opens while its task is still `in_progress` — a permission mid-turn
+ *   never parks the task — so no `task.*` follows it, and a list
+ *   refetched only on the other two shows nothing waiting on the
+ *   operator until something unrelated moves (D208).
  */
 export const invalidations: Record<string, Invalidation> = {
   'task.stream': (e) => (e.task_id == null ? [] : [queryKeys.stream(e.task_id)]),
@@ -122,7 +129,10 @@ export const invalidations: Record<string, Invalidation> = {
   ],
   'log.appended': (e) => (e.run_id == null ? [] : [queryKeys.log(e.run_id)]),
   'request.*': (e) => [
-    ...(e.run_id == null ? [] : [queryKeys.requests(e.run_id)]),
+    queryKeys.runs(),
+    ...(e.run_id == null
+      ? []
+      : [queryKeys.run(e.run_id), queryKeys.requests(e.run_id)]),
     queryKeys.inbox(),
   ],
   'agent.stats': (e) => (e.run_id == null ? [] : [queryKeys.run(e.run_id)]),

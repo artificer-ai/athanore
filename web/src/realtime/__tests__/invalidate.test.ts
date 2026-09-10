@@ -77,10 +77,26 @@ describe('the invalidation table', () => {
       expect(keys).toEqual(names([queryKeys.log('r1')]))
     })
 
-    it('refetches the run’s requests and the inbox on a request event', () => {
+    it('refetches the run list too on a request event, for the row’s ⚠', () => {
+      // A permission opens mid-turn, while its task is still
+      // `in_progress`, so no `task.*` follows it to refresh the list.
+      // `GET /api/runs` carries `pending_requests` (D208).
       const keys = names(keysFor(event('request.opened', { run_id: 'r1' })))
 
-      expect(keys).toEqual(names([queryKeys.requests('r1'), queryKeys.inbox()]))
+      expect(keys).toEqual(
+        names([
+          queryKeys.runs(),
+          queryKeys.run('r1'),
+          queryKeys.requests('r1'),
+          queryKeys.inbox(),
+        ]),
+      )
+    })
+
+    it('still refetches the list when a request event carries no run', () => {
+      const keys = names(keysFor(event('request.answered', {})))
+
+      expect(keys).toEqual(names([queryKeys.runs(), queryKeys.inbox()]))
     })
 
     it('refetches only the run on agent.stats', () => {
