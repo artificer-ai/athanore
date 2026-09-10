@@ -86,14 +86,9 @@ class SandboxAgent(ACPAgent):
 
     command = [str(AGENT_SH), "claude"]
     cwd = str(CHECKOUT)
-    # TEMPORARY (permission smoke test, 2026-09-10). Both of these go back
-    # to `auto_allow` / `decline` before any unattended run: an agent
-    # already confined to a container that is asked to approve each tool
-    # call is a build that stops on a dialog at 3am (05 §User-land
-    # adapters, D75), and an unattended build must never block on a
-    # question nobody is watching.
-    permission_policy = "ask"
-    elicitation_policy = "ask"
+    permission_policy = "auto_allow"
+    #: An unattended build must never block on a dialog it cannot answer.
+    elicitation_policy = "decline"
     timeout = AGENT_TIMEOUT
 
 
