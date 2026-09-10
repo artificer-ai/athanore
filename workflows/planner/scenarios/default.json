@@ -1,4 +1,0 @@
-{
-  "text": ["No scenario for this node."],
-  "log": "This workflow's agent nodes are enhance and architect; each has its own scenario file. The deterministic nodes after them read git, so a dry run on the fake stops at `verify` — which is the point of `verify`."
-}

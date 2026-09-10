@@ -15,7 +15,61 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-__all__ = ["QAVerdict", "ReviewVerdict", "TaskReport"]
+__all__ = ["Brief", "PlanDoc", "QAVerdict", "ReviewVerdict", "TaskReport"]
+
+
+class Brief(BaseModel):
+    """The operator's request, rewritten into one the next stage can use.
+
+    Deliberately thin. This is the cheapest seat in the pipeline and it
+    is not the one that decides anything: it sharpens a sentence into a
+    statement of the outcome, and the architecture is the planner's.
+    There is no `title` here on purpose — the title is the branch, the
+    merge subject and the glob that finds the plan, so it is the
+    operator's and no model gets to change it.
+    """
+
+    description: str = Field(
+        description=(
+            "The request rewritten: what must be true when this is done, "
+            "stated as the outcome rather than as an implementation, with "
+            "the documents and modules it touches named"
+        )
+    )
+    out_of_scope: list[str] = Field(
+        default_factory=list,
+        description=(
+            "What a reader might reasonably assume is included and is "
+            "not — the line that stops the next stage building more than "
+            "was asked for"
+        ),
+    )
+    open_questions: list[str] = Field(
+        default_factory=list,
+        description="What the request does not settle, each one a question",
+    )
+
+
+class PlanDoc(BaseModel):
+    """The plan the architect filed for this one task.
+
+    `plan` is read back off the branch rather than trusted: the node
+    checks that the file exists and that it is the one
+    `sandbox.plan_docs(title)` resolves, because a plan the implementer
+    cannot find is a plan that was never written.
+    """
+
+    plan: str = Field(
+        description=(
+            "The plan file written for this task, checkout-relative: "
+            "`docs/plans/<run title>-<slug>.md`"
+        )
+    )
+    summary: str = Field(description="The approach, in two or three sentences")
+    files: list[str] = Field(
+        default_factory=list,
+        description="The files the change is expected to touch",
+    )
 
 
 class TaskReport(BaseModel):
