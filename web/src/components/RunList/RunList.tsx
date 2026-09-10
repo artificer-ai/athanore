@@ -17,7 +17,20 @@
  * and it reads `text-row` as conflicting with the row's
  * `text-[var(--color-neutral-300)]` in the same call, keeping only the
  * last of the two (D157).
+ *
+ * Below the breakpoint the grid gives way to the two-line row of 21
+ * §Narrow layout — TITLE and the status pill over `run id · workflow ·
+ * node · age` — because six columns of 11 px text do not fit in a phone
+ * and truncating five of them to nothing would be the same as dropping
+ * them. It is a second row component and not a restyled one: the two
+ * lines are a different shape, not a different width. Everything else
+ * about the list is one thing at both widths — the same model, the same
+ * `listbox`, the same selection handler, the same `⚠` (10 §Attention).
+ * The column headings go with the columns, and the footer keeps
+ * `n shown` and drops the key hints, which are not what a touch device
+ * is operated by.
  */
+import { useIsNarrow } from '../../lib/useIsNarrow'
 import { cn } from '../../lib/utils'
 import { useUi } from '../../store/ui'
 import { StatusPill } from './StatusPill'
@@ -32,17 +45,56 @@ const HEADINGS = ['RUN', 'WORKFLOW', 'TITLE', 'STATUS', 'NODE', 'AGE']
 /** The glyph a run with unanswered requests carries after its node. */
 const PENDING_GLYPH = '⚠'
 
-function Row({
-  row,
-  zebra,
-  selected,
-  onSelect,
-}: {
+/** The separator between the narrow row's second line's four facts. */
+const NARROW_SEPARATOR = '·'
+
+/** What a row is, whichever shape it is drawn in. */
+type RowProps = {
   row: RunRow
   zebra: boolean
   selected: boolean
   onSelect: (runId: string) => void
-}) {
+}
+
+/**
+ * What the row is called: its title, or its id where there is none.
+ *
+ * The desktop grid can leave the TITLE column empty because the RUN
+ * column beside it says which run this is; the narrow row's first line
+ * is on its own, so an untitled run would be a status pill and nothing
+ * else (21 §Narrow layout).
+ */
+function rowTitle(row: RunRow): string {
+  return row.title === '' ? row.shortId : row.title
+}
+
+/** The `⚠` of 10 §Attention, or nothing to draw. */
+function Pending({ row }: { row: RunRow }) {
+  if (row.pendingRequests === 0) return null
+  return (
+    <span
+      className="text-status-gate ml-[4px]"
+      title={`${row.pendingRequests} waiting on you`}
+    >
+      {PENDING_GLYPH}
+    </span>
+  )
+}
+
+/**
+ * The classes every row carries whatever its shape: the zebra stripe,
+ * the selected tint and the accent bar down its left edge.
+ */
+function rowClasses(zebra: boolean, selected: boolean): string {
+  return cn(
+    'w-full overflow-hidden border-l-2 border-l-transparent text-left text-[var(--color-neutral-300)] hover:bg-[var(--color-neutral-900)]',
+    zebra && 'bg-zebra',
+    selected &&
+      'border-l-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface))]',
+  )
+}
+
+function Row({ row, zebra, selected, onSelect }: RowProps) {
   // `--muted-foreground` is 4.43:1 on the selected row's accent tint,
   // which is under AA for text this size; one step brighter clears it.
   // The tint itself is the mock's and is not touched — these three
@@ -60,10 +112,8 @@ function Row({
       onClick={() => onSelect(row.id)}
       style={{ gridTemplateColumns: COLUMNS }}
       className={cn(
-        'grid w-full items-center gap-[8px] overflow-hidden border-l-2 border-l-transparent px-[12px] py-[4px] text-left text-[var(--color-neutral-300)] hover:bg-[var(--color-neutral-900)]',
-        zebra && 'bg-zebra',
-        selected &&
-          'border-l-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface))]',
+        'grid items-center gap-[8px] px-[12px] py-[4px]',
+        rowClasses(zebra, selected),
       )}
     >
       <span className={cn('truncate', muted)}>{row.shortId}</span>
@@ -72,16 +122,70 @@ function Row({
       <StatusPill status={row.status} tone={row.tone} className="justify-self-start" />
       <span className={cn('truncate', muted)}>
         {row.node}
-        {row.pendingRequests > 0 && (
-          <span
-            className="text-status-gate ml-[4px]"
-            title={`${row.pendingRequests} waiting on you`}
-          >
-            {PENDING_GLYPH}
-          </span>
-        )}
+        <Pending row={row} />
       </span>
       <span className={cn('text-right', muted)}>{row.age}</span>
+    </button>
+  )
+}
+
+/**
+ * The same row below the breakpoint: two lines, four facts on the
+ * second (21 §Narrow layout).
+ *
+ * The separators are `aria-hidden`, because a screen reader reading
+ * "01H4 dot probe dot draft dot 4m" is being read punctuation; the
+ * `title` attribute carries the whole id here as it does on the grid.
+ */
+function NarrowRow({ row, zebra, selected, onSelect }: RowProps) {
+  // The same one step of contrast the grid takes on a selected row, for
+  // the same reason (10 §Accessibility and quality).
+  const muted = selected ? 'text-[var(--color-neutral-400)]' : 'text-muted-foreground'
+
+  return (
+    <button
+      type="button"
+      role="option"
+      aria-selected={selected}
+      data-selected={selected}
+      data-narrow
+      title={row.id}
+      onClick={() => onSelect(row.id)}
+      className={cn(
+        'flex flex-col gap-[3px] px-[12px] py-[8px]',
+        rowClasses(zebra, selected),
+      )}
+    >
+      <span className="flex w-full items-center gap-[8px]">
+        <span data-testid="narrow-title" className="min-w-0 flex-1 truncate">
+          {rowTitle(row)}
+        </span>
+        <StatusPill status={row.status} tone={row.tone} />
+      </span>
+
+      <span
+        data-testid="narrow-meta"
+        className={cn('text-meta flex w-full min-w-0 items-center gap-[5px]', muted)}
+      >
+        <span className="flex-none">{row.shortId}</span>
+        <span aria-hidden className="flex-none">
+          {NARROW_SEPARATOR}
+        </span>
+        <span className="flex-none truncate text-[var(--color-accent-2-400)]">
+          {row.workflow}
+        </span>
+        <span aria-hidden className="flex-none">
+          {NARROW_SEPARATOR}
+        </span>
+        <span className="min-w-0 flex-1 truncate">
+          {row.node}
+          <Pending row={row} />
+        </span>
+        <span aria-hidden className="flex-none">
+          {NARROW_SEPARATOR}
+        </span>
+        <span className="flex-none">{row.age}</span>
+      </span>
     </button>
   )
 }
@@ -127,6 +231,7 @@ export function RunList({
 }) {
   const focused = useUi((s) => s.focus === 'list')
   const setFocus = useUi((s) => s.setFocus)
+  const narrow = useIsNarrow()
 
   return (
     <section
@@ -135,10 +240,13 @@ export function RunList({
       data-focused={focused}
       onMouseDown={() => setFocus('list')}
       onFocusCapture={() => setFocus('list')}
-      className="flex h-full min-h-0 min-w-0 flex-col border-r border-border data-[focused=true]:border-r-[var(--color-accent-800)]"
+      className="flex h-full min-h-0 min-w-0 flex-col border-r border-border data-[focused=true]:border-r-[var(--color-accent-800)] max-md:flex-1 max-md:border-r-0"
     >
+      {/* The headings go with the columns: a two-line row has none to
+          head, and a strip reading RUN WORKFLOW TITLE over rows shaped
+          like neither would be a legend for a grid that is not there. */}
       <div
-        className="text-hint bg-chrome grid gap-[8px] overflow-hidden border-b border-border px-[12px] py-[6px] tracking-[0.1em] text-muted-foreground"
+        className="text-hint bg-chrome grid gap-[8px] overflow-hidden border-b border-border px-[12px] py-[6px] tracking-[0.1em] text-muted-foreground max-md:hidden"
         style={{ gridTemplateColumns: COLUMNS }}
       >
         {HEADINGS.map((heading) => (
@@ -159,23 +267,29 @@ export function RunList({
           <Empty model={model} />
         ) : (
           <div role="listbox" aria-label="run rows">
-            {model.rows.map((row, index) => (
-              <Row
-                key={row.id}
-                row={row}
-                zebra={index % 2 === 1}
-                selected={row.id === selected}
-                onSelect={onSelect}
-              />
-            ))}
+            {model.rows.map((row, index) => {
+              const props = {
+                row,
+                zebra: index % 2 === 1,
+                selected: row.id === selected,
+                onSelect,
+              }
+              return narrow ? (
+                <NarrowRow key={row.id} {...props} />
+              ) : (
+                <Row key={row.id} {...props} />
+              )
+            })}
           </div>
         )}
       </div>
 
       <div className="text-hint bg-chrome flex gap-[14px] border-t border-border px-[12px] py-[5px] text-muted-foreground">
         <span data-testid="rows-shown">{model.rows.length} shown</span>
-        <span>↑↓ select</span>
-        <span>⏎ focus detail</span>
+        {/* Keycaps are noise on a touchscreen; the keys they name stay
+            bound at every width (21 §Narrow layout). */}
+        <span className="max-md:hidden">↑↓ select</span>
+        <span className="max-md:hidden">⏎ focus detail</span>
       </div>
     </section>
   )

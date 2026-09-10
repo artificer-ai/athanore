@@ -454,6 +454,29 @@ describe('Library', () => {
     expect(row.textContent).not.toContain('runs')
   })
 
+  it('stacks its two columns into a sheet below the breakpoint', async () => {
+    await open()
+
+    // jsdom resolves no cascade, so what a unit can assert here is the
+    // declaration and not the geometry: that the body says "two columns
+    // at `md`, two rows below it" in one place, and that the sheet has
+    // dropped its margin. Whether the panel then fits a 390 px screen is
+    // Playwright's (`web/e2e/mobile.spec.ts`).
+    const body = screen.getByRole('listbox', { name: 'workflows' }).parentElement
+    expect(body).toHaveClass('grid-cols-[230px_minmax(0,1fr)]')
+    expect(body).toHaveClass('max-md:grid-cols-1')
+    expect(body).toHaveClass('max-md:grid-rows-[minmax(0,40%)_minmax(0,60%)]')
+
+    const panel = screen.getByRole('dialog', { name: LIBRARY_TITLE })
+    expect(panel).toHaveClass('max-md:inset-0')
+    expect(panel).toHaveClass('max-md:h-auto')
+    expect(panel).toHaveClass('max-md:w-full')
+    expect(panel).toHaveClass('max-md:rounded-none')
+    // A full-screen sheet leaves no backdrop to tap, so it carries a
+    // real close button (21 §Overlays, narrow).
+    expect(within(panel).getByRole('button', { name: 'close' })).toBeInTheDocument()
+  })
+
   it('closes on esc, and gives focus back to what opened it', async () => {
     const { user, onClose, opener } = await open({ runId: 'aaaa1111' })
 

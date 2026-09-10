@@ -63,6 +63,48 @@ globalThis.EventSource ??= InertEventSource as unknown as typeof EventSource
  */
 Element.prototype.scrollIntoView ??= function scrollIntoView() {}
 
+/**
+ * jsdom implements no `window.matchMedia`, and the SPA asks it which of
+ * its two layouts it is drawing (`lib/useIsNarrow.ts`) — without this,
+ * rendering the shell throws.
+ *
+ * It answers `(min-width: Npx)` and `(max-width: Npx)` off
+ * `window.innerWidth`, which jsdom does keep (1024 by default, so every
+ * test that says nothing is a desktop test), and re-answers on `resize`.
+ * A test that wants the narrow layout sets `window.innerWidth` and
+ * dispatches one, which is what `narrowViewport()` does
+ * (`lib/__tests__/fixtures.ts`).
+ */
+const WIDTH_QUERY = /\((min|max)-width:\s*(\d+)px\)/
+
+function matches(query: string): boolean {
+  const parsed = WIDTH_QUERY.exec(query)
+  if (parsed === null) return false
+  const px = Number(parsed[2])
+  return parsed[1] === 'min' ? window.innerWidth >= px : window.innerWidth <= px
+}
+
+class WidthQueryList extends EventTarget implements Partial<MediaQueryList> {
+  readonly media: string
+
+  constructor(media: string) {
+    super()
+    this.media = media
+    // One listener per list, dropped with the list: jsdom builds a new
+    // window per test file, and nothing here outlives it.
+    window.addEventListener('resize', () => {
+      this.dispatchEvent(new Event('change'))
+    })
+  }
+
+  get matches(): boolean {
+    return matches(this.media)
+  }
+}
+
+globalThis.matchMedia ??= ((query: string) =>
+  new WidthQueryList(query)) as typeof matchMedia
+
 afterEach(cleanup)
 
 /**

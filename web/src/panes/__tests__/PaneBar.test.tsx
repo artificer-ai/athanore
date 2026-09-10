@@ -1,8 +1,9 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { RunSummary } from '../../api/gen/types.gen'
+import { narrowViewport, wideViewport } from '../../lib/__tests__/fixtures'
 import { usePrefs } from '../../store/prefs'
 import { PaneBar } from '../PaneBar'
 import type { Pane, PaneModel } from '../usePanes'
@@ -142,5 +143,43 @@ describe('PaneBar', () => {
 
     rerender(<PaneBar panes={model()} />)
     expect(screen.queryByRole('button', { name: 'hide run list' })).toBeNull()
+  })
+
+  describe('below the breakpoint', () => {
+    beforeEach(() => {
+      narrowViewport()
+    })
+
+    afterEach(() => {
+      wideViewport()
+    })
+
+    it('puts a back control in the left slot instead of the collapse toggle', async () => {
+      const onBack = vi.fn()
+      render(<PaneBar panes={model()} onBack={onBack} />)
+
+      expect(screen.queryByRole('button', { name: 'hide run list' })).toBeNull()
+      await userEvent.click(screen.getByRole('button', { name: 'back to runs' }))
+      expect(onBack).toHaveBeenCalledOnce()
+      // Nothing about the desktop geometry is touched on the way (D194).
+      expect(usePrefs.getState().listCollapsed).toBe(false)
+    })
+
+    it('draws the back control even where the list was left collapsed', () => {
+      usePrefs.setState({ listCollapsed: true })
+      render(<PaneBar panes={model()} />)
+
+      expect(screen.getByRole('button', { name: 'back to runs' })).toBeInTheDocument()
+    })
+
+    it('keeps the arrows and the dots: they are the touch route round the cycle', async () => {
+      const panes = model()
+      render(<PaneBar panes={panes} onBack={vi.fn()} />)
+
+      await userEvent.click(screen.getByRole('button', { name: 'next pane' }))
+      expect(panes.next).toHaveBeenCalledOnce()
+      await userEvent.click(dots()[2]!)
+      expect(panes.jump).toHaveBeenCalledWith(2)
+    })
   })
 })

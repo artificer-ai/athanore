@@ -73,6 +73,7 @@ import { actionError } from '../lib/errors'
 import { cn } from '../lib/utils'
 import { queryKeys } from '../realtime/invalidate'
 import type { Overlay } from '../routes/search'
+import { OverlayClose } from './OverlayPanel'
 import {
   attemptDetail,
   eligibleNodes,
@@ -187,7 +188,7 @@ export function Pickers({
             restoreFocusTo.current?.focus()
             restoreFocusTo.current = null
           }}
-          className="text-body fixed top-[12vh] left-1/2 z-50 flex max-h-[76vh] w-[min(560px,92vw)] -translate-x-1/2 flex-col overflow-hidden rounded-lg border border-[var(--color-neutral-800)] bg-[var(--color-surface)] text-foreground shadow-[var(--shadow-lg)]"
+          className="text-body fixed top-[12vh] left-1/2 z-50 flex max-h-[76vh] w-[min(560px,92vw)] -translate-x-1/2 flex-col overflow-hidden rounded-lg border border-[var(--color-neutral-800)] bg-[var(--color-surface)] text-foreground shadow-[var(--shadow-lg)] max-md:top-[8px] max-md:max-h-[calc(100dvh-16px)] max-md:max-w-[calc(100vw-16px)]"
         >
           {kind !== undefined && (
             // Remounted per picker: the step a move is halfway through
@@ -375,9 +376,10 @@ function PickerPanel({
           {gloss}
         </span>
         <div className="flex-1" />
-        <span className="text-hint whitespace-nowrap text-muted-foreground">
+        <span className="text-hint whitespace-nowrap text-muted-foreground max-md:hidden">
           esc close
         </span>
+        <OverlayClose />
       </div>
 
       {runId === undefined ? (

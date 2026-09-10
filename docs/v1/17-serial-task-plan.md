@@ -3975,6 +3975,30 @@ by touch; at ≥ 768 px the layout is exactly 10 §Layout unchanged; the
 axe gate holds at desktop and mobile viewports and at `xlarge` (T081's
 run stays green); gate green; snapshot unchanged.
 
+**Status.** Done. The breakpoint is `md` and it is read in one place:
+`web/src/lib/useIsNarrow.ts` (`(min-width: 768px)`, negated), which
+three components ask because their markup differs rather than their
+styling — the shell mounts the list *or* the detail (`Splitter`'s new
+`stacked` prop), `PaneBar` draws `← back to runs` *instead of* the
+collapse toggle, and `RunList` draws the two-line row *instead of* the
+grid. Everything else is a `max-md:` class: the header's chips and `/`
+filter become one horizontally scrolling strip (its wrapper is
+`display: contents` at `md` and above, so the desktop strip is the box
+it always was), the footer's keycaps go, the pane dots gain a 24×24 px
+box around their 14×3 px bar, and every overlay is capped to the
+viewport less an 8 px margin with the library and the task drawer as
+full-screen sheets. Every overlay header carries a real `close` button
+below the breakpoint in place of its `esc …` hint. `web/e2e/mobile.spec.ts`
+drives the five flows of 21 §Touch operation at 390×844 by `tap()`
+alone, sweeps every overlay for containment and touch dismissal, and
+asserts no horizontal page scroll throughout; `a11y.spec.ts` gained the
+390×844 state over both narrow regions. Desktop is unchanged to the
+pixel — the geometry of every element in seventeen states was captured
+before and after, and only hidden elements were added. One deviation,
+measured and recorded: at 390 px the header's chrome takes two lines of
+its own before the strip, because 21's "two rows" cannot hold ~500 px of
+content in 362 px without dropping or shrinking something 21 says stays
+(D201).
 
 ---
 

@@ -64,6 +64,7 @@ import { useKeyOwner } from '../keys'
 import { actionError } from '../lib/errors'
 import { tokenize } from '../lib/highlight'
 import { cn } from '../lib/utils'
+import { OverlayClose } from './OverlayPanel'
 import {
   anchorLine,
   initialSelection,
@@ -181,7 +182,7 @@ export function Library({
             restoreFocusTo.current = null
             opened.current = false
           }}
-          className="text-body fixed top-1/2 left-1/2 z-50 flex h-[min(640px,88vh)] w-[min(880px,96vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-[var(--color-neutral-800)] bg-[var(--color-surface)] text-foreground shadow-[var(--shadow-lg)]"
+          className="text-body fixed top-1/2 left-1/2 z-50 flex h-[min(640px,88vh)] w-[min(880px,96vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-[var(--color-neutral-800)] bg-[var(--color-surface)] text-foreground shadow-[var(--shadow-lg)] max-md:inset-0 max-md:h-auto max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none"
         >
           <div className="flex flex-none items-center gap-[10px] border-b border-[var(--color-neutral-900)] px-[14px] py-[10px]">
             <Dialog.Title className="text-kicker text-[var(--color-accent-300)]">
@@ -191,7 +192,10 @@ export function Library({
               {LIBRARY_GLOSS}
             </span>
             <div className="flex-1" />
-            <span className="text-hint text-muted-foreground">esc close</span>
+            <span className="text-hint text-muted-foreground max-md:hidden">
+              esc close
+            </span>
+            <OverlayClose />
           </div>
 
           <LibraryBody
@@ -316,15 +320,16 @@ function LibraryPanel({
   const source = chosen < 0 ? undefined : sources[chosen]
 
   return (
-    <div
-      className="grid min-h-0 flex-1"
-      style={{ gridTemplateColumns: '230px minmax(0, 1fr)' }}
-    >
+    // The columns are classes and not an inline style so that the
+    // breakpoint can turn them into rows: below `md` the sheet stacks —
+    // the workflow list over the source viewer, each scrolling on its
+    // own (21 §Overlays, narrow).
+    <div className="grid min-h-0 flex-1 grid-cols-[230px_minmax(0,1fr)] max-md:grid-cols-1 max-md:grid-rows-[minmax(0,40%)_minmax(0,60%)]">
       <div
         role="listbox"
         aria-label="workflows"
         data-testid="library-list"
-        className="min-h-0 overflow-auto border-r border-[var(--color-neutral-900)]"
+        className="min-h-0 overflow-auto border-r border-[var(--color-neutral-900)] max-md:border-r-0 max-md:border-b"
       >
         {rows.map((row) => {
           const selected = row.name === selection.workflow

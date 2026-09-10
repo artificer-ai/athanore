@@ -75,6 +75,7 @@ import type { WorkflowOut } from '../api/gen/types.gen'
 import { useKeyOwner } from '../keys'
 import { queryKeys } from '../realtime/invalidate'
 import { ALL_WORKFLOWS, useUi } from '../store/ui'
+import { OverlayClose } from './OverlayPanel'
 import {
   isNewRunFailure,
   newRunSchema,
@@ -196,16 +197,17 @@ export function NewRun({ open, onClose }: { open: boolean; onClose: () => void }
             restoreFocusTo.current = null
             opened.current = false
           }}
-          className="text-body fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-48px)] w-[min(600px,94vw)] -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-lg border border-[var(--color-neutral-800)] bg-[var(--color-surface)] text-foreground shadow-[var(--shadow-lg)]"
+          className="text-body fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-48px)] w-[min(600px,94vw)] -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-lg border border-[var(--color-neutral-800)] bg-[var(--color-surface)] text-foreground shadow-[var(--shadow-lg)] max-md:max-h-[calc(100dvh-16px)] max-md:max-w-[calc(100vw-16px)]"
         >
           <div className="flex items-center gap-[10px] border-b border-[var(--color-neutral-900)] px-[14px] py-[10px]">
             <Dialog.Title className="text-kicker text-[var(--color-accent-300)]">
               {NEW_RUN_TITLE}
             </Dialog.Title>
             <div className="flex-1" />
-            <span className="text-hint text-muted-foreground">
+            <span className="text-hint text-muted-foreground max-md:hidden">
               ⌘⏎ submit · esc cancel
             </span>
+            <OverlayClose />
           </div>
 
           <NewRunBody onClose={onClose} onFormMounted={settleCaret} />

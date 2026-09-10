@@ -109,6 +109,7 @@ export function TaskDrawer({
       testId="task-drawer"
       width="w-[min(720px,94vw)]"
       placement="top"
+      sheet
     >
       {open && (
         // Remounted per attempt: the move list a drawer was halfway
