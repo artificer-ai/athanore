@@ -15,7 +15,8 @@ and this suite holds both halves:
 - every hand-written page is narrative, and the separation is checked
   rather than remembered: no page carries a capitalised RFC 2119
   keyword, no page names `docs/v1`, and every Python example is a module
-  that parses.
+  that parses. Those three parsers are `tests/_prose.py`, because the
+  skills are held to the same rules.
 
 The `mkdocs build --strict` step of `./scripts/test.sh` catches a broken
 link and a page nothing links to. What it cannot catch is a page that
@@ -30,7 +31,6 @@ from __future__ import annotations
 
 import ast
 import json
-import re
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -41,6 +41,7 @@ import yaml
 from athanore.events.names import EventName
 from athanore.settings import AthanoreSettings, Retention
 from tests._generators import load_script
+from tests._prose import SPEC, keywords, python_fences
 
 ROOT = Path(__file__).resolve().parent.parent
 SITE = ROOT / "docs" / "site"
@@ -52,26 +53,6 @@ STALE = (
     "a file under docs/site/src/reference/ is stale. Regenerate it:\n"
     "    uv run scripts/gen_docs.py"
 )
-
-#: RFC 2119's keywords, in the capitalised form the design documents give
-#: them. The site describes; it does not specify, so none of them belongs
-#: in a page here. Longest first, so `MUST NOT` is reported as itself.
-KEYWORDS = (
-    "MUST NOT",
-    "SHOULD NOT",
-    "MUST",
-    "SHOULD",
-    "SHALL",
-    "REQUIRED",
-    "RECOMMENDED",
-    "OPTIONAL",
-    "MAY",
-)
-KEYWORD = re.compile(r"\b(" + "|".join(KEYWORDS) + r")\b")
-
-#: The directory the site is deliberately not a second copy of. One nav
-#: entry in `mkdocs.yml` links it, and no page names it.
-SPEC = "docs/v1"
 
 #: The five `validation:` keys that make `--strict` worth having, and the
 #: level each is raised to. mkdocs' own levels are `warn`, `info` and
@@ -86,34 +67,8 @@ VALIDATION = {
 
 
 # --------------------------------------------------------------------------
-# The parsers
+# The parsers — the prose rules are `tests/_prose.py`, shared with the skills
 # --------------------------------------------------------------------------
-
-
-def keywords(text: str) -> list[str]:
-    """Every capitalised RFC 2119 keyword in ``text``."""
-
-    return KEYWORD.findall(text)
-
-
-def python_fences(text: str) -> list[str]:
-    """The body of every ` ```python ` block, in order."""
-
-    blocks: list[str] = []
-    lines = text.splitlines()
-    index = 0
-    while index < len(lines):
-        opening = lines[index].strip()
-        index += 1
-        if opening != "```python":
-            continue
-        body: list[str] = []
-        while index < len(lines) and not lines[index].strip().startswith("```"):
-            body.append(lines[index])
-            index += 1
-        index += 1
-        blocks.append("\n".join(body))
-    return blocks
 
 
 def nav_targets(nav: Any) -> list[str]:
@@ -238,9 +193,9 @@ def test_only_generated_pages_carry_the_marker(generator: ModuleType) -> None:
 def test_the_two_generators_are_two_front_ends_over_one_renderer(
     generator: ModuleType,
 ) -> None:
-    """The site and the skills render the same facts and only frame them
-    differently (D214), so a body renderer lives in one place and neither
-    script may grow a second copy of one."""
+    """The skills republish the site's pages rather than frame the same
+    bodies a second time: one `_reference` module, disjoint targets, and
+    a marker each, so a page says which script wrote it."""
 
     skills = load_script("gen_skills")
     assert generator.MARKER != skills.MARKER

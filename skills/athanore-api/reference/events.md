@@ -6,7 +6,7 @@ Every event name the server publishes, grouped as the vocabulary
 groups them, with the fields of the payload each one carries. A
 `?` marks a field that is absent rather than null when it has no
 value. These are the `event:` names on the SSE stream described in
-Driving the API (see the athanore-api skill).
+[Driving the API](guide-http-api.md).
 
 ## Runs
 

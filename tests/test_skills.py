@@ -1,22 +1,25 @@
-"""The skills under `skills/` are pointers, and every pointer resolves.
+"""The skills under `skills/` stand alone, and every link in one resolves.
 
-A skill is a pointer, never a copy (D213). That splits `skills/` in two
-and this suite holds both halves:
+A skill is installed into somebody else's coding agent, working on their
+own project, with no checkout of this repository on disk. That splits
+`skills/` in two and this suite holds both halves:
 
-- a `SKILL.md` is hand-written and cites; every path it names must exist,
-  every section it names must be a real heading in the document it names
-  it beside, and every code fence must be an excerpt of the file its
-  source marker points at;
-- everything a skill would otherwise have restated is generated into its
-  `reference/` directory by `scripts/gen_skills.py`, and the committed
-  bytes must be what that script writes.
+- a `SKILL.md` is hand-written and is the minimum to act. It names no
+  design document and — the web skill excepted — no path in this
+  checkout, carries no RFC 2119 keyword, keeps under 150 lines, names
+  every file in its own `reference/`, and every code fence in it is an
+  excerpt of a file in this tree, with every Python fence a module that
+  parses;
+- everything else is the documentation site's pages, republished into
+  the skill's `reference/` by `scripts/gen_skills.py` with their links
+  rewritten to resolve inside the skill, and the committed bytes must be
+  what that script writes.
 
 The second half is the OpenAPI snapshot's check again
 (`tests/test_openapi_snapshot.py`), and CI's `contract` job is its other
 half: it regenerates and runs `git diff --exit-code` over `skills/`. The
-first half is the one that cannot be generated — which section answers
-which question is judgement — and making the citation form
-machine-checkable is what keeps it honest.
+first half is the one that cannot be generated, and holding it to a few
+machine-checkable rules is what keeps it honest.
 
 A checker that passes everything is the one failure mode this design
 cannot survive, so the parsers below are exercised against deliberately
@@ -25,6 +28,7 @@ broken text as well as against the tree.
 
 from __future__ import annotations
 
+import ast
 import re
 import textwrap
 from pathlib import Path
@@ -34,9 +38,11 @@ import pytest
 import yaml
 
 from tests._generators import load_script
+from tests._prose import SPEC, keywords, python_fences
 
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS = ROOT / "skills"
+SITE = ROOT / "docs" / "site" / "src"
 
 #: The five surfaces, and the whole of `skills/` besides its README.
 NAMES = (
@@ -47,16 +53,26 @@ NAMES = (
     "athanore-web",
 )
 
+#: The four whose reader has no checkout. `athanore-web` is for a
+#: contributor to the SPA, which exists nowhere but here, so it alone
+#: may point into the tree.
+PORTABLE = tuple(name for name in NAMES if name != "athanore-web")
+
+#: The cap on a `SKILL.md`, frontmatter included. "Keep them short" is
+#: a rule that only holds if something holds it.
+MAX_LINES = 150
+
 STALE = (
     "a file under skills/*/reference/ is stale. Regenerate it:\n"
     "    uv run scripts/gen_skills.py"
 )
 
 #: What the first segment of a path citation may be: the top-level
-#: directories of the checkout a skill points into, and the root files it
-#: cites. An inline-code span that starts with anything else is code
-#: rather than a path — `wf.node(...)`, `run.completed`, `/api/health` —
-#: and is deliberately not checked, so that code in prose needs no escape.
+#: directories of the checkout and the root files a skill could point at.
+#: An inline-code span that starts with anything else is code rather than
+#: a path — `wf.node(...)`, `run.completed`, `/api/health`,
+#: `reference/events.md` — and is deliberately not checked as one, so
+#: that code in prose needs no escape.
 ROOTS = (
     "AGENTS.md",
     "CLAUDE.md",
@@ -76,26 +92,29 @@ ROOTS = (
 #: One inline-code span. Fenced blocks are removed before this is applied.
 SPAN = re.compile(r"`([^`\n]+)`")
 
-#: A path citation followed by the `§` that opens a section citation.
-SECTION = re.compile(r"`([^`\n]+)`\s+§")
-
 #: The source marker that must precede a code fence in a `SKILL.md`.
 FROM = re.compile(r"<!--\s*from:\s*(\S+)\s*-->")
 
-#: A markdown heading, once fenced blocks are out of the way.
-HEADING = re.compile(r"^#{1,6}\s+(.*?)\s*$")
+#: One markdown link, as `scripts/gen_skills.py` matches it: the text may
+#: wrap a line, the target may not contain whitespace or a parenthesis.
+LINK = re.compile(r"\[([^\[\]]+)\]\(([^()\s]+)\)")
+
+#: What the rewriter leaves after a link into another skill's bundle:
+#: the text, then the skill to install. Set aside when a republished
+#: page is compared with the site's.
+CARRIER = re.compile(r" \(see the athanore-[a-z]+ skill\)")
 
 
 # --------------------------------------------------------------------------
-# The three citation forms, parsed
+# The parsers
 # --------------------------------------------------------------------------
 
 
 def strip_fences(text: str) -> str:
     """``text`` with every fenced code block removed, lines preserved.
 
-    Inline code is what carries a citation; a fence carries an install
-    command or an excerpt, and neither is one.
+    Inline code and links are what the rules read; a fence carries an
+    install command or an excerpt, and neither is either.
     """
 
     out: list[str] = []
@@ -116,67 +135,46 @@ def is_path(span: str) -> bool:
 
 
 def cited_paths(text: str) -> list[str]:
-    """Every path citation in ``text``, in order, duplicates kept."""
+    """Every checkout path cited in ``text``, in order, duplicates kept."""
 
     return [span for span in SPAN.findall(strip_fences(text)) if is_path(span.strip())]
 
 
-def section_text(rest: str) -> str:
-    """The heading named after a `§`, read to the citation's end.
+def reference_spans(text: str) -> list[str]:
+    """Every inline-code span naming a file under the skill's `reference/`."""
 
-    It runs to the end of the line, a comma, a semicolon, a table-cell
-    pipe, a full stop, or a closing parenthesis that has no opening one
-    inside the citation — so `§Fan-in (join nodes)` keeps its
-    parentheses and `(§Slots)` does not take the wrapper's.
+    prefix = "reference/"
+    return [
+        span.strip()
+        for span in SPAN.findall(strip_fences(text))
+        if span.strip().startswith(prefix) and len(span.strip()) > len(prefix)
+    ]
+
+
+def relative_links(text: str) -> list[str]:
+    """Every link target that is neither external nor fragment-only.
+
+    The fragment is stripped: what has to exist is the file. A link in a
+    fence is not a link, so fences are removed first.
     """
 
-    depth = 0
-    out: list[str] = []
-    for index, char in enumerate(rest):
-        if char == "(":
-            depth += 1
-        elif char == ")":
-            if depth == 0:
-                break
-            depth -= 1
-        elif depth == 0:
-            if char in ",;|":
-                break
-            if char == "." and (index + 1 == len(rest) or rest[index + 1] == " "):
-                break
-        out.append(char)
-    return "".join(out).strip()
-
-
-def cited_sections(text: str) -> list[tuple[str, str]]:
-    """Every ``(document, heading)`` a section citation names."""
-
-    found: list[tuple[str, str]] = []
-    for line in strip_fences(text).splitlines():
-        for match in SECTION.finditer(line):
-            document = match.group(1).strip()
-            if not is_path(document):
-                continue
-            heading = section_text(line[match.end() :])
-            if heading:
-                found.append((document, heading))
+    found: list[str] = []
+    for _, target in LINK.findall(strip_fences(text)):
+        if "://" in target or target.startswith("#"):
+            continue
+        found.append(target.partition("#")[0])
     return found
 
 
-def headings(path: Path) -> set[str]:
-    """Every heading of a markdown file, without its trailing aside.
+def unlinked(text: str) -> str:
+    """``text`` with every link reduced to its text and every carrier dropped.
 
-    Some headings carry an aside after a long gap — 05 and 19 both do —
-    and a citation names the heading, not the aside, so the comparison is
-    against the leading text up to a run of two or more spaces.
+    What a republished page and the site page it came from have in
+    common, once links — and the "(see the athanore-x skill)" a link
+    into another skill's bundle becomes — are set aside.
     """
 
-    found: set[str] = set()
-    for line in strip_fences(path.read_text(encoding="utf-8")).splitlines():
-        match = HEADING.match(line)
-        if match:
-            found.add(re.split(r"\s{2,}", match.group(1))[0].strip())
-    return found
+    return CARRIER.sub("", LINK.sub(lambda match: match.group(1), text))
 
 
 def fenced_blocks(text: str) -> list[tuple[str | None, str]]:
@@ -228,17 +226,34 @@ def generator() -> ModuleType:
     `scripts/` is dev machinery rather than a package, so there is no
     import to do. Loading the real file is the point: the renderer under
     test is the one CI runs, not a copy of it. The loader is shared with
-    `tests/test_docs_site.py`, which loads this script's sibling front
-    end over the same renderer.
+    `tests/test_docs_site.py`, which loads the generator whose pages this
+    one republishes.
     """
 
     return load_script("gen_skills")
+
+
+@pytest.fixture(scope="module")
+def site() -> ModuleType:
+    """`scripts/gen_docs.py`, the generator whose pages the skills carry."""
+
+    return load_script("gen_docs")
 
 
 def skill_files() -> list[Path]:
     """Every hand-written skill file: the five skills and the README."""
 
     return [SKILLS / "README.md", *(SKILLS / name / "SKILL.md" for name in NAMES)]
+
+
+def markdown_files() -> list[Path]:
+    """Every markdown file under `skills/`, generated ones included."""
+
+    return sorted(SKILLS.rglob("*.md"))
+
+
+def relative(path: Path) -> str:
+    return path.relative_to(SKILLS).as_posix()
 
 
 def frontmatter(path: Path) -> dict[str, object]:
@@ -275,13 +290,20 @@ def test_every_skill_is_linked_from_the_readme() -> None:
 
 
 def test_the_readme_says_how_to_install_one() -> None:
-    """The install command lives in one place, and this is it (D213)."""
+    """Copying leads, because a copy now works; the symlink is how a
+    checkout stays current; `npx skills add` is the convenience."""
 
     readme = (SKILLS / "README.md").read_text(encoding="utf-8")
+    installs = [
+        block
+        for _, block in fenced_blocks(readme)
+        if "cp -r" in block or "ln -s" in block or "npx skills" in block
+    ]
+    assert installs, "the README has no install command"
+    assert "cp -r" in installs[0], "the copy is the form to lead with"
+    assert any("ln -s" in block for block in installs)
+    assert "npx skills add" in readme
     assert "uv run scripts/gen_skills.py" in readme
-    assert any("ln -s" in block for _, block in fenced_blocks(readme)), (
-        "the symlink install is the form to lead with"
-    )
 
 
 @pytest.mark.parametrize("name", NAMES)
@@ -344,7 +366,7 @@ def test_render_refuses_a_file_it_does_not_own(generator: ModuleType) -> None:
 
 def test_the_web_skill_has_no_generated_reference(generator: ModuleType) -> None:
     """Its facts are TypeScript; a Python parser restating them would be
-    the second, weaker copy this design exists to prevent (D213)."""
+    the second, weaker copy this design exists to prevent."""
 
     assert not (SKILLS / "athanore-web" / "reference").exists()
     assert not any(
@@ -352,90 +374,265 @@ def test_the_web_skill_has_no_generated_reference(generator: ModuleType) -> None
     )
 
 
-def test_only_generated_files_carry_the_marker(generator: ModuleType) -> None:
-    """The marker is the one thing that says "do not edit this by hand"."""
+def test_only_generated_files_carry_the_marker(
+    generator: ModuleType, site: ModuleType
+) -> None:
+    """The marker is the one thing that says "do not edit this by hand".
+
+    `reference/openapi.json` carries none — JSON has no comment — and is
+    held to the snapshot instead. The site's own marker appears nowhere
+    under `skills/`: a republished page says which script wrote *it*.
+    """
 
     for target in generator.TARGETS:
+        if target.endswith(".json"):
+            continue
         first = (ROOT / target).read_text(encoding="utf-8").splitlines()[0]
         assert first == generator.MARKER, target
     for path in skill_files():
         assert generator.MARKER not in path.read_text(encoding="utf-8"), path
+    for path in SKILLS.rglob("*"):
+        if path.is_file():
+            assert site.MARKER not in path.read_text(encoding="utf-8"), path
 
 
-# --------------------------------------------------------------------------
-# The hand-written half: every pointer resolves
-# --------------------------------------------------------------------------
+def test_the_api_skill_carries_the_openapi_document_byte_for_byte() -> None:
+    """A client can be generated from the skill with no server running."""
+
+    bundled = SKILLS / "athanore-api" / "reference" / "openapi.json"
+    snapshot = ROOT / "tests" / "snapshots" / "openapi.json"
+    assert bundled.read_bytes() == snapshot.read_bytes(), STALE
 
 
-def skill_and_reference_files() -> list[Path]:
-    """Every markdown file under `skills/`, generated ones included.
+def generated_pages() -> list[Path]:
+    """Every republished markdown page on disk, generated ones only."""
 
-    The generated files carry citations too — each says which section
-    specifies what it lists — and a renamed heading must fail the gate
-    wherever it is cited.
+    return sorted(SKILLS.rglob("reference/*.md"))
+
+
+@pytest.mark.parametrize("path", generated_pages(), ids=relative)
+def test_a_republished_page_is_the_site_page_modulo_links_and_marker(
+    path: Path, generator: ModuleType, site: ModuleType
+) -> None:
+    """What makes "one narrative" a checked fact rather than a described one.
+
+    A guide is read from disk; a reference page is what `gen_docs.py`
+    renders, in process. Either way, with the marker dropped and every
+    link reduced to its text, the skill's copy is the site's page.
     """
 
-    return sorted(SKILLS.rglob("*.md"))
+    target = path.relative_to(ROOT).as_posix()
+    skill, _, name = target.removeprefix("skills/").partition("/reference/")
+    if name.startswith("guide-"):
+        page = f"guide/{name.removeprefix('guide-')}"
+    else:
+        page = f"reference/{name}"
+    assert page in generator.BUNDLES[skill], target
+
+    copied = generator.render(target)
+    assert copied.startswith(generator.MARKER + "\n\n")
+    copied = copied[len(generator.MARKER) + 2 :]
+
+    if page.startswith("guide/"):
+        original = (SITE / page).read_text(encoding="utf-8")
+        original = original.rstrip("\n") + "\n"
+    else:
+        original = site.render(f"docs/site/src/{page}")
+        assert original.startswith(site.MARKER + "\n\n")
+        original = original[len(site.MARKER) + 2 :]
+
+    assert unlinked(copied) == unlinked(original), target
+
+
+# --------------------------------------------------------------------------
+# The hand-written half: nothing points outside the skill
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("path", markdown_files(), ids=relative)
+def test_no_file_names_the_design_documents(path: Path) -> None:
+    """A path the reader cannot open teaches nothing."""
+
+    assert SPEC not in path.read_text(encoding="utf-8"), relative(path)
+
+
+@pytest.mark.parametrize("path", markdown_files(), ids=relative)
+def test_no_file_specifies_anything(path: Path) -> None:
+    """RFC 2119's keywords belong to the specification, not to a skill."""
+
+    found = keywords(path.read_text(encoding="utf-8"))
+    assert not found, f"{relative(path)} carries {sorted(set(found))}"
+
+
+@pytest.mark.parametrize("name", PORTABLE)
+def test_a_portable_skill_names_no_checkout_path(name: str) -> None:
+    """Its reader has no checkout, so a path into one is a dead pointer."""
+
+    path = SKILLS / name / "SKILL.md"
+    cited = cited_paths(path.read_text(encoding="utf-8"))
+    assert cited == [], f"{relative(path)} cites {cited}"
 
 
 @pytest.mark.parametrize(
-    "path", skill_and_reference_files(), ids=lambda p: p.relative_to(SKILLS).as_posix()
+    "path",
+    [SKILLS / "README.md", SKILLS / "athanore-web" / "SKILL.md"],
+    ids=relative,
 )
 def test_every_cited_path_exists(path: Path) -> None:
-    for cited in cited_paths(path.read_text(encoding="utf-8")):
-        assert (ROOT / cited).exists(), f"{path.relative_to(ROOT)} cites {cited}"
+    """The two files that may point into the tree point at what is there."""
+
+    cited = cited_paths(path.read_text(encoding="utf-8"))
+    assert cited, f"{relative(path)} cites nothing, so this checks nothing"
+    for target in cited:
+        assert (ROOT / target).exists(), f"{relative(path)} cites {target}"
 
 
-@pytest.mark.parametrize(
-    "path", skill_and_reference_files(), ids=lambda p: p.relative_to(SKILLS).as_posix()
-)
-def test_every_cited_section_is_a_heading_of_the_document_beside_it(
-    path: Path,
-) -> None:
-    for document, heading in cited_sections(path.read_text(encoding="utf-8")):
-        target = ROOT / document
-        assert target.is_file(), f"{path.relative_to(ROOT)} cites {document}"
-        assert heading in headings(target), (
-            f"{path.relative_to(ROOT)} cites {document} §{heading}, "
-            f"which is not a heading of it"
-        )
+@pytest.mark.parametrize("path", markdown_files(), ids=relative)
+def test_every_relative_link_resolves_inside_the_skill(path: Path) -> None:
+    """The check that proves the link rewriter and the bundles agree.
+
+    Every `[text](target)` that is neither external nor a fragment must
+    name a file relative to the linking file's own directory, and every
+    `reference/...` span in a `SKILL.md` must name a file under it.
+    """
+
+    text = path.read_text(encoding="utf-8")
+    for target in relative_links(text):
+        assert (path.parent / target).is_file(), f"{relative(path)} links {target}"
+    if path.name == "SKILL.md":
+        for span in reference_spans(text):
+            assert (path.parent / span).is_file(), f"{relative(path)} names {span}"
 
 
 @pytest.mark.parametrize("name", NAMES)
-def test_every_code_fence_is_an_excerpt_of_the_file_it_names(name: str) -> None:
+def test_every_reference_file_is_named_by_its_skill(name: str) -> None:
+    """A generated file the front door never mentions is one an agent
+    never loads."""
+
+    skill = SKILLS / name
+    text = (skill / "SKILL.md").read_text(encoding="utf-8")
+    named = set(reference_spans(text)) | set(relative_links(text))
+    reference = skill / "reference"
+    files = sorted(reference.iterdir()) if reference.is_dir() else []
+    for file in files:
+        assert f"reference/{file.name}" in named, f"{name} never names {file.name}"
+
+
+@pytest.mark.parametrize("name", NAMES)
+def test_every_code_fence_is_a_marked_excerpt_that_parses(name: str) -> None:
     """A fence in a `SKILL.md` is code from the tree, or it is a copy.
 
-    `skills/README.md` is exempt: its fences are the install commands,
-    which are excerpts of nothing.
+    Every fence is preceded by `<!-- from: path -->` and its text appears
+    in that file, verbatim or uniformly indented; every Python fence is
+    a module that parses. `skills/README.md` is exempt: its fences are
+    the install commands, which are excerpts of nothing.
     """
 
     path = SKILLS / name / "SKILL.md"
-    for source, block in fenced_blocks(path.read_text(encoding="utf-8")):
-        assert source is not None, f"{path.relative_to(ROOT)}: fence with no marker"
+    text = path.read_text(encoding="utf-8")
+    blocks = fenced_blocks(text)
+    assert blocks, f"{relative(path)} excerpts nothing, so this checks nothing"
+    for source, block in blocks:
+        assert source is not None, f"{relative(path)}: fence with no marker"
         target = ROOT / source
-        assert target.is_file(), f"{path.relative_to(ROOT)} names {source}"
+        assert target.is_file(), f"{relative(path)} names {source}"
         assert is_excerpt(block, target.read_text(encoding="utf-8")), (
-            f"{path.relative_to(ROOT)}: the fence marked `from: {source}` "
-            f"is not in that file"
+            f"{relative(path)}: the fence marked `from: {source}` is not in that file"
         )
+    for index, block in enumerate(python_fences(text)):
+        try:
+            ast.parse(block)
+        except SyntaxError as exc:  # pragma: no cover - the assert reports it
+            pytest.fail(f"{relative(path)} python fence {index}: {exc}")
 
 
-def test_the_skills_actually_cite_something() -> None:
-    """The checkers must have work to do.
+@pytest.mark.parametrize("name", NAMES)
+def test_a_skill_is_the_minimum_to_act(name: str) -> None:
+    """A skill nobody finishes reading is a skill that does not work."""
 
-    A parser that never matched would pass every file above without
-    reading a single citation, which is the quiet way this whole design
-    stops working.
-    """
+    path = SKILLS / name / "SKILL.md"
+    count = len(path.read_text(encoding="utf-8").splitlines())
+    assert count <= MAX_LINES, f"{relative(path)} is {count} lines"
 
-    for name in NAMES:
-        text = (SKILLS / name / "SKILL.md").read_text(encoding="utf-8")
-        assert len(cited_paths(text)) >= 5, name
-        assert len(cited_sections(text)) >= 5, name
-    assert any(
-        fenced_blocks((SKILLS / name / "SKILL.md").read_text(encoding="utf-8"))
-        for name in NAMES
-    ), "no skill excerpts any code, so the excerpt check checks nothing"
+
+# --------------------------------------------------------------------------
+# The rewriter, against text
+# --------------------------------------------------------------------------
+
+
+def test_a_link_into_the_bundle_becomes_the_filename(generator: ModuleType) -> None:
+    text = "see [Node options](../reference/node-options.md) here"
+    out = generator.rewrite(text, page="guide/workflows.md", skill="athanore-workflows")
+    assert out == "see [Node options](node-options.md) here"
+
+
+def test_a_fragment_is_kept(generator: ModuleType) -> None:
+    text = (
+        "[Writing a workflow](workflows.md#rule-3-the-exception-is-the-failure-policy)"
+    )
+    out = generator.rewrite(text, page="guide/runs.md", skill="athanore-workflows")
+    assert out == (
+        "[Writing a workflow]"
+        "(guide-workflows.md#rule-3-the-exception-is-the-failure-policy)"
+    )
+
+
+def test_a_link_into_another_skill_names_that_skill(generator: ModuleType) -> None:
+    text = "- [The command line](cli.md) — the answering verbs in full."
+    out = generator.rewrite(
+        text, page="guide/human-in-the-loop.md", skill="athanore-workflows"
+    )
+    assert out == (
+        "- The command line (see the athanore-cli skill) — the answering verbs in full."
+    )
+
+    text = "described in\n[Driving the API](../guide/http-api.md)."
+    out = generator.rewrite(text, page="reference/events.md", skill="athanore-plugins")
+    assert out == "described in\nDriving the API (see the athanore-api skill)."
+
+
+def test_a_link_to_an_unbundled_page_becomes_its_text(generator: ModuleType) -> None:
+    text = "start at the [quickstart](../quickstart.md), then [install](../install.md)"
+    out = generator.rewrite(text, page="guide/workflows.md", skill="athanore-workflows")
+    assert out == "start at the quickstart, then install"
+
+
+def test_the_openapi_document_resolves_in_the_api_skill(generator: ModuleType) -> None:
+    text = "this page: [openapi.json](../openapi.json)."
+    out = generator.rewrite(text, page="reference/http-api.md", skill="athanore-api")
+    assert out == "this page: [openapi.json](openapi.json)."
+    out = generator.rewrite(text, page="reference/http-api.md", skill="athanore-cli")
+    assert out == "this page: openapi.json (see the athanore-api skill)."
+
+
+def test_external_and_fragment_only_links_are_untouched(generator: ModuleType) -> None:
+    text = "[ACP](https://agentclientprotocol.com) and [`Run`](#schema-Run)"
+    out = generator.rewrite(text, page="reference/http-api.md", skill="athanore-api")
+    assert out == text
+
+
+def test_a_link_whose_text_wraps_keeps_its_line_break(generator: ModuleType) -> None:
+    """A republished page has exactly the site page's line count."""
+
+    text = "see [Runs, retries\nand capacity](runs.md) next"
+    out = generator.rewrite(text, page="guide/workflows.md", skill="athanore-workflows")
+    assert out == "see [Runs, retries\nand capacity](guide-runs.md) next"
+    assert out.count("\n") == text.count("\n")
+
+
+def test_a_list_comprehension_is_not_a_link(generator: ModuleType) -> None:
+    text = '    return [build(item) for item in payload["items"]]'
+    out = generator.rewrite(text, page="guide/workflows.md", skill="athanore-workflows")
+    assert out == text
+
+
+def test_every_bundled_page_is_a_site_page(generator: ModuleType) -> None:
+    """A bundle naming a page that is not there would republish nothing."""
+
+    for skill, bundle in generator.BUNDLES.items():
+        assert skill in NAMES
+        for page in bundle:
+            assert (SITE / page).is_file() or page == generator.OPENAPI, page
 
 
 # --------------------------------------------------------------------------
@@ -443,18 +640,32 @@ def test_the_skills_actually_cite_something() -> None:
 # --------------------------------------------------------------------------
 
 
-def test_a_deleted_path_is_caught() -> None:
-    assert cited_paths("see `docs/v1/99-nonexistent.md` for this") == [
-        "docs/v1/99-nonexistent.md"
+def test_a_design_document_in_a_skill_is_caught() -> None:
+    assert SPEC in "the rule is fixed in `docs/v1/04-engine.md` §Routing"
+
+
+def test_a_keyword_in_a_skill_is_caught() -> None:
+    assert keywords("A node body MUST NOT retry an agent call.") == ["MUST NOT"]
+    assert keywords("A body may raise, and should say why.") == []
+
+
+def test_a_checkout_path_in_a_portable_skill_is_caught() -> None:
+    assert cited_paths("copy `workflows/feature/files.py` for this") == [
+        "workflows/feature/files.py"
     ]
-    assert not (ROOT / "docs/v1/99-nonexistent.md").exists()
+    assert cited_paths("see `README.md` §The CLI") == ["README.md"]
 
 
 def test_code_in_prose_is_not_mistaken_for_a_path() -> None:
     """The rule has to be quiet about code, or every skill needs escapes."""
 
-    text = "`wf.node(...)`, `run.completed`, `/api/health`, `path/to/file.py:wf`"
+    text = (
+        "`wf.node(...)`, `run.completed`, `/api/health`, `path/to/file.py:wf`, "
+        "`athanore serve hello.py:wf`, `reference/events.md`, `athanore.testing`"
+    )
     assert cited_paths(text) == []
+    assert reference_spans(text) == ["reference/events.md"]
+    assert reference_spans("this skill's `reference/` directory") == []
 
 
 def test_a_path_inside_a_fence_is_not_a_citation() -> None:
@@ -462,52 +673,25 @@ def test_a_path_inside_a_fence_is_not_a_citation() -> None:
     assert cited_paths(text) == []
 
 
-def test_an_invented_heading_is_caught() -> None:
-    text = "`docs/v1/04-engine.md` §Not A Real Heading"
-    assert cited_sections(text) == [("docs/v1/04-engine.md", "Not A Real Heading")]
-    assert "Not A Real Heading" not in headings(ROOT / "docs/v1/04-engine.md")
+def test_a_link_to_a_missing_file_is_caught() -> None:
+    text = "see [the guide](guide-invented.md#anchor) and [top](#top)"
+    assert relative_links(text) == ["guide-invented.md"]
+    assert not (
+        SKILLS / "athanore-workflows" / "reference" / "guide-invented.md"
+    ).exists()
 
 
-def test_a_renamed_section_is_caught() -> None:
-    """The failure a rename produces: the citation parses, and misses."""
-
-    document = ROOT / "docs/v1/04-engine.md"
-    assert "Fan-in (join nodes)" in headings(document)
-    assert "Fan-in" not in headings(document)
+def test_an_external_link_is_not_a_relative_one() -> None:
+    assert relative_links("[ACP](https://agentclientprotocol.com)") == []
 
 
-@pytest.mark.parametrize(
-    ("line", "expected"),
-    [
-        ("`d.md` §Fan-in (join nodes)", "Fan-in (join nodes)"),
-        ("(`d.md` §Slots)", "Slots"),
-        (
-            "`d.md` §Node options (metadata seam). Then prose.",
-            "Node options (metadata seam)",
-        ),
-        ("| `d.md` §Fakes |", "Fakes"),
-        ("`d.md` §Pools, and `e.md` §Scheduling", "Pools"),
-        (
-            "`d.md` §Failure classes (rule 3, refined).",
-            "Failure classes (rule 3, refined)",
-        ),
-        ("(`d.md` §The three rules (unchanged)):", "The three rules (unchanged)"),
-    ],
-)
-def test_the_section_parse_stops_where_the_citation_does(
-    line: str, expected: str
-) -> None:
-    match = SECTION.search(line)
-    assert match is not None
-    assert section_text(line[match.end() :]) == expected
+def test_a_republished_page_that_drifted_is_caught() -> None:
+    """The comparison sets links and carriers aside, and nothing else."""
 
-
-def test_a_second_citation_on_one_line_is_read_too() -> None:
-    line = "`docs/v1/04-engine.md` §Pools, and `docs/v1/04-engine.md` §Scheduling"
-    assert cited_sections(line) == [
-        ("docs/v1/04-engine.md", "Pools"),
-        ("docs/v1/04-engine.md", "Scheduling"),
-    ]
+    site = "see [Driving the API](http-api.md) for the stream."
+    copy = "see Driving the API (see the athanore-api skill) for the stream."
+    assert unlinked(copy) == unlinked(site)
+    assert unlinked("see Driving the API for the socket.") != unlinked(site)
 
 
 def test_a_fence_with_no_source_marker_is_caught() -> None:
@@ -515,20 +699,41 @@ def test_a_fence_with_no_source_marker_is_caught() -> None:
 
 
 def test_a_fence_that_is_not_in_the_file_it_names_is_caught() -> None:
-    source = (ROOT / "workflows" / "rps.py").read_text(encoding="utf-8")
-    assert is_excerpt("async def tally(*, payload):", source)
-    assert not is_excerpt("async def tally(*, payload, invented):", source)
+    source = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert is_excerpt("async def shout(*, name):", source)
+    assert not is_excerpt("async def shout(*, name, invented):", source)
 
     # A declaration written inside a function may be dedented to read,
     # which is the one liberty `is_excerpt` takes.
-    nested = (ROOT / "workflows" / "feature" / "files.py").read_text(encoding="utf-8")
-    assert is_excerpt('@wf.route("/files")', nested)
-    assert not is_excerpt('@wf.route("/invented")', nested)
+    nested = (ROOT / "docs/site/src/guide/workflows.md").read_text(encoding="utf-8")
+    assert is_excerpt('return {"shipped": True}', nested)
+    assert not is_excerpt('return {"invented": True}', nested)
 
 
-def test_a_heading_inside_a_fence_is_not_a_heading() -> None:
-    """07 has a `#` comment inside a code block, and it is not a section."""
+def test_a_python_fence_that_does_not_parse_is_caught() -> None:
+    text = "<!-- from: README.md -->\n```python\nasync def n(\n```\n"
+    assert python_fences(text) == ["async def n("]
+    with pytest.raises(SyntaxError):
+        ast.parse(python_fences(text)[0])
 
-    assert "commit → events inserted in the same transaction" not in " ".join(
-        headings(ROOT / "docs/v1/07-storage.md")
+
+def test_a_stale_copy_is_caught(
+    generator: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An edited guide is a red byte-check until the skills are regenerated.
+
+    The generator reads guides under its `ROOT`, so pointing that at a
+    tree holding an edited copy is the edit without touching the site.
+    """
+
+    page = "docs/site/src/guide/workflows.md"
+    edited = tmp_path / page
+    edited.parent.mkdir(parents=True)
+    edited.write_text(
+        (ROOT / page).read_text(encoding="utf-8") + "\nAn edit.\n", encoding="utf-8"
     )
+    monkeypatch.setattr(generator, "ROOT", tmp_path)
+    target = "skills/athanore-workflows/reference/guide-workflows.md"
+    committed = (ROOT / target).read_text(encoding="utf-8")
+    assert generator.render(target) != committed
+    assert generator.render(target).endswith("\nAn edit.\n")

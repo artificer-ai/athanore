@@ -2,9 +2,10 @@
 
 # Error codes
 
-The stable `code` of an error body, read off
-`athanore/api/errors.py`. The shape it appears in and what each one
-means is `docs/v1/08-api.md` §Conventions.
+The stable `code` an error body carries. It is what a client
+branches on, so it outlives any wording change to the human
+`error` message beside it. The shape both live in is in
+[Driving the API](guide-http-api.md).
 
 - `not_found`
 - `conflict`

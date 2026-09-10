@@ -1,133 +1,116 @@
 ---
 name: athanore-workflows
-description: Write or change an Athanore workflow — nodes and inferred edges, routing by return value, failure and retry policy, agents, human input, fan-out and joins, pools. Load this before authoring a workflow module, a node body or an agent class, to find which design document settles the behaviour and which shipped workflow to copy.
+description: Write or change an Athanore workflow — nodes and inferred edges, routing by return value, failure and retry policy, agents, human input, fan-out and joins, pools. Load this before writing a workflow module, a node body or an agent class.
 ---
 
 # Writing an Athanore workflow
 
-Every path in this file is relative to the **checkout root**: the
-directory two levels above this file in the checkout this skill was
-installed from. Nothing here is normative — `docs/v1/` is the
-specification and this only says which part of it to open.
+A workflow is one Python module: a `Workflow` object and some `async`
+functions decorated with `@wf.node()`. Three rules are the whole
+authoring interface — the signature is the graph, the return value is
+the routing, the exception is the failure policy — and everything else
+attaches to them. This directory is self-contained: every file it
+names is under its own `reference/`.
 
-## The surface
+## A complete workflow
 
-A workflow is one Python module: a `Workflow` object and some functions
-decorated with `@wf.node()`. Three rules are the whole authoring
-interface, and there is deliberately never a fourth
-(`docs/v1/01-vision-and-scope.md` §The three rules (unchanged)):
+Two nodes, no agents, so it runs with nothing configured. Save it as
+`hello.py`:
 
-1. **The signature is the graph.** A node's positional parameters are
-   the nodes it may hand work to, so the edges are read off the function
-   rather than declared. See `docs/v1/04-engine.md` §Signature parsing (unchanged semantics).
-2. **The return value is the routing.** What a body returns says where
-   the work goes next and what it carries, and a plain value with one
-   successor auto-transitions along it. The full table is
-   `docs/v1/04-engine.md` §Routing interpretation, and — for the forms
-   that are easy to get wrong — `docs/v1/04-engine.md` §Routing edge cases.
-3. **The exception is the failure policy.** Raising is how a body says
-   the attempt failed, and which exception it raises decides whether the
-   engine tries again: `docs/v1/04-engine.md` §Failure classes (rule 3, refined).
-   Retries belong to the engine — never write one into a node body on
-   its behalf.
-
-Capability is added by attaching it to a seam below. If you find
-yourself wanting a fourth rule, you have found a seam you have not read
-yet.
-
-## The seams
-
-- **Node options** — the metadata a node carries, given to the
-  decorator: `docs/v1/04-engine.md` §Node options (metadata seam).
-  Which options exist, with their types and defaults, is
-  `skills/athanore-workflows/reference/node-options.md`.
-- **`join=True`** — a node that waits for a fan-out to arrive rather
-  than for one predecessor: `docs/v1/04-engine.md` §Fan-in (join nodes).
-- **Pools and priority** — the capacity a workflow's work is dispatched
-  against, and the order within it: `docs/v1/04-engine.md` §Pools,
-  and `docs/v1/04-engine.md` §Dispatch order (per pool).
-- **An object awaited inside a body** — where most new capability goes,
-  and there are three of them: an agent
-  (`docs/v1/05-agents.md` §Agent classes), a question for the operator
-  (`docs/v1/06-requests.md` §The model), and the narrow services on the
-  task context (`docs/v1/04-engine.md` §TaskContext).
-- **Declarations the workflow carries** — routes, actions, panels and
-  event handlers, which is how a workflow ships its own UI. That is a
-  surface of its own: `skills/athanore-plugins/SKILL.md`.
-- **The host** — `wf.run()` for one workflow, a `Server` for several:
-  `docs/v1/04-engine.md` §Programmatic host. The command line that does
-  the same thing is `skills/athanore-cli/SKILL.md`.
-
-## Where to read
-
-| If you are asking | Open |
-|---|---|
-| how are edges inferred from a signature? | `docs/v1/04-engine.md` §Signature parsing (unchanged semantics) |
-| what may a body return, and what does each form do? | `docs/v1/04-engine.md` §Routing interpretation |
-| what happens on an empty return, a duplicate edge, a payload that is not a mapping? | `docs/v1/04-engine.md` §Routing edge cases |
-| when is a graph rejected, and when is that noticed? | `docs/v1/04-engine.md` §Finalization |
-| what happens when a node raises, and what does `NonRetryable` change? | `docs/v1/04-engine.md` §Failure classes (rule 3, refined) |
-| which clock does a node timeout use, and what error does it raise? | `docs/v1/04-engine.md` §Timeouts (which clock, which error) |
-| how do I fan out and join? | `docs/v1/04-engine.md` §Fan-in (join nodes) |
-| what does a body get from its task context? | `docs/v1/04-engine.md` §TaskContext |
-| how do I ask a human, and what happens to the worker slot while I wait? | `docs/v1/04-engine.md` §Waiting on a human (new) |
-| what shape may an answer take, and where can it be answered from? | `docs/v1/06-requests.md` §The model |
-| which surfaces can answer a question? | `docs/v1/06-requests.md` §Surfaces |
-| how do I declare an agent? | `docs/v1/05-agents.md` §Agent classes |
-| what does `output_model` buy me? | `docs/v1/05-agents.md` §Submissions |
-| what does one agent run return? | `docs/v1/05-agents.md` §AgentResult |
-| how does an agent reach its own task? | `docs/v1/05-agents.md` §Tooling tiers: how an agent reaches its task |
-| what happens when an agent asks for a permission? | `docs/v1/05-agents.md` §Policies |
-| what does the agent actually receive as its prompt? | `docs/v1/19-agent-prompts.md` §Assembly |
-| what do I get in the way of token counts and cost? | `docs/v1/05-agents.md` §Stats entry |
-| how do I run a workflow without a model in the loop? | `docs/v1/05-agents.md` §Testing doubles (`athanore.testing`) |
-| what does a test of this look like? | `docs/v1/13-testing.md` §Fakes |
-| at which layer does that test belong? | `docs/v1/13-testing.md` §Pyramid |
-
-Two things to get right the first time, both of which the documents
-above say plainly: **an agent never moves a task** — it submits a value
-and the node body routes on it — and a body never retries an agent call
-on the engine's behalf, because retrying is rule 3's job.
-
-## What to copy
-
-- `README.md` §A first workflow. Two nodes, no agents, and it runs with
-  nothing configured.
-- `workflows/rps.py` — the smallest complete workflow in the tree: a
-  question for the operator, a loop-back edge, a real output, no agent
-  anywhere.
-- `workflows/feature/` — the multi-node workflow with agents, a join,
-  pools and plugins that builds this repository. The best worked example
-  of everything at once.
-- `examples/pi/agent.py`, `examples/claude_acp/`, `examples/docker_acp/`
-  — vendor `ACPAgent` subclasses. They are user-land by design, kept as
-  examples rather than shipped in the package:
-  `docs/v1/05-agents.md` §User-land adapters (examples, not shipped).
-- `athanore/testing/` — the doubles CI runs behind every agent.
-
-`workflows/` is this repository's own operating workflows; `examples/`
-is a distribution, a workspace package of its own.
-
-Rule 1 taken literally, from `workflows/rps.py` — a node naming itself
-as one of its own edges, so the engine walks the loop as a fresh task
-each time round:
-
-<!-- from: workflows/rps.py -->
+<!-- from: README.md -->
 ```python
-@wf.node(retries=0, timeout=None)
-async def play(play, tally, *, payload):
+from athanore import Workflow, human_input
+
+wf = Workflow("hello")
+
+
+@wf.node(start=True)
+async def greet(shout):
+    name = await human_input("Who is this run for?")
+    return shout(name)          # a called edge ref carries the payload
+
+
+@wf.node()
+async def shout(*, name):
+    return {"greeting": f"HELLO {name.upper()}"}   # no edges: the run ends here
 ```
 
-## Generated reference
+`greet` is the start node and `shout` is its one successor, because
+`shout` is `greet`'s parameter. `shout` takes no edges — only the
+payload after `*` — so it is terminal, and what it returns is the run's
+output. Serve it, and drive it from a second shell:
 
-Facts, read off the code by `scripts/gen_skills.py`, so they cannot
-drift from it:
+<!-- from: README.md -->
+```sh
+athanore serve hello.py:wf          # http://127.0.0.1:4002, SPA and API
+```
 
-- `skills/athanore-workflows/reference/public-api.md` — every name
-  `athanore` exports.
-- `skills/athanore-workflows/reference/node-options.md` — the node
-  options and the fields of a pool.
-- `skills/athanore-workflows/reference/agents.md` — what an agent
-  subclass may set, and what a run returns.
-- `skills/athanore-workflows/reference/events.md` — the event
-  vocabulary and the payload each name carries.
+<!-- from: README.md -->
+```sh
+athanore submit hello "first run"   # → run id
+athanore ls                         # runs, with the node each is on
+athanore requests                   # what is waiting for you
+athanore answer 1 world             # the request id, and the text typed
+athanore show <run>                 # output: {'greeting': 'HELLO WORLD'}
+```
+
+## The rules an agent gets wrong first
+
+- **Positional parameters are edges; the keyword-only parameter after
+  `*` is the payload.** `*args` and `**kwargs` are rejected. Exactly one
+  node is `start=True`, and the graph is checked once, at registration.
+- **Return an edge to move, call it to carry a payload, return a list to
+  fan out, return an empty list to end the branch.** A plain value from
+  a node with one edge goes along it; from a node with no edges it is
+  the branch's result; from a node with two or more edges it is an
+  error — the engine does not guess.
+- **`NonRetryable` and `GraphError` dead-letter at once; anything else
+  is retried** up to the node's `retries` and then dead-lettered.
+- **Never write a retry loop around an agent call.** Retrying is the
+  engine's job, and a body that does it too takes that budget away.
+- **A node `timeout` caps one attempt of the body and its clock stops
+  while a person is being waited on.** An agent's own timeout does not
+  stop, because the agent process is alive throughout.
+- **`join=True` closes a fan-out**: the node runs once, after every
+  branch has arrived, with one entry per branch in its payload slot. A
+  join node has to declare a payload slot, and it waits for every
+  branch — there is no timeout and no "first N of M".
+- **An agent submits a value; the body routes on it.** An agent cannot
+  transition a task or choose a node. `output_model` makes
+  `result.output` a validated instance of your model, or the body never
+  got there; `result.ok` is false for a refusal or a truncated turn, and
+  a transport failure raises `AgentError`.
+- **`human_input(prompt)` returns text, `options=[...]` returns the
+  option picked, `output_model=Model` returns an instance** — and the
+  worker slot goes back to the pool while the body waits.
+- **In tests, replace the agent with `MockAgent`** from
+  `athanore.testing`: `output=` is the shortest double, `submit=` makes
+  the real round trip, `fail=` raises what a body has to route around.
+- A workflow is registered on exactly one pool, and a workflow name may
+  not be a verb of the command line.
+
+## Where to read next
+
+Every file below is in this skill's `reference/`. The guides are
+narrative; the four after them are generated from the code, so a
+default there is the default that runs.
+
+- How routing works in full, fan-out and joins, output, registering and
+  serving: `reference/guide-workflows.md`.
+- Agent classes, inlined prompts, structured submissions, how an agent
+  reaches its task, permissions and elicitations, stats, testing without
+  a model, vendor adapters: `reference/guide-agents.md`.
+- Asking a person from a body, what the wait does to the slot, and how
+  an answer is claimed once: `reference/guide-human-in-the-loop.md`.
+- Pools and capacity, dispatch order, retries and dead-letter, steering
+  a run, restart recovery: `reference/guide-runs.md`.
+- Every name the package exports, with its signature:
+  `reference/python-api.md`.
+- Every `@wf.node()` option and every `Pool` field, with defaults:
+  `reference/node-options.md`.
+- Every attribute an `Agent` or `ACPAgent` subclass may set, and the
+  fields of `AgentResult`: `reference/agents.md`.
+- Every event name and the payload it carries: `reference/events.md`.
+
+A workflow's own routes, actions and panels are the `athanore-plugins`
+skill; the command line that serves it is the `athanore-cli` skill.

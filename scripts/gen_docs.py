@@ -14,14 +14,15 @@ renders, `docs/site/src/reference/*.md` is committed,
 writes, and CI's `contract` job regenerates and runs `git diff
 --exit-code`.
 
-The bodies come from `scripts/_reference.py`, which
-`scripts/gen_skills.py` renders too — one renderer, two front ends. What
-is here is this front end's framing (its own marker, title and lede, and
-no citation of `docs/v1/`, which the site does not publish) plus the two
-renderings that are the site's alone: the detailed HTTP reference, which
-walks the snapshot operation by operation and schema by schema, and the
-settings table, which is built from the descriptions on the
-pydantic-settings model.
+The bodies come from `scripts/_reference.py`. What is here is the
+framing (the marker, the title and the lede of each page, and no citation
+of `docs/v1/`, which the site does not publish) plus the two renderings
+that are built here alone: the detailed HTTP reference, which walks the
+snapshot operation by operation and schema by schema, and the settings
+table, which is built from the descriptions on the pydantic-settings
+model. `scripts/gen_skills.py` republishes these pages, links rewritten,
+into `skills/*/reference/`, so a skill carries the same page rather than
+a second framing of the same facts.
 
 Determinism is the same contract as there: declaration order where it is
 contract, sorted everywhere else, and no timestamps, no version numbers
@@ -238,7 +239,7 @@ def _plugins() -> str:
         [
             "## Declarations",
             "",
-            *_shift(reference.declarations(note=reference.plainly)),
+            *_shift(reference.declarations()),
             "",
             "## `PluginContext`",
             "",
@@ -247,7 +248,7 @@ def _plugins() -> str:
             "run-scoped declaration has a run, a task-scoped one has a task,",
             "and a workflow-scoped one has neither.",
             "",
-            *_shift(reference.context(note=reference.plainly)),
+            *_shift(reference.context()),
         ],
     )
 
