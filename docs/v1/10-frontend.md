@@ -362,7 +362,7 @@ const invalidations: Record<string, (e: Event) => QueryKey[]> = {
   "run.*":        e => [["runs"], ["run", e.run_id], ["graph", e.run_id]],
   "task.*":       e => [["runs"], ["run", e.run_id], ["graph", e.run_id], ["task", e.task_id]],
   "log.appended": e => [["log", e.run_id]],
-  "request.*":    e => [["requests", e.run_id], ["inbox"]],
+  "request.*":    e => [["runs"], ["run", e.run_id], ["requests", e.run_id], ["inbox"]],
   "agent.stats":  e => [["run", e.run_id]],
   "plugin.*":     e => panelsRefreshingOn(e.name),
 };
@@ -384,7 +384,11 @@ panel's key is `['panel', <source>]`, the prefix of every scoped copy of
 that panel's data, so one registration made before a run is selected
 reaches whichever run is (D158). The header's active
 count and the run list come from `GET /api/runs`, refetched on
-`run.*`/`task.*`. Server down: the header
+`run.*`/`task.*` — and on `request.*`, because that response carries
+`pending_requests` and the run row draws the `⚠` of §Attention from it.
+A request opens while its task sits `in_progress`, which emits no
+`task.*`, so a list refetched only on the other two would show no `⚠`
+until something unrelated moved (D208). Server down: the header
 counts grey out, a banner shows a reconnect countdown, the last data stays
 visible (the mock's `server-down placeholder` behaviour).
 
