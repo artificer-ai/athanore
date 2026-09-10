@@ -1,77 +1,103 @@
 ---
 name: athanore-cli
-description: Serve and steer Athanore from a terminal — `athanore serve` and its module:wf targets, the client verbs and how they find a server, --json output, pools and athanore.toml, and the exit codes. Load this before writing a command line, a script or a crontab entry against Athanore, or when a verb is refusing and you need to know what its exit status means.
+description: Serve and steer Athanore from a terminal — `athanore serve` and its module:wf targets, the client verbs and how they find a server, `--json` output, `athanore.toml` and pools, deployment, and the exit codes. Load this before writing a command line, a shell script or a crontab entry against Athanore.
 ---
 
-# Using the Athanore CLI
+# Using the Athanore command line
 
-Every path in this file is relative to the **checkout root**: the
-directory two levels above this file in the checkout this skill was
-installed from. Nothing here is normative — `docs/v1/11-cli.md` is the
-specification and this only says which part of it to open.
+The command line is a small program: one server verb, and a set of
+client verbs that are thin wrappers over the HTTP API. It is not the full
+operator surface — the browser interface is — but it is enough to start
+a server, submit work, look at a run and answer a question from a shell
+or a script. This directory is self-contained: every file it names is
+under its own `reference/`.
 
-## The surface
+## A complete session
 
-`athanore` is a small program with one server verb and a set of client
-verbs. Three ideas are the whole of it:
+Serve one workflow, or several, or whatever is installed:
 
-1. **`athanore serve` is the composition root's command line.** It takes
-   `module:wf` targets, builds the server, registers what it was given,
-   and serves: `docs/v1/11-cli.md` §Server.
-2. **Every verb that acts on a run or a request is a client of the HTTP
-   API**, and they all find their server and their token the same way,
-   through the same global flags: `docs/v1/11-cli.md` §Client connection.
-   Three verbs talk to no server: `athanore db` acts on `--db` or on the
-   configured database directly and `athanore token` and `athanore login`
-   read and write files on disk (`docs/v1/11-cli.md` §Server,
-   `docs/v1/11-cli.md` §Client connection).
-3. **Output is a table on a TTY and JSON with `--json` everywhere**, so
-   the CLI composes with `jq` rather than growing a query language of
-   its own. That is the opening paragraph of `docs/v1/11-cli.md`; the
-   verbs it applies to are `docs/v1/11-cli.md` §Verbs.
+<!-- from: docs/site/src/guide/cli.md -->
+```sh
+athanore serve                                   # whatever is installed
+athanore serve hello.py:wf                       # a file, and the object in it
+athanore serve myproject.flows:build --workers 4
+athanore serve --host 0.0.0.0 --port 8080        # needs an operator token
+athanore serve --open                            # ...and open a browser at it
+```
 
-## Where to read
+Then, from a second shell, submit a run, watch it stop on a question,
+answer it and read the output:
 
-| If you are asking | Open |
-|---|---|
-| how do I serve one workflow, or several? | `docs/v1/11-cli.md` §Server |
-| how does a verb decide which server to talk to? | `docs/v1/11-cli.md` §Client connection |
-| which verbs are there, and which take `--json`? | `docs/v1/11-cli.md` §Verbs |
-| where are the database and the config file looked for? | `docs/v1/02-architecture.md` §Configuration |
-| what may the config file set, and what is refused in it? | `docs/v1/02-architecture.md` §`athanore.toml` layout |
-| how do I declare a pool and put a workflow on it? | `docs/v1/04-engine.md` §Pools |
-| how do I answer a question from a terminal? | `docs/v1/06-requests.md` §CLI (11) |
-| what does the answer argument mean for this request's mode? | `docs/v1/06-requests.md` §The model |
-| what does this exit status mean? | `docs/v1/11-cli.md` §Exit codes |
-| do I need a token for this, and where does it live on disk? | `docs/v1/12-security.md` §Operator token (network binds only) |
-| what must a script never print or log? | `docs/v1/12-security.md` §Hygiene |
-| why is there no verb for the thing I want? | `docs/v1/11-cli.md` §Not in v1 |
+<!-- from: docs/site/src/quickstart.md -->
+```sh
+athanore submit hello "first run"   # prints a run id
+athanore ls                         # every run, and the node each is on
+athanore requests                   # what is waiting for you
+athanore answer 1 world             # the request id, then what you are answering
+athanore show <run>                 # output: {'greeting': 'HELLO WORLD'}
+```
 
-An exit status is part of the contract, not a detail: a script that
-branches on it is what the codes are for, and all four of them are
-fixed in `docs/v1/11-cli.md` §Exit codes.
+`--json` is a global flag — it goes before the verb, like `--url` and
+`--token` — and every read verb honours it, so this composes with `jq`:
 
-## What to copy
+<!-- from: docs/site/src/guide/cli.md -->
+```sh
+athanore --json ls | jq -r '.[] | select(.status == "failed") | .id'
+athanore --json show "$RUN" | jq '.tasks[] | {node, status, attempt}'
+athanore --json requests | jq 'length'
+```
 
-- `README.md` §The CLI. Serving and driving, in about a dozen lines.
-- `workflows/__main__.py` — a real `serve` target: this repository's own
-  workflows, registered on their own pools.
-- `athanore/cli/` — the implementation, if a verb's behaviour is not
-  written down anywhere else. `athanore/cli/client.py` is where the
-  connection and the token are actually resolved.
+## The rules an agent gets wrong first
 
-The dev stack's wrappers around all of this — running the app, the gate
-and an agent, on the host or in the container — are `AGENTS.md`
-§Commands and the scripts under `scripts/`.
+- **A serve target is `module:wf` or `file.py:wf`**, naming the module
+  or file and the `Workflow` object in it. What is served, in order: the
+  targets named, then installed workflows advertised as entry points
+  unless `--no-discover`, then the pool bindings from `athanore.toml`. A
+  named target wins over a discovered workflow of the same name.
+- **Client verbs default to `http://127.0.0.1:4002`, and a loopback
+  server needs no credential.** For anything else, `--url` and
+  `--token` before the verb, `ATHANORE_TOKEN` in the environment, or
+  `athanore login <url>` once, which remembers both.
+- **`athanore db`, `athanore token` and `athanore login` talk to no
+  server.** `db` acts on the database directly; the other two read and
+  write files on disk.
+- **`athanore <workflow> "title"` is `athanore submit`**, which is why a
+  workflow may not be named after a verb — that is refused at
+  registration.
+- **`answer` reads its argument against the request's mode**: a form
+  request takes JSON that parses as an object, an options request takes
+  an option, a text request takes the characters typed. `permit` and
+  `deny` answer a permission request. Request ids are unique across
+  runs, so no run id is needed.
+- **`--watch` on `ls` and `-f` on `logs` and `stream` follow the event
+  stream** and resume after a dropped connection; Ctrl-C ends a follow
+  successfully.
+- **Binding anywhere but loopback needs an operator token**, and the
+  server refuses to start without one: `athanore token rotate` writes
+  it, owner-only. Behind a reverse proxy, keep the bind on loopback and
+  set `require_token`.
+- **`serve` runs outstanding migrations before it serves.** Set
+  `run_migrations` to false to do it yourself, with `athanore db upgrade`.
+  `athanore db backup <path>` is consistent while the server runs.
+- **Exit codes**: 0 success; 1 the API refused, and the message is what
+  it said; 2 usage — a bad flag, an unresolvable target, a pool binding
+  naming a pool nothing declares; 3 the server could not be reached.
 
-## Generated reference
+## Where to read next
 
-The command tree, walked out of the code by `scripts/gen_skills.py`, so
-it cannot drift from it:
+Every file below is in this skill's `reference/`. The two guides are
+narrative; the two after them are generated from the command tree and
+the settings model, so a flag or a default there is the one that runs.
 
-- `skills/athanore-cli/reference/commands.md` — every command, its
-  arguments and its options.
+- Serving, finding a server, every verb by group, JSON out, following,
+  the exit codes: `reference/guide-cli.md`.
+- `athanore.toml` and precedence, binding to a network, a reverse
+  proxy, Postgres, migrations, backups, retention, agents in containers,
+  hygiene: `reference/guide-deployment.md`.
+- Every command, its arguments and its options: `reference/cli.md`.
+- Every setting, its environment variable, its `athanore.toml` key and
+  its default, and the `[pools]` and `[workflows]` tables:
+  `reference/settings.md`.
 
-The endpoints these verbs call are
-`skills/athanore-api/reference/routes.md`, and the error codes they
-report are `skills/athanore-api/reference/error-codes.md`.
+The workflow being served is the `athanore-workflows` skill; the API
+these verbs call is the `athanore-api` skill.

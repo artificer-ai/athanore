@@ -1,21 +1,17 @@
 #!/usr/bin/env python
 """The one place a fact about this package is turned into markdown.
 
-Two front ends read this module and nothing else does:
+One front end frames what is rendered here, and nothing else reads it:
+`scripts/gen_docs.py` writes `docs/site/src/reference/`, for a reader who
+has neither the checkout nor the specifications. `scripts/gen_skills.py`
+republishes those pages into `skills/*/reference/` with their links
+rewritten, so the skills carry the same pages rather than a second
+framing of the same facts.
 
-- `scripts/gen_skills.py` writes `skills/*/reference/`, for an agent that
-  has the checkout open and should be sent to the document that fixes
-  what it just read;
-- `scripts/gen_docs.py` writes `docs/site/src/reference/`, for a reader
-  who has neither the checkout nor the specifications.
-
-The facts are the same facts and only the framing differs, so what lives
-here is the *body* of each reference: no title, no lede, no marker. Each
-renderer returns `list[str]`, and the front end wraps it in its own
-heading and its own opening paragraph through :func:`document`. The two
-paragraphs that point at `docs/v1/` from inside a body — the ones the
-skills keep and the site drops — arrive as a :data:`Note`, so neither
-front end has to edit the other's prose.
+What lives here is therefore the *body* of each reference: no title, no
+lede, no marker, and no citation of a design document — the reader has
+none. Each renderer returns `list[str]`, and the front end wraps it in its
+own heading and its own opening paragraph through :func:`document`.
 
 Determinism is the point, as it is in `scripts/dump_openapi.py`: no
 timestamps, no version numbers, no absolute paths, and no ordering that
@@ -34,7 +30,6 @@ import dataclasses
 import inspect
 import json
 import re
-from collections.abc import Callable
 from enum import Enum
 from pathlib import Path
 from types import NoneType
@@ -63,28 +58,6 @@ ROOT = Path(__file__).resolve().parent.parent
 #: check — `tests/test_openapi_snapshot.py`'s — instead of two, and so
 #: that no generator ever builds an application.
 SNAPSHOT = ROOT / "tests" / "snapshots" / "openapi.json"
-
-#: A paragraph inside a body that exists in two wordings: one that cites
-#: the specification and one that does not. The skills take the first
-#: (D213); the published site names no document in `docs/v1/`, so it
-#: takes the second (D214). Passing the choice in is what lets one
-#: renderer serve both front ends without either rewriting the other's
-#: prose — and what keeps the site's copy a *sentence* rather than the
-#: hole a dropped citation would leave.
-Note = Callable[..., list[str]]
-
-
-def cite(*, spec: str, plain: str) -> list[str]:
-    """Take the wording that points at `docs/v1/`, and the blank after it."""
-
-    return [*spec.splitlines(), ""]
-
-
-def plainly(*, spec: str, plain: str) -> list[str]:
-    """Take the wording that names no document."""
-
-    return [*plain.splitlines(), ""]
-
 
 # --------------------------------------------------------------------------
 # Envelope and formatting
@@ -440,7 +413,7 @@ def events() -> list[str]:
 # --------------------------------------------------------------------------
 
 
-def declarations(*, note: Note) -> list[str]:
+def declarations() -> list[str]:
     """The four declarations, the two enums, and the two closed vocabularies."""
 
     lines: list[str] = []
@@ -452,35 +425,16 @@ def declarations(*, note: Note) -> list[str]:
     lines += [
         "## `Slot` (and `Scope`, which is the same enum)",
         "",
-        *note(
-            spec=(
-                "Where a panel is shown, and what a declaration needs resolved "
-                "before\n"
-                "it runs: `docs/v1/09-plugins.md` §Slots, and\n"
-                "`docs/v1/09-plugins.md` §Context and scopes."
-            ),
-            plain=(
-                "Where a panel is shown, and what a declaration needs resolved "
-                "before\n"
-                "it runs."
-            ),
-        ),
+        "Where a panel is shown, and what a declaration needs resolved before",
+        "it runs.",
+        "",
         *members(decl.Slot),
         "",
         "## `PanelKind`",
         "",
-        *note(
-            spec=(
-                "The renderer vocabulary of\n"
-                "`docs/v1/09-plugins.md` §Panel kinds (the renderer vocabulary), "
-                "which\n"
-                "fixes the shape a panel's `source` must return."
-            ),
-            plain=(
-                "The renderer vocabulary: which of these a panel declares fixes\n"
-                "the shape its `source` has to return."
-            ),
-        ),
+        "The renderer vocabulary: which of these a panel declares fixes",
+        "the shape its `source` has to return.",
+        "",
         *members(decl.PanelKind),
         "",
         "## `Placement`",
@@ -525,7 +479,7 @@ def service_classes() -> list[tuple[str, type]]:
     return resolved
 
 
-def context(*, note: Note) -> list[str]:
+def context() -> list[str]:
     """What a handler is handed: the context, its services, and the refusals."""
 
     lines = ["## Attributes", ""]
@@ -557,22 +511,10 @@ def context(*, note: Note) -> list[str]:
     lines += [
         "## Refusals",
         "",
-        *note(
-            spec=(
-                "What the context itself raises when a handler reaches for "
-                "something\n"
-                "its scope does not have. Both are `PluginError(400, ...)`; an\n"
-                "out-of-scope id is a 404 and never a 403\n"
-                "(`docs/v1/09-plugins.md` §Context and scopes)."
-            ),
-            plain=(
-                "What the context itself raises when a handler reaches for "
-                "something\n"
-                "its scope does not have. Both are `PluginError(400, ...)`, and "
-                "an\n"
-                "out-of-scope id is a 404 rather than a 403."
-            ),
-        ),
+        "What the context itself raises when a handler reaches for something",
+        "its scope does not have. Both are `PluginError(400, ...)`, and an",
+        "out-of-scope id is a 404 rather than a 403.",
+        "",
         f"- `{NO_RUN}`",
         f"- `{NO_TASK}`",
     ]

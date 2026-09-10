@@ -1,131 +1,124 @@
 ---
 name: athanore-plugins
-description: Give an Athanore workflow its own UI and endpoints — routes, actions, panels and event handlers, the panel kinds, the scopes a handler is resolved in, PluginContext, and the custom web-component escape hatch. Load this before adding a pane, an operator button or an HTTP endpoint to a workflow, or when a plugin handler is being refused and you need to know why.
+description: Give an Athanore workflow its own interface and endpoints — routes, actions, panels and event handlers, the panel kinds, the scopes a handler is resolved in, PluginContext, and the custom web-component escape hatch. Load this before adding a pane, an operator button or an HTTP endpoint to a workflow, or when a plugin handler is being refused.
 ---
 
 # Writing an Athanore plugin
 
-Every path in this file is relative to the **checkout root**: the
-directory two levels above this file in the checkout this skill was
-installed from. Nothing here is normative — `docs/v1/09-plugins.md` is
-the specification and this only says which part of it to open.
-
-## The surface
-
 A plugin is not a separate artefact. **The workflow is the host**: the
 same `Workflow` object that carries the nodes carries the declarations,
-and installing the workflow installs its UI. Three ideas are the whole
-of it:
+and installing the workflow installs its interface. Four declarations
+cross the wire — a route, an action, a panel and an event handler — and
+they are data; the renderer stays in the interface, so a plugin ships
+no JavaScript unless it chooses to. This directory is self-contained:
+every file it names is under its own `reference/`.
 
-1. **Four declarations, and nothing else crosses the wire.** A route, an
-   action, a panel and an event handler are data; the *renderer* stays
-   in the SPA, so a plugin ships no JavaScript unless it chooses to:
-   `docs/v1/09-plugins.md` §Declarations.
-2. **Scope follows ownership.** A workflow's panels show on its runs,
-   its actions validate against its runs, and its routes mount under its
-   name. An id belonging to somebody else is not visible, which is why
-   it is answered as missing rather than as forbidden:
-   `docs/v1/09-plugins.md` §Context and scopes.
-3. **`PluginContext` is the one thing a handler is handed.** It is an
-   explicit parameter and never signature injection — a node's
-   parameters already mean edges, and one meaning per signature is the
-   whole reason the graph reads the way it does.
+## A complete plugin
 
-## The seams
+A route, an action, a table panel fed by the route, and a handler:
 
-- **`@wf.route`** — an HTTP endpoint mounted under this workflow's own
-  prefix: `docs/v1/09-plugins.md` §Mounting.
-- **`@wf.action`** — a named operation the operator can invoke, whose
-  pydantic model *is* its form.
-- **`wf.panel(...)`** — a pane or a card, declared as data. Which kinds
-  exist, and what a panel's source must return for each, is
-  `docs/v1/09-plugins.md` §Panel kinds (the renderer vocabulary).
-- **`@wf.on(...)`** — a handler called after the transaction that
-  emitted an event has committed.
-- **Slots and placement** — where a panel appears, and when a
-  node-scoped one is live: `docs/v1/09-plugins.md` §Slots.
-- **The `custom` panel kind, with `assets=`** — a web component of your
-  own when no built-in kind fits, reaching the API through the bridge
-  the SPA exposes: `docs/v1/09-plugins.md` §Escape hatch: web components.
-- **`ctx.services` and `ctx.ops`** — the same narrow services a node
-  body gets, plus the operator operations.
-- **The `plugin.` event namespace** — a workflow may publish its own
-  events, under its own name and nowhere else:
-  `docs/v1/18-event-payloads.md` §Plugins.
-- **Entry-point discovery** — how an installed package advertises a
-  workflow so a bare `athanore serve` finds it:
-  `docs/v1/09-plugins.md` §Discovery.
-
-## Where to read
-
-| If you are asking | Open |
-|---|---|
-| which of the four declarations do I want? | `docs/v1/09-plugins.md` §Declarations |
-| what must a panel's `source` return for this kind? | `docs/v1/09-plugins.md` §Panel kinds (the renderer vocabulary) |
-| where will this panel appear, and when is a node slot live? | `docs/v1/09-plugins.md` §Slots |
-| what does a handler get in `workflow` or `global` scope, and which services refuse there? | `docs/v1/09-plugins.md` §Context and scopes |
-| why is an id I do not own a 404 and never a 403? | `docs/v1/09-plugins.md` §Context and scopes |
-| what is rejected at registration, and when? | `docs/v1/09-plugins.md` §Registration and validation |
-| what path does my route end up on? | `docs/v1/09-plugins.md` §Mounting |
-| how does a custom element reach my routes? | `docs/v1/09-plugins.md` §Escape hatch: web components |
-| what does the manifest look like on the wire? | `docs/v1/09-plugins.md` §Wire contract |
-| how is a plugin authenticated? | `docs/v1/12-security.md` §Plugins |
-| what may a plugin event be called, and what may it carry? | `docs/v1/18-event-payloads.md` §Plugins |
-| how does the SPA render any of this? | `docs/v1/10-frontend.md` §Plugin renderers |
-| how does a packaged workflow get discovered? | `docs/v1/09-plugins.md` §Discovery |
-| what is deliberately not a seam yet? | `docs/v1/09-plugins.md` §Later seams |
-
-A plugin has no authentication model of its own: a plugin route is an
-operator route and hangs on the API's own door. `docs/v1/12-security.md`
-§Plugins is the whole of it, and it is short.
-
-## What to copy
-
-- `athanore/plugins/builtin/` — the built-in panes are themselves
-  plugins, declared through the same four decorators:
-  `docs/v1/09-plugins.md` §Builtins are plugins. Read these first; they
-  are the reference implementation of every kind.
-- `workflows/feature/files.py` — four routes and two `custom` panels,
-  which is the escape hatch end to end.
-- `workflows/feature/static/files.js` — the other side of that escape
-  hatch: the custom element itself, and how it calls back.
-- `workflows/feature/cron.py` and `workflows/feature/static/cron.js` —
-  the same shape again, with a background ticker behind it.
-
-The two shapes, from `workflows/feature/files.py`. A route is a
-decorated function taking the context:
-
-<!-- from: workflows/feature/files.py -->
+<!-- from: docs/site/src/guide/plugins.md -->
 ```python
-@wf.route("/files")
-async def files_list(ctx: PluginContext) -> list[dict[str, Any]]:
-    """Every file in the drop box, newest first."""
+from typing import Any
+
+from athanore import PluginContext, Workflow
+from pydantic import BaseModel
+
+wf = Workflow("gamedev", assets="./static")
+
+
+class Override(BaseModel):
+    word: str
+    reason: str = ""
+
+
+@wf.route("/words")
+async def words(ctx: PluginContext, limit: int = 50) -> dict[str, Any]:
+    """Every word this run has used, newest last."""
+    entries = await ctx.services.run.log_entries()
+    rows = [{"word": entry.text} for entry in entries[-limit:]]
+    return {"columns": [{"key": "word", "label": "Word"}], "rows": rows}
+
+
+@wf.action("override", scope="task", title="Override secret word", confirm=True)
+async def override(ctx: PluginContext, input: Override) -> dict[str, Any]:
+    await ctx.services.log.append(f"override: {input.word} ({input.reason})")
+    return {"ok": True}
+
+
+wf.panel("Words", slot="run", kind="table", source=words, refresh_on=["log.appended"])
+
+
+@wf.on("run.completed")
+async def done(ctx: PluginContext, event: Any) -> None:
+    ...
 ```
 
-...and a panel is data, naming the element that draws it:
+The route mounts under the workflow's own prefix; `ctx` is resolved
+from the request's `run_id`, `task_id` and `node` query parameters, and
+`limit` is an ordinary query parameter with a default. The action's
+pydantic model *is* its form, and it is `scope="task"` because it
+writes an attempt's work log. The panel is a plain call, not a
+decorator, because it declares data and has no function to wrap. This
+is the interface half only: before `athanore serve` accepts it, give it
+a start node (the `athanore-workflows` skill) and create the `./static`
+directory `assets=` names, or drop that argument.
 
-<!-- from: workflows/feature/files.py -->
-```python
-wf.panel(
-    "files",
-    slot="global",
-    kind="custom",
-    element="athanore-files",
-)
-```
+## The rules an agent gets wrong first
 
-## Generated reference
+- **`ctx: PluginContext` is an explicit parameter, never injected by
+  name.** A node's parameters already mean edges, and one meaning per
+  signature is why the graph reads the way it does.
+- **Scope follows ownership.** A workflow's panels show on its runs,
+  its actions validate only against its runs, its routes mount under
+  its name. An id belonging to another workflow is a 404, never a 403:
+  it is not yours to know about.
+- **Each service says which ids it needs, and refuses without them.**
+  `log`, `stream`, `submissions` and `requests` belong to the *attempt*
+  in scope and raise without a task, so an action that writes the work
+  log is `scope="task"`, not `"run"`; `run.get`, `run.detail`,
+  `run.log_entries` and `run.events` need only a run. In workflow or
+  global scope there is neither. Listing your workflow's runs,
+  publishing your own events and the operator operations — which take
+  explicit ids — work in every scope.
+- **The panel `kind` fixes what its `source` returns**: prose for
+  `markdown`, a mapping for `kv`, columns and rows for `table`,
+  timestamped lines for `log`, series for `chart`, metric tiles for
+  `dashboard`, an action name for `form`. An unknown kind renders a
+  placeholder card rather than breaking the page.
+- **`slot` says where a panel shows** — the selected run, a task, a
+  node (live only while that node has work in flight or has produced
+  output), the workflow's page, or globally — and `refresh_on` names
+  the events that make it refetch.
+- **A `custom` panel with `assets=` is the escape hatch**: one file of
+  browser JavaScript defining a web component, served under the
+  workflow's own asset prefix with a strict content-security policy and
+  no inline scripts. It calls back to your routes through the bridge
+  the interface exposes. A library from a CDN needs its origin in
+  `plugin_cdns`.
+- **A workflow's own events go under its own name** through
+  `ctx.services.events.publish`; `@wf.on(...)` subscribes to the
+  engine's vocabulary and runs after the emitting transaction commits.
+- **A packaged workflow advertises itself as an entry point** in the
+  `athanore.workflows` group, and a bare `athanore serve` finds it.
+- A plugin route is an operator route and hangs on the same door as the
+  rest of the API; there is no authentication model of its own.
 
-Facts, read off the code by `scripts/gen_skills.py`, so they cannot
-drift from it:
+## Where to read next
 
-- `skills/athanore-plugins/reference/declarations.md` — the four
-  declarations field by field, the slot and panel-kind vocabularies, and
-  the methods a route may declare.
-- `skills/athanore-plugins/reference/context.md` — what is on
-  `PluginContext`, every service and its methods, and the two refusals a
-  handler gets for reaching outside its scope.
+Every file below is in this skill's `reference/`. The guide is
+narrative; the three after it are generated from the code, so a field
+or a default there is the one that runs.
 
-The event names an `@wf.on(...)` may subscribe to are
-`skills/athanore-workflows/reference/events.md`, and the error shape a
-refusal is reported in is `skills/athanore-api/reference/error-codes.md`.
+- The four declarations, panels as data, scope, the escape hatch, your
+  own events, getting it installed: `reference/guide-plugins.md`.
+- Every field of `Route`, `Action`, `Panel` and `Handler`; the slot,
+  placement, panel-kind and method vocabularies; every attribute of
+  `PluginContext`, every service and its methods, `ctx.ops`, and the
+  two refusals: `reference/plugins.md`.
+- Every event name a handler may subscribe to, and the payload it
+  carries: `reference/events.md`.
+- Every setting, `plugin_cdns` among them: `reference/settings.md`.
+
+The nodes the plugin hangs off are the `athanore-workflows` skill; the
+API a custom element calls back to is the `athanore-api` skill.

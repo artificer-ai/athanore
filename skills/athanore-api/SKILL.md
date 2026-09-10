@@ -1,92 +1,101 @@
 ---
 name: athanore-api
-description: Drive the Athanore HTTP API and its SSE event stream from a client — the endpoint groups, the two credentials, the error shape, pagination and size caps, and the generated OpenAPI document and TypeScript client. Load this before writing anything that talks to a running Athanore over HTTP, or before changing a route and needing to know what must be regenerated.
+description: Drive the Athanore HTTP API and its server-sent event stream from a client of your own — the two credentials, the error shape, resuming the stream, sizes and pagination, and generating a typed client from the OpenAPI document. Load this before writing anything that talks to a running Athanore over HTTP.
 ---
 
 # Using the Athanore HTTP API
 
-Every path in this file is relative to the **checkout root**: the
-directory two levels above this file in the checkout this skill was
-installed from. Nothing here is normative — `docs/v1/08-api.md` is the
-specification and this only says which part of it to open.
+The HTTP API and its event stream are the only way in: the browser
+interface, the command line, agents and plugins all go through this one
+contract, so anything they can do, your client can do. One contract,
+generated from the code; two credentials; one push channel. This
+directory is self-contained: every file it names is under its own
+`reference/`, including the OpenAPI document itself.
 
-## The surface
+## A complete client session
 
-The HTTP API and its event stream are the only way in: the SPA, the
-CLI, agents and plugins all go through this one contract. Three ideas
-are the whole of it:
+Everything realtime is one server-sent event stream, filtered
+server-side:
 
-1. **One contract, generated.** OpenAPI is generated from the code and
-   the TypeScript client from OpenAPI, and both are committed, so a
-   change to a route shows up as a diff:
-   `docs/v1/08-api.md` §OpenAPI. Neither
-   `tests/snapshots/openapi.json` nor `web/src/api/gen` is ever
-   hand-edited.
-2. **Two credentials.** An operator bearer token, needed only on a
-   non-loopback bind, and a task token that is header-only, reaches one
-   task, and never appears in an operator response:
-   `docs/v1/08-api.md` §Authentication (12 has the model).
-3. **One push, and it is the event stream.** Everything realtime is SSE;
-   there is no second channel and no polling contract:
-   `docs/v1/08-api.md` §Events (SSE).
+<!-- from: docs/site/src/guide/http-api.md -->
+```sh
+curl -N "http://127.0.0.1:4002/api/events?names=run.*,task.*"
+```
 
-## What is and is not a seam
+Every refusal, from any endpoint, is the same object:
 
-**Adding a route to `athanore/api` is not how this surface is
-extended.** A new endpoint that belongs to a workflow is a plugin route,
-mounted under that workflow's own name — see
-`skills/athanore-plugins/SKILL.md`. What this skill is for is *use*: the
-endpoint groups, the credentials, the error shape, and the two ways an
-agent reaches its own task.
+<!-- from: docs/site/src/guide/http-api.md -->
+```json
+{"error": "no such run", "code": "not_found"}
+```
 
-## Where to read
+The server publishes its own OpenAPI at `/openapi.json`, with
+interactive views at `/docs` and `/redoc`, and generating a client from
+it is the recommended way to write one:
 
-| If you are asking | Open |
-|---|---|
-| how are ids, ordering, pagination and JSON spelled? | `docs/v1/08-api.md` §Conventions |
-| do I need a token on this bind, and where does it go? | `docs/v1/08-api.md` §Authentication (12 has the model) |
-| what may a task token do, and how long does it live? | `docs/v1/12-security.md` §Task tokens |
-| where does the operator token come from? | `docs/v1/12-security.md` §Operator token (network binds only) |
-| which endpoints are there? | `docs/v1/08-api.md` §Endpoints |
-| what does the run graph response mean? | `docs/v1/08-api.md` §Graph semantics |
-| what can an agent call on its own behalf? | `docs/v1/08-api.md` §Agent-facing (task token; own prefix, tagged `agent` in OpenAPI) |
-| how does an agent use MCP instead of REST? | `docs/v1/08-api.md` §MCP (agent-facing, task token) |
-| how do I subscribe to events, filter them, and resume after a drop? | `docs/v1/08-api.md` §Events (SSE) |
-| what does an error body look like? | `docs/v1/08-api.md` §Conventions |
-| how big may a payload, a log entry or a transcript chunk be? | `docs/v1/08-api.md` §Sizes |
-| what is allowed to change without a new version? | `docs/v1/08-api.md` §Versioning |
-| what must I regenerate after changing a route? | `docs/v1/08-api.md` §OpenAPI |
-| what does an event's `data` object contain? | `docs/v1/18-event-payloads.md` §Payloads |
-| how is that union typed for a TypeScript client? | `docs/v1/18-event-payloads.md` §Typing |
+<!-- from: docs/site/src/guide/http-api.md -->
+```sh
+npx @hey-api/openapi-ts -i http://127.0.0.1:4002/openapi.json -o src/api/gen
+```
 
-After a route changes, `uv run scripts/dump_openapi.py` and
-`pnpm -C web gen` regenerate the snapshot and the client; CI's
-`contract` job runs both and fails on a tree either left dirty. A route
-whose wire shape changed without those two files changing is the one
-failure this contract exists to catch.
+With no server running yet, `reference/openapi.json` in this directory
+takes the place of the URL: the same document, minus the plugin routes a
+running server mounts (`/api/plugins/_builtin/...` and each served
+workflow's own).
 
-## What to copy
+## The rules an agent gets wrong first
 
-- `tests/snapshots/openapi.json` — the entire contract in one file, and
-  the fastest way to answer "what does this endpoint accept?".
-- `athanore/cli/client.py` — a working Python client of this API,
-  including how it resolves a server and a token.
-- `web/src/api/client.ts` — how the SPA configures the generated client;
-  `web/src/api/gen/` is the generated part.
-- `web/src/realtime/` — a working SSE consumer, including what it does
-  with each event.
-- `examples/pi/extensions/athanore.ts` — a client of the *agent* surface,
-  written from inside an agent.
+- **On a loopback bind there is no credential.** Send nothing.
+- **On a network bind, or behind a proxy with `require_token` set, send
+  `Authorization: Bearer <token>`**; `athanore token rotate` generates
+  one. Whether a bind is loopback is decided by the configured host,
+  never by the peer address.
+- **An agent's task token goes in the `X-Athanore-Token` header.** It
+  reaches exactly one task's own endpoints, dies with the attempt, and
+  never appears in an operator response. Omitting the header is a 422
+  naming it; presenting a token that is refused is a 403.
+- **Branch on `code`, never on `error`.** `code` is a stable value from
+  a closed vocabulary; `error` is a sentence that may be reworded. A
+  validation failure adds `errors`; a rejected agent submission adds
+  `errors` and the `schema` it was measured against.
+- **Resume the stream with a cursor**: `after=<event id>`, or
+  `Last-Event-ID` on reconnect. Replay is capped; past the cap you get
+  a `resync` event and refetch rather than assume you have everything.
+- **Filter server-side** with `names=` (globs) and `run=`; one stream
+  per client is the intended shape. The stream is the one place a token
+  is also accepted as a query parameter, because a browser cannot set
+  headers on it.
+- **Transcript chunks are not on the stream.** A `task.stream` event
+  carries the task and the sequence range that arrived; the chunks are
+  fetched from the task's stream endpoint. Those events are ephemeral
+  and carry no id.
+- JSON bodies are capped, by default at one mebibyte, and refused with
+  `payload_too_large`. Lists that can grow take `limit` and `cursor`.
+  Timestamps are ISO-8601 in UTC.
+- New fields, endpoints and event names are minor releases; a removal
+  or a rename is a major one. The event vocabulary is part of the
+  contract.
+- **A new endpoint that belongs to a workflow is a plugin route**,
+  mounted under the workflow's own name — that is the `athanore-plugins`
+  skill, not a change to the API.
 
-## Generated reference
+## Where to read next
 
-Facts, read off the committed contract by `scripts/gen_skills.py`, so
-they cannot drift from it:
+Every file below is in this skill's `reference/`. The guide is
+narrative; the rest is generated from the OpenAPI document the server
+produces and from the code, so a shape there is the shape on the wire.
 
-- `skills/athanore-api/reference/routes.md` — every operation, its tag
-  and the credential it declares.
-- `skills/athanore-api/reference/error-codes.md` — the `code`
-  vocabulary a client branches on.
+- The document, authenticating, the error shape, the event stream,
+  sizes and pagination, what is stable: `reference/guide-http-api.md`.
+- Every operation with its parameters, request body and responses,
+  grouped by tag, and every schema as a field table:
+  `reference/http-api.md`.
+- The `code` vocabulary: `reference/errors.md`.
+- Every event name, grouped, with the fields of its payload:
+  `reference/events.md`.
+- The OpenAPI document itself, for a code generator:
+  `reference/openapi.json`.
 
-The event names that arrive on the stream, and the payload each one
-carries, are `skills/athanore-workflows/reference/events.md`.
+The command line is a client of this API and is the `athanore-cli`
+skill; an agent reaches its own task through the same surface, which
+the `athanore-workflows` skill describes.

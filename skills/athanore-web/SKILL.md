@@ -1,98 +1,93 @@
 ---
 name: athanore-web
-description: Change the Athanore SPA in web/ — the one-screen layout and its pane cycle, SSE-driven cache invalidation, the keyboard map, plugin panel renderers, and the generated design tokens and API client that must never be hand-edited. Load this before editing anything under web/, or when deciding whether a change belongs in the SPA at all.
+description: Change the Athanore SPA in web/ — the one-screen layout and its pane cycle, SSE-driven cache invalidation, the keyboard map, plugin panel renderers, and the generated design tokens and API client that are never hand-edited. Load this before editing anything under web/, or when deciding whether a change belongs in the SPA at all.
 ---
 
 # Working on the Athanore SPA
 
-Every path in this file is relative to the **checkout root**: the
-directory two levels above this file in the checkout this skill was
-installed from. Nothing here is normative — `docs/v1/10-frontend.md` is
-the specification and this only says which part of it to open.
+This skill is for a contributor to the SPA itself, so unlike its four
+siblings it points into the checkout: every path below is relative to
+the checkout root, two levels above this file, and `AGENTS.md` there is
+how to work in the repository — read it first. The SPA in `web/` is the
+operator interface, and it is the only one.
 
 ## The surface
 
-The SPA in `web/` is the operator UI, and it is the only one: there is
-no second frontend. Three ideas are the whole of it:
-
 1. **One screen, with a pane cycle.** Not a router full of pages: a
    single operating surface whose regions change what they show. The
-   regions are `docs/v1/10-frontend.md` §Layout (from the mock); what a
-   pane is, and the order they cycle in, is
-   `docs/v1/10-frontend.md` §Panes (cycle order).
-2. **Realtime is SSE invalidating query caches**, never a second copy of
-   the server's state kept in the browser:
-   `docs/v1/10-frontend.md` §Realtime and caching.
-3. **The design system is normative and generated from the mock's
-   tokens**: `docs/v1/10-frontend.md` §Design system (normative). What a
-   call site may write for type is
-   `docs/v1/21-design-refresh.md` §Type scale (normative).
+   cycle lives in `web/src/panes/`, with one renderer per pane kind
+   under `web/src/panes/kinds/`.
+2. **Realtime is server-sent events invalidating query caches**, never
+   a second copy of the server's state kept in the browser. Nothing
+   polls: `web/src/realtime/sse.ts` consumes the stream and
+   `web/src/realtime/invalidate.ts` is the table saying which event
+   makes which query stale. A view that goes stale is a row missing from
+   that table.
+3. **The design system is generated from the mock's tokens.**
+   `web/src/styles/theme.css` is written by `pnpm -C web gen:theme` from
+   the design mock's stylesheet; `AGENTS.md` says where the mock and the
+   normative design document are.
 
-## The seams — and what is not one
+## The commands
 
-- **A plugin panel is how a workflow gets UI.** If the change you are
-  about to make is a workflow's own view, it belongs to that workflow
-  and not to the SPA: `docs/v1/10-frontend.md` §Plugin renderers, and
-  `skills/athanore-plugins/SKILL.md`.
-- **A pane kind is the renderer vocabulary.** Adding one is a change to
-  the vocabulary in `docs/v1/09-plugins.md` §Panel kinds (the renderer vocabulary),
-  not a local addition.
-- **A custom element is the escape hatch**, for the panel that no kind
-  fits: `docs/v1/09-plugins.md` §Escape hatch: web components.
+<!-- from: AGENTS.md -->
+```sh
+pnpm -C web install
+pnpm -C web typecheck && pnpm -C web lint && pnpm -C web test && pnpm -C web build
+```
 
-**Two files under `web/` are generated, and hand-editing either is
-always wrong**: `web/src/api/gen`, written from
-`tests/snapshots/openapi.json` by `pnpm -C web gen`, and
-`web/src/styles/theme.css`, written from `docs/v1/design/nocturne.css`
-by `pnpm -C web gen:theme`. Both are gated, so an edit to one is a red
-gate rather than a surprise later.
+The Playwright suite drives the built SPA against a real server with a
+fake agent behind every agent, and it is the fastest way to see what a
+change looks like from outside:
 
-## Where to read
+<!-- from: AGENTS.md -->
+```sh
+pnpm -C web exec playwright test           # all of web/e2e
+pnpm -C web exec playwright test run.spec.ts --workers=1
+```
 
-| If you are asking | Open |
-|---|---|
-| what is the stack, and what may I add to it? | `docs/v1/10-frontend.md` §Stack |
-| how is the screen laid out? | `docs/v1/10-frontend.md` §Layout (from the mock) |
-| where does a pane live, and how is one added? | `docs/v1/10-frontend.md` §Panes (cycle order) |
-| how does the graph pane work? | `docs/v1/10-frontend.md` §Graph pane |
-| what opens over the screen, and how does it close? | `docs/v1/10-frontend.md` §Overlays |
-| what is bound to which key, and when is a binding live? | `docs/v1/10-frontend.md` §Keyboard |
-| which event invalidates which query? | `docs/v1/10-frontend.md` §Realtime and caching |
-| how does the SPA draw a plugin's panel? | `docs/v1/10-frontend.md` §Plugin renderers |
-| what gets the operator's attention, and how? | `docs/v1/10-frontend.md` §Attention |
-| what is the accessibility floor? | `docs/v1/10-frontend.md` §Accessibility and quality |
-| how does auth work in the browser? | `docs/v1/10-frontend.md` §Auth in the browser |
-| which token do I use for this colour or spacing? | `docs/v1/10-frontend.md` §Tokens → shadcn |
-| what colour is a status? | `docs/v1/10-frontend.md` §Status colours |
-| what may a call site write for a font size? | `docs/v1/21-design-refresh.md` §Type scale (normative) |
-| what happens at a narrow viewport? | `docs/v1/21-design-refresh.md` §Narrow layout (normative) |
-| how is the mock re-imported, and what may diverge from it? | `docs/v1/21-design-refresh.md` §Re-import (normative) |
-| what must be green before this lands? | `docs/v1/21-design-refresh.md` §Gates (normative) |
-| which commands run the SPA and its suites? | `AGENTS.md` §Commands |
+## The rules an agent gets wrong first
 
-## What to copy
+- **Two files under `web/` are generated, and hand-editing either is
+  a red gate**: `web/src/api/gen` from the committed OpenAPI snapshot by
+  `pnpm -C web gen`, and `web/src/styles/theme.css` by
+  `pnpm -C web gen:theme`. A route change means regenerating the client,
+  not patching it; a colour change means changing the mock's tokens.
+- **A workflow's own view is a plugin panel, not a change to the SPA.**
+  If the change you are about to make is one workflow's pane or button,
+  it belongs to that workflow's declarations — the `athanore-plugins`
+  skill — and the SPA already renders every panel kind.
+- **Adding a pane kind is a change to the renderer vocabulary** shared
+  with the server's plugin declarations, not a local addition; the
+  `custom` kind, drawn by `web/src/panes/CustomElementHost.tsx` through
+  the bridge in `web/src/plugins/bridge.ts`, is the escape hatch for a
+  panel no kind fits.
+- **The event union and the client are in `web/src/api/gen`.** Every
+  query key the invalidation table uses is built by a generated helper,
+  so a key written by hand is one the table cannot reach.
+- **Keyboard bindings are scoped**: `web/src/keys/` is the map and the
+  scoping, and a binding is live only in the scope it belongs to. The
+  typing check walks the event's composed path, so a keystroke inside a
+  plugin's shadow root is still a keystroke in a field.
+- Overlays — the palette, the new-run form, the task drawer, the
+  library — are under `web/src/overlays/`, and `web/e2e/` is where a
+  new behaviour gets its end-to-end test.
 
-- `web/src/panes/kinds/` — one file per renderer, which is where a new
-  pane kind's neighbours live.
+## Where things live
+
+- `web/src/panes/` — the cycle, the pane bar, the panel cards and the
+  manifest; `web/src/panes/kinds/` — one file per renderer.
 - `web/src/realtime/` — the SSE consumer and the invalidation map.
-- `web/src/plugins/` — the manifest, the renderer registry and the
-  bridge a custom element talks to.
+- `web/src/plugins/` — the manifest, the renderer registry, the asset
+  loader and the bridge a custom element talks to.
 - `web/src/keys/` — the keyboard map and its scoping.
-- `web/e2e/` — the Playwright suite, which drives the built SPA against
-  a real server with a fake agent behind it. It is the fastest way to
-  see what a change is supposed to look like from outside.
-- `docs/v1/design/` — the imported mock, which is the reference for
-  layout and copy.
+- `web/src/overlays/` — everything that opens over the screen.
+- `web/src/api/client.ts` — how the SPA configures the generated
+  client; `web/src/api/gen/` is the generated part.
+- `web/e2e/` — the Playwright suite.
 
-## Generated reference
-
-This skill has no `reference/` directory of its own, deliberately. The
-SPA's facts live in TypeScript, and a Python script restating them would
-be exactly the second, weaker copy the whole design forbids. The two
-things that *are* generated are already gated: `web/src/api/gen` and
-`web/src/styles/theme.css`.
-
-The event names the SPA subscribes to, with the payload each carries,
-are `skills/athanore-workflows/reference/events.md`; the endpoints
-behind the generated client are
-`skills/athanore-api/reference/routes.md`.
+This skill has no `reference/` directory, deliberately: the SPA's facts
+are TypeScript, already generated and gated where they can be. The
+event names it subscribes to, with their payloads, are in the
+`athanore-workflows` skill's reference; the endpoints behind the
+generated client are in the `athanore-api` skill's.
