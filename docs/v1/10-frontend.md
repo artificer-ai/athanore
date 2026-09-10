@@ -85,10 +85,12 @@ of TOML nobody executes.
   `window − 340`, collapsible with `b` to a 30 px vertical rail reading
   `RUNS n`): grid columns RUN · WORKFLOW · TITLE · STATUS · NODE · AGE.
   Selected row gets a flat accent tint (`color-mix(accent 12%, surface)`)
-  and a 2 px accent left border; the row `⏎` has focused takes the second
-  accent instead (`color-mix(accent-2 22%, surface)` and a 2 px
-  `accent-2-400` left border), so the two modes are told apart without
-  the column shifting. Footer strip: `n shown · ↑↓ select · ⏎ focus run`,
+  and a 2 px accent left border; the row `⏎` has focused keeps that tint
+  and takes the second accent in its chrome — a 2 px `accent-2-400` left
+  border and a 1 px inset ring of the same colour — so the two modes are
+  told apart without the column shifting and without moving the ground
+  the status pill is painted on (§Status colours, §Accessibility and
+  quality, D204 (5)). Footer strip: `n shown · ↑↓ select · ⏎ focus run`,
   and while a run is focused `n shown · ↑↓ move run · ⏎/esc done`; the
   pair of hints is a live region, so the mode is announced as well as
   drawn.
@@ -379,9 +381,15 @@ attributes.
   under Playwright: the score is the share of the rules axe evaluated on
   the page that passed, and **no violation may be `serious` or
   `critical`** whatever that share says (D178, D179). The floor holds in
-  four states of that page, because they are four documents: the empty
-  dashboard, the loaded one, the loaded one at `xlarge`, and the loaded
-  one at 390×844 — both of its narrow regions (D197).
+  five states of that page, because they are five documents: the empty
+  dashboard, the loaded one, the loaded one at `xlarge`, the loaded one
+  at 390×844 — both of its narrow regions (D197) — and the run list with
+  a `failed` run picked up by `⏎`, which is the only state that draws a
+  focused row and so the only one that measures what a status pill sits
+  on inside that mode (D204 (5)). The pointer is moved off the row
+  before axe walks it: `hover:bg-*` outranks a row's own tint, so a row
+  still under the cursor that a click selected is measured on its hover
+  colour rather than on the tint the assertion is about.
 - Touch targets in the narrow chrome are at least 24×24 CSS px (WCAG
   2.5.8); the visual size stays the mock's. `web/e2e/mobile.spec.ts`
   drives the five flows of 21 §Touch operation with `tap()` alone and

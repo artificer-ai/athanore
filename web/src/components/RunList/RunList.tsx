@@ -15,11 +15,13 @@
  * **Focus is one step past selection and is drawn as its own state.**
  * `⏎` picks the selected run up so that `↑`/`↓` move it in the dispatch
  * order (10 §Keyboard, D204); the shell decides whether a run is held
- * and names it in `focusedRun`, and the row it names takes the second
- * accent rather than a stronger version of the selection's blurple. The
- * footer strip swaps its two hints to say which mode the list is in, in
- * a live region, because colour is never the only signal (10
- * §Accessibility and quality).
+ * and names it in `focusedRun`, and the row it names keeps the
+ * selection's tint and takes the second accent in its chrome — the left
+ * border and an inset ring — rather than a fill of its own, which is
+ * what keeps the status pill on it above the contrast floor. The footer
+ * strip swaps its two hints to say which mode the list is in, in a live
+ * region, because colour is never the only signal (10 §Accessibility and
+ * quality).
  *
  * The 11.5 px row scale sits on the scrolling container and is inherited
  * rather than merged into a row's own classes: `cn` is tailwind-merge,
@@ -94,22 +96,37 @@ function Pending({ row }: { row: RunRow }) {
 
 /**
  * The classes every row carries whatever its shape: the zebra stripe,
- * the selected tint and the accent bar down its left edge — or, on the
- * row `⏎` has picked up, the second accent in place of both.
+ * the selected tint and the accent bar down its left edge — and, on the
+ * row `⏎` has picked up, the second accent in the chrome around it.
  *
- * A focused row is always a selected row, so the two never both apply;
- * written as one branch rather than two truthy classes, so that
- * tailwind-merge is never asked to pick between them (D157). The border
+ * **The mode is carried by the chrome and not by the fill.** A focused
+ * row is always a selected row, so it keeps the selection's tint exactly
+ * and changes its left border to `accent-2-400`, plus a 1 px inset ring
+ * of the same colour around the whole row. A denser fill was the first
+ * thing tried and is what a status pill cannot survive: `StatusPill` is
+ * transparent and paints `text-status-*` straight onto the row, and
+ * `color-mix(accent-2 22%, surface)` is light enough to take `fail`
+ * (`#d9868f`) from 4.74:1 to 3.71:1 and `muted` (`#9397ab`) to 3.47:1 —
+ * a `serious` axe violation, which 10 §Accessibility and quality
+ * forbids outright, on a pill that is 10.5 px at normal weight and so is
+ * never WCAG large text. The fix has to move the tint rather than the
+ * text: `styles/theme.css` is generated from the design's tokens and
+ * `--ath-status-fail` has no brighter sibling. Keeping the fill keeps
+ * every one of the seven tones at the ratio it has today, and `⏎` may be
+ * pressed on a `failed` or `cancelled` run (D204 (4), (5)).
+ *
+ * The border is written as one branch rather than two truthy classes, so
+ * that tailwind-merge is never asked to pick between them (D157), and it
  * keeps its 2 px, so nothing in the grid shifts when the mode changes.
  */
 function rowClasses(zebra: boolean, selected: boolean, focused: boolean): string {
   return cn(
     'w-full overflow-hidden border-l-2 border-l-transparent text-left text-[var(--color-neutral-300)] hover:bg-[var(--color-neutral-900)]',
     zebra && 'bg-zebra',
+    selected && 'bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface))]',
     focused
-      ? 'border-l-[var(--color-accent-2-400)] bg-[color-mix(in_srgb,var(--color-accent-2)_22%,var(--color-surface))]'
-      : selected &&
-          'border-l-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface))]',
+      ? 'border-l-[var(--color-accent-2-400)] inset-ring-1 inset-ring-[var(--color-accent-2-400)]'
+      : selected && 'border-l-[var(--color-accent)]',
   )
 }
 
@@ -119,9 +136,9 @@ function Row({ row, zebra, selected, focused, onSelect }: RowProps) {
   // The tint itself is the mock's and is not touched — these three
   // columns are muted by the SPA's choice, not the mock's, so this is
   // the half of the pair that may move (10 §Accessibility and quality).
-  // The focused row's tint is denser still, so it takes the same step.
-  const muted =
-    selected || focused ? 'text-[var(--color-neutral-400)]' : 'text-muted-foreground'
+  // A focused row is a selected row wearing different chrome, so it is
+  // the same tint and takes the same step, from the same branch.
+  const muted = selected ? 'text-[var(--color-neutral-400)]' : 'text-muted-foreground'
 
   return (
     <button
@@ -166,8 +183,7 @@ function Row({ row, zebra, selected, focused, onSelect }: RowProps) {
 function NarrowRow({ row, zebra, selected, focused, onSelect }: RowProps) {
   // The same one step of contrast the grid takes on a selected row, for
   // the same reason (10 §Accessibility and quality).
-  const muted =
-    selected || focused ? 'text-[var(--color-neutral-400)]' : 'text-muted-foreground'
+  const muted = selected ? 'text-[var(--color-neutral-400)]' : 'text-muted-foreground'
 
   return (
     <button

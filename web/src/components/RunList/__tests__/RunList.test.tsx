@@ -169,11 +169,21 @@ describe('RunList', () => {
 
     const [other, held] = rows()
     expect(held).toHaveAttribute('data-run-focused', 'true')
+    // The mode is chrome and not fill: the left border and an inset
+    // ring in the second accent, over the selection's own tint.
     expect(held).toHaveClass(
       'border-l-[var(--color-accent-2-400)]',
-      'bg-[color-mix(in_srgb,var(--color-accent-2)_22%,var(--color-surface))]',
+      'inset-ring-1',
+      'inset-ring-[var(--color-accent-2-400)]',
     )
-    // The selection's own tint is replaced, not layered under it.
+    // The fill is the selected row's, unchanged. It has to be: the
+    // status pill paints `text-status-*` straight onto it, and a lighter
+    // tint takes `fail` and `muted` under AA (10 §Accessibility and
+    // quality, D204 (5)).
+    expect(held).toHaveClass(
+      'bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface))]',
+    )
+    // The selection's border is replaced, not layered under it.
     expect(held).not.toHaveClass('border-l-[var(--color-accent)]')
     // It is still the selected run: `⏎` picks the selection up, and
     // `aria-selected` is what a screen reader is told (D204 (2)).

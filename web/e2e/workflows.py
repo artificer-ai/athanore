@@ -1,6 +1,6 @@
 """The workflows the Playwright suite drives (T068a, 13 §Pyramid).
 
-Four of them, and between them they are every shape the E2E specs need:
+Five of them, and between them they are every shape the E2E specs need:
 
 - :data:`probe` is the run the suite watches from `submit` to
   `completed` — an agent that asks for permission to make a tool call,
@@ -18,6 +18,15 @@ Four of them, and between them they are every shape the E2E specs need:
   the server stops. With the default pool at one worker it is how the
   suite gets a queue — a second and a third submission stay ``queued``,
   which is what `pause`, `resume` and `reorder` act on.
+
+- :data:`flop` is the run that does not survive its first node: one
+  node that raises with ``retries=0``, so the attempt dead-letters at
+  once and the run reaches ``failed`` (04 §Retries, 03 §State machines).
+  It is what puts the `fail` tone of 10 §Status colours on a row, which
+  is the tone the a11y gate needs in the list — the run list's focused
+  row is drawn over the selection's tint, and the pill on it is
+  transparent, so `fail` is the tone that decides whether the two are
+  compatible (`a11y.spec.ts`, D204 (5)).
 
 - :data:`plugged` is the plugin host of 09 §Escape hatch: a workflow
   that ships a static ES module (``static/playfield.js``) and declares a
@@ -40,9 +49,11 @@ from athanore import ACPAgent, PluginContext, Workflow, human_input
 
 __all__ = [
     "Builder",
+    "FLOP_ERROR",
     "HOLD_SECONDS",
     "QUESTION",
     "PLAYFIELD_WORD",
+    "flop",
     "hold",
     "plugged",
     "probe",
@@ -57,6 +68,9 @@ QUESTION = "Ship it?"
 #: element fetched through `window.athanore`" is asserted rather than
 #: assumed.
 PLAYFIELD_WORD = "athanor"
+
+#: What :data:`flop`'s one node raises, and what the run's error reads.
+FLOP_ERROR = "the fixture that fails"
 
 #: How long :data:`hold`'s one node sleeps. Longer than any run of the
 #: suite: the point of the node is that it never finishes on its own, and
@@ -157,6 +171,24 @@ def _hold() -> Workflow:
     return wf
 
 
+def _flop() -> Workflow:
+    """One node that raises and is not retried, so the run fails.
+
+    ``retries=0`` is the node option of 04 §Node options: the attempt
+    dead-letters on its first exception rather than waiting out the
+    server's three, so the spec that needs a ``failed`` run in the list
+    gets one without a backoff in the middle of an a11y gate.
+    """
+
+    wf = Workflow("flop")
+
+    @wf.node(start=True, retries=0)
+    async def burst():
+        raise RuntimeError(FLOP_ERROR)
+
+    return wf
+
+
 def _plugged() -> Workflow:
     """A workflow that ships a web component, and a pane that mounts it.
 
@@ -196,10 +228,11 @@ def _plugged() -> Workflow:
     return wf
 
 
-#: The four, built at import: ``athanore serve <file>:<attr>`` resolves
+#: The five, built at import: ``athanore serve <file>:<attr>`` resolves
 #: an attribute and refuses anything that is not a :class:`Workflow`
 #: already (11 §Server), so a factory would never be reached.
 probe = _probe()
 spread = _spread()
 hold = _hold()
+flop = _flop()
 plugged = _plugged()

@@ -46,7 +46,7 @@ const WORKFLOWS = join(ROOT, 'web', 'e2e', 'workflows.py')
 const SCENARIOS = join(ROOT, 'web', 'e2e', 'scenarios')
 
 /** The workflows this server runs, as `path.py:attr` (11 §Server). */
-const TARGETS = ['probe', 'spread', 'hold', 'plugged'].map(
+const TARGETS = ['probe', 'spread', 'hold', 'flop', 'plugged'].map(
   (name) => `${WORKFLOWS}:${name}`,
 )
 
