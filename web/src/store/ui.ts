@@ -4,9 +4,14 @@
  *
  * Which region has the operator's attention is neither worth a link nor
  * worth remembering across a reload: it is where the next keystroke goes
- * (`docs/v1/10-frontend.md` §Keyboard — `tab` moves it, `⏎` sends it to
- * the detail pane). It starts on the run list, which is where a fresh
- * page's first `↑`/`↓` should land.
+ * (`docs/v1/10-frontend.md` §Keyboard — `tab` moves it). It starts on
+ * the run list, which is where a fresh page's first `↑`/`↓` should land.
+ *
+ * `focusedRun` is the same kind of fact one step in: the run `⏎` has
+ * picked up, so that `↑`/`↓` move it in the dispatch order instead of
+ * moving the selection (10 §Keyboard, D204). It is a mode the operator
+ * is in for a keystroke or two, not a view worth linking to — and the
+ * run it names is already in the URL, as `?run=`.
  *
  * Whether the operator has to produce a token belongs here for the same
  * reason: it is a fact about this tab's conversation with the server,
@@ -75,6 +80,21 @@ export type Ui = {
   toggleFocus: () => void
 
   /**
+   * The run `⏎` has picked up, or `null` (10 §Keyboard).
+   *
+   * An id and not a boolean, so that the shell can say *which* run is
+   * held and check it against the selection: focus is only ever on the
+   * selected run, and a held id that stops being `?run=` — or whose row
+   * a filter, a delete or a narrow viewport takes off the screen — is
+   * put down rather than left under the arrow keys (D204 (2)).
+   */
+  focusedRun: string | null
+  /** `⏎`: pick this run up. */
+  focusRun: (runId: string) => void
+  /** `⏎` again, `esc`, or the row leaving the screen: put it down. */
+  blurRun: () => void
+
+  /**
    * Whether the operator token screen is what the app should be showing.
    *
    * The API client's 401 interceptor raises it (`src/api/client.ts`):
@@ -126,6 +146,10 @@ export const useUi = create<Ui>()((set) => ({
   setFocus: (focus) => set({ focus }),
   toggleFocus: () =>
     set((state) => ({ focus: state.focus === 'list' ? 'detail' : 'list' })),
+
+  focusedRun: null,
+  focusRun: (runId) => set({ focusedRun: runId }),
+  blurRun: () => set({ focusedRun: null }),
 
   needsToken: false,
   setNeedsToken: (needsToken) => set({ needsToken }),

@@ -12,6 +12,15 @@
  * search parameter names. The list holds no selection of its own, so a
  * link into the app and a click inside it end in the same state.
  *
+ * **Focus is one step past selection and is drawn as its own state.**
+ * `⏎` picks the selected run up so that `↑`/`↓` move it in the dispatch
+ * order (10 §Keyboard, D204); the shell decides whether a run is held
+ * and names it in `focusedRun`, and the row it names takes the second
+ * accent rather than a stronger version of the selection's blurple. The
+ * footer strip swaps its two hints to say which mode the list is in, in
+ * a live region, because colour is never the only signal (10
+ * §Accessibility and quality).
+ *
  * The 11.5 px row scale sits on the scrolling container and is inherited
  * rather than merged into a row's own classes: `cn` is tailwind-merge,
  * and it reads `text-row` as conflicting with the row's
@@ -53,6 +62,8 @@ type RowProps = {
   row: RunRow
   zebra: boolean
   selected: boolean
+  /** Whether `⏎` has picked this row up (10 §Keyboard). */
+  focused: boolean
   onSelect: (runId: string) => void
 }
 
@@ -83,24 +94,34 @@ function Pending({ row }: { row: RunRow }) {
 
 /**
  * The classes every row carries whatever its shape: the zebra stripe,
- * the selected tint and the accent bar down its left edge.
+ * the selected tint and the accent bar down its left edge — or, on the
+ * row `⏎` has picked up, the second accent in place of both.
+ *
+ * A focused row is always a selected row, so the two never both apply;
+ * written as one branch rather than two truthy classes, so that
+ * tailwind-merge is never asked to pick between them (D157). The border
+ * keeps its 2 px, so nothing in the grid shifts when the mode changes.
  */
-function rowClasses(zebra: boolean, selected: boolean): string {
+function rowClasses(zebra: boolean, selected: boolean, focused: boolean): string {
   return cn(
     'w-full overflow-hidden border-l-2 border-l-transparent text-left text-[var(--color-neutral-300)] hover:bg-[var(--color-neutral-900)]',
     zebra && 'bg-zebra',
-    selected &&
-      'border-l-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface))]',
+    focused
+      ? 'border-l-[var(--color-accent-2-400)] bg-[color-mix(in_srgb,var(--color-accent-2)_22%,var(--color-surface))]'
+      : selected &&
+          'border-l-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface))]',
   )
 }
 
-function Row({ row, zebra, selected, onSelect }: RowProps) {
+function Row({ row, zebra, selected, focused, onSelect }: RowProps) {
   // `--muted-foreground` is 4.43:1 on the selected row's accent tint,
   // which is under AA for text this size; one step brighter clears it.
   // The tint itself is the mock's and is not touched — these three
   // columns are muted by the SPA's choice, not the mock's, so this is
   // the half of the pair that may move (10 §Accessibility and quality).
-  const muted = selected ? 'text-[var(--color-neutral-400)]' : 'text-muted-foreground'
+  // The focused row's tint is denser still, so it takes the same step.
+  const muted =
+    selected || focused ? 'text-[var(--color-neutral-400)]' : 'text-muted-foreground'
 
   return (
     <button
@@ -108,12 +129,17 @@ function Row({ row, zebra, selected, onSelect }: RowProps) {
       role="option"
       aria-selected={selected}
       data-selected={selected}
+      // A `data-*` attribute and not ARIA: `option` takes
+      // `aria-selected` and nothing else that means this, and
+      // `aria-grabbed` is deprecated. What announces the mode is the
+      // footer strip's live region.
+      data-run-focused={focused}
       title={row.id}
       onClick={() => onSelect(row.id)}
       style={{ gridTemplateColumns: COLUMNS }}
       className={cn(
         'grid items-center gap-[8px] px-[12px] py-[4px]',
-        rowClasses(zebra, selected),
+        rowClasses(zebra, selected, focused),
       )}
     >
       <span className={cn('truncate', muted)}>{row.shortId}</span>
@@ -137,10 +163,11 @@ function Row({ row, zebra, selected, onSelect }: RowProps) {
  * "01H4 dot probe dot draft dot 4m" is being read punctuation; the
  * `title` attribute carries the whole id here as it does on the grid.
  */
-function NarrowRow({ row, zebra, selected, onSelect }: RowProps) {
+function NarrowRow({ row, zebra, selected, focused, onSelect }: RowProps) {
   // The same one step of contrast the grid takes on a selected row, for
   // the same reason (10 §Accessibility and quality).
-  const muted = selected ? 'text-[var(--color-neutral-400)]' : 'text-muted-foreground'
+  const muted =
+    selected || focused ? 'text-[var(--color-neutral-400)]' : 'text-muted-foreground'
 
   return (
     <button
@@ -148,12 +175,13 @@ function NarrowRow({ row, zebra, selected, onSelect }: RowProps) {
       role="option"
       aria-selected={selected}
       data-selected={selected}
+      data-run-focused={focused}
       data-narrow
       title={row.id}
       onClick={() => onSelect(row.id)}
       className={cn(
         'flex flex-col gap-[3px] px-[12px] py-[8px]',
-        rowClasses(zebra, selected),
+        rowClasses(zebra, selected, focused),
       )}
     >
       <span className="flex w-full items-center gap-[8px]">
@@ -222,13 +250,23 @@ function Empty({ model }: { model: RunListModel }) {
 export function RunList({
   model,
   selected,
+  focusedRun,
   onSelect,
 }: {
   model: RunListModel
   /** The run `?run=` names, if any. */
   selected: string | undefined
+  /**
+   * The run `⏎` has picked up, if any (10 §Keyboard).
+   *
+   * The shell decides it and hands it down already guarded: it is only
+   * ever the selected run, only while that row is in `model.rows`, and
+   * only at `md` and above (`../../App.tsx`, D204 (2)).
+   */
+  focusedRun?: string | undefined
   onSelect: (runId: string) => void
 }) {
+  const holding = focusedRun !== undefined
   const focused = useUi((s) => s.focus === 'list')
   const setFocus = useUi((s) => s.setFocus)
   const narrow = useIsNarrow()
@@ -272,6 +310,7 @@ export function RunList({
                 row,
                 zebra: index % 2 === 1,
                 selected: row.id === selected,
+                focused: row.id === focusedRun,
                 onSelect,
               }
               return narrow ? (
@@ -287,9 +326,18 @@ export function RunList({
       <div className="text-hint bg-chrome flex gap-[14px] border-t border-border px-[12px] py-[5px] text-muted-foreground">
         <span data-testid="rows-shown">{model.rows.length} shown</span>
         {/* Keycaps are noise on a touchscreen; the keys they name stay
-            bound at every width (21 §Narrow layout). */}
-        <span className="max-md:hidden">↑↓ select</span>
-        <span className="max-md:hidden">⏎ focus detail</span>
+            bound at every width (21 §Narrow layout). The pair is a live
+            region because it is what says which mode the arrows are in,
+            and colour is never the only signal (10 §Accessibility and
+            quality); `n shown` stays outside it, being neither. */}
+        <span
+          role="status"
+          data-testid="list-hints"
+          className="flex gap-[14px] max-md:hidden"
+        >
+          <span>{holding ? '↑↓ move run' : '↑↓ select'}</span>
+          <span>{holding ? '⏎/esc done' : '⏎ focus run'}</span>
+        </span>
       </div>
     </section>
   )

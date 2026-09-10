@@ -158,7 +158,9 @@ describe('useRunOps', () => {
     })
     expect(sent[0]?.url).toContain(`/api/runs/${RUN_ID}/position`)
     expect(sent[0]?.body).toEqual({ direction: -1 })
-    expect(toast).toHaveBeenCalledWith('position 3')
+    // Named after the run, so that holding `↑` on a focused run replaces
+    // one toast instead of stacking a position per keypress (D204 (4)).
+    expect(toast).toHaveBeenCalledWith('position 3', { id: `run-position-${RUN_ID}` })
 
     await user.click(screen.getByRole('button', { name: 'down' }))
     await waitFor(() => {

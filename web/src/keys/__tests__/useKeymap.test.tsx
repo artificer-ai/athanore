@@ -26,7 +26,8 @@ function handlers() {
     select: vi.fn(),
     cyclePane: vi.fn(),
     jumpPane: vi.fn(),
-    focusDetail: vi.fn(),
+    toggleRunFocus: vi.fn(),
+    moveRun: vi.fn(),
     openPalette: vi.fn(),
     close: vi.fn(),
   }
@@ -95,10 +96,10 @@ let allow: Mock<() => void>
 let deny: Mock<() => void>
 let released: Array<() => void>
 
-/** Mount the harness over `actions`. */
-function mount(actions: readonly KeymapAction[]) {
+/** Mount the harness over `actions`, with or without a run held. */
+function mount(actions: readonly KeymapAction[], runFocused = false) {
   return render(
-    <Harness keymap={{ ...spies, actions }} allow={allow} deny={deny} />,
+    <Harness keymap={{ ...spies, actions, runFocused }} allow={allow} deny={deny} />,
   )
 }
 
@@ -301,16 +302,16 @@ describe('the map', () => {
 })
 
 /* -------------------------------------------------------------------- */
-/* `⏎` focus detail                                                      */
+/* `⏎` focus run                                                         */
 /* -------------------------------------------------------------------- */
 
 describe('`⏎`', () => {
-  it('hands the keyboard to the detail pane from the run list', () => {
+  it('picks the highlighted run up, from the run list', () => {
     const { actions } = catalogue()
     mount(actions)
 
     fireEvent.keyDown(list(), { key: 'Enter' })
-    expect(spies.focusDetail).toHaveBeenCalledOnce()
+    expect(spies.toggleRunFocus).toHaveBeenCalledOnce()
   })
 
   it('does the same from a run row, and does only that', () => {
@@ -326,7 +327,7 @@ describe('`⏎`', () => {
       { key: 'Enter' },
     )
 
-    expect(spies.focusDetail).toHaveBeenCalledOnce()
+    expect(spies.toggleRunFocus).toHaveBeenCalledOnce()
     expect(cancelled).toBe(false)
   })
 
@@ -335,7 +336,15 @@ describe('`⏎`', () => {
     mount(actions)
 
     fireEvent.keyDown(document.body, { key: 'Enter' })
-    expect(spies.focusDetail).toHaveBeenCalledOnce()
+    expect(spies.toggleRunFocus).toHaveBeenCalledOnce()
+  })
+
+  it('puts a held run down again, which is the same key', () => {
+    const { actions } = catalogue()
+    mount(actions, true)
+
+    fireEvent.keyDown(list(), { key: 'Enter' })
+    expect(spies.toggleRunFocus).toHaveBeenCalledOnce()
   })
 
   it('belongs to whatever has focus outside the list', () => {
@@ -343,7 +352,72 @@ describe('`⏎`', () => {
     mount(actions)
 
     fireEvent.keyDown(panel(), { key: 'Enter' })
-    expect(spies.focusDetail).not.toHaveBeenCalled()
+    expect(spies.toggleRunFocus).not.toHaveBeenCalled()
+  })
+})
+
+/* -------------------------------------------------------------------- */
+/* ...and what `↑`/`↓` mean while one is held                            */
+/* -------------------------------------------------------------------- */
+
+describe('while a run is focused', () => {
+  it('moves the run with `↑`/`↓` and `j`/`k`, and never the selection', () => {
+    const { actions } = catalogue()
+    mount(actions, true)
+
+    fireEvent.keyDown(document.body, { key: 'ArrowDown' })
+    fireEvent.keyDown(document.body, { key: 'j' })
+    fireEvent.keyDown(document.body, { key: 'ArrowUp' })
+    fireEvent.keyDown(document.body, { key: 'k' })
+
+    expect(spies.moveRun.mock.calls).toEqual([[1], [1], [-1], [-1]])
+    expect(spies.select).not.toHaveBeenCalled()
+  })
+
+  it('moves nothing while no run is held, which is the other half', () => {
+    const { actions } = catalogue()
+    mount(actions)
+
+    fireEvent.keyDown(document.body, { key: 'ArrowDown' })
+    fireEvent.keyDown(document.body, { key: 'k' })
+
+    expect(spies.select.mock.calls).toEqual([[1], [-1]])
+    expect(spies.moveRun).not.toHaveBeenCalled()
+  })
+
+  it('leaves every other key of the map exactly as it was', () => {
+    const { actions, ran } = catalogue()
+    mount(actions, true)
+
+    fireEvent.keyDown(document.body, { key: 'ArrowRight' })
+    fireEvent.keyDown(document.body, { key: '1' })
+    fireEvent.keyDown(document.body, { key: 'n' })
+
+    expect(spies.cyclePane.mock.calls).toEqual([[1]])
+    expect(spies.jumpPane.mock.calls).toEqual([[0]])
+    expect(ran).toEqual(['new-run'])
+    expect(spies.moveRun).not.toHaveBeenCalled()
+  })
+
+  it('moves nothing from inside an input, or under an overlay', () => {
+    const { actions } = catalogue()
+    mount(actions, true)
+
+    fireEvent.keyDown(filter(), { key: 'ArrowDown' })
+    expect(spies.moveRun).not.toHaveBeenCalled()
+
+    released.push(claimKeyboard())
+    fireEvent.keyDown(document.body, { key: 'ArrowUp' })
+    expect(spies.moveRun).not.toHaveBeenCalled()
+    expect(spies.select).not.toHaveBeenCalled()
+  })
+
+  it('is put down by `esc`, which the shell reads as its `close`', () => {
+    const { actions } = catalogue()
+    mount(actions, true)
+
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(spies.close).toHaveBeenCalledOnce()
   })
 })
 
@@ -432,7 +506,7 @@ describe('a keystroke that came from no element at all', () => {
     // in neither is in neither, so they do nothing rather than firing
     // from wherever the last focus happened to be.
     expect(ran).toEqual(['new-run'])
-    expect(spies.focusDetail).not.toHaveBeenCalled()
+    expect(spies.toggleRunFocus).not.toHaveBeenCalled()
     expect(allow).not.toHaveBeenCalled()
   })
 })

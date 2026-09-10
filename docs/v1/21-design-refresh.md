@@ -199,7 +199,9 @@ fluid, not a second fixed design. Strips that manage their own overflow
   open-request glyph kept beside the node (10 §Attention). Same data,
   same query, same selection behaviour; tapping a row opens the detail.
   The list's footer strip keeps `n shown` and drops the `↑↓ select · ⏎
-  focus detail` key hints.
+  focus run` key hints. There is no focus mode below the breakpoint
+  either: the list is not on screen while a run is selected (D194), so
+  `⏎` picks nothing up there (10 §Keyboard, D204 (2)).
 - **Detail**: the pane bar's left slot shows a back control (`←` with
   an accessible "back to runs" label) in place of the list-collapse
   toggle, which has no meaning without the split; it clears `?run=`.
