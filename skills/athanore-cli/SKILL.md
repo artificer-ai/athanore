@@ -17,11 +17,14 @@ verbs. Three ideas are the whole of it:
 
 1. **`athanore serve` is the composition root's command line.** It takes
    `module:wf` targets, builds the server, registers what it was given,
-   and serves: `docs/v1/11-cli.md` §Server. It is the only verb that is
-   not a client.
-2. **Every other verb is a client of the HTTP API**, and they all find
-   their server and their token the same way, through the same global
-   flags: `docs/v1/11-cli.md` §Client connection.
+   and serves: `docs/v1/11-cli.md` §Server.
+2. **Every verb that acts on a run or a request is a client of the HTTP
+   API**, and they all find their server and their token the same way,
+   through the same global flags: `docs/v1/11-cli.md` §Client connection.
+   Three verbs talk to no server: `athanore db` acts on `--db` or on the
+   configured database directly and `athanore token` and `athanore login`
+   read and write files on disk (`docs/v1/11-cli.md` §Server,
+   `docs/v1/11-cli.md` §Client connection).
 3. **Output is a table on a TTY and JSON with `--json` everywhere**, so
    the CLI composes with `jq` rather than growing a query language of
    its own. That is the opening paragraph of `docs/v1/11-cli.md`; the

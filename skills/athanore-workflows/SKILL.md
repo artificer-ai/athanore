@@ -17,14 +17,14 @@ decorated with `@wf.node()`. Three rules are the whole authoring
 interface, and there is deliberately never a fourth
 (`docs/v1/01-vision-and-scope.md` §The three rules (unchanged)):
 
-1. **The signature is the graph.** A node's parameters are the nodes it
-   may hand work to, so the edges are read off the function rather than
-   declared. See `docs/v1/04-engine.md` §Signature parsing (unchanged semantics).
+1. **The signature is the graph.** A node's positional parameters are
+   the nodes it may hand work to, so the edges are read off the function
+   rather than declared. See `docs/v1/04-engine.md` §Signature parsing (unchanged semantics).
 2. **The return value is the routing.** What a body returns says where
-   the work goes next and what it carries; returning something that is
-   not an edge ends that branch. See `docs/v1/04-engine.md` §Routing interpretation,
-   and — for the forms that are easy to get wrong —
-   `docs/v1/04-engine.md` §Routing edge cases.
+   the work goes next and what it carries, and a plain value with one
+   successor auto-transitions along it. The full table is
+   `docs/v1/04-engine.md` §Routing interpretation, and — for the forms
+   that are easy to get wrong — `docs/v1/04-engine.md` §Routing edge cases.
 3. **The exception is the failure policy.** Raising is how a body says
    the attempt failed, and which exception it raises decides whether the
    engine tries again: `docs/v1/04-engine.md` §Failure classes (rule 3, refined).
