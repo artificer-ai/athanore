@@ -46,7 +46,22 @@ __all__ = [
 PROMPT_MODEL = os.environ.get("FEATURE_PROMPT_MODEL", "haiku")
 PLAN_MODEL = os.environ.get("FEATURE_PLAN_MODEL", "opus[1m]")
 IMPLEMENT_MODEL = os.environ.get("FEATURE_IMPLEMENT_MODEL", "opus[1m]")
-REVIEW_MODEL = os.environ.get("FEATURE_REVIEW_MODEL", "opus[1m]")
+#: The reviewer runs Fable, through the `agent-claude-fable` compose
+#: service. That service is the *only* way to reach it: `claude-agent-acp`
+#: builds its model menu from a fixed set (`opus[1m]`, `sonnet`, `haiku`,
+#: `default`) plus whatever `ANTHROPIC_MODEL` names in its container, and
+#: refuses `session/set_config_option` for anything else — measured, both
+#: `fable` and `claude-fable-5` are rejected on the default service (D75).
+#: `compose.yaml` sets that service's `ANTHROPIC_MODEL` to
+#: `${BUILDER_REVIEW_MODEL:-claude-fable-5}`, so the session asks for the
+#: value read from that same variable and cannot drift from it. A rejected
+#: option is only a WARNING and a transcript notice (D11), so a mismatch
+#: here would review every branch on the wrong model and say so nowhere
+#: but the log.
+REVIEW_MODEL = os.environ.get(
+    "FEATURE_REVIEW_MODEL",
+    os.environ.get("BUILDER_REVIEW_MODEL", "claude-fable-5"),
+)
 QA_MODEL = os.environ.get("FEATURE_QA_MODEL", "opus[1m]")
 
 #: How long one agent turn may take. Three hours: an implement turn on a
@@ -227,8 +242,18 @@ endpoint or a page — not a description.
 
 
 class ReviewerAgent(SandboxAgent):
-    """Reads the whole branch diff and the gate's output, and votes."""
+    """Reads the whole branch diff and the gate's output, and votes.
 
+    The one seat that overrides ``command``: Fable is a property of the
+    compose service rather than of the session (D75), so the reviewer is
+    dispatched into `agent-claude-fable` instead of the default service.
+
+    That a *different* model judges the code than wrote it is the point.
+    With `implement` and `review` both on `opus[1m]`, "no agent rules on
+    its own work" softens into "no agent rules on its own turn".
+    """
+
+    command = [str(AGENT_SH), "claude-fable"]
     model = REVIEW_MODEL
     output_model = ReviewVerdict
 
