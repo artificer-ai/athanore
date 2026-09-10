@@ -8,7 +8,7 @@ looking at the run that was asking, there was no way to hand it anything.
 Now there is: drop the file in the pane, and it is on disk in the
 checkout before the next attempt starts.
 
-**Four routes and a `custom` panel**, which is the whole of 09's escape
+**Four routes and two `custom` panels**, which is the whole of 09's escape
 hatch (§Escape hatch, D183): `assets="./static"` is served at
 `/plugins/feature/static/`, the panel names an element, and the element
 reaches these routes through `window.athanore.fetch` — bound to
@@ -256,4 +256,14 @@ def declare(wf: Workflow) -> None:
         slot="global",
         kind="custom",
         element="athanore-files",
+    )
+    # The other half of the drop box: one takes a file you already have,
+    # the other makes one you do not. It declares no routes — a canvas is
+    # a `Blob` with a name, and `POST /files` above already takes an
+    # upload — so the whole of it is this line and `static/sketch.js`.
+    wf.panel(
+        "sketch",
+        slot="global",
+        kind="custom",
+        element="athanore-sketch",
     )
