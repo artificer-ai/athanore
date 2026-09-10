@@ -291,7 +291,7 @@ The core-shipped operator views are declared through the same API in
 | `log` | run pane `log` sourced from the work log + events, refresh on `log.appended` and `task.*` |
 | `agent` | run pane `custom` `<ath-agent-stream>` reading `/api/tasks/{id}/stream` for the focused task, with the docked request panel |
 | `requests` | run pane `custom` `<ath-requests>` (the mock's messages pane), plus a global pane when no run is selected |
-| `graph` | run panel `custom` `<ath-run-graph>` (the rail-list renderer, shipped in the SPA bundle, not as a plugin asset) |
+| `graph` | run panel `custom` `<ath-run-graph>` (the React Flow canvas of 10 §Graph pane, shipped in the SPA bundle, not as a plugin asset) |
 
 The SPA ships the renderers for these element tags itself; the point is
 that their *placement and liveness* flow through the manifest, so the

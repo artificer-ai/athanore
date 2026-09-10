@@ -1,31 +1,30 @@
 /**
- * The graph pane: the order the rows come in, the sub-lists a fan-out
- * opens, the rails a loop draws, and what the detail column says
- * (`docs/v1/10-frontend.md` §Graph pane, `docs/v1/08-api.md` §Graph
- * semantics).
+ * The graph pane: where the canvas puts each node, which arrow it draws
+ * between them, the chips a fan-out gives a node, and what the detail
+ * line says (`docs/v1/10-frontend.md` §Graph pane, `docs/v1/08-api.md`
+ * §Graph semantics).
  *
- * Three fixtures, which are the three shapes a run can have (T063e):
- * linear with a loop-back, a fan-out that never closes, and the same
- * fan-out closed by a join. Between them they cover every rule the rail
- * has — a node drawn once per branch it ran in, a join drawn back at the
- * parent indent with the branches arriving into it, and a rail that
- * spans from the node a loop points at down to the node it leaves.
+ * Three fixtures, which are the three shapes a run can have: linear with
+ * a loop-back, a fan-out that never closes, and the same fan-out closed
+ * by a join. Between them they cover every rule the canvas has — a rank
+ * per generation, a node drawn **once** however many branches it ran in,
+ * a join drawn with `⋈` and counting its arrivals, and a back edge that
+ * leaves and arrives on the right.
  *
  * Four things this suite is deliberately strict about:
  *
- * - **the row order is the route's.** `GET /api/runs/{id}/graph` sends
- *   the nodes in generation order and the pane draws the list it is
- *   given (08); what the pane adds is the *grouping*, and a sub-list
- *   lands where its first node does.
- * - **two branches of one fan-out are two sub-lists.** They carry the
- *   same `from_task` on the wire, so a renderer that grouped by
- *   `from_task` alone would draw one — which is why `render` and
- *   `report` each appear twice in the fan-out fixtures.
+ * - **the rank order is the route's.** `GET /api/runs/{id}/graph` sends
+ *   the nodes in generation order and, within a generation, in
+ *   declaration order (08), and {@link graphLayout} ranks and spreads
+ *   them in exactly that order. Nothing sorts to reduce crossings.
+ * - **a fan-out never duplicates a node.** Two branches of one fan-out
+ *   are two *chips* on one card (D206 (2)), because the wire's edges
+ *   name nodes and a second card would leave the arrows ambiguous.
  * - **`k of n arrived` is the join's, and only while a fan-out is
  *   open.** It comes from `arrivals`, which the server computes; nothing
  *   here counts branches.
  * - **nothing is zero-filled.** A node no agent measured shows what was
- *   measured and no more, and an idle node's detail column is empty
+ *   measured and no more, and an idle node's detail line is absent
  *   rather than `0 · 0s` (01 §Real data only).
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -39,13 +38,20 @@ import {
   getSourceApiWorkflowsNameSourceGetQueryKey,
 } from '../../api/gen/@tanstack/react-query.gen'
 import type { GraphOut, RunDetail } from '../../api/gen/types.gen'
+import { narrowViewport, wideViewport } from '../../lib/__tests__/fixtures'
 import {
-  GraphRail,
+  BRANCH_ROW,
+  COLUMN_GAP,
+  GraphCanvas,
+  NODE_HEIGHT,
+  NODE_WIDTH,
+  RANK_GAP,
+  UNTAKEN_CLASS,
   branchState,
+  graphLayout,
   legendRows,
   moveRefusal,
   nodeDetail,
-  railRows,
 } from '../kinds'
 import {
   FANOUT_GRAPH,
@@ -115,7 +121,7 @@ function draw(
 
   return render(
     <QueryClientProvider client={queryClient}>
-      <GraphRail
+      <GraphCanvas
         runId={runId}
         taskId={options.taskId}
         onOpenNode={options.onOpenNode}
@@ -125,26 +131,50 @@ function draw(
   )
 }
 
-/** The rows in the order they are drawn. */
-function rows() {
+/** The cards in the order they are drawn. */
+function cards() {
   return screen.getAllByTestId('graph-row')
 }
 
 /** The node names in the order they are drawn. */
 function names() {
-  return rows().map((row) => row.getAttribute('data-node'))
+  return cards().map((card) => card.getAttribute('data-node'))
 }
 
-/** The row for one node, by name; the first when it is drawn twice. */
-function row(node: string): HTMLElement {
-  const found = rows().find((element) => element.getAttribute('data-node') === node)
-  if (found === undefined) throw new Error(`no row for ${node}`)
+/** The card for one node, by name. */
+function card(node: string): HTMLElement {
+  const found = cards().find((element) => element.getAttribute('data-node') === node)
+  if (found === undefined) throw new Error(`no card for ${node}`)
   return found
 }
 
-/** The detail column of a row, or `null` when it draws none. */
+/** The detail line of a card, or `null` when it draws none. */
 function detailOf(element: HTMLElement): string | null {
   return element.querySelector('[data-testid="graph-detail"]')?.textContent ?? null
+}
+
+/** The branch chips of one node's card, in the order drawn. */
+function chips(node: string): HTMLElement[] {
+  return [...card(node).querySelectorAll<HTMLElement>('[data-testid="graph-branch"]')]
+}
+
+/** The layout of one fixture at {@link NOW}. */
+function layout(graph: GraphOut, detail: RunDetail | null = null) {
+  return graphLayout(graph, detail?.tasks, NOW)
+}
+
+/** One laid-out node, by name. */
+function placed(graph: GraphOut, name: string, detail: RunDetail | null = null) {
+  const node = layout(graph, detail).nodes.find((entry) => entry.id === name)
+  if (node === undefined) throw new Error(`no node for ${name}`)
+  return node
+}
+
+/** One laid-out edge, by the id `graph.ts` gives it. */
+function edge(graph: GraphOut, id: string) {
+  const found = layout(graph).edges.find((entry) => entry.id === id)
+  if (found === undefined) throw new Error(`no edge for ${id}`)
+  return found
 }
 
 beforeEach(() => {
@@ -156,70 +186,162 @@ beforeEach(() => {
 })
 
 afterEach(() => {
+  wideViewport()
   vi.useRealTimers()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
 })
 
 /* -------------------------------------------------------------------- */
-/* The row order                                                         */
+/* The ranks                                                             */
 /* -------------------------------------------------------------------- */
 
-describe('the order of the rows', () => {
-  it('draws a linear graph in the generation order the route sent', () => {
+describe('the ranks the layout puts the nodes in', () => {
+  it('draws a linear graph as one centred column, in the route’s order', () => {
     draw()
     expect(names()).toEqual(['prompt', 'engineering', 'review', 'qa', 'git'])
+
+    const column = layout(LINEAR_GRAPH).nodes
+    expect(column.map((node) => node.position.x)).toEqual([0, 0, 0, 0, 0])
+    expect(column.map((node) => node.position.y)).toEqual(
+      column.map((_, index) => index * (NODE_HEIGHT + RANK_GAP)),
+    )
   })
 
-  it('draws each branch of a fan-out as its own sub-list, in order', () => {
-    draw(FANOUT_GRAPH, fannedRun())
-    // `plan` fanned out; each of the two branches ran `render` then
-    // `report`, so each node is drawn once per branch and the branches
-    // are consecutive.
-    expect(names()).toEqual(['plan', 'render', 'report', 'render', 'report'])
-    expect(rows().map((element) => element.getAttribute('data-depth'))).toEqual([
-      '0',
-      '1',
-      '1',
-      '1',
-      '1',
-    ])
+  it('spreads one generation across a rank, centred, in declaration order', () => {
+    const graph: GraphOut = {
+      nodes: [
+        graphNode({ name: 'plan', generation: 0 }),
+        graphNode({ name: 'left', generation: 1 }),
+        graphNode({ name: 'right', generation: 1 }),
+      ],
+      edges: [],
+    }
+    const pitch = NODE_WIDTH + COLUMN_GAP
+    expect(placed(graph, 'left').position).toEqual({ x: -pitch / 2, y: NODE_HEIGHT + RANK_GAP })
+    expect(placed(graph, 'right').position).toEqual({ x: pitch / 2, y: NODE_HEIGHT + RANK_GAP })
+    expect(placed(graph, 'plan').position).toEqual({ x: 0, y: 0 })
   })
 
-  it('closes the sub-lists with the join, back at the parent indent', () => {
-    draw(JOINED_GRAPH, fannedRun())
-    expect(names()).toEqual(['plan', 'render', 'report', 'render', 'report', 'merge'])
-    expect(row('merge').getAttribute('data-depth')).toBe('0')
+  it('leaves no empty band where a workflow skips a generation', () => {
+    const graph: GraphOut = {
+      nodes: [
+        graphNode({ name: 'first', generation: 0 }),
+        graphNode({ name: 'later', generation: 7 }),
+      ],
+      edges: [],
+    }
+    expect(placed(graph, 'later').position.y).toBe(NODE_HEIGHT + RANK_GAP)
   })
 
-  it('keeps a node the run has not reached at the parent indent', () => {
-    // `qa` and `git` are idle in the linear fixture: no attempt has ever
-    // existed, so there is no branch to nest them in.
-    draw()
-    expect(row('qa').getAttribute('data-depth')).toBe('0')
+  it('gives every node an explicit width and height, so nothing is measured', () => {
+    for (const node of layout(LINEAR_GRAPH).nodes) {
+      expect(node.width).toBe(NODE_WIDTH)
+      expect(node.height).toBe(NODE_HEIGHT)
+      expect(node.type).toBe('athanore')
+    }
+  })
+
+  it('makes a node that draws chips one chip row taller', () => {
+    const fanned = placed(FANOUT_GRAPH, 'render', fannedRun())
+    expect(fanned.height).toBe(NODE_HEIGHT + BRANCH_ROW)
+    expect(placed(FANOUT_GRAPH, 'plan', fannedRun()).height).toBe(NODE_HEIGHT)
+    // The rank below it starts under the taller card, not through it.
+    expect(placed(FANOUT_GRAPH, 'report', fannedRun()).position.y).toBe(
+      NODE_HEIGHT + RANK_GAP + NODE_HEIGHT + BRANCH_ROW + RANK_GAP,
+    )
   })
 })
 
 /* -------------------------------------------------------------------- */
-/* The sub-lists                                                         */
+/* The edges                                                             */
 /* -------------------------------------------------------------------- */
 
-describe('the sub-lists a fan-out opens', () => {
-  it('keys them by the fan-out and the branch, not by the fan-out alone', () => {
+describe('the edges the layout draws', () => {
+  it('runs a forward edge down the ranks, bottom to top', () => {
+    const forward = edge(LINEAR_GRAPH, 'forward:prompt→engineering')
+    expect(forward.sourceHandle).toBe('bottom')
+    expect(forward.targetHandle).toBe('top')
+    expect(forward.label).toBeUndefined()
+    expect(forward.type).toBe('smoothstep')
+  })
+
+  it('bows a back edge out to the right, and labels it `loop`', () => {
+    const back = edge(LINEAR_GRAPH, 'back:review→engineering')
+    expect(back.sourceHandle).toBe('right-source')
+    expect(back.targetHandle).toBe('right-target')
+    expect(back.label).toBe('loop')
+    expect(back.pathOptions).toEqual({ borderRadius: 12, offset: 24 })
+  })
+
+  it('draws a join edge exactly as a forward one', () => {
+    // The `⋈` glyph on the target and the EDGES aside already say the
+    // node is a fan-in; a third geometry would be a third notation.
+    const join = edge(JOINED_GRAPH, 'join:report→merge')
+    expect(join.sourceHandle).toBe('bottom')
+    expect(join.targetHandle).toBe('top')
+    expect(join.label).toBeUndefined()
+  })
+
+  it('labels an arrow this run took more than once', () => {
+    expect(edge(FANOUT_GRAPH, 'forward:plan→render').label).toBe('×2')
+  })
+
+  it('marks an arrow this run never took', () => {
+    const untaken = edge(LINEAR_GRAPH, 'forward:review→qa')
+    expect(untaken.className).toBe(UNTAKEN_CLASS)
+    expect(edge(LINEAR_GRAPH, 'forward:prompt→engineering').className).toBeUndefined()
+    // A loop the run has not taken is still a loop, and still labelled.
+    expect(edge(LINEAR_GRAPH, 'back:qa→engineering').label).toBe('loop')
+  })
+
+  it('drops an arrow naming a node this response does not carry', () => {
+    const built = graphLayout(
+      {
+        nodes: [graphNode({ name: 'only', generation: 0 })],
+        edges: [{ from: 'gone', to: 'only', kind: 'back', traversed: 1 }],
+      },
+      [],
+      NOW,
+    )
+    expect(built.nodes).toHaveLength(1)
+    expect(built.edges).toEqual([])
+  })
+})
+
+/* -------------------------------------------------------------------- */
+/* The branch chips                                                      */
+/* -------------------------------------------------------------------- */
+
+describe('the chips a fan-out gives a node', () => {
+  it('draws the node once, with one chip per branch', () => {
+    // The rail this replaced drew `render` twice. A canvas cannot: the
+    // wire's edges name nodes, so a second card would leave every arrow
+    // into and out of `render` ambiguous (D206 (2)).
     draw(FANOUT_GRAPH, fannedRun())
-    expect(rows().map((element) => element.getAttribute('data-branch'))).toEqual([
-      null,
+    expect(names()).toEqual(['plan', 'render', 'report'])
+    expect(chips('render')).toHaveLength(2)
+    expect(card('render').getAttribute('data-branches')).toBe('2')
+  })
+
+  it('keys the chips by the fan-out and the branch, not the fan-out alone', () => {
+    draw(FANOUT_GRAPH, fannedRun())
+    expect(chips('render').map((chip) => chip.getAttribute('data-branch'))).toEqual([
       '601:0',
-      '601:0',
-      '601:1',
       '601:1',
     ])
   })
 
-  it('labels each sub-list with its branch, its key and the fan-out', () => {
+  it('pairs a branch’s chips by their frames, not by their position', () => {
+    // `report`'s entries arrive in the opposite order to `render`'s, so
+    // a renderer that keyed by position would give branch 2's chip
+    // branch 1's tag. The key is the branch-frame stack on the attempts.
     draw(FANOUT_GRAPH, fannedRun())
-    const labels = screen.getAllByTestId('graph-branch-label')
-    expect(labels.map((label) => label.textContent)).toEqual([
+    expect(chips('report').map((chip) => chip.getAttribute('data-branch'))).toEqual([
+      '601:0',
+      '601:1',
+    ])
+    expect(chips('report').map((chip) => chip.getAttribute('title'))).toEqual([
       'branch 1 of 2 · alpha · from task 601',
       'branch 2 of 2 · beta · from task 601',
     ])
@@ -227,35 +349,20 @@ describe('the sub-lists a fan-out opens', () => {
 
   it('falls back to the position when the attempts have not arrived', () => {
     // `GraphBranch` alone cannot tell two branches of one fan-out apart
-    // (08 §Graph semantics), so with no run detail the label says which
-    // sub-list this is and no more.
+    // (08 §Graph semantics), so with no run detail a chip says which
+    // branch of the entry list it is and no more.
     draw(FANOUT_GRAPH, null)
-    expect(
-      screen.getAllByTestId('graph-branch-label').map((label) => label.textContent),
-    ).toEqual(['branch 1 · from task 601', 'branch 2 · from task 601'])
-  })
-
-  it('pairs a branch’s rows by their frames, not by their position', () => {
-    // `report`'s entries arrive in the opposite order to `render`'s, so
-    // a renderer that paired the two nodes' entries by position would
-    // put branch 2's report under branch 1's render. The pairing is the
-    // branch-frame stack on the attempts (08 §Graph semantics).
-    draw(FANOUT_GRAPH, fannedRun())
-    const reports = rows().filter(
-      (element) => element.getAttribute('data-node') === 'report',
-    )
-    expect(reports.map((element) => element.getAttribute('data-branch'))).toEqual([
-      '601:0',
-      '601:1',
+    expect(chips('render').map((chip) => chip.textContent)).toEqual(['#1', '#2'])
+    expect(chips('render').map((chip) => chip.getAttribute('title'))).toEqual([
+      'branch 1 · from task 601',
+      'branch 2 · from task 601',
     ])
-    // Branch 1's report took 5 s and branch 2's 3 s.
-    expect(reports.map(detailOf)).toEqual(['5s', '3s'])
   })
 
-  it('gives each branch row its own state, not the node’s', () => {
+  it('gives each chip its own branch’s state, not the node’s', () => {
     // `render` is `in_progress` as a node while one of its two branches
-    // is running and the other is done: two rows drawn with the node's
-    // own glyph would each claim to be the running one.
+    // is running and the other is done: two chips in the node's own
+    // colour would each claim to be the running one.
     const graph = {
       ...FANOUT_GRAPH,
       nodes: FANOUT_GRAPH.nodes.map((node) =>
@@ -270,13 +377,11 @@ describe('the sub-lists a fan-out opens', () => {
     )
     draw(graph, { ...detail, tasks })
 
-    const rendered = rows().filter(
-      (element) => element.getAttribute('data-node') === 'render',
-    )
-    expect(rendered.map((element) => element.getAttribute('data-state'))).toEqual([
+    expect(chips('render').map((chip) => chip.getAttribute('data-state'))).toEqual([
       'done',
       'in_progress',
     ])
+    expect(card('render').getAttribute('data-state')).toBe('in_progress')
   })
 
   it('reads 08’s precedence over one branch’s attempts', () => {
@@ -288,121 +393,23 @@ describe('the sub-lists a fan-out opens', () => {
     expect(branchState([])).toBe('idle')
   })
 
-  it('gives a branch row the detail of its own branch, not of the node', () => {
-    draw(FANOUT_GRAPH, fannedRun())
-    // Branch 1 ran `render` for 20 s on 4,000 tokens; branch 2 for 40 s
-    // on 9,000. A row that summed the node would show 13,000 on both.
-    const rendered = rows().filter(
-      (element) => element.getAttribute('data-node') === 'render',
-    )
-    expect(rendered.map(detailOf)).toEqual(['4,000 · 20s', '9,000 · 40s'])
-  })
-})
-
-/* -------------------------------------------------------------------- */
-/* The rails                                                             */
-/* -------------------------------------------------------------------- */
-
-describe('the loop rail', () => {
-  /** The rail cells, one per row, in draw order. */
-  function rails() {
-    return screen.getAllByTestId('graph-rail')
-  }
-
-  it('spans from the node a loop points at down to the node it leaves', () => {
-    draw()
-    // `review → engineering` and `qa → engineering`: the rail runs from
-    // row 1 (engineering) to row 3 (qa), so the line leaves rows 1 and 2
-    // downwards and arrives at rows 2 and 3 from above.
-    expect(rails().map((cell) => cell.getAttribute('data-down'))).toEqual([
-      'false',
-      'true',
-      'true',
-      'false',
-      'false',
-    ])
-    expect(rails().map((cell) => cell.getAttribute('data-up'))).toEqual([
-      'false',
-      'false',
-      'true',
-      'true',
-      'false',
-    ])
-  })
-
-  it('puts the ◀ on the node the back edges point at', () => {
-    draw()
-    expect(rails().map((cell) => cell.getAttribute('data-arrow'))).toEqual([
-      'false',
-      'true',
-      'false',
-      'false',
-      'false',
-    ])
-  })
-
-  it('labels the rail once, at the middle of its span', () => {
-    draw()
-    const labels = screen.getAllByTestId('graph-loop-label')
-    expect(labels).toHaveLength(1)
-    expect(labels[0]?.textContent).toBe('loop')
-  })
-
-  it('draws no rail at all on a graph with no back edge', () => {
-    draw(FANOUT_GRAPH, fannedRun())
-    expect(rails().every((cell) => cell.getAttribute('data-down') === 'false')).toBe(true)
-    expect(screen.queryByTestId('graph-loop-label')).toBeNull()
-  })
-
-  it('skips a back edge whose ends this run has not drawn', () => {
-    // An edge of the finalized graph naming a node the response does not
-    // carry is drawn to nowhere rather than crashing the rail.
-    const built = railRows(
-      {
-        nodes: [graphNode({ name: 'only', generation: 0 })],
-        edges: [{ from: 'gone', to: 'only', kind: 'back', traversed: 1 }],
-      },
-      [],
-      NOW,
-    )
-    expect(built).toHaveLength(1)
-    expect(built[0]?.rail.arrow).toBe(false)
-  })
-})
-
-/* -------------------------------------------------------------------- */
-/* The connectors                                                        */
-/* -------------------------------------------------------------------- */
-
-describe('the connectors between the rows', () => {
-  it('draws a ▼ under every row but the last', () => {
-    draw()
-    expect(screen.getAllByTestId('graph-connector')).toHaveLength(4)
-    expect(screen.queryByTestId('graph-into-join')).toBeNull()
-  })
-
-  it('draws a ▲ from each sub-list into the join that closes it', () => {
+  it('draws no chip on a node reached by a single path, or on a join', () => {
     draw(JOINED_GRAPH, fannedRun())
-    const arrows = screen.getAllByTestId('graph-into-join')
-    expect(arrows).toHaveLength(2)
-    expect(arrows.every((arrow) => arrow.textContent?.includes('▲'))).toBe(true)
-  })
-
-  it('draws no arrow out of a fan-out that no join closes', () => {
-    draw(FANOUT_GRAPH, fannedRun())
-    expect(screen.queryByTestId('graph-into-join')).toBeNull()
+    expect(chips('plan')).toHaveLength(0)
+    expect(chips('merge')).toHaveLength(0)
+    expect(card('plan').getAttribute('data-branches')).toBeNull()
   })
 })
 
 /* -------------------------------------------------------------------- */
-/* The glyphs and the detail column                                      */
+/* The card                                                              */
 /* -------------------------------------------------------------------- */
 
-describe('the glyphs', () => {
+describe('the card one node draws', () => {
   it('marks done, active, waiting and idle nodes', () => {
     draw()
     const glyph = (node: string) =>
-      row(node).querySelector('[data-testid="graph-glyph"]')?.textContent
+      card(node).querySelector('[data-testid="graph-glyph"]')?.textContent
     expect(glyph('prompt')).toBe('✓')
     expect(glyph('engineering')).toBe('●')
     expect(glyph('review')).toBe('·')
@@ -411,7 +418,7 @@ describe('the glyphs', () => {
 
   it('marks a join with ⋈ wherever its state is', () => {
     draw(JOINED_GRAPH, fannedRun())
-    expect(row('merge').querySelector('[data-testid="graph-glyph"]')?.textContent).toBe(
+    expect(card('merge').querySelector('[data-testid="graph-glyph"]')?.textContent).toBe(
       '⋈',
     )
   })
@@ -422,35 +429,50 @@ describe('the glyphs', () => {
       .getAllByTestId('graph-glyph')
       .filter((glyph) => glyph.className.includes('animate-ath-pulse'))
     expect(pulsing).toHaveLength(1)
-    expect(row('engineering')).toContainElement(pulsing[0] ?? null)
+    expect(card('engineering')).toContainElement(pulsing[0] ?? null)
+  })
+
+  it('carries the node and its state as data attributes', () => {
+    draw()
+    expect(card('engineering').getAttribute('data-node')).toBe('engineering')
+    expect(card('engineering').getAttribute('data-state')).toBe('in_progress')
+    expect(card('qa').getAttribute('data-state')).toBe('idle')
   })
 })
 
-describe('the detail column', () => {
+describe('the detail line', () => {
   it('shows tokens · duration for what a node has spent', () => {
     draw()
-    expect(detailOf(row('prompt'))).toBe('18,204 · 9s')
+    expect(detailOf(card('prompt'))).toBe('18,204 · 9s')
   })
 
   it('shows attempt n · elapsed while a node is in progress', () => {
     draw()
     // Attempt 2 was claimed at 09:00:00 and the clock is at 09:01:45.
-    expect(detailOf(row('engineering'))).toBe('attempt 2 · 105s')
+    expect(detailOf(card('engineering'))).toBe('attempt 2 · 105s')
   })
 
   it('shows waiting for a node parked on a request', () => {
     draw()
-    expect(detailOf(row('review'))).toBe('waiting')
+    expect(detailOf(card('review'))).toBe('waiting')
   })
 
   it('shows k of n arrived on a join with a fan-out still open', () => {
     draw(JOINED_GRAPH, fannedRun())
-    expect(detailOf(row('merge'))).toBe('1 of 2 arrived')
+    expect(detailOf(card('merge'))).toBe('1 of 2 arrived')
+  })
+
+  it('sums every attempt of a node the fan-out ran more than once', () => {
+    // The card is the node, so its line is the node's: branch 1 spent
+    // 4,000 tokens over 20 s and branch 2 spent 9,000 over 40 s. Which
+    // branch spent which is the chips' business, not this line's.
+    draw(FANOUT_GRAPH, fannedRun())
+    expect(detailOf(card('render'))).toBe('13,000 · 60s')
   })
 
   it('says nothing at all about a node the run has not reached', () => {
     draw()
-    expect(detailOf(row('qa'))).toBeNull()
+    expect(detailOf(card('qa'))).toBeNull()
   })
 
   it('names the state when a node has attempts but nothing measured', () => {
@@ -517,14 +539,36 @@ describe('the EDGES block', () => {
 })
 
 /* -------------------------------------------------------------------- */
+/* The canvas's own controls                                             */
+/* -------------------------------------------------------------------- */
+
+describe('panning and zooming', () => {
+  it('offers zoom and fit as real buttons above the breakpoint', () => {
+    draw()
+    expect(screen.getByTestId('rf__controls')).toBeInTheDocument()
+  })
+
+  it('is a fitted picture below it, with no controls to reach for', () => {
+    // 21 §Narrow layout: there is no wheel and no room for a control
+    // strip on a phone, and the EDGES block underneath carries the
+    // detail instead.
+    narrowViewport()
+    draw()
+    expect(screen.queryByTestId('rf__controls')).toBeNull()
+    expect(screen.getAllByTestId('graph-legend-row')).not.toHaveLength(0)
+    expect(cards()).not.toHaveLength(0)
+  })
+})
+
+/* -------------------------------------------------------------------- */
 /* Clicking and right-clicking                                           */
 /* -------------------------------------------------------------------- */
 
-describe('clicking a row', () => {
+describe('clicking a node', () => {
   it('jumps to the log pane filtered to that node', () => {
     const onOpenNode = vi.fn()
     draw(LINEAR_GRAPH, linearRun(), { onOpenNode })
-    fireEvent.click(row('review'))
+    fireEvent.click(card('review'))
     expect(onOpenNode).toHaveBeenCalledWith('review')
   })
 })
@@ -532,7 +576,7 @@ describe('clicking a row', () => {
 describe('the right-click menu', () => {
   it('offers rerun and move for the node it was opened on', () => {
     draw()
-    fireEvent.contextMenu(row('engineering'))
+    fireEvent.contextMenu(card('engineering'))
     const menu = screen.getByTestId('graph-menu')
     expect(menu.getAttribute('data-node')).toBe('engineering')
     expect(screen.getByTestId('graph-menu-rerun')).toBeEnabled()
@@ -544,7 +588,7 @@ describe('the right-click menu', () => {
 
   it('disables move on a join and says why', () => {
     draw(JOINED_GRAPH, fannedRun())
-    fireEvent.contextMenu(row('merge'))
+    fireEvent.contextMenu(card('merge'))
     expect(screen.getByTestId('graph-menu-move')).toBeDisabled()
     expect(screen.getByTestId('graph-menu-refusal')).toHaveTextContent(
       'a task cannot be moved into a join',
@@ -562,16 +606,27 @@ describe('the right-click menu', () => {
 
   it('closes on esc', () => {
     draw()
-    fireEvent.contextMenu(row('engineering'))
+    fireEvent.contextMenu(card('engineering'))
     expect(screen.getByTestId('graph-menu')).toBeInTheDocument()
     fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByTestId('graph-menu')).toBeNull()
+  })
+
+  it('closes on a click of the canvas behind it', () => {
+    // A click outside is the other half of 10 §Overlays' rule, and on a
+    // canvas the outside is the pane the nodes sit on.
+    const { container } = draw()
+    fireEvent.contextMenu(card('engineering'))
+    const pane = container.querySelector('.react-flow__pane')
+    expect(pane).not.toBeNull()
+    fireEvent.click(pane as Element)
     expect(screen.queryByTestId('graph-menu')).toBeNull()
   })
 
   it('posts the rerun and reports the attempt it made', async () => {
     const urls = stubFetch({ task_id: 812 })
     draw()
-    fireEvent.contextMenu(row('review'))
+    fireEvent.contextMenu(card('review'))
     fireEvent.click(screen.getByTestId('graph-menu-rerun'))
 
     await vi.waitFor(() => {
@@ -585,7 +640,7 @@ describe('the right-click menu', () => {
   it('posts the move against the focused attempt', async () => {
     const urls = stubFetch({ task_id: 813 })
     draw()
-    fireEvent.contextMenu(row('qa'))
+    fireEvent.contextMenu(card('qa'))
     fireEvent.click(screen.getByTestId('graph-menu-move'))
 
     await vi.waitFor(() => {
@@ -597,7 +652,7 @@ describe('the right-click menu', () => {
   it('says what a refused action said', async () => {
     stubFetch({ error: 'a task cannot be moved into a join', code: 'conflict' }, 409)
     draw()
-    fireEvent.contextMenu(row('qa'))
+    fireEvent.contextMenu(card('qa'))
     fireEvent.click(screen.getByTestId('graph-menu-move'))
 
     await vi.waitFor(() => {
@@ -636,5 +691,15 @@ describe('the states with no graph', () => {
     draw(LINEAR_GRAPH, linearRun(), { source: { file: undefined } })
     expect(screen.queryByTestId('graph-source')).toBeNull()
     expect(screen.getAllByTestId('graph-row')).not.toHaveLength(0)
+  })
+
+  it('draws nothing but the EDGES note for a workflow of one node', () => {
+    const solo: GraphOut = {
+      nodes: [graphNode({ name: 'only', generation: 0 })],
+      edges: [],
+    }
+    draw(solo, linearRun())
+    expect(names()).toEqual(['only'])
+    expect(screen.getByText('this workflow has one node')).toBeInTheDocument()
   })
 })

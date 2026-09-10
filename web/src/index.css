@@ -13,6 +13,14 @@
 @import "@fontsource-variable/jetbrains-mono";
 @import "./styles/theme.css";
 
+/* The graph pane's canvas (10 §Graph pane, D206). The first is
+ * @xyflow/react's own stylesheet, which the component cannot work
+ * without; the second maps its `--xy-*` variables onto the Nocturne
+ * tokens and is hand-written, unlike theme.css above it.
+ */
+@import "@xyflow/react/dist/style.css";
+@import "./styles/reactflow.css";
+
 /* Tailwind scans this project's own sources and no dependency's, so the
  * utility classes @rjsf/shadcn's templates are written with would not be
  * generated and a `form` request would draw as unstyled HTML. The theme

@@ -29,7 +29,7 @@
  */
 import { createElement, type ReactNode } from 'react'
 
-import { AgentStream, GraphRail, Requests } from '../panes/kinds'
+import { AgentStream, GraphCanvas, Requests } from '../panes/kinds'
 import type { PanelScope } from '../panes/source'
 
 /**
@@ -116,12 +116,12 @@ registerElement('ath-requests', (ctx) => ({
   node: createElement(Requests, { runId: ctx.scope.runId }),
 }))
 
-// The rail list of 10 §Graph pane. The EDGES column beside the rail is
-// part of the pane's body rather than of a section poured into the
-// host's scroller.
+// The React Flow canvas of 10 §Graph pane. The EDGES column beside the
+// canvas is part of the pane's body rather than of a section poured into
+// the host's scroller.
 registerElement('ath-run-graph', (ctx) => ({
   scrolls: true,
-  node: createElement(GraphRail, {
+  node: createElement(GraphCanvas, {
     runId: ctx.scope.runId,
     taskId: ctx.scope.taskId,
     onOpenNode: ctx.onOpenNode,

@@ -1,26 +1,30 @@
 /**
- * The graph pane: the run's shape as a vertical rail
+ * The graph pane: the run's shape as a React Flow canvas
  * (`docs/v1/10-frontend.md` §Graph pane and §Panes item 5, over `GET
  * /api/runs/{id}/graph` of `docs/v1/08-api.md` §Graph semantics, and the
  * mock's `isGraph` block in `docs/v1/design/Athanore.dc.html`).
  *
  * `WORKFLOW GRAPH · <workflow>` with the active / done / failed legend,
- * then one row per node — a glyph, the name, a detail column — with
- * `▼` connectors between them, the fan-out's branches as indented
- * sub-lists, `▲` from each sub-list into the join that closes it, and a
- * right-hand rail carrying the back edges with `◀` and a `loop` label.
- * Beside the rail: the EDGES block, the SOURCE path and `open
+ * then one card per node — a glyph, the name, a detail line, and a chip
+ * per branch of the fan-out it ran in — laid out in ranks by generation,
+ * with the graph's own arrows drawn as edges: forward and join edges
+ * down the ranks, back edges bowing out to the right with a `loop`
+ * label. Beside the canvas: the EDGES block, the SOURCE path and `open
  * definition`.
  *
- * **No graph library and no canvas** (15, D32). The mock's pipeline is a
- * list of rows and a rail drawn with 1 px spans, and 10 fixes that as
- * the v1 renderer: "React Flow is **not** used… A canvas renderer is a
- * later seam." Every position on this page comes out of the row order
- * the API already sent.
+ * **A canvas, and a graph library** (15, D206, superseding D32). The
+ * rail list this replaced drew the arrows as `▼` connectors and a
+ * right-hand rail of 1 px spans, which a pipeline with one loop-back can
+ * carry and a fan-out cannot: a list has no arrows, so a branch could be
+ * a sub-list, and on a canvas it cannot. The operator asked for the
+ * canvas and 10 §Graph pane now specifies it.
  *
- * **The shape is `./graph.ts`.** Which rows there are, which sub-list
- * each is in, which rails cross which rows and what the detail column
- * says are all decided there, without a DOM; this file paints them.
+ * **The shape is `./graph.ts`.** Where every card sits, how tall it is,
+ * which chips it draws, which handles an edge leaves and arrives on and
+ * what the detail line says are all decided there, without a DOM; this
+ * file paints them. Nothing here measures anything: every node carries
+ * an explicit `width` and `height`, which is what React Flow calls
+ * measured (D206 (4)).
  *
  * **Three requests, all of them the app's own cache entries.** The graph
  * is the generated query, so it is the entry `run.*` and `task.*`
@@ -28,12 +32,12 @@
  * reads for `node`-slot liveness — one entry, so the pane and the pane
  * cycle cannot disagree about the shape of the run. `GET /api/runs/{id}`
  * is the same shared entry the overview and the agent pane read, and it
- * is where the detail column's tokens and durations come from: the
- * graph route carries a node's *state*, and what its attempts spent is a
- * fact about the attempts. `GET /api/workflows/{name}/source` is the
- * SOURCE path, which is the only place the wire carries the file a
- * workflow is defined in — the same entry the library overlay (T066c)
- * will read, so opening it costs nothing twice.
+ * is where the detail line's tokens and durations come from: the graph
+ * route carries a node's *state*, and what its attempts spent is a fact
+ * about the attempts. `GET /api/workflows/{name}/source` is the SOURCE
+ * path, which is the only place the wire carries the file a workflow is
+ * defined in — the same entry the library overlay reads, so opening it
+ * costs nothing twice.
  *
  * **Clicking is the log, right-clicking is the two node operations.** 10
  * §Graph pane: "Clicking a node jumps to the log pane filtered to that
@@ -44,7 +48,14 @@
  * the rule rather than wonder where the item went.
  */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useEffect, useState } from 'react'
+import {
+  Controls,
+  Handle,
+  Position,
+  ReactFlow,
+  type NodeProps,
+} from '@xyflow/react'
+import { memo, useEffect, useState } from 'react'
 
 import {
   getGraphApiRunsRunIdGraphGetOptions,
@@ -57,23 +68,20 @@ import {
 import type { GraphNode } from '../../api/gen/types.gen'
 import { toneClass, tonePulses, useNow } from '../../components/RunList'
 import { actionError } from '../../lib/errors'
+import { useIsNarrow } from '../../lib/useIsNarrow'
 import { cn } from '../../lib/utils'
 import { PlaceholderCard } from './cards'
 import {
+  HANDLES,
   LEGEND_GLOSS,
-  branchLabel,
-  branchTag,
+  graphLayout,
   legendRows,
   moveRefusal,
-  railRows,
+  type GraphFlowNode,
   type LegendKind,
-  type RailRow,
 } from './graph'
 import { useRunDetail } from './run'
 import { focusedTask } from './stream'
-
-/** How far a sub-list's rows are indented from the parent, in pixels. */
-const INDENT_PX = 18
 
 /** The mock's header separator: a neutral-800 pipe between the parts. */
 function Bar() {
@@ -140,142 +148,147 @@ function LegendDot({ colour, label }: { colour: string; label: string }) {
   )
 }
 
-/** `▼` under a row, or `▲` where a sub-list arrives at its join. */
-function Connector({ into }: { into: boolean }) {
+/**
+ * The four anchor points an edge of `./graph.ts` names.
+ *
+ * All of them are 1 px, transparent and `aria-hidden`, and none is
+ * connectable: the workflow is defined in Python and drawn here, so a
+ * handle is where an arrow meets a card and nothing an operator can take
+ * hold of. The pair on the right is what a back edge leaves and arrives
+ * on, which is how a loop keeps the mock's right-hand idiom (D206 (5)).
+ */
+function Anchors() {
   return (
-    <div
-      data-testid={into ? 'graph-into-join' : 'graph-connector'}
-      className="ml-[12px] flex w-[28px] flex-col items-center"
-    >
-      <span className="block h-[16px] w-px bg-[var(--color-neutral-700)]" />
-      <span
+    <>
+      <Handle
+        type="target"
+        id={HANDLES.top}
+        position={Position.Top}
+        isConnectable={false}
         aria-hidden="true"
-        className="text-hint h-[9px] leading-[8px] text-[var(--color-neutral-500)]"
-      >
-        {into ? '▲' : '▼'}
-      </span>
-    </div>
+        className="graph-handle"
+      />
+      <Handle
+        type="source"
+        id={HANDLES.bottom}
+        position={Position.Bottom}
+        isConnectable={false}
+        aria-hidden="true"
+        className="graph-handle"
+      />
+      <Handle
+        type="source"
+        id={HANDLES.loopOut}
+        position={Position.Right}
+        isConnectable={false}
+        aria-hidden="true"
+        className="graph-handle"
+      />
+      <Handle
+        type="target"
+        id={HANDLES.loopIn}
+        position={Position.Right}
+        isConnectable={false}
+        aria-hidden="true"
+        className="graph-handle"
+      />
+    </>
   )
 }
 
 /**
- * The right-hand rail column for one row: the loop's vertical line, the
- * horizontal stub into it, the `◀` at the node it points back to and the
- * `loop` label at the middle of its span.
+ * One node's card: the glyph, the name, the detail line and the chips of
+ * the fan-out it ran in.
  *
- * Absolutely positioned inside a 58 px column, exactly as the mock draws
- * it: the rail is a set of 1 px spans rather than a path, which is why
- * it needs no canvas.
+ * The card's own `<button>` is the single tab stop and the thing `⏎`
+ * activates — React Flow's node wrapper takes no `tabIndex` of its own,
+ * because the canvas sets `nodesFocusable={false}` — and the click and
+ * the right-click are handled by the canvas's `onNodeClick` /
+ * `onNodeContextMenu`, which the button's own events bubble to.
+ *
+ * **The test ids are the rail's on purpose** (D206 (9)): `graph-row`,
+ * `graph-detail`, `data-node` and `data-state` mean exactly what they
+ * meant, and `web/e2e/support/fixtures.ts`, `run.spec.ts`, `a11y.spec.ts`
+ * and `App.test.tsx` all reach for them.
  */
-function LoopRail({ rail }: { rail: RailRow['rail'] }) {
-  return (
-    <div
-      data-testid="graph-rail"
-      data-down={rail.down}
-      data-up={rail.up}
-      data-arrow={rail.arrow}
-      className="relative min-w-0"
-    >
-      {rail.down && (
-        <span className="absolute top-1/2 right-[14px] bottom-0 block w-px bg-[var(--color-neutral-700)]" />
-      )}
-      {rail.up && (
-        <span className="absolute top-0 right-[14px] block h-1/2 w-px bg-[var(--color-neutral-700)]" />
-      )}
-      {rail.stub && (
-        <span className="absolute top-[14px] right-[14px] left-[2px] block h-px bg-[var(--color-neutral-700)]" />
-      )}
-      {rail.arrow && (
-        <span
-          aria-hidden="true"
-          className="text-hint absolute top-[7px] -left-[4px] leading-none text-[var(--color-neutral-500)]"
-        >
-          ◀
-        </span>
-      )}
-      {rail.label && (
-        <span
-          data-testid="graph-loop-label"
-          className="absolute top-[18px] right-[20px] text-[calc(9rem/12)] tracking-[0.06em] whitespace-nowrap text-[var(--color-neutral-500)]"
-        >
-          loop
-        </span>
-      )}
-    </div>
-  )
-}
-
-/** The kicker that opens a sub-list: which branch, and what opened it. */
-function BranchLabel({ branch }: { branch: NonNullable<RailRow['branch']> }) {
-  return (
-    <p
-      data-testid="graph-branch-label"
-      data-branch={branchTag(branch)}
-      className="text-hint mb-[4px] tracking-[0.1em] text-[var(--color-neutral-600)]"
-    >
-      {branchLabel(branch)}
-    </p>
-  )
-}
-
-/** One node's row: the glyph, the name and the detail column. */
-function Row({
-  row,
-  onOpen,
-  onMenu,
-}: {
-  row: RailRow
-  onOpen: (node: string) => void
-  onMenu: (node: GraphNode, x: number, y: number) => void
-}) {
-  const active = row.state === 'in_progress'
+const GraphNodeCard = memo(function GraphNodeCard({
+  data,
+}: NodeProps<GraphFlowNode>) {
+  const active = data.state === 'in_progress'
 
   return (
-    <button
-      type="button"
-      data-testid="graph-row"
-      data-node={row.node.name}
-      data-state={row.state}
-      data-depth={row.depth}
-      {...(row.branch === null ? {} : { 'data-branch': branchTag(row.branch) })}
-      onClick={() => {
-        onOpen(row.node.name)
-      }}
-      onContextMenu={(event) => {
-        event.preventDefault()
-        onMenu(row.node, event.clientX, event.clientY)
-      }}
-      className={cn(
-        'text-row flex w-full max-w-[420px] cursor-pointer items-center gap-[8px] rounded-lg border px-[10px] py-[6px] text-left text-[var(--color-neutral-300)]',
-        active
-          ? 'border-[var(--color-accent-600)] bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface))] shadow-[0_0_0_1px_color-mix(in_srgb,var(--color-accent)_30%,transparent)]'
-          : 'border-[var(--color-neutral-800)] bg-card',
-        'hover:border-[var(--color-accent-500)]',
-      )}
-    >
-      <span
-        data-testid="graph-glyph"
-        aria-hidden="true"
+    <>
+      <Anchors />
+      <button
+        type="button"
+        data-testid="graph-row"
+        data-node={data.node.name}
+        data-state={data.state}
+        {...(data.branches.length === 0
+          ? {}
+          : { 'data-branches': String(data.branches.length) })}
         className={cn(
-          'w-[14px] flex-none',
-          toneClass(row.tone),
-          tonePulses(row.tone) && 'animate-ath-pulse',
+          'text-row flex h-full w-full cursor-pointer flex-col justify-center gap-[2px] rounded-lg border px-[10px] py-[6px] text-left text-[var(--color-neutral-300)]',
+          active
+            ? 'border-[var(--color-accent-600)] bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface))] shadow-[0_0_0_1px_color-mix(in_srgb,var(--color-accent)_30%,transparent)]'
+            : 'border-[var(--color-neutral-800)] bg-card',
+          'hover:border-[var(--color-accent-500)]',
         )}
       >
-        {row.glyph}
-      </span>
-      <span className="min-w-0 flex-1 truncate">{row.node.name}</span>
-      {row.detail !== '' && (
-        <span
-          data-testid="graph-detail"
-          className="text-hint whitespace-nowrap text-[var(--color-neutral-500)]"
-        >
-          {row.detail}
+        <span className="flex items-center gap-[8px]">
+          <span
+            data-testid="graph-glyph"
+            aria-hidden="true"
+            className={cn(
+              'w-[14px] flex-none',
+              toneClass(data.tone),
+              tonePulses(data.tone) && 'animate-ath-pulse',
+            )}
+          >
+            {data.glyph}
+          </span>
+          <span className="min-w-0 flex-1 truncate">{data.node.name}</span>
         </span>
-      )}
-    </button>
+        {data.detail !== '' && (
+          <span
+            data-testid="graph-detail"
+            className="text-hint truncate pl-[22px] text-[var(--color-neutral-500)]"
+          >
+            {data.detail}
+          </span>
+        )}
+        {data.branches.length > 0 && (
+          <span className="flex flex-wrap items-center gap-[4px] pl-[22px]">
+            {data.branches.map((chip, position) => (
+              <span
+                key={`${chip.tag}/${String(position)}`}
+                data-testid="graph-branch"
+                data-branch={chip.tag}
+                data-state={chip.state}
+                title={chip.label}
+                className={cn(
+                  'text-hint rounded border border-[var(--color-neutral-800)] px-[4px] leading-[14px]',
+                  toneClass(chip.tone),
+                )}
+              >
+                {chip.short}
+              </span>
+            ))}
+          </span>
+        )}
+      </button>
+    </>
   )
-}
+})
+
+/**
+ * The one node kind the canvas draws, at module scope.
+ *
+ * React Flow re-mounts every node when the `nodeTypes` object changes
+ * identity, so building this in the render would throw the cards away on
+ * every tick of the elapsed clock.
+ */
+const NODE_TYPES = { athanore: GraphNodeCard }
 
 /** What the right-click menu is open on, and where it was opened. */
 type Menu = { node: GraphNode; x: number; y: number }
@@ -445,7 +458,7 @@ function Status({ children }: { children: string }) {
   )
 }
 
-export function GraphRail({
+export function GraphCanvas({
   runId,
   taskId,
   onOpenNode,
@@ -455,7 +468,7 @@ export function GraphRail({
   runId: string | undefined
   /** The focused attempt, from `?task=`: what `move task here` moves. */
   taskId?: number | undefined
-  /** Click a row: `?node=`, and the log pane (10 §Graph pane). */
+  /** Click a card: `?node=`, and the log pane (10 §Graph pane). */
   onOpenNode?: ((node: string) => void) | undefined
   /** `open definition`: the workflow library overlay (10 §Overlays). */
   onOpenLibrary?: (() => void) | undefined
@@ -465,12 +478,13 @@ export function GraphRail({
   const { data: graph, isError, error } = useGraph(runId)
   const { data: source } = useSource(workflow)
   const queryClient = useQueryClient()
+  const narrow = useIsNarrow()
 
   // The elapsed half of `attempt n · elapsed` is `now − started`, and the
   // finest unit it prints is a second — the same reason the run list's
   // AGE column carries a clock, and the same clock.
   const now = useNow()
-  const rows = railRows(graph, detail?.tasks, now)
+  const layout = graphLayout(graph, detail?.tasks, now)
   const legend = legendRows(graph)
 
   const [menu, setMenu] = useState<Menu | null>(null)
@@ -558,6 +572,21 @@ export function GraphRail({
         <LegendDot colour="var(--ath-status-fail)" label="failed" />
       </div>
 
+      {/* Under the bar and outside the canvas: an action's result is not
+          something an operator should have to pan back to. */}
+      {notice !== null && (
+        <p
+          data-testid="graph-notice"
+          role="status"
+          className={cn(
+            'text-hint flex-none px-[14px] pt-[8px]',
+            notice.ok ? 'text-[var(--color-accent-300)]' : 'text-status-fail',
+          )}
+        >
+          {notice.text}
+        </p>
+      )}
+
       {runId === undefined ? (
         <div className="p-[12px_14px]">
           <PlaceholderCard
@@ -581,50 +610,57 @@ export function GraphRail({
       ) : graph === undefined ? (
         <Status>loading the graph…</Status>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-wrap items-start gap-x-[26px] gap-y-[22px] overflow-x-hidden overflow-y-auto px-[14px] pt-[18px] pb-[28px]">
-          {/* 420 px of node card plus the mock's 58 px rail column: the
-              rail is drawn beside the rows and not at the far edge of
-              however wide the pane happens to be. */}
-          <div className="flex min-w-0 max-w-[478px] flex-[1_1_280px] flex-col items-stretch">
-            {rows.map((row) => (
-              <div
-                key={row.key}
-                className="grid items-stretch"
-                style={{ gridTemplateColumns: 'minmax(0, 1fr) 58px' }}
-              >
-                <div
-                  className="flex min-w-0 flex-col items-stretch"
-                  style={{ marginLeft: row.depth * INDENT_PX }}
-                >
-                  {row.first && row.branch !== null && <BranchLabel branch={row.branch} />}
-                  <Row row={row} onOpen={onOpenNode ?? (() => undefined)} onMenu={openMenu} />
-                  {(row.connector || row.intoJoin) && (
-                    <Connector into={row.intoJoin} />
-                  )}
-                </div>
-                <LoopRail rail={row.rail} />
-              </div>
-            ))}
-
-            {notice !== null && (
-              <p
-                data-testid="graph-notice"
-                role="status"
-                className={cn(
-                  'text-hint mt-[10px]',
-                  notice.ok ? 'text-[var(--color-accent-300)]' : 'text-status-fail',
-                )}
-              >
-                {notice.text}
-              </p>
-            )}
+        /* At `md` and above the canvas fills the pane and the aside
+           scrolls beside it; below it the canvas is a fitted picture of
+           fixed height with the EDGES block underneath, and the pane
+           scrolls as one (21 §Narrow layout). */
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-[14px] pb-[18px] md:flex-row md:items-stretch md:gap-x-[26px] md:overflow-hidden">
+          <div className="h-[320px] flex-none md:h-auto md:min-h-0 md:min-w-0 md:flex-1">
+            <ReactFlow<GraphFlowNode>
+              key={runId}
+              nodes={layout.nodes}
+              edges={layout.edges}
+              nodeTypes={NODE_TYPES}
+              colorMode="dark"
+              fitView
+              fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
+              minZoom={0.4}
+              maxZoom={1.6}
+              nodesDraggable={false}
+              nodesConnectable={false}
+              nodesFocusable={false}
+              edgesFocusable={false}
+              elementsSelectable={false}
+              zoomOnScroll={false}
+              zoomOnDoubleClick={false}
+              preventScrolling={false}
+              panOnDrag={!narrow}
+              zoomOnPinch={!narrow}
+              aria-label={
+                workflow === undefined ? 'workflow graph' : `workflow graph for ${workflow}`
+              }
+              onNodeClick={(_, node) => {
+                onOpenNode?.(node.id)
+              }}
+              onNodeContextMenu={(event, node) => {
+                event.preventDefault()
+                openMenu(node.data.node, event.clientX, event.clientY)
+              }}
+              onPaneClick={() => {
+                setMenu(null)
+              }}
+            >
+              {!narrow && <Controls showInteractive={false} position="bottom-left" />}
+            </ReactFlow>
           </div>
 
-          <Aside
-            legend={legend}
-            {...(source?.file === undefined ? {} : { file: source.file })}
-            onOpenLibrary={onOpenLibrary}
-          />
+          <div className="flex flex-none flex-col md:w-[300px] md:overflow-y-auto">
+            <Aside
+              legend={legend}
+              {...(source?.file === undefined ? {} : { file: source.file })}
+              onOpenLibrary={onOpenLibrary}
+            />
+          </div>
         </div>
       )}
 

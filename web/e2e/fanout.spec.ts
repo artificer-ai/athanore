@@ -24,12 +24,24 @@ test('a join with a fan-out still open reads `1 of 2 arrived`', async ({
 
   await expect(dashboard.graphDetail('release')).toHaveText('1 of 2 arrived')
 
-  // Each branch is a sub-list of its own, labelled from the branch frame
-  // its attempts carry rather than from their position (`panes/kinds/graph.ts`).
-  const branches = dashboard.page.getByTestId('graph-branch-label')
+  // The fanned node is drawn once, with a chip per branch: the wire's
+  // edges name nodes, so a second card would leave every arrow into and
+  // out of `build` ambiguous (D206 (2)). Each chip is keyed and titled
+  // from the branch frame its attempts carry rather than from their
+  // position (`panes/kinds/graph.ts`).
+  await expect(dashboard.graphRow('build')).toHaveCount(1)
+  const branches = dashboard.graphBranches('build')
   await expect(branches).toHaveCount(2)
-  await expect(branches.nth(0)).toContainText('branch 1 of 2 · alpha')
-  await expect(branches.nth(1)).toContainText('branch 2 of 2 · beta')
+  await expect(branches.nth(0)).toHaveAttribute('title', /branch 1 of 2 · alpha/)
+  await expect(branches.nth(1)).toHaveAttribute('title', /branch 2 of 2 · beta/)
+  await expect(branches.nth(0)).toHaveAttribute('data-branch', /:0$/)
+  await expect(branches.nth(1)).toHaveAttribute('data-branch', /:1$/)
+
+  // And each chip carries its own branch's state: `alpha` is through
+  // while `beta` is still at the question, which is the fact the two
+  // sub-lists of the rail proved and the chips prove on the card.
+  await expect(branches.nth(0)).toHaveAttribute('data-state', 'done')
+  await expect(branches.nth(1)).toHaveAttribute('data-state', 'waiting')
 
   // Answering the branch that stopped closes the fan-out: the join fires
   // and the column has nothing left to count.

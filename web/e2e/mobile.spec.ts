@@ -282,3 +282,37 @@ test('every overlay opens by touch, fits the viewport and closes by touch', asyn
     'close',
   )
 })
+
+test('the graph canvas is a fitted picture below the breakpoint', async ({
+  dashboard,
+}) => {
+  const page = dashboard.page
+  await dashboard.open()
+  await dashboard.submit('probe', TITLE, 'tap')
+  await dashboard.row(TITLE).tap()
+  await page.locator('[data-pane="graph"][role="radio"]').tap()
+
+  // The cards are drawn and reachable, so the pane says what the run is
+  // doing at 390 px as it does at 1440 (10 §Graph pane).
+  await expect(dashboard.graphRow('draft')).toBeVisible({ timeout: RUN_TIMEOUT })
+  await tappable(dashboard.graphRow('draft'))
+
+  // No pan, no zoom, and therefore no control strip: below the
+  // breakpoint the canvas is a picture, and the EDGES block underneath
+  // carries the detail (21 §Narrow layout, D206 (7)).
+  await expect(page.getByTestId('rf__controls')).toHaveCount(0)
+  const edges = page.getByTestId('graph-legend-row').first()
+  await expect(edges).toBeVisible()
+  const canvas = page.locator('.react-flow')
+  const canvasBox = await canvas.boundingBox()
+  const edgesBox = await edges.boundingBox()
+  expect(canvasBox, 'the canvas has no box').not.toBeNull()
+  expect(edgesBox, 'the EDGES block has no box').not.toBeNull()
+  if (canvasBox !== null && edgesBox !== null) {
+    expect(edgesBox.y, 'EDGES sits under the canvas').toBeGreaterThanOrEqual(
+      canvasBox.y + canvasBox.height,
+    )
+  }
+
+  await noHorizontalScroll(page)
+})

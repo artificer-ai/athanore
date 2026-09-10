@@ -899,13 +899,14 @@ describe('the run operations', () => {
 /* -------------------------------------------------------------------- */
 
 /**
- * 10 §Graph pane: a row "jumps to the log pane filtered to that node",
+ * 10 §Graph pane: a node "jumps to the log pane filtered to that node",
  * and `open definition` opens the library.
  *
- * Both are the graph rail's clicks and the shell's answers. The shell's
- * half is the one thing neither `GraphRail.test.tsx` nor the route can
- * assert: **which** pane index the node goes with, which is the log
- * pane of *this* selection's cycle rather than a number written down.
+ * Both are the graph canvas's clicks and the shell's answers. The
+ * shell's half is the one thing neither `GraphCanvas.test.tsx` nor the
+ * route can assert: **which** pane index the node goes with, which is
+ * the log pane of *this* selection's cycle rather than a number written
+ * down.
  */
 describe('the graph pane’s handovers', () => {
   /** A cycle whose log pane is second and whose graph pane is third. */
