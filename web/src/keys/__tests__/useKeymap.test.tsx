@@ -447,6 +447,46 @@ describe('inside an input', () => {
     nothingHappened(ran)
   })
 
+  it('suppresses them inside a plugin pane’s shadow root', () => {
+    // The bug D210 fixes: an event that crosses a shadow boundary is
+    // retargeted, so `event.target` is the host element and a `closest`
+    // from there finds no field. Typing `1` into a plugin's own input
+    // jumped to pane 1. `composedPath()` sees the field.
+    const { actions, ran } = catalogue()
+    mount(actions)
+
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = host.attachShadow({ mode: 'open' })
+    const inner = document.createElement('input')
+    root.append(inner)
+
+    for (const key of ['1', 'n', 'j', 'd']) {
+      fireEvent.keyDown(inner, { key })
+    }
+
+    nothingHappened(ran)
+    host.remove()
+  })
+
+  it('leaves the map on for a keystroke that only *passes* a custom element', () => {
+    // The path is the ancestor chain, not a blanket exemption: a plugin
+    // pane with focus on nothing typeable is still the app's keyboard.
+    const { actions, ran } = catalogue()
+    mount(actions)
+
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = host.attachShadow({ mode: 'open' })
+    const button = document.createElement('button')
+    root.append(button)
+
+    fireEvent.keyDown(button, { key: 'n' })
+
+    expect(ran).toEqual(['new-run'])
+    host.remove()
+  })
+
   it('still closes on `esc`, and still takes the chords', () => {
     const { actions, ran } = catalogue()
     mount(actions)

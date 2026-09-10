@@ -31,7 +31,9 @@
  *    and are left alone.
  * 3. Every **plain** key is suppressed while the target is an input, a
  *    textarea, a select or a contenteditable, and while an overlay owns
- *    the keyboard (`./scope.ts`).
+ *    the keyboard (`./scope.ts`). "The target" is read off
+ *    `composedPath()`, so a field inside a plugin pane's shadow root
+ *    counts like any other (D210).
  *
  * `a` and `d` are plain keys with one more condition on top: the
  * keystroke has to have come from inside a request panel, which
@@ -117,13 +119,33 @@ export type KeymapHandlers = {
 const TYPING =
   'input, textarea, select, [contenteditable=""], [contenteditable="true"], [contenteditable="plaintext-only"]'
 
-/** Whether the operator is typing, in which case the map is off. */
-export function isTyping(target: EventTarget | null): boolean {
-  if (!(target instanceof Element)) return false
-  if (target instanceof HTMLElement && target.isContentEditable) return true
-  // `closest`, so a keystroke from inside a rich-text editor's own
-  // markup counts as typing too.
-  return target.closest(TYPING) !== null
+/**
+ * Whether the operator is typing, in which case the map is off.
+ *
+ * Takes the **event**, not its target, because of the shadow DOM. An
+ * event that crosses a shadow boundary is *retargeted*: `event.target`
+ * becomes the host element, so a keystroke in an `<input>` inside a
+ * plugin's `custom` pane arrives looking like one aimed at
+ * `<athanore-cron>` — an element that matches nothing in {@link TYPING}
+ * and has no input to `closest` its way up to. Typing `1` into a field
+ * therefore jumped to pane 1 (D210).
+ *
+ * `composedPath()` is the path *before* retargeting, so the real
+ * innermost node is its first entry and the walk sees the field. The
+ * loop stops at the host of any closed root, which is all any caller can
+ * know: a plugin that closes its shadow root has opted out of the app
+ * being able to tell, and the map stays on over it.
+ */
+export function isTyping(event: Event): boolean {
+  for (const node of event.composedPath()) {
+    if (!(node instanceof Element)) continue
+    if (node instanceof HTMLElement && node.isContentEditable) return true
+    // `matches` per node rather than one `closest`: the path already
+    // *is* the ancestor chain, through every shadow boundary the event
+    // crossed, which is the part `closest` cannot walk.
+    if (node.matches(TYPING)) return true
+  }
+  return false
 }
 
 /**
@@ -220,7 +242,7 @@ export function handleKey(event: KeyboardEvent, handlers: KeymapHandlers): boole
 
   // 3. The plain keys, suppressed while typing and while an overlay has
   //    the keyboard.
-  if (isTyping(event.target) || keyboardOwned()) return false
+  if (isTyping(event) || keyboardOwned()) return false
 
   // `a` and `d` belong to the request panel the keystroke came from, and
   // to nothing else. Checked before the app's own keys so that a future
