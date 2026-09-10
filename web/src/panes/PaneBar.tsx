@@ -40,9 +40,16 @@ export function PaneBar({
 }: {
   panes: PaneModel
   /**
-   * Clear `?run=`: the back control's whole action, below the
-   * breakpoint. Absent at a width where the slot is the collapse
-   * toggle, and absent in a shell that passes no handler.
+   * Clear `?run=`: the back control's whole action, at every width.
+   *
+   * Narrow, it is 21 §Narrow layout's back arrow and the list is what
+   * you go back *to*. Wide, the list is already on screen, so it is not
+   * navigation but deselection — and it is the only pointer route to the
+   * `global` panes, which are shown when no run is selected and were
+   * otherwise unreachable once one had been (D209).
+   *
+   * Absent only when a run is not selected, or in a shell that passes no
+   * handler.
    */
   onBack?: (() => void) | undefined
 }) {
@@ -54,28 +61,31 @@ export function PaneBar({
 
   return (
     <div className="bg-chrome flex flex-none flex-wrap items-center gap-x-[10px] gap-y-[6px] border-b border-border px-[12px] py-[6px]">
-      {narrow ? (
+      {/* Back, whenever there is a selection to clear. Its own control
+          rather than a mode of the collapse toggle: wide, both are
+          useful at once — hide the list, and stop looking at this run
+          are different wishes. */}
+      {onBack !== undefined && run !== undefined && (
         <button
           type="button"
           onClick={onBack}
-          aria-label="back to runs"
-          title="back to runs"
+          aria-label={narrow ? 'back to runs' : 'clear the selected run'}
+          title={narrow ? 'back to runs' : 'clear the selected run (esc)'}
           className={`text-hint flex items-center justify-center rounded-lg border border-border px-[6px] py-px text-muted-foreground hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)] ${TOUCH}`}
         >
           ←
         </button>
-      ) : (
-        !listCollapsed && (
-          <button
-            type="button"
-            onClick={() => setListCollapsed(true)}
-            aria-label="hide run list"
-            title="hide run list (b)"
-            className="text-hint rounded-lg border border-border px-[6px] py-px text-muted-foreground hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)]"
-          >
-            ❮
-          </button>
-        )
+      )}
+      {!narrow && !listCollapsed && (
+        <button
+          type="button"
+          onClick={() => setListCollapsed(true)}
+          aria-label="hide run list"
+          title="hide run list (b)"
+          className="text-hint rounded-lg border border-border px-[6px] py-px text-muted-foreground hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)]"
+        >
+          ❮
+        </button>
       )}
 
       <button

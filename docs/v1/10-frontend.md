@@ -334,6 +334,15 @@ workflow chips, the pane bar or a request's own buttons, which
 focus instead, and `tab` is the only way attention reaches the detail
 pane (D176, D179, D204 (1)).
 
+`esc` unwinds one rung at a time, nearest outwards: an open overlay, then
+a run held by `⏎`, then the selection itself. That last rung is what
+makes the `global` panes reachable again — they are shown when no run is
+selected, and until it existed the only things that cleared `?run=` were
+the delete confirm and the narrow back control, so above the breakpoint
+selecting a run was a dead end (D209). With nothing to unwind `esc` does
+nothing, rather than rewriting the same search and spending a history
+entry per keystroke.
+
 `⏎` **focuses a run**: it picks the highlighted run up so that `↑`/`↓`
 — and `j`/`k`, which are the same binding — move it in the dispatch
 order instead of moving the selection, one swap per press, through
