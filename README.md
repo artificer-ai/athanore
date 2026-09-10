@@ -212,6 +212,7 @@ gate an agent runs:
 ./scripts/test.sh                          # the gate: ruff, pyright, import-linter,
                                            # pytest, the docs build, the SPA suites
 ./scripts/run.sh                           # serve the app on 127.0.0.1:4002
+./scripts/docs.sh                          # serve the docs on 127.0.0.1:8000
 ./scripts/dev.sh                           # a shell in the container
 ./scripts/dev.sh "uv run pytest -q -k settings"
 ```

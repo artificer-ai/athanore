@@ -703,9 +703,14 @@ question 7 and it is what proves the refactor was a move.
 - It does not touch `web/`, `web/src/styles/theme.css`, or the design
   system. The site borrows four colours and two font names from Nocturne
   through a hand-written `extra.css`; there is no second theme pipeline.
-- It does not add a compose service, a `scripts/docs.sh`, or a
-  `scripts/gate.sh`. The gate is one command (D74) and the dev stack
-  already runs `mkdocs serve` through `./scripts/dev.sh`.
+- It does not add a compose service or a `scripts/gate.sh`. The gate is
+  one command (D74) and every service uses host networking, so a served
+  site is reachable from the host with no service of its own.
+  ~~It does not add a `scripts/docs.sh`.~~ **Overridden by the operator
+  mid-task:** every other recurring job here has a wrapper, so the site
+  gets one too — `./scripts/docs.sh` serves it on `127.0.0.1:8000` and
+  `./scripts/docs.sh build` builds it, host or container, in the shape of
+  `run.sh` and `test.sh`. Everything else in this plan stands.
 - It does not change the wire contract. `tests/snapshots/openapi.json`
   and `web/src/api/gen` are byte-identical when the task is done.
 - It does not change a byte under `skills/`.

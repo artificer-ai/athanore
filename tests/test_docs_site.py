@@ -398,6 +398,30 @@ def test_the_gate_builds_the_site() -> None:
     assert "mkdocs build --strict -f docs/site/mkdocs.yml" in gate
 
 
+def test_the_site_has_a_wrapper_of_its_own() -> None:
+    """Every recurring job in `scripts/` has one, and the site is one.
+
+    `./scripts/docs.sh` serves it on `127.0.0.1:8000` and
+    `./scripts/docs.sh build` builds it, from the host or from inside the
+    container like `run.sh` and `test.sh` — which is why it sources
+    `_lib.sh` and dispatches on `in_container` rather than assuming a
+    side. `AGENTS.md` names it beside the others so it is findable.
+    """
+
+    wrapper = ROOT / "scripts" / "docs.sh"
+    assert wrapper.stat().st_mode & 0o111, "scripts/docs.sh is not executable"
+
+    text = wrapper.read_text(encoding="utf-8")
+    assert "_lib.sh" in text
+    assert "in_container" in text
+    assert "mkdocs serve" in text
+    assert "mkdocs build --strict" in text
+    assert "8000" in text
+
+    for named_in in (ROOT / "AGENTS.md", ROOT / "README.md"):
+        assert "./scripts/docs.sh" in named_in.read_text(encoding="utf-8"), named_in
+
+
 def test_every_page_is_in_the_nav_exactly_once(config: dict[str, Any]) -> None:
     """`nav.omitted_files` catches the same thing at build time.
 
