@@ -311,15 +311,26 @@ export default function App({
     openPalette: onOpenPalette,
     // `esc close`: the overlay first, because it is the nearer thing —
     // and while one is up the arrows are suppressed anyway — then a held
-    // run. With neither there is nothing to close, and a navigation that
-    // rewrote the same search would be one entry of history per
-    // keystroke.
+    // run, then the selection itself. Nearest outwards, one rung per
+    // keystroke, so `esc` never skips a step the operator can see.
+    //
+    // The last rung is what makes the `global` panes reachable again: a
+    // run stays selected until something clears `?run=`, and until now
+    // the only things that did were the delete confirm and the narrow
+    // back control — so above the breakpoint, selecting a run was a dead
+    // end and the crontab and drop-box panes could not be got back to
+    // (D209). The guard matters: a navigation that rewrote the same
+    // search would be one history entry per keystroke.
     close: () => {
       if (search.overlay !== undefined) {
         onCloseOverlay?.()
         return
       }
-      if (runFocused) blurRun()
+      if (runFocused) {
+        blurRun()
+        return
+      }
+      if (search.run !== undefined) onClearRun?.()
     },
   })
 
@@ -371,10 +382,12 @@ export default function App({
                     onOpenOverlay('library')
                   }
             }
-            // The back control of 21 §Narrow layout, in the pane bar's
-            // left slot below the breakpoint: it clears `?run=` through
-            // the same write the delete confirm uses, so "back to the
-            // list" and "nothing is selected" are one state.
+            // The back control: it clears `?run=` through the same
+            // write the delete confirm uses, so "back to the list" and
+            // "nothing is selected" are one state. Drawn at every width
+            // since D209 — below the breakpoint it is 21 §Narrow
+            // layout's back arrow, above it, it is the only pointer
+            // route to the `global` panes.
             onBack={onClearRun}
           />
         }

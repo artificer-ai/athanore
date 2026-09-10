@@ -145,6 +145,43 @@ describe('PaneBar', () => {
     expect(screen.queryByRole('button', { name: 'hide run list' })).toBeNull()
   })
 
+  describe('above the breakpoint', () => {
+    beforeEach(() => {
+      wideViewport()
+    })
+
+    it('draws back beside the collapse toggle, not instead of it', () => {
+      // Wide, both are useful at once: hide the list, and stop looking
+      // at this run, are different wishes (D209). Back is also the only
+      // pointer route to the `global` panes, which are shown when no run
+      // is selected.
+      usePrefs.setState({ listCollapsed: false })
+      render(<PaneBar panes={model()} onBack={vi.fn()} />)
+
+      expect(
+        screen.getByRole('button', { name: 'clear the selected run' }),
+      ).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'hide run list' })).toBeInTheDocument()
+    })
+
+    it('clears the selection when back is pressed', async () => {
+      const onBack = vi.fn()
+      render(<PaneBar panes={model()} onBack={onBack} />)
+
+      await userEvent.click(screen.getByRole('button', { name: 'clear the selected run' }))
+
+      expect(onBack).toHaveBeenCalledOnce()
+    })
+
+    it('draws no back control when nothing is selected', () => {
+      render(<PaneBar panes={model({ run: undefined, runId: undefined })} onBack={vi.fn()} />)
+
+      expect(
+        screen.queryByRole('button', { name: 'clear the selected run' }),
+      ).toBeNull()
+    })
+  })
+
   describe('below the breakpoint', () => {
     beforeEach(() => {
       narrowViewport()
@@ -167,9 +204,18 @@ describe('PaneBar', () => {
 
     it('draws the back control even where the list was left collapsed', () => {
       usePrefs.setState({ listCollapsed: true })
-      render(<PaneBar panes={model()} />)
+      render(<PaneBar panes={model()} onBack={vi.fn()} />)
 
       expect(screen.getByRole('button', { name: 'back to runs' })).toBeInTheDocument()
+    })
+
+    it('draws no back control in a shell that passes no handler', () => {
+      // A control that does nothing when clicked is worse than no
+      // control: the operator presses it, the selection stays, and the
+      // conclusion is that back is broken rather than absent.
+      render(<PaneBar panes={model()} />)
+
+      expect(screen.queryByRole('button', { name: 'back to runs' })).toBeNull()
     })
 
     it('keeps the arrows and the dots: they are the touch route round the cycle', async () => {

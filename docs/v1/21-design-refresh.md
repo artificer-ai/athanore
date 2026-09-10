@@ -205,6 +205,11 @@ fluid, not a second fixed design. Strips that manage their own overflow
 - **Detail**: the pane bar's left slot shows a back control (`←` with
   an accessible "back to runs" label) in place of the list-collapse
   toggle, which has no meaning without the split; it clears `?run=`.
+  The control itself is **not** narrow-only — above the breakpoint it
+  sits *beside* the collapse toggle rather than replacing it, labelled
+  "clear the selected run", because hiding the list and stopping looking
+  at a run are different wishes and the `global` panes need a pointer
+  route (D209). Only its label and its placement are this section's.
   The `◀`/`▶` pane buttons and the dots remain and are the touch route
   for cycling panes. The docked request panel and every pane render
   full-width; panes scroll vertically as they do today.
