@@ -236,16 +236,23 @@ back on the next invalidation.
 **Two columns while the pane can hold two, one when it cannot.** The
 canvas and the `EDGES` block sit side by side above 556 px of pane — the
 canvas's 320 px basis, the 26 px gutter, and the aside's 210 px — and
-below it they stack: the canvas becomes a fitted picture of fixed height
-with no pan, no zoom and no controls, the `EDGES` block goes underneath,
-and the pane scrolls as one (21 §Narrow layout). That threshold is a
-width of the **pane**, measured, not of the window: the run list, the
-splitter and the pane cycle all take width off it, so a 900 px window
-leaves this pane around 460 px and the `md` breakpoint alone gets the
-answer wrong (D206 (10)). The fit has a zoom floor of its own when
-stacked, far under the one the zoom buttons stop at: with no gesture to
-recover a clipped picture with, a graph taller than the canvas shrinks
-rather than losing its ends (D206 (7)).
+below it they stack: the canvas becomes a picture of fixed height, the
+`EDGES` block goes underneath, and the pane scrolls as one (21 §Narrow
+layout). That threshold is a width of the **pane**, measured, not of the
+window: the run list, the splitter and the pane cycle all take width off
+it, so a 900 px window leaves this pane around 460 px and the `md`
+breakpoint alone gets the answer wrong (D206 (10)).
+
+**The picture is legible or it is movable.** Stacking takes a column
+away, not the pointer: a pane too narrow for two columns on a desktop
+keeps `<Controls>`, drag-to-pan and pinch, and its fit keeps the zoom
+floor the buttons stop at, so an eight-rank graph is drawn at a size the
+operator can read and panned to the part they want. Only below the `md`
+breakpoint — a phone, where there is no wheel, no hover and no room for
+a control strip — does the canvas become a *fitted* picture, and there
+the fit is given a floor of its own far under the interaction one, so a
+graph taller than the canvas shrinks rather than losing its ends to a
+gesture nobody has (D206 (7), (11)).
 
 Clicking a node jumps to the log pane filtered to that node; right-click
 offers rerun here / move task here (move is disabled for join nodes).

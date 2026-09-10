@@ -13,11 +13,19 @@
  * scroll and no gesture that reached them.
  *
  * So this sweeps the band: at every width from the breakpoint up to a
- * comfortable desktop the whole graph is drawn inside a canvas at least
- * a card wide, and at the top of the band the aside is beside it rather
- * than under it — the fix must not make the app stack forever.
+ * comfortable desktop the graph is drawn inside a canvas at least a card
+ * wide, and at the top of the band the aside is beside it rather than
+ * under it — the fix must not make the app stack forever.
  *
- * `ladder` is eight ranks, so a clipped canvas cannot pass by accident.
+ * And the picture the canvas draws is **either legible or movable**. A
+ * canvas of the right size can still fail an operator: fitting eight
+ * ranks into a 320 px picture with no controls, no drag-pan and no
+ * pinch puts a card at 69 × 19 px, where the name and the state glyph
+ * cannot be read and nothing on screen recovers them. Zoom floor or
+ * control strip — one of the two has to be there (D206 (11)).
+ *
+ * `ladder` is eight ranks, so neither a clipped canvas nor a thumbnail
+ * can pass by accident.
  */
 import type { Locator, Page } from '@playwright/test'
 
@@ -40,6 +48,41 @@ const WIDTHS = [768, 900, 1024, 1440]
 /** Half a pixel: the canvas draws through a fractional CSS transform. */
 const SLACK = 0.5
 
+/**
+ * The zoom the pane's own `<Controls>` stop at, and the floor the fit
+ * takes wherever those controls are drawn (`GraphCanvas.tsx`'s
+ * `minZoom`). Under it the type inside a card is not type any more.
+ */
+const LEGIBLE_ZOOM = 0.4
+
+/** The scale the canvas is currently drawing its contents at. */
+async function zoomOf(page: Page): Promise<number> {
+  return await page.evaluate(() => {
+    const viewport = document.querySelector('.react-flow__viewport')
+    if (viewport === null) return 0
+    const transform = getComputedStyle(viewport).transform
+    return transform === 'none' ? 1 : new DOMMatrixReadOnly(transform).a
+  })
+}
+
+/**
+ * What the operator has: a picture big enough to read, or a picture with
+ * something to move it with. The zoom is in every answer so that a
+ * failure names the number rather than the verdict.
+ */
+async function verdict(page: Page): Promise<string> {
+  const zoom = await zoomOf(page)
+  const at = `at zoom ${zoom.toFixed(3)}`
+  if ((await page.getByTestId('rf__controls').count()) === 1) return `movable, ${at}`
+  if (zoom >= LEGIBLE_ZOOM) return `legible, ${at}`
+  return `a thumbnail ${at}, with nothing to zoom or pan it`
+}
+
+/** `stacked` or `split`, as the pane itself reports it. */
+async function layoutOf(page: Page): Promise<string | null> {
+  return await page.getByTestId('graph-frame').getAttribute('data-layout')
+}
+
 /** Which edges of `cards` fall outside `.react-flow`, named. */
 async function clipped(page: Page, cards: [string, Locator][]): Promise<string[]> {
   const canvas = await page.locator('.react-flow').boundingBox()
@@ -59,7 +102,7 @@ async function clipped(page: Page, cards: [string, Locator][]): Promise<string[]
   return out
 }
 
-test('the graph is drawn whole at every width from the breakpoint up', async ({
+test('the graph is drawn, and drawn usably, at every width from the breakpoint up', async ({
   dashboard,
 }) => {
   const page = dashboard.page
@@ -85,18 +128,29 @@ test('the graph is drawn whole at every width from the breakpoint up', async ({
       })
       .toBeGreaterThanOrEqual(CARD_WIDTH)
 
-    // And the whole graph is inside it: below the split the canvas is a
-    // fitted picture, above it the fit has the room it needs.
+    // And what it draws is worth drawing: either the type is legible or
+    // the control strip is there to make it so. Asserting only that the
+    // cards are inside the box passes a one-third-scale thumbnail.
     await expect
-      .poll(
-        async () =>
-          await clipped(page, [
-            ['the first card', first],
-            ['the last card', last],
-          ]),
-        { message: `clipped at ${String(width)} px` },
-      )
-      .toEqual([])
+      .poll(async () => await verdict(page), {
+        message: `the picture at ${String(width)} px`,
+      })
+      .toMatch(/^(movable|legible),/)
+
+    // Split, the fit has the room it needs, so the whole graph is inside
+    // the canvas with no panning at all.
+    if ((await layoutOf(page)) === 'split') {
+      await expect
+        .poll(
+          async () =>
+            await clipped(page, [
+              ['the first card', first],
+              ['the last card', last],
+            ]),
+          { message: `clipped at ${String(width)} px` },
+        )
+        .toEqual([])
+    }
 
     // The aside is always drawn, beside the canvas or under it.
     await expect(page.getByTestId('graph-legend-row').first()).toBeVisible()

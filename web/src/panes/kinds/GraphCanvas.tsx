@@ -508,6 +508,17 @@ export function GraphCanvas({
   const narrow = useIsNarrow()
   const stacked = paneWidth === null ? narrow : paneWidth < SPLIT_WIDTH
 
+  // Whether the canvas is a picture or an instrument is a different
+  // question from how many columns it has, and it is answered by the
+  // *device*. A phone has no wheel, no hover and no room for a control
+  // strip, so there the canvas is a fitted picture and the fit is given
+  // a floor low enough that nothing is ever out of reach (D206 (7)). A
+  // pane too narrow for two columns on a desktop is still a desktop:
+  // there is a pointer to drag with and room for the buttons, so it
+  // keeps them, and keeps the interaction floor with them rather than
+  // shrinking an eight-rank graph to a third scale (D206 (11)).
+  const fitted = stacked && narrow
+
   // The elapsed half of `attempt n · elapsed` is `now − started`, and the
   // finest unit it prints is a second — the same reason the run list's
   // AGE column carries a clock, and the same clock.
@@ -639,9 +650,11 @@ export function GraphCanvas({
         <Status>loading the graph…</Status>
       ) : (
         /* Wide enough for both columns, the canvas fills the pane and the
-           aside scrolls beside it; stacked, the canvas is a fitted
-           picture of fixed height with the EDGES block underneath, and
-           the pane scrolls as one (21 §Narrow layout, D206 (10)). */
+           aside scrolls beside it; stacked, it is a fixed-height picture
+           with the EDGES block underneath and the pane scrolling as one
+           (21 §Narrow layout, D206 (10)). Stacked on a phone that
+           picture is also the whole picture; stacked in a narrow pane on
+           a desktop it is the picture the controls start on. */
         <div
           ref={measure}
           data-testid="graph-frame"
@@ -662,10 +675,12 @@ export function GraphCanvas({
             <ReactFlow<GraphFlowNode>
               /* `fitView` is solved once, when the nodes are first
                  measured, and a container that changes size afterwards
-                 does not re-solve it. Both the run and the layout change
-                 what the right fit is — the two layouts do not even share
-                 a floor — so both are in the key. */
-              key={`${runId ?? ''}/${stacked ? 'stacked' : 'split'}`}
+                 does not re-solve it. The run, the number of columns and
+                 whether the fit has its own floor all change what the
+                 right fit is, so all three are in the key. */
+              key={`${runId ?? ''}/${stacked ? 'stacked' : 'split'}/${
+                fitted ? 'fitted' : 'movable'
+              }`}
               nodes={layout.nodes}
               edges={layout.edges}
               nodeTypes={NODE_TYPES}
@@ -673,15 +688,18 @@ export function GraphCanvas({
               fitView
               /* The fit gets its own floor, because `getViewportForBounds`
                  clamps the zoom it solves to `fitViewOptions.minZoom ??
-                 minZoom`. Stacked there is no pan, no pinch and no
+                 minZoom`. On a phone there is no pan, no pinch and no
                  controls, so a fit floored at the interaction floor
                  would put the top and bottom of a tall graph — eight ranks
-                 is `examples/feature_build` — out of reach for good. The
-                 picture shrinks instead (D206 (7)). */
+                 is `examples/feature_build` — out of reach for good, and
+                 the picture shrinks instead (D206 (7)). Anywhere the
+                 gestures exist the floor is the interaction floor: a
+                 clipped picture is recoverable there, and an illegible
+                 one is not (D206 (11)). */
               fitViewOptions={{
                 padding: 0.15,
                 maxZoom: 1,
-                minZoom: stacked ? 0.05 : 0.4,
+                minZoom: fitted ? 0.05 : 0.4,
               }}
               minZoom={0.4}
               maxZoom={1.6}
@@ -693,8 +711,8 @@ export function GraphCanvas({
               zoomOnScroll={false}
               zoomOnDoubleClick={false}
               preventScrolling={false}
-              panOnDrag={!stacked}
-              zoomOnPinch={!stacked}
+              panOnDrag={!fitted}
+              zoomOnPinch={!fitted}
               aria-label={
                 workflow === undefined ? 'workflow graph' : `workflow graph for ${workflow}`
               }
@@ -709,7 +727,7 @@ export function GraphCanvas({
                 setMenu(null)
               }}
             >
-              {!stacked && <Controls showInteractive={false} position="bottom-left" />}
+              {!fitted && <Controls showInteractive={false} position="bottom-left" />}
             </ReactFlow>
           </div>
 

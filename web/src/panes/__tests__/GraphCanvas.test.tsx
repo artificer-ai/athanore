@@ -649,11 +649,24 @@ describe('the layout follows the pane, not the window', () => {
     drawInPane(460)
 
     expect(layoutDrawn()).toBe('stacked')
-    // Which is the same pane the phone gets: a fitted picture, the EDGES
-    // block underneath, and nothing to pan with.
-    expect(screen.queryByTestId('rf__controls')).toBeNull()
+    // Which is the phone's column order — the canvas, then the EDGES
+    // block underneath — but not the phone's canvas: there is a pointer
+    // here, so the controls stay and the fit keeps the interaction
+    // floor rather than shrinking the graph to fit (D206 (11)).
+    expect(screen.getByTestId('rf__controls')).toBeInTheDocument()
     expect(cards()).not.toHaveLength(0)
     expect(screen.getAllByTestId('graph-legend-row')).not.toHaveLength(0)
+  })
+
+  it('drops the controls only where there is no gesture to use them', () => {
+    // The phone: stacked *and* narrow. This is the one layout whose
+    // picture has to be the whole picture, because nothing on screen
+    // can move it (D206 (7)).
+    narrowViewport()
+    drawInPane(320)
+
+    expect(layoutDrawn()).toBe('stacked')
+    expect(screen.queryByTestId('rf__controls')).toBeNull()
   })
 
   it('splits a pane with room for both, below the breakpoint', () => {
