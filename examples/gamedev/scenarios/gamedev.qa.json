@@ -1,6 +1,0 @@
-{
-  "text": ["Loaded the game in Chrome, played it, and read the error hook."],
-  "log": "qa: approve. Booted to the title screen with the controls listed (screenshot 1), started on SPACE and played 12 seconds of turns (screenshot 2), paused and resumed on P, died into the game-over screen with the score, and restarted on R. window.__errs is empty. The operator's playtest report raised nothing I could still reproduce.",
-  "submit": { "verdict": "approve", "feedback": "" },
-  "usage": { "input": 7100, "output": 420 }
-}

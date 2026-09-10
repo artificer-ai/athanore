@@ -13,10 +13,6 @@ dependencies = ["athanore"]
 [project.entry-points."athanore.workflows"]
 claude_acp = "claude_acp:wf"
 docker_acp = "docker_acp:wf"
-feature_build = "feature_build:wf"
-gamedev = "gamedev:wf"
-msgtest = "msgtest:wf"
-projects = "projects:wf"
 
 [build-system]
 requires = ["hatchling"]

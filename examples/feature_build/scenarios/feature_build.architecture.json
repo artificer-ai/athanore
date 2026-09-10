@@ -1,6 +1,0 @@
-{
-  "thoughts": ["Reading cli/report.py before planning anything."],
-  "text": ["Planned the change against the code that is actually there."],
-  "log": "architecture: cli/report.py gains a `--json` flag; the row builder is lifted out of the table renderer so both formats share it. Tests: tests/cli/test_report.py, empty and populated. No migration. Spec: docs/specs/report-list-json.md.",
-  "usage": { "input": 3600, "output": 520 }
-}

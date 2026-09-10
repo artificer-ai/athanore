@@ -1,6 +1,0 @@
-{
-  "thoughts": ["The request names one game and two things it must feel like."],
-  "text": ["Rewording the request into a game brief; not designing anything."],
-  "log": "prompt: brief — Concept: a fast arcade snake on a neon grid, one screen, keyboard only. Requested features: wrap-around walls, a speed ramp, chunky trail glow. Constraints: desktop browser, no assets. Acceptance: it boots to a title screen, plays, ends, and restarts without a reload.",
-  "usage": { "input": 1180, "output": 210 }
-}

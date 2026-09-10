@@ -1,5 +1,0 @@
-{
-  "text": ["Read the project's CLI module and planned the change against it."],
-  "log": "architecture: cli/report.py grows a `--json` flag on `list`; the row building moves out of the table renderer into `_rows()` so both formats read the same query. No migration. Tests: tests/test_report_cli.py gains the empty and populated cases.",
-  "usage": { "input": 3400, "output": 520 }
-}

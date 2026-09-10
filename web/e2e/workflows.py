@@ -44,9 +44,10 @@ Six of them, and between them they are every shape the E2E specs need:
   what T071 built is the seam between the two.
 
 They live here rather than in ``examples/`` because they are fixtures of
-this suite: ``examples/msgtest``, which 17 §T068a names, is T075's and
-does not exist yet (D178). When it lands it is one more target on the
-command line in ``support/server.ts``, not a rewrite of these.
+this suite, answerable to what a test needs rather than to what an
+example should show. `examples/` now carries the vendor adapters and
+nothing else (D212), so there is no workflow there for these to be
+replaced by.
 """
 
 from __future__ import annotations

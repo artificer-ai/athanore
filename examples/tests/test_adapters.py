@@ -22,14 +22,11 @@ from importlib.metadata import entry_points
 from pathlib import Path
 from typing import Any
 
-import claude_acp
-import docker_acp
 import pytest
 import yaml
-from claude_acp import ClaudeAgent, ImplementerAgent
-from docker_acp import DockerAgent
 
-import projects
+import claude_acp
+import docker_acp
 from athanore import NonRetryable
 from athanore.agents.acp import ACPAgent
 from athanore.engine.context import TaskContext, bind
@@ -39,6 +36,8 @@ from athanore.plugins.discovery import discover
 from athanore.settings import AthanoreSettings
 from athanore.store.rows import LogAuthor, LogKind
 from athanore.store.uow import Store
+from claude_acp import ClaudeAgent, ImplementerAgent
+from docker_acp import DockerAgent
 from pi import PiAgent, PiSessionStats
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -139,23 +138,22 @@ def test_the_claude_adapter_is_pinned() -> None:
     assert re.fullmatch(r"\d+\.\d+\.\d+", claude_acp.CLAUDE_ACP_VERSION)
 
 
-def test_the_pinned_adapter_is_the_sandboxs_and_the_one_projects_runs() -> None:
-    """One pin, in three places, or two of them are stale.
+def test_the_pinned_adapter_is_the_sandboxs() -> None:
+    """One pin, in two places, or one of them is stale.
 
-    `compose.yaml` builds the adapter into the dev image, `projects` runs
-    its seats on it, and this example checks it. The version literal is
-    written in each of the three because none of them can import the
-    others — an example must not depend on the dev stack, and a workflow
-    must not depend on another workflow for its vendor pin — so what
-    keeps them equal is this assertion.
+    `compose.yaml` builds the adapter into the dev image and this example
+    names the version it expects. The literal is written in both because
+    neither can import the other — an example must not depend on the dev
+    stack — so what keeps them equal is this assertion.
+
+    It was three places until `projects` was removed (D212); the third
+    was a workflow that ran its seats on the same pin.
     """
 
     raw = (ROOT / "compose.yaml").read_text(encoding="utf-8")
     found = re.search(r"CLAUDE_ACP_VERSION:\s*\$\{CLAUDE_ACP_VERSION:-([\d.]+)\}", raw)
     assert found is not None, "compose.yaml no longer pins CLAUDE_ACP_VERSION"
     assert found.group(1) == claude_acp.CLAUDE_ACP_VERSION
-    assert projects.CLAUDE_ACP_VERSION == claude_acp.CLAUDE_ACP_VERSION
-    assert projects.CLAUDE == ClaudeAgent.command
 
 
 def test_the_claude_seat_reports_no_stats_it_cannot_read() -> None:

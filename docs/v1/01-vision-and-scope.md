@@ -137,11 +137,19 @@ specifies it.
 | Operator UI: runs list with status/node/attention marker; run overview, work log, live agent stream, graph diagram with node states; new run; edit run; append log; task pickers (retry/move/cancel); reorder; pause/resume; requests panel with per-option buttons, text box, form; auto-focus on new request; server-down state | 10 |
 | Serve the UI from the server process | 02, 10 |
 
-### Example workflows (user-land, kept as examples)
+### Example adapters (user-land, kept as examples)
 
-`feature_build`, `gamedev`, `msgtest`, `claude_acp`, `docker_acp`,
-`projects`. They are ported to the v1 API in the migration (14) and remain
-the integration test bed.
+`claude_acp`, `docker_acp` and the `pi` package. They are the vendor half
+of 02 §Small core — nothing in `athanore/` may know about pi, Claude or
+Docker, so the adapters that do live here — and they remain the
+integration test bed (`examples/tests`).
+
+`feature_build`, `gamedev`, `msgtest` and `projects` were ported in the
+migration and have since been removed (D212). They were showcases rather
+than adapters: nothing in `athanore/` depended on them, and the shape they
+demonstrated is better shown by `workflows/feature`, which is a real
+seat rather than a sketch of one. `examples/` is read on GitHub as
+documentation; `athanore-examples` is not published.
 
 ## What v1 adds
 

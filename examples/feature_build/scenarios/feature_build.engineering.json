@@ -1,5 +1,0 @@
-{
-  "text": ["Implemented the plan and ran the test command."],
-  "log": "engineering: cli/report.py — lifted `_rows()` out of the renderer and added `--json`. tests/cli/test_report.py — two cases, empty and populated. `make test` green. Ran `report list --json` and read the output: one array, exit 0.",
-  "usage": { "input": 4800, "output": 900 }
-}
