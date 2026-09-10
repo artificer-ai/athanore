@@ -24,6 +24,57 @@ function size(n) {
   return `${(n / 1024 / 1024).toFixed(1)} MB`
 }
 
+/** A clipboard icon and a tick, as inline SVG inheriting `currentColor`. */
+const COPY_ICON =
+  '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" ' +
+  'stroke="currentColor" stroke-width="1.5" aria-hidden="true">' +
+  '<rect x="5.5" y="5.5" width="9" height="9" rx="1.5"/>' +
+  '<path d="M10.5 3.5v-1a1 1 0 0 0-1-1h-7a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h1"/></svg>'
+const DONE_ICON =
+  '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" ' +
+  'stroke="currentColor" stroke-width="1.8" aria-hidden="true">' +
+  '<path d="M3 8.5l3.5 3.5L13 5"/></svg>'
+
+/**
+ * Put `text` on the clipboard, and say whether it landed.
+ *
+ * `navigator.clipboard` exists only in a **secure context** — HTTPS, or
+ * localhost. This pane's whole reason for existing is being reached from
+ * a phone at `http://<lan-ip>:4002`, which is neither, so on the device
+ * that needs it most the modern API is simply `undefined`.
+ *
+ * The fallback is the deprecated `document.execCommand('copy')`, which
+ * still works over plain HTTP everywhere that matters. The textarea goes
+ * in the *document*, not the shadow root: the selection APIs the command
+ * reads operate on the document's selection, and a node inside a closed
+ * subtree is not reliably part of it.
+ */
+async function copyText(text) {
+  try {
+    if (window.isSecureContext && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+  } catch {
+    // fall through — a permissions refusal is not worth a message of its
+    // own when there is a second way to try.
+  }
+  const area = document.createElement('textarea')
+  area.value = text
+  area.setAttribute('readonly', '')
+  area.style.cssText = 'position:fixed;top:-1000px;opacity:0'
+  document.body.append(area)
+  area.select()
+  let ok = false
+  try {
+    ok = document.execCommand('copy')
+  } catch {
+    ok = false
+  }
+  area.remove()
+  return ok
+}
+
 class AthanoreFiles extends HTMLElement {
   connectedCallback() {
     this.attachShadow({ mode: 'open' })
@@ -47,6 +98,9 @@ class AthanoreFiles extends HTMLElement {
         button { font: inherit; color: var(--ath-accent); background: none;
                  border: none; cursor: pointer; padding: 0; }
         button.link { text-align: left; text-decoration: underline; }
+        button.icon { display: inline-flex; align-items: center;
+                      color: var(--ath-muted); }
+        button.icon:hover { color: var(--ath-accent); }
         a { color: var(--ath-accent); }
         ul { list-style: none; margin: 12px 0 0; padding: 0; }
       </style>
@@ -178,10 +232,27 @@ class AthanoreFiles extends HTMLElement {
       when.className = 'muted'
       when.textContent = `${size(entry.bytes)} · ` +
         new Date(entry.modified * 1000).toLocaleString()
+      const copy = document.createElement('button')
+      copy.className = 'icon'
+      copy.innerHTML = COPY_ICON
+      copy.title = `copy ${entry.path}`
+      copy.setAttribute('aria-label', `copy the path of ${entry.name}`)
+      copy.addEventListener('click', async () => {
+        const ok = await copyText(entry.path)
+        if (!ok) {
+          this.fail(`could not reach the clipboard — the path is ${entry.path}`)
+          return
+        }
+        // The tick is the only feedback: a toast for a copy is noise, and
+        // the operator is already looking at the thing they clicked.
+        copy.innerHTML = DONE_ICON
+        setTimeout(() => { copy.innerHTML = COPY_ICON }, 1200)
+        this.fail('')
+      })
       const del = document.createElement('button')
       del.textContent = 'delete'
       del.addEventListener('click', () => this.remove(entry.name))
-      li.append(a, when, del)
+      li.append(a, when, copy, del)
       list.append(li)
     }
   }
