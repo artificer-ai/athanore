@@ -212,7 +212,7 @@ name is told the same thing as the first — and none of them is in
 | Lint / types | ruff, pyright (strict on `graph`, `engine`, `store`), import-linter; oxlint for the SPA, the linter its own scaffold ships (D77) | |
 | Python | 3.11+; 3.13 in the dev stack and the CI default | `StrEnum` (events, error codes) and `asyncio.timeout` (the three nested timeouts of D60) are the floor; every runtime dependency already supports 3.11 (D66) |
 | Packaging | uv, hatchling; `athanore[postgres]` extra | |
-| Frontend | Vite, React 19, TypeScript strict, TanStack Router + Query, Tailwind v4, shadcn/ui, react-hook-form + zod, `@rjsf/core` + `@rjsf/shadcn` (JSON-Schema forms), cmdk, Phosphor icons, `@fontsource-variable/jetbrains-mono`, react-markdown + shiki (lazy), @tanstack/react-virtual, react-resizable-panels, `@hey-api/openapi-ts` (client + TanStack Query options), Vitest + Testing Library + Playwright | See 10; the design mock's single-page dashboard |
+| Frontend | Vite, React 19, TypeScript strict, TanStack Router + Query, Tailwind v4, shadcn/ui, react-hook-form + zod, `@rjsf/core` + `@rjsf/shadcn` (JSON-Schema forms), cmdk, Phosphor icons, `@fontsource-variable/jetbrains-mono`, react-markdown + shiki (lazy), @tanstack/react-virtual, react-resizable-panels, `@xyflow/react` (React Flow, the graph pane's canvas), `@hey-api/openapi-ts` (client + TanStack Query options), Vitest + Testing Library + Playwright | See 10; the design mock's single-page dashboard |
 
 Nothing in the core depends on pi, Claude, or Docker. Those live in
 `examples/` (memory: vendor adapters are user-land).

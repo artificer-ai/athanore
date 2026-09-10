@@ -631,7 +631,8 @@ def graph_view(
     attempts, the edge crossings counted off the event log, and the
     fan-outs that have not completed. Nodes come out in generation
     order and, within a generation, in the order the workflow declared
-    them — the order the SPA's rail list draws (10 §Graph pane).
+    them — the order the SPA's canvas ranks and spreads a rank in
+    (10 §Graph pane).
     """
 
     by_node: dict[str, list[rows.TaskRow]] = {name: [] for name in graph.nodes}

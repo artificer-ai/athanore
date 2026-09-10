@@ -12,6 +12,13 @@
  * list, which draws a two-line row *instead of* a grid row
  * (`components/RunList/RunList.tsx`). D201 (2).
  *
+ * It is not the question a *pane* should ask about its own contents:
+ * what a pane gets is the viewport minus the run list, minus the
+ * splitter, divided by the pane cycle, and the graph canvas measures
+ * that instead (`lib/useElementWidth.ts`, D206 (10)). This is still its
+ * fallback for the frame before the first measurement, because at both
+ * ends of the range the window and the pane agree.
+ *
  * The query is written once, here, so the breakpoint the CSS uses and
  * the breakpoint JavaScript uses cannot drift apart. It is expressed as
  * `min-width` — the same direction Tailwind's `md` is — and negated, so

@@ -1,0 +1,71 @@
+/* React Flow, in Nocturne (10 §Graph pane, D206 (1) and (8)).
+ *
+ * Unlike its neighbour theme.css, which is generated from
+ * docs/v1/design/nocturne.css by `pnpm gen:theme`, this file is
+ * hand-written. It does one thing: map the `--xy-*` variables
+ * @xyflow/react's own stylesheet reads onto the Nocturne tokens, scoped
+ * to `.react-flow`, so nothing the graph pane draws is a hex and nothing
+ * here needs `!important`.
+ *
+ * One rule is a fix rather than a mapping. The library hard-codes `#999`
+ * on a translucent grey for the attribution link, which composites to
+ * roughly 3.2:1 on Nocturne's background — a serious contrast violation
+ * on a page `web/e2e/a11y.spec.ts` runs axe over (D178). The attribution
+ * stays: `proOptions.hideAttribution` is the subscriber's switch and
+ * this project is not one. It is restyled to a token instead.
+ */
+
+.react-flow {
+  /* The pane's own surface is the background. The library's dark theme
+   * paints #141414 here, which would be a second surface colour inside
+   * a pane that already has one. */
+  --xy-background-color: transparent;
+
+  --xy-edge-stroke: var(--color-neutral-700);
+  --xy-edge-stroke-selected: var(--color-neutral-700);
+  --xy-edge-stroke-width: 1;
+  --xy-edge-label-color: var(--color-neutral-400);
+  --xy-edge-label-background-color: var(--color-bg);
+
+  --xy-controls-button-background-color: var(--color-surface);
+  --xy-controls-button-background-color-hover: var(--color-neutral-900);
+  --xy-controls-button-color: var(--color-neutral-300);
+  --xy-controls-button-color-hover: var(--color-accent-200);
+  --xy-controls-button-border-color: var(--color-neutral-800);
+  --xy-controls-box-shadow: var(--shadow-sm);
+
+  --xy-attribution-background-color: transparent;
+}
+
+.react-flow__attribution a {
+  color: var(--color-neutral-400);
+}
+
+/* The library pins two sizes in absolute pixels — the attribution and
+ * the edge labels — which would stay put at every step of the text-size
+ * chooser and be the mixed-scale text D195 forbids. Both are written in
+ * the type ramp's own form instead: the same pixels at the default base
+ * and a fraction of it everywhere else (10 §Type and density). */
+.react-flow__attribution,
+.react-flow__edge-text {
+  font-size: calc(10rem / 12);
+}
+
+/* An arrow this run never took (`traversed == 0`) is dashed and a step
+ * back in the neutral ramp: the geometry says which kind of arrow it is,
+ * the weight says whether this run took it (D206 (5)). */
+.react-flow__edge.graph-edge-untaken .react-flow__edge-path {
+  stroke: var(--color-neutral-800);
+  stroke-dasharray: 4 3;
+}
+
+/* The graph is not editable, so a handle is an anchor point and not
+ * something an operator should see or reach for. */
+.react-flow__handle.graph-handle {
+  width: 1px;
+  min-width: 1px;
+  height: 1px;
+  min-height: 1px;
+  border: 0;
+  background: transparent;
+}

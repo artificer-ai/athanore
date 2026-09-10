@@ -112,7 +112,7 @@ information the door hands out.
   an inner fan-out under an outer one produces one entry per leaf, each
   naming the inner fan-out.
 - `edges` are the finalized graph's edges; `kind` is `back` when the target's
-  generation is ≤ the source's (a loop-back, drawn as a rail), `join` when
+  generation is ≤ the source's (a loop-back, which 10 §Graph pane draws bowing out to the right), `join` when
   the target is a join node, else `forward`. The three tests are applied
   in that order, so an arrow that goes back *into* a join node is `back`:
   it is a loop however its target is declared, and the crossing is

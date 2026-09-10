@@ -1,10 +1,12 @@
 """The graph pane: this run's history projected onto its workflow's shape.
 
 09 §Builtins are plugins: "run panel `custom` ``<ath-run-graph>`` (the
-rail-list renderer, shipped in the SPA bundle, not as a plugin asset)".
-10 §Graph pane fixes what it draws — one row per node, forward edges as
-connectors, back edges as a right-hand rail, fan-out branches as indented
-sub-lists, and a join drawn back at the parent indent.
+React Flow canvas of 10 §Graph pane, shipped in the SPA bundle, not as a
+plugin asset)". 10 §Graph pane fixes what it draws — one card per node
+and never more than one, ranked by the response's own ``generation``,
+forward and join edges running down the ranks, a back edge bowing out to
+the right with a ``loop`` label, and a fan-out's branches as chips inside
+the node it fanned (D206).
 
 One panel. The element reads ``GET /api/runs/{id}/graph`` (08 §Graph
 semantics), which is where a node's ``state``, its ``live`` flag and a

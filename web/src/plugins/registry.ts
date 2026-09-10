@@ -29,7 +29,7 @@
  */
 import { createElement, type ReactNode } from 'react'
 
-import { AgentStream, GraphRail, Requests } from '../panes/kinds'
+import { AgentStream, GraphCanvas, Requests } from '../panes/kinds'
 import type { PanelScope } from '../panes/source'
 
 /**
@@ -47,7 +47,7 @@ export type ElementContent = { node: ReactNode; scrolls: boolean }
 
 /**
  * What an element is drawn for: the scope its attributes come from, and
- * the two navigations the graph rail performs.
+ * the two navigations the graph canvas performs.
  *
  * A subset of `panes/content.tsx`'s `RenderContext` rather than the
  * whole of it, because a renderer is handed what an element can use —
@@ -70,7 +70,7 @@ export type ElementRenderer = (ctx: ElementContext) => ElementContent
  * The table itself, keyed by tag and not by workflow.
  *
  * A tag is a name for a renderer, so a plugin declaring `ath-run-graph`
- * means the graph rail: 09 gives the element vocabulary no namespace,
+ * means the graph canvas: 09 gives the element vocabulary no namespace,
  * and a second table per workflow would make one tag two things.
  */
 const RENDERERS = new Map<string, ElementRenderer>()
@@ -116,12 +116,12 @@ registerElement('ath-requests', (ctx) => ({
   node: createElement(Requests, { runId: ctx.scope.runId }),
 }))
 
-// The rail list of 10 §Graph pane. The EDGES column beside the rail is
-// part of the pane's body rather than of a section poured into the
-// host's scroller.
+// The React Flow canvas of 10 §Graph pane. The EDGES column beside the
+// canvas is part of the pane's body rather than of a section poured into
+// the host's scroller.
 registerElement('ath-run-graph', (ctx) => ({
   scrolls: true,
-  node: createElement(GraphRail, {
+  node: createElement(GraphCanvas, {
     runId: ctx.scope.runId,
     taskId: ctx.scope.taskId,
     onOpenNode: ctx.onOpenNode,

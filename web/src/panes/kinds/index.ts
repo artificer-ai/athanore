@@ -3,7 +3,7 @@ export { AgentStream } from './AgentStream'
 export { ChartPane } from './ChartPane'
 export { DashboardPane } from './DashboardPane'
 export { FormPane } from './Form'
-export { GraphRail } from './GraphRail'
+export { GraphCanvas } from './GraphCanvas'
 export { KvPane } from './KvPane'
 export { Log } from './Log'
 export { LogPane } from './LogPane'
@@ -25,21 +25,31 @@ export {
 } from './format'
 export {
   BRANCH_KEY_CHARS,
+  BRANCH_ROW,
+  COLUMN_GAP,
   GLYPHS,
+  HANDLES,
   LEGEND_GLOSS,
+  NODE_HEIGHT,
+  NODE_WIDTH,
+  RANK_GAP,
+  UNTAKEN_CLASS,
   branchLabel,
   branchState,
   branchTag,
+  graphLayout,
   legendRows,
   moveRefusal,
   nodeDetail,
   nodeGlyph,
-  railRows,
+  type BranchChip,
   type BranchKey,
+  type EdgeMeta,
+  type GraphFlowEdge,
+  type GraphFlowNode,
   type LegendKind,
   type LegendRow,
-  type Rail,
-  type RailRow,
+  type NodeCard,
 } from './graph'
 export {
   LOG_TONES,

@@ -31,7 +31,13 @@ export const RUN_TIMEOUT = 30_000
 export const NARROW_VIEWPORT = { width: 390, height: 844 }
 
 /** The workflows `support/server.ts` registers (`../workflows.py`). */
-export type FixtureWorkflow = 'probe' | 'spread' | 'hold' | 'flop' | 'plugged'
+export type FixtureWorkflow =
+  | 'probe'
+  | 'spread'
+  | 'hold'
+  | 'flop'
+  | 'ladder'
+  | 'plugged'
 
 /**
  * How a control is activated: with a mouse, or with a finger.
@@ -169,14 +175,25 @@ export class Dashboard {
     )
   }
 
-  /** One row of the graph rail. */
+  /** One node's card on the graph canvas. */
   graphRow(node: string): Locator {
     return this.page.locator(`[data-testid="graph-row"][data-node="${node}"]`)
   }
 
-  /** What a graph row says in its right-hand column (10 §Graph pane). */
+  /** What a node's card says on its detail line (10 §Graph pane). */
   graphDetail(node: string): Locator {
     return this.graphRow(node).getByTestId('graph-detail')
+  }
+
+  /**
+   * The branch chips inside one node's card: one per branch of the
+   * fan-out it ran in (10 §Graph pane, D206 (2)).
+   *
+   * A fan-out never draws a second card — the wire's edges name nodes —
+   * so this is where a run's branches are visible on the canvas.
+   */
+  graphBranches(node: string): Locator {
+    return this.graphRow(node).getByTestId('graph-branch')
   }
 
   // -- the overlays ----------------------------------------------------

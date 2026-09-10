@@ -22,14 +22,16 @@ Nocturne tokens in [`design/nocturne.css`](design/nocturne.css).
 | Forms | react-hook-form + zod for the app's own forms (new run, edit, token); `@rjsf/core` + `@rjsf/shadcn` for anything driven by a JSON Schema at runtime (plugin actions, `form` requests, elicitations) | pydantic schemas on both sides; RJSF already handles nested objects, arrays, enums, and error mapping, which a hand-written schema walker would re-implement badly |
 | Markdown | react-markdown + remark-gfm + shiki | Work-log entries and agent output |
 | Long lists | `@tanstack/react-virtual` | Transcripts, event log |
+| Graph | React Flow (`@xyflow/react`) | The graph pane's canvas. Every node carries an explicit `width`/`height` and a position computed from the `generation` the graph route already sends, so there is no measurement pass and no layout engine (D206) |
 | Command palette | cmdk | The `^p` palette in the mock |
 | Icons | Phosphor (`@phosphor-icons/react`), configured as shadcn's `iconLibrary` | Nocturne's icon set; the mock uses glyphs throughout and every one of them was kept, so the built SPA imports no icon from it (D179) |
 | Fonts | `@fontsource-variable/jetbrains-mono`, bundled | The mock's one face; no request ever leaves the machine (12 §No telemetry) and `font-src 'self'` holds |
 | Tests | Vitest + Testing Library; Playwright against a real server with `FakeACPAgent` | 13 |
 
-React Flow is **not** used: the mock's graph is a vertical rail list,
-which is simpler and reads better for pipelines with loop-backs (see
-§Graph pane). A canvas renderer is a later seam.
+The graph pane **is** a React Flow canvas (`@xyflow/react`), laid out
+from the `generation` the graph route sends rather than by Dagre or ELK
+(see §Graph pane). It replaces the mock's vertical rail list, which is
+D32 — superseded by D206.
 
 ## Build
 
@@ -191,26 +193,69 @@ the pane host reads the manifest and has no list of its own.
 
 ### Graph pane
 
-The mock draws the pipeline as a **vertical rail list**: one row per
-node (`✓` done in status-ok, `●` active in accent with pulse, `✗`
-failed, `·` idle), a detail column (tokens · duration, or `attempt n ·
-elapsed`, or `waiting`), a `▼` connector between rows, and a right-hand
-rail that draws loop-backs (`review → engineering`, `qa → engineering`)
-as a vertical line with a `◀` arrow and a `loop` label. Beside it: an
-`EDGES` legend (edge / loop / gate with plain-language descriptions), the
-`SOURCE` path, and an `open definition` button that opens the library
-on that workflow.
+The pane is a **React Flow canvas**, drawn from `GET
+/api/runs/{id}/graph`. Beside it: an `EDGES` legend (edge / loop / join /
+gate with plain-language descriptions), the `SOURCE` path, and an `open
+definition` button that opens the library on that workflow.
 
-v1 renders exactly this from `GET /api/runs/{id}/graph`: nodes in
-generation order, forward edges as connectors, back edges as rails, and
-**fan-out branches as indented sub-lists** under the node that fanned
-out (an extension the mock does not show; the sample workflow is
-linear). A join node closes the sub-lists: it is drawn back at the
-parent indent with a `⋈` glyph, the sub-lists' last rows connect into it
-with `▲`, and its detail column reads `2 of 3 arrived` while the fan-out
-is open, from `arrivals` (08 §Graph semantics). Clicking a node jumps to
-the log pane filtered to that node; right-click offers rerun here / move
-task here (move is disabled for join nodes).
+**One card per node**, and never more than one: a glyph (`✓` done in
+status-ok, `●` active in accent with pulse, `✗` failed, `·` idle, `⋈` on
+a join in every state), the node's name, and a detail line (tokens ·
+duration, or `attempt n · elapsed`, or `waiting`, or `2 of 3 arrived` on
+a join while the fan-out is open, from `arrivals` — 08 §Graph
+semantics). The card carries a fixed size in pixels; what the type ramp
+scales is the type inside it (D195).
+
+**A fan-out draws branch chips inside the node it fanned**, one per
+branch, each carrying that branch's own state and titled `branch 2 of 3
+· beta · from task 26`. It does not draw the node twice: the wire's
+edges name nodes, so a second card would leave every arrow into and out
+of it ambiguous (D206 (2)). A join takes no chips — it is where the
+branches stop being separate — and is marked with `⋈`.
+
+**The layout is the response's own order.** A node's rank is its
+`generation`'s index among the generations present, and the nodes of one
+rank spread left to right in the declaration order the route sent them,
+centred on the rank. There is no Dagre and no ELK, and crossings are not
+minimised (D206 (3)).
+
+**The edges are the graph's own arrows.** Forward and `join` edges run
+down the ranks, bottom to top. A back edge leaves and arrives on the
+node's right-hand side, bowing out, and is the only kind that carries a
+`loop` label — the mock's right-hand rail idiom, without a colour to
+read. An arrow this run never took is dashed; one it took more than once
+is labelled `×n`.
+
+**Fit on load, zoom by button, pan by drag.** The canvas fits its
+contents when the run is opened and refits when the selection changes;
+`<Controls>` carries zoom in / out / fit as real buttons, dragging pans,
+and the wheel belongs to the pane. Nodes are not draggable: their
+positions are derived from the response, so a dragged node would snap
+back on the next invalidation.
+
+**Two columns while the pane can hold two, one when it cannot.** The
+canvas and the `EDGES` block sit side by side above 556 px of pane — the
+canvas's 320 px basis, the 26 px gutter, and the aside's 210 px — and
+below it they stack: the canvas becomes a picture of fixed height, the
+`EDGES` block goes underneath, and the pane scrolls as one (21 §Narrow
+layout). That threshold is a width of the **pane**, measured, not of the
+window: the run list, the splitter and the pane cycle all take width off
+it, so a 900 px window leaves this pane around 460 px and the `md`
+breakpoint alone gets the answer wrong (D206 (10)).
+
+**The picture is legible or it is movable.** Stacking takes a column
+away, not the pointer: a pane too narrow for two columns on a desktop
+keeps `<Controls>`, drag-to-pan and pinch, and its fit keeps the zoom
+floor the buttons stop at, so an eight-rank graph is drawn at a size the
+operator can read and panned to the part they want. Only below the `md`
+breakpoint — a phone, where there is no wheel, no hover and no room for
+a control strip — does the canvas become a *fitted* picture, and there
+the fit is given a floor of its own far under the interaction one, so a
+graph taller than the canvas shrinks rather than losing its ends to a
+gesture nobody has (D206 (7), (11)).
+
+Clicking a node jumps to the log pane filtered to that node; right-click
+offers rerun here / move task here (move is disabled for join nodes).
 
 ## Overlays
 
@@ -467,11 +512,15 @@ Source: `design/nocturne.css` (tokens) and `design/Athanore.dc.html`
   `text-hint` `calc(10rem / 12)` — so the pixel sizes above are what they
   resolve to at the default base and the whole ramp moves together when
   it changes. A size the ramp has no rung for (the status pill's and the
-  chips' 10.5 px, the graph rail's 9 px `loop` label) is written at the
-  call site in the same form — `text-[calc(10.5rem/12)]` — and never in
-  absolute pixels: an absolute size is invisible at the default base and
-  is the mixed-scale text 21 §Type scale forbids at every other step.
-  `web/src/styles/ramp.test.ts` sweeps `src/` for one.
+  chips' 10.5 px) is written at the call site in the same form —
+  `text-[calc(10.5rem/12)]` — and never in absolute pixels: an absolute
+  size is invisible at the default base and is the mixed-scale text 21
+  §Type scale forbids at every other step.
+  `web/src/styles/ramp.test.ts` sweeps `src/` for one. A dependency's
+  stylesheet is past the sweep's reach, so the two absolute sizes React
+  Flow ships — the attribution and the edge labels, both 10 px — are
+  rewritten in the same form by `web/src/styles/reactflow.css` (D206
+  (8)).
 - **The base is the operator's**, chosen from the header's text-size
   control: four steps as multipliers of `--ath-font-size` — `small`
   ×11/12, `default` ×1, `large` ×13.5/12, `xlarge` ×15/12 — applied as

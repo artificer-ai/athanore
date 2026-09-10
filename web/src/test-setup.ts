@@ -21,6 +21,34 @@ class NoLayoutResizeObserver implements ResizeObserver {
 globalThis.ResizeObserver ??= NoLayoutResizeObserver
 
 /**
+ * jsdom computes no transform, and React Flow reads the canvas
+ * viewport's through a `DOMMatrixReadOnly` when it updates a node's
+ * internals (`panes/kinds/GraphCanvas.tsx`) — without this, drawing the
+ * graph pane throws.
+ *
+ * It parses nothing and reports the identity scale, which is the truth
+ * of the environment: with no computed transform there is no zoom, so
+ * `m22` is 1.
+ */
+class IdentityMatrix {
+  readonly m22 = 1
+}
+
+globalThis.DOMMatrixReadOnly ??= IdentityMatrix as unknown as typeof DOMMatrixReadOnly
+
+/**
+ * jsdom implements no `SVGElement.getBBox`, and React Flow's edge labels
+ * measure themselves with one to centre their background
+ * (`panes/kinds/GraphCanvas.tsx`).
+ *
+ * It reports a zero box, which is the truth of an engine that performs
+ * no layout. The label is still in the DOM, which is what a test asserts
+ * on; the `loop` on a back edge is text, not a measurement.
+ */
+const svgLayout = SVGElement.prototype as unknown as { getBBox?: () => DOMRect }
+svgLayout.getBBox ??= () => new DOMRect(0, 0, 0, 0)
+
+/**
  * jsdom implements no `EventSource`, and `Providers` opens one for the
  * event feed on mount (`src/realtime/sse.ts`) — without this, rendering
  * anything inside the providers throws.
