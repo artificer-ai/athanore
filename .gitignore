@@ -25,6 +25,14 @@ coverage.xml
 # driver's `prepare` refuses to branch from (AGENTS.md).
 /output/
 
+# Local agent state. `.claude/settings.local.json` is Claude Code's
+# machine-local permission list — the `.local` half of its settings pair,
+# which is per-checkout and per-operator and not this repository's
+# configuration. Ignored for the same reason `.env` and `.athanore/` are:
+# an untracked file is a dirty checkout, which `feature`'s `prepare`
+# refuses to branch from (AGENTS.md).
+/.claude/
+
 # Local server state. `operator_token` lives in .athanore/token and is
 # refused in athanore.toml (12 §Auth).
 athanore.db
