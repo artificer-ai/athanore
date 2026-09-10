@@ -31,7 +31,7 @@ import type {
 } from './api/gen/types.gen'
 import type { AppSearch, Overlay } from './routes/search'
 import { PALETTE_COMMANDS } from './overlays'
-import { KEY_BINDINGS } from './lib/keys'
+import { capLabel, KEY_BINDINGS } from './lib/keys'
 import { DEFAULT_LIST_WIDTH, usePrefs } from './store/prefs'
 import { ALL_WORKFLOWS, useUi } from './store/ui'
 
@@ -552,7 +552,9 @@ describe('App', () => {
     for (const { name, hint, key } of PALETTE_COMMANDS) {
       const row = command(name)
       expect(within(row).getByText(hint)).toBeInTheDocument()
-      expect(within(row).getByText(key)).toBeInTheDocument()
+      // The key column draws `capLabel` of the cap the catalogue
+      // dispatches on: `D` is bound, `⇧D` is shown (D207).
+      expect(within(row).getByText(capLabel(key))).toBeInTheDocument()
     }
   })
 

@@ -92,3 +92,43 @@ test('`a` answers the request panel the keystroke came from', async ({
   await expect(answered).toHaveAttribute('data-state', 'answered')
   await expect(answered.getByTestId('request-value')).toContainText('Allow Once')
 })
+
+test('`⇧D` is what the strip advertises, and what deletes the run', async ({
+  dashboard,
+}) => {
+  const page = dashboard.page
+  await dashboard.open()
+  // `hold` parks at a request, so this is 04's cancel-then-delete rather
+  // than the deletion of something already finished.
+  await dashboard.submit('hold', 'doomed')
+  await dashboard.select('doomed')
+
+  // The strip is the app's one always-visible advertisement of the map,
+  // and it draws the keystroke: a bare `D` here reads as `d`, which is
+  // the request panel's deny and reaches nothing else (D51, D207).
+  const caps = await page.locator('footer kbd').allTextContents()
+  expect(caps).toContain('⇧D')
+  expect(caps).not.toContain('D')
+  expect(caps).not.toContain('d')
+
+  // And `d` really does reach nothing: no overlay, no navigation.
+  const before = page.url()
+  await page.keyboard.press('d')
+  await expect(page.getByTestId('delete-run')).toBeHidden()
+  expect(page.url()).toBe(before)
+
+  await page.keyboard.press('Shift+D')
+  await expect(page.getByTestId('delete-run')).toBeVisible()
+  expect(new URL(page.url()).searchParams.get('overlay')).toBe('delete')
+
+  await page
+    .getByTestId('delete-run')
+    .getByRole('button', { name: 'delete run', exact: true })
+    .click()
+
+  await expect(page.getByTestId('delete-run-error')).toBeHidden()
+  await expect(page.getByTestId('delete-run')).toBeHidden()
+  await expect(dashboard.rows()).toHaveCount(0)
+  // A run that no longer exists cannot be the selection.
+  expect(new URL(page.url()).searchParams.get('run')).toBeNull()
+})

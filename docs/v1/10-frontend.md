@@ -313,7 +313,13 @@ retry task, `m` move task, `x` cancel task, `l` append log, `n` new run,
 `^p` palette, `^r` refresh, `esc` close. Shortcuts are suppressed inside
 inputs. Requests add `a` allow / `d` deny when the request panel has
 focus. Delete moved from `d` to `D` so a `d` meant for "deny" that lands
-one focus ring away cannot reach the delete confirm.
+one focus ring away cannot reach the delete confirm. Every place the map
+is drawn — the footer strip, the `?` overlay and the palette's key
+column — draws that cap as `⇧D`: a bare capital in an interface whose
+every other word is lowercase reads as the letter, and `d` is a row of
+this same map one keystroke away. The handler still dispatches on
+`event.key`, so the map's cap stays `D` — the modifier is drawn, not
+bound (D207).
 
 `tab` is the one row in that list the app does **not** intercept. It is
 drawn in the footer strip because `tab` is how focus moves, but the key

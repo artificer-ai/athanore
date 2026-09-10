@@ -3,8 +3,8 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
+import { KEYLESS, type PaletteAction } from '../actions'
 import { Palette, PALETTE_TITLE } from '../Palette'
-import type { PaletteAction } from '../actions'
 
 function act(over: Partial<PaletteAction> & { id: string }): PaletteAction {
   return {
@@ -171,6 +171,39 @@ describe('Palette', () => {
     // is not disabled, so `enter` on a fresh palette runs `refresh`.
     await user.keyboard('{Enter}')
     expect(run).not.toHaveBeenCalled()
+  })
+
+  it('draws the delete row’s key as the keystroke, and matches both spellings', async () => {
+    // The key column is the third view of the map, and it agrees with
+    // the footer strip: `D` is bound, `⇧D` is drawn (D207). Typing
+    // either still finds the row — the cap is a cmdk keyword both ways.
+    const actions = [
+      act({ id: 'delete run', hint: 'remove the run and its logs', key: 'D' }),
+      // No `d` anywhere in this row, so the query below narrows to one.
+      act({ id: 'move run up', hint: 'earlier in the queue', key: KEYLESS }),
+    ]
+    const { user } = await openPalette(actions)
+
+    const row = screen.getByRole('option', { name: /delete run/ })
+    expect(within(row).getByText('⇧D')).toBeInTheDocument()
+    expect(within(row).queryByText('D')).toBeNull()
+
+    // A keyless row still prints `—` rather than a key it has not got
+    // (D175 (5)).
+    expect(
+      within(screen.getByRole('option', { name: /move run up/ })).getByText(KEYLESS),
+    ).toBeInTheDocument()
+
+    await user.keyboard('D')
+    await waitFor(() => {
+      expect(rowNames()).toEqual(['delete run'])
+    })
+
+    await user.clear(screen.getByPlaceholderText('run a command'))
+    await user.keyboard('⇧')
+    await waitFor(() => {
+      expect(rowNames()).toEqual(['delete run'])
+    })
   })
 
   it('closes on esc and gives focus back to what opened it', async () => {

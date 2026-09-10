@@ -20,7 +20,13 @@
  * why `t` did nothing while they were typing a run title has not been
  * shown the map, only its rows.
  */
-import { KEY_BINDINGS, KEY_GROUPS, KEY_NOTES, type KeyBinding } from '../lib/keys'
+import {
+  capLabel,
+  KEY_BINDINGS,
+  KEY_GROUPS,
+  KEY_NOTES,
+  type KeyBinding,
+} from '../lib/keys'
 import { OverlayDialog, OverlayHeader } from './OverlayPanel'
 
 /** The dialog's accessible name, and the panel's header kicker. */
@@ -48,7 +54,7 @@ function Row({ binding }: { binding: KeyBinding }) {
     >
       <span className="flex flex-wrap items-center gap-[4px]">
         {binding.keys.map((key) => (
-          <Kbd key={key}>{key}</Kbd>
+          <Kbd key={key}>{capLabel(key)}</Kbd>
         ))}
       </span>
       <span className="text-row text-[var(--color-neutral-300)]">

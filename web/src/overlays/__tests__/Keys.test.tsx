@@ -13,7 +13,13 @@ import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
-import { FOOTER_HINTS, KEY_BINDINGS, KEY_GROUPS, KEY_NOTES } from '../../lib/keys'
+import {
+  capLabel,
+  FOOTER_HINTS,
+  KEY_BINDINGS,
+  KEY_GROUPS,
+  KEY_NOTES,
+} from '../../lib/keys'
 import { Keys, KEYS_TITLE } from '../Keys'
 
 /** The overlay over the button that opens it, which `esc` restores to. */
@@ -66,10 +72,12 @@ describe('Keys', () => {
 
     for (const binding of KEY_BINDINGS) {
       const line = row(binding.id)
+      // What the panel draws is `capLabel` of the table, row for row:
+      // `D` is bound and `⇧D` is shown (D207).
       expect(
         [...line.querySelectorAll('kbd')].map((cap) => cap.textContent),
         `caps for ${binding.id}`,
-      ).toEqual([...binding.keys])
+      ).toEqual(binding.keys.map(capLabel))
       expect(within(line).getByText(binding.label, { exact: false })).toBeInTheDocument()
     }
 
@@ -97,6 +105,17 @@ describe('Keys', () => {
     )
 
     expect(groups).toEqual([...KEY_GROUPS])
+  })
+
+  it('says delete needs shift in words as well as on the chip', async () => {
+    await open()
+
+    const line = row('delete-run')
+
+    expect([...line.querySelectorAll('kbd')].map((cap) => cap.textContent)).toEqual([
+      '⇧D',
+    ])
+    expect(within(line).getByText('shift, and it asks first')).toBeInTheDocument()
   })
 
   it('says when a binding does not apply', async () => {

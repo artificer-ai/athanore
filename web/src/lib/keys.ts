@@ -27,6 +27,11 @@
  * sentence at the points it already turns, and every row stays in the
  * order that sentence lists it, so reading the table top to bottom reads
  * the spec.
+ *
+ * A row's `keys` are the caps that are *bound* — the handler dispatches
+ * on them directly — and {@link capLabel} is how they are *drawn*, so
+ * none of the three views can advertise a keystroke nothing runs
+ * (D207).
  */
 
 /** The headings the `?` overlay draws its sections under. */
@@ -52,6 +57,26 @@ export type KeyBinding = {
   note: string
   /** Whether the footer strip carries this one (10 §Layout). */
   footer: boolean
+}
+
+/** The shift chip: U+21E7, the strip's own arrow family. */
+export const SHIFT_CAP = '⇧'
+
+/**
+ * A cap as the operator has to type it.
+ *
+ * The table's caps are 10 §Keyboard's and the handler dispatches on
+ * them directly (`keys/useKeymap.ts` `capOf` returns `event.key`), so
+ * `D` is what runs the delete confirm. `D` is also the one cap of this
+ * map whose only difference from another cap in it is its case — which
+ * is why D51 chose it — and a chip reading `D` in an interface whose
+ * every other word is lowercase reads as the letter `d`, which is the
+ * request panel's deny and reaches nothing else. So a cap that is one
+ * uppercase letter is *drawn* with the shift chip and still *bound*
+ * without it: the modifier is drawn, not bound (D207).
+ */
+export function capLabel(cap: string): string {
+  return /^[A-Z]$/.test(cap) ? `${SHIFT_CAP}${cap}` : cap
 }
 
 /**
