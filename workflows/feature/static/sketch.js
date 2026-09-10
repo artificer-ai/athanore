@@ -57,7 +57,14 @@ const COLOURS = [
   '#fde68a', '#fcd34d', '#fbbf24', '#86efac', '#22c55e', '#15803d',
   '#bae6fd', '#7dd3fc', '#38bdf8', '#a5b4fc', '#c084fc', '#a855f7',
 ]
-const SIZES = [2, 4, 8]
+const SIZES = [1, 2, 4, 8, 14]
+
+/**
+ * How a closed shape is painted. `outline` strokes and leaves the middle
+ * empty; `solid` fills it and does not stroke. Only `box` and `ellipse`
+ * read it — a line, an arrow and a pen stroke have no inside.
+ */
+const FILLS = ['outline', 'solid']
 
 /** The upload cap, mirrored from `body_limit` so the message can say so. */
 const LIMIT = 1024 * 1024
@@ -89,7 +96,8 @@ class AthanoreSketch extends HTMLElement {
   connectedCallback() {
     this.tool = 'box'
     this.colour = COLOURS[1]
-    this.size = SIZES[1]
+    this.size = SIZES[2]
+    this.fill = FILLS[0]
 
     this.attachShadow({ mode: 'open' })
     const theme = (window.athanore?.theme?.tokens) ?? {}
@@ -110,7 +118,7 @@ class AthanoreSketch extends HTMLElement {
                  border: 1px solid var(--ath-border); border-radius: 5px;
                  padding: 3px 8px; cursor: pointer; min-height: 24px; }
         button.save { color: var(--ath-accent); border-color: var(--ath-accent); }
-        .picker { position: relative; display: inline-flex; }
+        .menu { position: relative; display: inline-flex; }
         /* A chip and a caret, so it reads as a dropdown rather than as a
            coloured square that happens to be clickable. */
         .current { display: inline-flex; align-items: center; gap: 4px;
@@ -121,16 +129,26 @@ class AthanoreSketch extends HTMLElement {
                 box-shadow: inset 0 0 0 1px var(--ath-border); }
         .caret { font-size: 9px; line-height: 1; color: var(--ath-muted); }
         .current[aria-expanded="true"] .caret { color: var(--ath-accent); }
+        /* The hidden attribute works through the UA stylesheet, and any
+           author display rule outranks it — so the display:grid below
+           makes the popover permanently visible and grid.hidden a no-op.
+           This is the rule that gives the attribute its meaning. No
+           backticks in here: the whole stylesheet is a template literal. */
+        .grid[hidden] { display: none; }
         .grid { position: absolute; top: calc(100% + 4px); left: 0; z-index: 5;
-                display: grid; grid-template-columns: repeat(6, 20px); gap: 4px;
-                padding: 6px; background: var(--ath-surface);
+                display: grid; gap: 4px; padding: 6px;
+                background: var(--ath-surface); white-space: nowrap;
                 border: 1px solid var(--ath-border); border-radius: 8px;
                 box-shadow: 0 6px 20px rgb(0 0 0 / 0.45); }
+        .grid[data-cols="6"] { grid-template-columns: repeat(6, 20px); }
+        .grid[data-cols="1"] { grid-template-columns: max-content; }
+        .grid[data-cols="1"] button { text-align: left; }
+        [role="option"][aria-selected="true"] { outline: 2px solid var(--ath-accent);
+                                                outline-offset: 1px; }
         .swatch { width: 20px; height: 20px; padding: 0; border-radius: 4px;
                   border: none; box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18); }
         [aria-pressed="true"] { outline: 2px solid var(--ath-accent);
                                 outline-offset: 1px; }
-        .nib { width: 26px; }
         .muted { color: var(--ath-muted); }
         .bad { color: var(--ath-status-bad); }
         .ok { color: var(--ath-status-ok); }
@@ -138,14 +156,9 @@ class AthanoreSketch extends HTMLElement {
       </style>
       <div class="bar">
         <span class="tools"></span>
-        <span class="picker">
-          <button class="current" type="button" aria-haspopup="listbox"
-                  aria-expanded="false" aria-label="colour">
-            <span class="chip"></span><span class="caret">▾</span>
-          </button>
-          <div class="grid" role="listbox" aria-label="colours" hidden></div>
-        </span>
-        <span class="nibs"></span>
+        <span class="menu" data-menu="colour"></span>
+        <span class="menu" data-menu="fill"></span>
+        <span class="menu" data-menu="size"></span>
         <button class="del" type="button">delete</button>
         <button class="clear" type="button">clear</button>
         <button class="save" type="button">save to files</button>
@@ -156,8 +169,48 @@ class AthanoreSketch extends HTMLElement {
       <p class="note" hidden></p>`
 
     this.buttons('.tools', TOOLS, (v) => v, (v) => { this.tool = v; this.retool() })
-    this.picker()
-    this.buttons('.nibs', SIZES, (v) => String(v), (v) => { this.size = v }, 'nib')
+    this.menus = []
+    this.menu({
+      name: 'colour', values: COLOURS, columns: 6,
+      pick: (v) => { this.colour = v },
+      preview: (chip, v) => { chip.style.background = v; chip.textContent = '' },
+      option: (b, v) => {
+        b.className = 'swatch'
+        b.style.background = v
+        b.setAttribute('aria-label', v)
+      },
+    })
+    this.menu({
+      name: 'fill', values: FILLS, columns: 1,
+      pick: (v) => { this.fill = v },
+      preview: (chip, v) => {
+        // The chip *is* the answer: an empty square with a ring for
+        // `outline`, a filled one for `solid`.
+        chip.textContent = ''
+        chip.style.background = v === 'solid' ? this.colour : 'transparent'
+      },
+      option: (b, v) => { b.textContent = v },
+    })
+    this.menu({
+      name: 'size', values: SIZES, columns: 1,
+      pick: (v) => { this.size = v },
+      preview: (chip, v) => {
+        chip.style.background = 'transparent'
+        chip.textContent = String(v)
+      },
+      option: (b, v) => { b.textContent = `${v} px` },
+    })
+    // One listener for every popover. `composedPath` because a click
+    // inside this shadow root is retargeted to the host by the time the
+    // document sees it — the same retargeting that made typing fire
+    // hotkeys (D210).
+    this.away = (e) => {
+      const path = e.composedPath()
+      for (const { holder } of this.menus) {
+        if (!path.includes(holder)) this.close(holder)
+      }
+    }
+    document.addEventListener('pointerdown', this.away)
     this.shadowRoot.querySelector('.del')
       .addEventListener('click', () => this.remove_())
     this.shadowRoot.querySelector('.clear')
@@ -169,60 +222,79 @@ class AthanoreSketch extends HTMLElement {
   }
 
   /**
-   * The colour trigger and its grid.
+   * One dropdown: a trigger showing the current value, and a popover.
    *
-   * A popover rather than a row because twenty-four swatches inline is a
-   * toolbar that wraps to three lines on a tablet, which is the width
-   * this pane is used at.
+   * Generic because there are three of them now — colour, fill and nib —
+   * and three copies of "open, close on a click outside, close on `esc`"
+   * is three places for those to drift apart. A popover rather than a row
+   * of buttons because twenty-four swatches inline is a toolbar that
+   * wraps to three lines at the width this pane is used at, which is a
+   * tablet.
+   *
+   * `spec.preview` draws the trigger's chip for a value; `spec.option`
+   * draws one entry. Colour wants coloured squares in a grid, the other
+   * two want words in a column, and that is the whole of the difference.
    */
-  picker() {
-    const trigger = this.shadowRoot.querySelector('.current')
-    const grid = this.shadowRoot.querySelector('.grid')
-    for (const value of COLOURS) {
-      const swatch = document.createElement('button')
-      swatch.type = 'button'
-      swatch.className = 'swatch'
-      swatch.style.background = value
-      swatch.setAttribute('role', 'option')
-      swatch.setAttribute('aria-label', value)
-      swatch.addEventListener('click', () => {
-        this.colour = value
-        this.open(false)
+  menu(spec) {
+    const holder = this.shadowRoot.querySelector(`.menu[data-menu="${spec.name}"]`)
+    holder.innerHTML = `
+      <button class="current" type="button" aria-haspopup="listbox"
+              aria-expanded="false" aria-label="${spec.name}">
+        <span class="chip"></span><span class="caret">▾</span>
+      </button>
+      <div class="grid" role="listbox" aria-label="${spec.name}"
+           data-cols="${spec.columns}" hidden></div>`
+    const trigger = holder.querySelector('.current')
+    const grid = holder.querySelector('.grid')
+
+    for (const value of spec.values) {
+      const option = document.createElement('button')
+      option.type = 'button'
+      option.setAttribute('role', 'option')
+      option.dataset.value = String(value)
+      spec.option(option, value)
+      option.addEventListener('click', () => {
+        spec.pick(value)
+        this.close(holder)
         this.marks()
         trigger.focus()
       })
-      grid.append(swatch)
+      grid.append(option)
     }
-    trigger.addEventListener('click', () => this.open(grid.hidden))
-    // `esc` from inside the grid closes it and nothing else: the app's
-    // own `esc` would otherwise unwind a run selection behind an open
+
+    trigger.addEventListener('click', () => {
+      const show = grid.hidden
+      // One at a time: opening this closes the others, or two popovers
+      // overlap and the second reads as a rendering fault.
+      for (const other of this.shadowRoot.querySelectorAll('.menu')) {
+        this.close(other)
+      }
+      if (show) this.open(holder)
+    })
+    // `esc` from inside a popover closes it and nothing else: the app's
+    // own `esc` would otherwise unwind the run selection behind a
     // popover the operator was looking at (D209).
-    this.shadowRoot.querySelector('.picker').addEventListener('keydown', (e) => {
+    holder.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape' || grid.hidden) return
       e.stopPropagation()
-      this.open(false)
+      this.close(holder)
       trigger.focus()
     })
-    // A click anywhere else closes it. `composedPath` because a click
-    // inside this shadow root is retargeted to the host by the time the
-    // document sees it — the same retargeting that made typing fire
-    // hotkeys (D210).
-    this.away = (e) => {
-      if (!grid.hidden && !e.composedPath().includes(this.shadowRoot.querySelector('.picker'))) {
-        this.open(false)
-      }
-    }
-    document.addEventListener('pointerdown', this.away)
+    this.menus.push({ holder, spec })
   }
 
-  open(show) {
-    const grid = this.shadowRoot.querySelector('.grid')
-    grid.hidden = !show
-    const trigger = this.shadowRoot.querySelector('.current')
-    trigger.setAttribute('aria-expanded', String(show))
+  open(holder) {
+    holder.querySelector('.grid').hidden = false
+    holder.querySelector('.current').setAttribute('aria-expanded', 'true')
     // The caret points at where the list is: down when it is about to
     // appear below, up when it is already there.
-    trigger.querySelector('.caret').textContent = show ? '▴' : '▾'
+    holder.querySelector('.caret').textContent = '▴'
+  }
+
+  close(holder) {
+    holder.querySelector('.grid').hidden = true
+    holder.querySelector('.current').setAttribute('aria-expanded', 'false')
+    holder.querySelector('.caret').textContent = '▾'
   }
 
   buttons(holder, values, label, pick, cls = 'tool') {
@@ -251,14 +323,15 @@ class AthanoreSketch extends HTMLElement {
         b.setAttribute('aria-pressed', String(values[i] === current))
       })
     }
-    const trigger = this.shadowRoot.querySelector('.current')
-    if (trigger !== null) {
-      trigger.querySelector('.chip').style.background = this.colour
-      trigger.title = `colour ${this.colour}`
+    for (const { holder, spec } of this.menus ?? []) {
+      const current = { colour: this.colour, fill: this.fill, size: this.size }[spec.name]
+      const trigger = holder.querySelector('.current')
+      spec.preview(trigger.querySelector('.chip'), current)
+      trigger.title = `${spec.name} ${String(current)}`
+      for (const option of holder.querySelectorAll('[role="option"]')) {
+        option.setAttribute('aria-selected', String(option.dataset.value === String(current)))
+      }
     }
-    this.shadowRoot.querySelectorAll('.swatch').forEach((b, i) => {
-      b.setAttribute('aria-selected', String(COLOURS[i] === this.colour))
-    })
   }
 
   async start() {
@@ -313,7 +386,14 @@ class AthanoreSketch extends HTMLElement {
       return
     }
     const { x, y } = this.stage.getPointerPosition()
+    // `solid` fills and does not stroke; `outline` strokes and leaves the
+    // middle empty. Only the two closed shapes below read `filled` — a
+    // line, an arrow and a pen stroke have no inside to fill.
+    const filled = this.fill === 'solid'
     const common = { stroke: this.colour, strokeWidth: this.size, draggable: false }
+    const closed = filled
+      ? { fill: this.colour, draggable: false }
+      : common
     const K = this.Konva
     if (this.tool === 'text') {
       const text = window.prompt('text')
@@ -326,8 +406,8 @@ class AthanoreSketch extends HTMLElement {
       return
     }
     const made =
-      this.tool === 'box' ? new K.Rect({ ...common, x, y, width: 0, height: 0 })
-      : this.tool === 'ellipse' ? new K.Ellipse({ ...common, x, y, radiusX: 0, radiusY: 0 })
+      this.tool === 'box' ? new K.Rect({ ...closed, x, y, width: 0, height: 0 })
+      : this.tool === 'ellipse' ? new K.Ellipse({ ...closed, x, y, radiusX: 0, radiusY: 0 })
       : this.tool === 'arrow' ? new K.Arrow({ ...common, points: [x, y, x, y],
           fill: this.colour, pointerLength: 6 + this.size, pointerWidth: 6 + this.size })
       : this.tool === 'line' ? new K.Line({ ...common, points: [x, y, x, y] })
