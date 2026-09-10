@@ -25,6 +25,7 @@ from typing import Any, Final
 import httpx
 import pytest
 from fastapi import FastAPI
+from pydantic import ValidationError
 
 from athanore import web
 from athanore.api import static
@@ -118,6 +119,63 @@ async def test_the_root_is_the_document_with_the_policy(serve, built: Path) -> N
     assert response.headers["content-type"].startswith("text/html")
     assert '<div id="root">' in response.text
     assert response.headers["content-security-policy"] == static.CSP
+
+
+async def test_plugin_cdns_widen_only_where_code_is_fetched_from(
+    serve, built: Path
+) -> None:
+    """D211: the three fetch directives, and `connect-src` left alone.
+
+    That last part is the containment. A CDN script runs with
+    `window.athanore` in reach — the operator's credential and `ops` —
+    so if it could also reach a third-party origin, a bad script could
+    post what it found there. With `connect-src` closed the worst it can
+    do is fail to render.
+    """
+
+    response = await call(
+        serve(built, plugin_cdns=["https://cdn.jsdelivr.net"]), "GET", "/"
+    )
+
+    assert response.headers["content-security-policy"] == (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-eval' https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "font-src 'self' https://cdn.jsdelivr.net; "
+        "img-src 'self' data:; connect-src 'self'"
+    )
+
+
+async def test_no_plugin_cdns_is_the_policy_every_install_had(
+    serve, built: Path
+) -> None:
+    """Empty is not "a policy with an empty allowlist" — it is the old one."""
+
+    response = await call(serve(built, plugin_cdns=[]), "GET", "/")
+
+    assert response.headers["content-security-policy"] == static.CSP
+
+
+@pytest.mark.parametrize(
+    "entry",
+    [
+        "cdn.jsdelivr.net",
+        "https://cdn.jsdelivr.net/npm/thing",
+        "https://x.net; script-src *",
+        "https://x.net 'unsafe-inline'",
+        "https://x.net?a=1",
+    ],
+)
+def test_a_plugin_cdn_that_is_not_a_bare_origin_is_refused(entry: str) -> None:
+    """A CSP is built by joining strings, so an entry is checked as a host.
+
+    `urlparse` alone is not enough: it takes everything up to the first
+    `/` as the netloc, so `https://x.net; script-src *` parses with the
+    injection sitting inside the host.
+    """
+
+    with pytest.raises(ValidationError):
+        AthanoreSettings(plugin_cdns=[entry])
 
 
 async def test_the_policy_is_the_one_12_states(serve, built: Path) -> None:

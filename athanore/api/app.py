@@ -183,11 +183,11 @@ def create_app(
     for spec in app.state.plugins:
         directory = spec.assets_dir()
         if directory is not None:
-            mount_plugin_assets(app, spec.workflow, directory)
+            mount_plugin_assets(app, spec.workflow, directory, settings)
     # The SPA at `/`, as the router's fallback rather than as a route:
     # every route is matched first — including the ones a plugin
     # registers after this call — and an unmatched path is the client
     # router's (08 §Static).
-    mount_spa(app)
+    mount_spa(app, settings=settings)
 
     return app
