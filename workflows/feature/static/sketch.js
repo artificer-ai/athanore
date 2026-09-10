@@ -111,10 +111,16 @@ class AthanoreSketch extends HTMLElement {
                  padding: 3px 8px; cursor: pointer; min-height: 24px; }
         button.save { color: var(--ath-accent); border-color: var(--ath-accent); }
         .picker { position: relative; display: inline-flex; }
-        .current { width: 26px; height: 22px; padding: 0;
-                   /* A ring in the border colour, so a white swatch and a
-                      black one are both visible against the chrome. */
-                   box-shadow: inset 0 0 0 1px var(--ath-border); }
+        /* A chip and a caret, so it reads as a dropdown rather than as a
+           coloured square that happens to be clickable. */
+        .current { display: inline-flex; align-items: center; gap: 4px;
+                   padding: 2px 5px; }
+        .chip { width: 14px; height: 14px; border-radius: 3px;
+                /* A ring, so white and black are both visible against the
+                   chrome behind them. */
+                box-shadow: inset 0 0 0 1px var(--ath-border); }
+        .caret { font-size: 9px; line-height: 1; color: var(--ath-muted); }
+        .current[aria-expanded="true"] .caret { color: var(--ath-accent); }
         .grid { position: absolute; top: calc(100% + 4px); left: 0; z-index: 5;
                 display: grid; grid-template-columns: repeat(6, 20px); gap: 4px;
                 padding: 6px; background: var(--ath-surface);
@@ -133,8 +139,10 @@ class AthanoreSketch extends HTMLElement {
       <div class="bar">
         <span class="tools"></span>
         <span class="picker">
-          <button class="current" type="button" aria-haspopup="true"
-                  aria-expanded="false" aria-label="colour"></button>
+          <button class="current" type="button" aria-haspopup="listbox"
+                  aria-expanded="false" aria-label="colour">
+            <span class="chip"></span><span class="caret">▾</span>
+          </button>
           <div class="grid" role="listbox" aria-label="colours" hidden></div>
         </span>
         <span class="nibs"></span>
@@ -210,8 +218,11 @@ class AthanoreSketch extends HTMLElement {
   open(show) {
     const grid = this.shadowRoot.querySelector('.grid')
     grid.hidden = !show
-    this.shadowRoot.querySelector('.current')
-      .setAttribute('aria-expanded', String(show))
+    const trigger = this.shadowRoot.querySelector('.current')
+    trigger.setAttribute('aria-expanded', String(show))
+    // The caret points at where the list is: down when it is about to
+    // appear below, up when it is already there.
+    trigger.querySelector('.caret').textContent = show ? '▴' : '▾'
   }
 
   buttons(holder, values, label, pick, cls = 'tool') {
@@ -242,7 +253,7 @@ class AthanoreSketch extends HTMLElement {
     }
     const trigger = this.shadowRoot.querySelector('.current')
     if (trigger !== null) {
-      trigger.style.background = this.colour
+      trigger.querySelector('.chip').style.background = this.colour
       trigger.title = `colour ${this.colour}`
     }
     this.shadowRoot.querySelectorAll('.swatch').forEach((b, i) => {
