@@ -49,7 +49,7 @@ from athanore import PluginContext, PluginError, Workflow
 
 from .sandbox import CHECKOUT
 
-__all__ = ["FILES", "MAX_NAME", "declare", "safe_path"]
+__all__ = ["FILES", "MAX_NAME", "declare", "safe_name", "safe_path"]
 
 #: Where a dropped file lands. Inside `.athanore/`, which is git-ignored,
 #: so nothing dropped here can be committed by accident or dirty the
@@ -63,6 +63,9 @@ FILES = CHECKOUT / ".athanore" / "files"
 #: is hard to fool are worth more than either alone.
 NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 MAX_NAME = 128
+
+#: Everything :func:`safe_name` collapses to a dash on the way in.
+UNSAFE = re.compile(r"[^A-Za-z0-9._-]+")
 
 
 def safe_path(name: str) -> Path:
@@ -93,12 +96,61 @@ def safe_path(name: str) -> Path:
     return resolved
 
 
+def safe_name(raw: str) -> str:
+    """``raw`` as a name :func:`safe_path` will accept.
+
+    **Uploads are cleaned, not refused.** The names people actually drop
+    are `Screenshot 2026-09-10 at 6.21.43 PM.png` and `nocturne (1).css`,
+    and both fail :data:`NAME` — spaces, brackets, colons. Rejecting them
+    would make the pane useless for the one thing it is for, and asking
+    the operator to rename a file before dropping it is asking them to go
+    and find a shell, which is what this exists to avoid.
+
+    So the strictness moves: this cleans, and :func:`safe_path` still
+    refuses. A name that reaches the listing has been through here, and a
+    name that arrives on a *lookup* is one the listing gave out, so both
+    ends stay strict without the drop box being precious.
+
+    The extension survives the length cap, because it is the half that
+    tells an agent what the file is.
+    """
+
+    base = Path(raw).name
+    stem, dot, suffix = base.rpartition(".")
+    if not dot:
+        stem, suffix = base, ""
+    stem = UNSAFE.sub("-", stem).strip("-._") or "file"
+    suffix = UNSAFE.sub("-", suffix).strip("-._")
+    room = MAX_NAME - (len(suffix) + 1 if suffix else 0)
+    cleaned = stem[:room] + (f".{suffix}" if suffix else "")
+    # `NAME` also requires the first character to be alphanumeric, which
+    # the strip above does not guarantee for a name that was all dots.
+    return cleaned if NAME.match(cleaned) else f"file-{cleaned}"[:MAX_NAME]
+
+
 def _entry(path: Path) -> dict[str, Any]:
-    """One file, as both the table and the element read it."""
+    """One file, as both the table and the element read it.
+
+    ``path`` is checkout-relative and is the whole point of the copy
+    button: it is the string an operator pastes into a run's description
+    so the agent can open the file. Relative rather than absolute because
+    an agent's ``cwd`` *is* the checkout — on both sides of the container
+    boundary, which is why `compose.yaml` mounts it at its own host path
+    — so the relative form is the one that reads the same everywhere.
+    """
 
     stat = path.stat()
+    # Relative when it can be, absolute when it cannot. `FILES` is derived
+    # from `CHECKOUT`, so the fallback only fires when something has
+    # pointed it elsewhere — and a crash there would be a worse answer
+    # than a longer path.
+    try:
+        shown = str(path.relative_to(CHECKOUT))
+    except ValueError:
+        shown = str(path)
     return {
         "name": path.name,
+        "path": shown,
         "bytes": stat.st_size,
         "modified": int(stat.st_mtime),
     }
@@ -131,7 +183,7 @@ async def _upload(file: UploadFile) -> dict[str, Any]:
 
     if file.filename is None:
         raise PluginError(400, "the upload carried no file name")
-    target = safe_path(Path(file.filename).name)
+    target = safe_path(safe_name(file.filename))
     FILES.mkdir(parents=True, exist_ok=True)
     target.write_bytes(await file.read())
     return _entry(target)
