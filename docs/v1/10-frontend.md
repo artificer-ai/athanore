@@ -315,7 +315,10 @@ retry task, `m` move task, `x` cancel task, `l` append log, `n` new run,
 `r` rerun node, `p` pause/resume, `c` cancel run, `D` (shift) delete run
 (with confirm), `e` edit run, `w` workflows, `b` toggle list, `?` keys,
 `^p` palette, `^r` refresh, `esc` close. Shortcuts are suppressed inside
-inputs. Requests add `a` allow / `d` deny when the request panel has
+inputs — read off the keystroke's `composedPath()`, so a field inside a
+plugin pane's shadow root suppresses them like any other; an event that
+crosses a shadow boundary is retargeted to the host, and a check against
+the target alone would see `<some-plugin-pane>` and fire (D210). Requests add `a` allow / `d` deny when the request panel has
 focus. Delete moved from `d` to `D` so a `d` meant for "deny" that lands
 one focus ring away cannot reach the delete confirm. Every place the map
 is drawn — the footer strip, the `?` overlay and the palette's key
