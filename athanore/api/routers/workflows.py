@@ -22,7 +22,6 @@ arguments and a row into a 201.
 from __future__ import annotations
 
 import inspect
-from collections.abc import Sequence
 from pathlib import Path
 from typing import Annotated
 
@@ -41,7 +40,8 @@ from athanore.api.schemas import (
 )
 from athanore.engine import Engine, UnknownWorkflow
 from athanore.graph import Graph
-from athanore.plugins.registry import PluginSpec, manifest_entry
+from athanore.plugins.mount import MountedPlugins
+from athanore.plugins.registry import manifest_entry
 
 __all__ = ["router"]
 
@@ -112,13 +112,14 @@ def _view(request: Request, graph: Graph) -> WorkflowOut:
 def _plugin(request: Request, name: str) -> WorkflowPlugin:
     """What this workflow contributes to the UI (08 §Workflows, 09).
 
-    The same entries ``GET /api/plugins`` publishes, so the two views of
-    one declaration cannot disagree: a workflow that declares nothing
+    The same entries ``GET /api/plugins`` publishes, read off the live
+    collection per request so the two views of one declaration cannot
+    disagree (22 §Live mounting): a workflow that declares nothing
     carries two empty lists, which is a fact rather than a placeholder.
     """
 
-    specs: Sequence[PluginSpec] = getattr(request.app.state, "plugins", None) or ()
-    spec = next((one for one in specs if one.workflow == name), None)
+    plugins: MountedPlugins = request.app.state.plugins
+    spec = plugins.get(name)
     if spec is None:
         return WorkflowPlugin()
     entry = manifest_entry(spec)

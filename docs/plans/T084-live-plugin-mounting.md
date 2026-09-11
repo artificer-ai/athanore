@@ -214,6 +214,29 @@ Three facts about the code decide the shape below:
 19. `docs/v1/17-serial-task-plan.md`: `**Status.** Done.` on `### T084`,
     in the same commit.
 
+## What the implementation found
+
+Two facts the plan above did not have, settled on the branch:
+
+- **FastAPI ≥ 0.141 includes a router as one entry.** `include_router`
+  no longer copies the routes flat onto `app.router.routes`; it appends
+  one entry that *refers* to the included `APIRouter` and reads its
+  routes per request. The `plugin:{wf}:…` names are therefore one level
+  down, on the router `mount()` built. `MountedPlugins` keeps that
+  router per workflow and `_unmount` drops the entry referring to it;
+  a route carried flat under the name prefix, and the `Mount` at
+  `/plugins/{wf}/static`, are dropped by the same filter, so the
+  behaviour 17 §T084 names — routes by name prefix, mount by path —
+  holds whichever shape the list has. The list is still the one
+  Starlette iterates per request, so filtering it is live.
+- **`mount -> api.static` is a third arrow up.** `mount_plugin_assets`
+  lives in `athanore.api.static`, above `plugins.mount` in the layering,
+  and the assets mount has to be added and removed beside the routes.
+  It is a named exemption in `pyproject.toml` beside the two of D138,
+  recorded in D236.
+
+The empty-spec rule of step 3 is D237, a row of its own.
+
 ## What this task is not
 
 - No `Server` verb, no engine call, no event, no route under

@@ -37,7 +37,7 @@ test('a plugin element mounts, fetches, and is fed the event stream', async ({
 
   // 2. the asset the manifest listed was injected, once, as a module.
   const scripts = page.locator(
-    'script[data-athanore-asset="/plugins/plugged/static/playfield.js"]',
+    'script[data-athanore-asset^="/plugins/plugged/static/playfield.js"]',
   )
   await expect(scripts).toHaveCount(1)
   await expect(scripts).toHaveAttribute('type', 'module')
@@ -109,7 +109,7 @@ test('the pane still works on every visit, not only the first', async ({
 
   // Still one script: the remounts reused the module they injected.
   await expect(
-    page.locator('script[data-athanore-asset="/plugins/plugged/static/playfield.js"]'),
+    page.locator('script[data-athanore-asset^="/plugins/plugged/static/playfield.js"]'),
   ).toHaveCount(1)
 })
 

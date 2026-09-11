@@ -350,7 +350,14 @@ async def test_the_manifest_lists_builtins_first(
 ):
     """09 §Builtins are plugins: the core's own views come first."""
 
-    builtin = PluginSpec(workflow=BUILTIN_WORKFLOW)
+    async def noted(ctx: PluginContext, event: Event) -> None:
+        return None
+
+    # A spec that declares something: one that declares nothing is held
+    # nowhere and has no entry (09 §Wire contract, `MountedPlugins`).
+    builtin = PluginSpec(
+        workflow=BUILTIN_WORKFLOW, handlers=(Handler(event="run.created", fn=noted),)
+    )
     client = await app_with(gamedev(), extra=[builtin])
 
     assert [
@@ -677,6 +684,122 @@ async def test_a_context_that_will_not_close_does_not_skip_the_next_plugin(
         await dispatch.aclose()
 
     assert fired == ["gamedev", BUILTIN_WORKFLOW]
+
+
+def _created(run_id: str, workflow: str = "gamedev") -> Event:
+    """A ``run.created`` whose owner is on the payload (18 §Payloads)."""
+
+    return Event(
+        name="run.created",
+        run_id=run_id,
+        data={"workflow": workflow, "title": "a run"},
+        created=datetime.now(UTC),
+    )
+
+
+def _subscriber(name: str, fired: list[str]) -> PluginSpec:
+    """A ``gamedev`` spec with one ``run.created`` handler that records ``name``."""
+
+    async def created(ctx: PluginContext, event: Event) -> None:
+        fired.append(f"{name}:{event.run_id}")
+
+    return PluginSpec(
+        workflow="gamedev", handlers=(Handler(event="run.created", fn=created),)
+    )
+
+
+async def test_set_swaps_a_workflows_handlers_under_the_one_subscription(
+    store: Store,
+    bus: EventBus,
+    wait_until: Callable[[Callable[[], bool]], Awaitable[None]],
+):
+    """22 §Live mounting: the first event reaches the old handler, the
+    second the new one, and the subscription is the same object."""
+
+    fired: list[str] = []
+    dispatch = dispatch_handlers(bus, [_subscriber("old", fired)], PluginHost(store))
+    subscription = dispatch.subscription
+    assert subscription is not None
+    try:
+        bus.publish(_created("01J"))
+        await wait_until(lambda: len(fired) == 1)
+
+        dispatch.set("gamedev", _subscriber("new", fired))
+        assert dispatch.subscription is subscription
+
+        bus.publish(_created("01K"))
+        await wait_until(lambda: len(fired) == 2)
+    finally:
+        await dispatch.aclose()
+
+    assert fired == ["old:01J", "new:01K"]
+    assert subscription.closed
+
+
+async def test_set_to_none_drops_the_name_and_set_again_restores_it(
+    store: Store,
+    bus: EventBus,
+    wait_until: Callable[[Callable[[], bool]], Awaitable[None]],
+):
+    fired: list[str] = []
+    spec = _subscriber("one", fired)
+    dispatch = dispatch_handlers(bus, [spec], PluginHost(store))
+    subscription = dispatch.subscription
+    try:
+        dispatch.set("gamedev", None)
+        assert dispatch.specs == {}
+        assert dispatch.subscription is subscription
+        bus.publish(_created("01J"))
+        await asyncio.sleep(0.05)
+        assert fired == []
+
+        dispatch.set("gamedev", spec)
+        assert dispatch.subscription is subscription
+        bus.publish(_created("01K"))
+        await wait_until(lambda: len(fired) == 1)
+    finally:
+        await dispatch.aclose()
+
+    assert fired == ["one:01K"]
+
+
+async def test_a_spec_without_handlers_is_not_kept_in_the_map(
+    bus: EventBus,
+):
+    dispatch = dispatch_handlers(bus, [PluginSpec(workflow="gamedev")])
+    try:
+        assert dispatch.specs == {}
+        dispatch.set("gamedev", PluginSpec(workflow="gamedev"))
+        assert dispatch.specs == {}
+    finally:
+        await dispatch.aclose()
+
+
+async def test_a_dispatcher_started_with_nothing_to_deliver_to_is_subscribed(
+    store: Store,
+    bus: EventBus,
+    wait_until: Callable[[Callable[[], bool]], Awaitable[None]],
+):
+    """D236: the subscription is taken at start, so a spec with handlers
+    that arrives later joins the one that already exists."""
+
+    fired: list[str] = []
+    dispatch = dispatch_handlers(bus, [], PluginHost(store))
+    try:
+        subscription = dispatch.subscription
+        assert subscription is not None and not subscription.closed
+        assert dispatch.running
+
+        dispatch.set("gamedev", _subscriber("late", fired))
+        assert dispatch.subscription is subscription
+        bus.publish(_created("01J"))
+        await wait_until(lambda: len(fired) == 1)
+    finally:
+        await dispatch.aclose()
+
+    assert fired == ["late:01J"]
+    assert dispatch.subscription is None
+    assert not dispatch.running
 
 
 async def test_a_handler_that_subscribes_to_nothing_that_fires_is_never_called(

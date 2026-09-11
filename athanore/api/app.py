@@ -46,10 +46,10 @@ from athanore.api.openapi import (
 )
 from athanore.api.routers import agent, requests, runs, system, tasks, workflows
 from athanore.api.sse import router as sse_router
-from athanore.api.static import install_cors, mount_plugin_assets, mount_spa
+from athanore.api.static import install_cors, mount_spa
 from athanore.engine import Engine
 from athanore.plugins.context import PluginHost
-from athanore.plugins.mount import dispatch_handlers, mount_plugins
+from athanore.plugins.mount import MountedPlugins
 from athanore.plugins.registry import PluginSpec
 from athanore.settings import AthanoreSettings
 from athanore.store.clock import now
@@ -69,7 +69,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     bus, and it can only be taken once there is a loop to consume it in
     (09 §Wire contract) — so it is started here and closed here, and a
     handler that outlived the application would otherwise be delivering
-    events into a store on its way down.
+    events into a store on its way down. It is started whether or not a
+    spec with handlers is mounted yet: the subscription is the one every
+    later ``add`` swaps its handlers under (22 §Live mounting, D236).
 
     Everything else — the engine, the store, the event bus — is started
     and stopped by whoever built it and handed it here (04 §Shutdown),
@@ -77,13 +79,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     stop one out from under a host still using it.
     """
 
-    engine: Engine | None = app.state.engine
-    specs: Sequence[PluginSpec] = app.state.plugins
+    plugins: MountedPlugins = app.state.plugins
     async with AsyncExitStack() as stack:
         await stack.enter_async_context(app.state.mcp.run())
-        if engine is not None and any(spec.handlers for spec in specs):
-            dispatch = dispatch_handlers(engine.bus, specs, PluginHost.from_app(app))
-            stack.push_async_callback(dispatch.aclose)
+        if plugins.dispatch is not None:
+            plugins.dispatch.start()
+            stack.push_async_callback(plugins.dispatch.aclose)
         yield
 
 
@@ -99,7 +100,11 @@ def create_app(
     a bare `create_app()` is the server the environment describes.
     `plugins` are the collected, **validated** specs of the registered
     workflows (09): the host that registered them is what checked them,
-    and this application mounts what it is given.
+    and this application mounts what it is given. They become the first
+    entries of the :class:`~athanore.plugins.mount.MountedPlugins` on
+    ``app.state.plugins``, which is where a host adds, replaces and
+    removes a workflow's surface while the application serves (22 §Live
+    mounting).
 
     Raises :class:`~athanore.api.deps.MissingOperatorToken` when the
     settings turn operator auth on without a token to check against —
@@ -125,7 +130,6 @@ def create_app(
     app.state.settings = settings
     app.state.engine = engine
     app.state.store = store
-    app.state.plugins = tuple(plugins) if plugins is not None else ()
     # When this process came up. `/api/me` reports it and the SPA
     # refetches the plugin manifest whenever it changes (09).
     app.state.started_at = now()
@@ -169,21 +173,25 @@ def create_app(
     # item the line above inserts as well as the generated routes (08
     # §OpenAPI).
     install_openapi(app)
-    # The plugin routes, then the manifest that lists them: one router
-    # per workflow at `/api/plugins/{workflow}`, under the same operator
-    # door as everything else (09 §Mounting, 12 §Plugins).
-    mount_plugins(app, app.state.plugins)
-    # ...and the JavaScript a workflow ships beside them, at
-    # `/plugins/{workflow}/static/` (09 §Escape hatch). Not under
-    # `/api/`: it is a document's asset rather than an operation, it is
-    # served by `StaticFiles` under the SPA's own content-security
-    # policy, and the `<script type="module">` the SPA injects for it
-    # carries no credential — which is why the manifest lists the URLs
-    # and this is the only thing at them.
-    for spec in app.state.plugins:
-        directory = spec.assets_dir()
-        if directory is not None:
-            mount_plugin_assets(app, spec.workflow, directory, settings)
+    # The plugin surface: the manifest and the actions endpoint once,
+    # then one router per workflow at `/api/plugins/{workflow}` under the
+    # same operator door as everything else (09 §Mounting, 12 §Plugins),
+    # and the JavaScript a workflow ships beside them at
+    # `/plugins/{workflow}/static/` (09 §Escape hatch) — not under
+    # `/api/`, because it is a document's asset rather than an
+    # operation, served by `StaticFiles` under the SPA's own
+    # content-security policy. The collection is live: what a host adds
+    # or removes later is mounted the same way (22 §Live mounting). The
+    # dispatcher it owns is built here and started by `lifespan`, and
+    # only where there is an engine: no engine, no bus, no events.
+    app.state.plugins = MountedPlugins(
+        app,
+        settings,
+        bus=engine.bus if engine is not None else None,
+        host=PluginHost.from_app(app) if engine is not None else None,
+    )
+    for spec in plugins if plugins is not None else ():
+        app.state.plugins.add(spec)
     # The SPA at `/`, as the router's fallback rather than as a route:
     # every route is matched first — including the ones a plugin
     # registers after this call — and an unmatched path is the client

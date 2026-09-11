@@ -34,6 +34,7 @@ The six, in the order :func:`validate` runs them:
 
 from __future__ import annotations
 
+import hashlib
 import importlib.resources
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -42,6 +43,7 @@ from typing import Any
 
 from athanore.events.names import PLUGIN_PREFIX, is_known
 from athanore.graph import Graph
+from athanore.logging import get_logger
 from athanore.plugins.decl import Action, Handler, Panel, PanelKind, Route, Slot
 from athanore.workflow import Workflow
 
@@ -68,6 +70,13 @@ ASSETS_URL = "/plugins/{workflow}/static"
 #: Where a plugin's routes are mounted (08 §Plugins).
 ROUTES_URL = "/api/plugins/{workflow}"
 
+#: How much of an asset file's sha256 its manifest URL carries as ``?v=``
+#: (22 §Live mounting): enough that two builds of one module do not
+#: collide, short enough to read in a script tag.
+ASSET_VERSION_LENGTH = 12
+
+_log = get_logger(__name__)
+
 
 class PluginValidationError(ValueError):
     """A declaration this server refuses to publish.
@@ -85,8 +94,9 @@ class PluginSpec:
 
     What :func:`collect` produces and everything downstream reads: the
     router :func:`athanore.plugins.mount.mount` builds, the manifest
-    :func:`manifest_entry` renders, and the subscriptions
-    :func:`athanore.plugins.mount.dispatch_handlers` makes.
+    :func:`manifest_entry` renders (with the versioned asset URLs of
+    :func:`_asset_urls`), and the handlers
+    :class:`athanore.plugins.mount.HandlerDispatch` feeds.
 
     ``assets``, ``base`` and ``package`` are kept apart rather than
     joined here because 09 resolves a relative ``assets=`` against the
@@ -229,7 +239,10 @@ def manifest_entry(spec: PluginSpec, assets_root: Path | None = None) -> dict[st
     the element tag a ``custom`` panel renders, and the event globs that
     invalidate it. An action carries the JSON Schema of its model —
     which *is* its form — so the SPA renders one without a second
-    declaration.
+    declaration. The asset URLs are read off disk when this is called
+    and each carries the file's content version as ``?v=``
+    (:func:`_asset_urls`), so a manifest read after a rebuild lists the
+    new bytes under a new URL.
 
     Fields that do not apply are **absent**, not null: 01 §Real data only
     is the rule the whole API is written to, and a ``source`` of ``null``
@@ -326,28 +339,50 @@ def _route_by_path(spec: PluginSpec, source: str) -> Route | None:
 
 
 def _asset_urls(spec: PluginSpec, assets_root: Path | None = None) -> list[str]:
-    """Every ``.js`` under the assets directory, as URLs, sorted.
+    """Every ``.js`` under the assets directory, as versioned URLs, sorted.
 
     09: the manifest lists each ``.js`` in the directory and the SPA
-    injects them once as ``<script type="module">``. Sorted so the
-    manifest of one directory is the same list on every restart, and
+    injects them once as ``<script type="module">``. Sorted by path so
+    the manifest of one directory is the same list on every read, and
     empty — never absent — for a workflow that ships no assets.
+
+    Each URL carries ``?v=<first 12 hex of the file's sha256>`` (22 §Live
+    mounting). A module the browser has already run cannot be run again,
+    so the one thing the SPA needs to know about an asset is whether the
+    bytes behind a URL it injected have changed — and a URL that changes
+    when the bytes do is the whole of that. The path part is unchanged;
+    ``StaticFiles`` ignores the query, so the listed URL is served as the
+    bare one is.
 
     The files are read here rather than at ``collect`` time because a
     build that writes them under a running server should not need a
-    restart to be listed; :func:`validate` has already established that
-    the directory is there.
+    restart to be listed — nor re-versioned; :func:`validate` has already
+    established that the directory is there. A file the walk listed but
+    this process cannot read is omitted with a warning rather than listed
+    unversioned: it could not be served either, and unknown is omitted.
     """
 
     directory = spec.assets_dir(assets_root)
     if directory is None or not directory.is_dir():
         return []
     base = ASSETS_URL.format(workflow=spec.workflow)
-    return sorted(
-        f"{base}/{path.relative_to(directory).as_posix()}"
-        for path in directory.rglob("*.js")
-        if path.is_file()
-    )
+    urls: list[str] = []
+    for path in sorted(directory.rglob("*.js")):
+        if not path.is_file():
+            continue
+        try:
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError as exc:
+            _log.warning(
+                "plugin asset could not be read and is not listed",
+                workflow=spec.workflow,
+                path=str(path),
+                error=str(exc),
+            )
+            continue
+        version = digest[:ASSET_VERSION_LENGTH]
+        urls.append(f"{base}/{path.relative_to(directory).as_posix()}?v={version}")
+    return urls
 
 
 def package_directory(package: str | None) -> Path | None:

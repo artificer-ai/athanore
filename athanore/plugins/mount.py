@@ -1,9 +1,16 @@
 """Turning declarations into live routes, a manifest, and subscriptions.
 
-09 §Mounting and §Wire contract. Four things happen here and nothing
-else does — the three of §Mounting, plus the one endpoint §Wire contract
-gives every action:
+09 §Mounting and §Wire contract, and 22 §Live mounting. Four things
+happen here and nothing else does — the three of §Mounting, plus the one
+endpoint §Wire contract gives every action — and one object owns them
+for the life of an application:
 
+- :class:`MountedPlugins` is what ``app.state.plugins`` holds. It mounts
+  the manifest and the actions endpoint once, and then adds, replaces
+  and removes one workflow's surface at a time — router, assets mount,
+  manifest entry, ``on`` handlers — on an application that is already
+  serving (22 §Live mounting). Every reader of the specs reads its
+  ``.specs`` per request, so a mutation is visible on the next one.
 - :func:`mount` builds one ``APIRouter`` per workflow at
   ``/api/plugins/{workflow}``, under ``Depends(operator_auth)``. **A
   plugin does not get an auth model of its own** (12 §Plugins): its
@@ -21,11 +28,14 @@ gives every action:
   ``started_at``. Builtins come first, under the ``_builtin`` workflow,
   because the operator's own views are the ones the pane host lays out
   before anything a workflow contributed (09 §Builtins are plugins).
-- :func:`dispatch_handlers` subscribes **once** to the bus and calls the
+- :class:`HandlerDispatch` subscribes **once** to the bus and calls the
   ``on`` handlers that match each event. The bus is fed by the store's
   outbox after the commit, so a handler sees only state that is durable,
   and it runs in the dispatcher's own task rather than in the
-  transaction — which is what makes the next paragraph true.
+  transaction — which is what makes the next paragraph true. Its map of
+  handler-bearing specs is mutable and read per event, so a workflow's
+  handlers are swapped under the one subscription without it closing,
+  and no event is missed across the swap.
 
 **A plugin cannot break the engine.** A handler that raises is logged
 and dropped: the transaction that emitted the event has already
@@ -36,18 +46,19 @@ stalling a writer, because the bus never awaits a subscriber (D29).
 **What is not here.** The assets a workflow ships are served under
 ``/plugins/{wf}/static/`` (09 §Escape hatch) by
 :func:`athanore.api.static.mount_plugin_assets`, which
-:func:`athanore.api.app.create_app` calls for every spec that declares
-one. They are files rather than operations: they hang off ``/`` rather
-than ``/api/``, they carry the SPA's content-security policy rather than
-the operator door, and the module that owns the other things at ``/`` is
-where they belong.
+:class:`MountedPlugins` calls for every spec that declares one. They are
+files rather than operations: they hang off ``/`` rather than ``/api/``,
+they carry the SPA's content-security policy rather than the operator
+door, and the module that owns the other things at ``/`` is where they
+belong.
 
-This module reaches up into :mod:`athanore.api` for two things and two
-only — the operator dependency, and the OpenAPI security requirement
-that documents it. Both are named exemptions in the layering contract
-(D138): a plugin route *is* an API route, so the door it hangs on is the
-API's, and there is no lower place to put a door that has to be the same
-one.
+This module reaches up into :mod:`athanore.api` for three things and
+three only — the operator dependency, the OpenAPI security requirement
+that documents it, and the assets mount. All three are named exemptions
+in the layering contract (D138, D236): a plugin route *is* an API route,
+so the door it hangs on is the API's, and a plugin's assets are served
+under the API's own policy, so the mount that serves them is the API's
+too. There is no lower place to put either.
 """
 
 from __future__ import annotations
@@ -62,9 +73,11 @@ from fastapi import APIRouter, Depends, FastAPI, Path, Query, Request
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
 from pydantic import ValidationError as PydanticValidationError
+from starlette.routing import BaseRoute, Mount
 
 from athanore.api.deps import operator_auth
 from athanore.api.openapi import OPERATOR_BEARER, OPERATOR_RESPONSES, secure
+from athanore.api.static import mount_plugin_assets
 from athanore.events import names
 from athanore.events.bus import EventBus, Subscription
 from athanore.events.model import Event
@@ -86,7 +99,13 @@ from athanore.plugins.decl import (
     Route,
     Slot,
 )
-from athanore.plugins.registry import BUILTIN_WORKFLOW, PluginSpec, manifest_entry
+from athanore.plugins.registry import (
+    ASSETS_URL,
+    BUILTIN_WORKFLOW,
+    PluginSpec,
+    manifest_entry,
+)
+from athanore.settings import AthanoreSettings
 
 __all__ = [
     "ACTIONS_PATH",
@@ -95,13 +114,13 @@ __all__ = [
     "ActionOut",
     "ActionScope",
     "HandlerDispatch",
+    "MountedPlugins",
     "PanelOut",
     "PluginManifestEntry",
     "dispatch_handlers",
     "mount",
     "mount_actions",
     "mount_manifest",
-    "mount_plugins",
 ]
 
 _log = get_logger(__name__)
@@ -114,6 +133,11 @@ MANIFEST_PATH = "/api/plugins"
 ACTIONS_PATH = "/{wf}/actions/{name}"
 
 
+# The docstring of `PanelOut`, the `assets` description of
+# `PluginManifestEntry` and the docstring of the `manifest` route below
+# are in `tests/snapshots/openapi.json`, and T084 leaves the snapshot
+# byte-identical. Their "changes only on restart" wording is stale since
+# 22 §Live mounting; T086, which regenerates the snapshot, corrects it.
 class PanelOut(BaseModel):
     """One panel of the manifest (09 §Wire contract).
 
@@ -224,23 +248,199 @@ class PluginManifestEntry(BaseModel):
     )
 
 
-def mount_plugins(app: FastAPI, specs: Sequence[PluginSpec]) -> None:
-    """Mount every spec on ``app``, and the manifest that lists them.
+class MountedPlugins:
+    """The plugin surface of one application, mutable while it serves.
 
-    What :func:`athanore.api.app.create_app` calls. The manifest route
-    exists whether or not anything is registered: a server with no
-    plugins answers with an empty list, which is a fact the SPA can act
-    on, rather than a 404 it has to special-case.
+    What :func:`athanore.api.app.create_app` builds and puts on
+    ``app.state.plugins`` (22 §Live mounting). Construction mounts the
+    two fixed routers — the manifest, then the actions endpoint — which
+    exist whether or not anything is registered: a server with no
+    plugins answers the manifest with an empty list, which is a fact the
+    SPA can act on rather than a 404 it has to special-case. Everything
+    else is per workflow and arrives through :meth:`add`.
+
+    **What one workflow's surface is.** Its router, included under
+    ``/api/plugins/{wf}`` with every route named ``plugin:{wf}:{fn}``;
+    its assets ``Mount`` at ``/plugins/{wf}/static``, when it declares
+    a directory; its manifest entry, in the order it was added; and its
+    ``on`` handlers, set under its name in the one
+    :class:`HandlerDispatch`. :meth:`add` puts all four in place,
+    :meth:`remove` takes all four away — the routes by their name
+    prefix, the mount by its path — and :meth:`replace` is the two at
+    the same manifest position. Starlette matches ``app.router.routes``
+    on every request and the SPA is the router's *fallback* rather than
+    a route (08 §Static), so a route included now is matched on the next
+    request and a route dropped from the list is gone on the next;
+    nothing is rebuilt. Every mutation drops the cached OpenAPI document
+    so ``GET /openapi.json`` describes the routes that exist.
+
+    **An empty spec is held nowhere.** A workflow that declares nothing
+    mounts nothing and has no manifest entry (09 §Wire contract), and
+    that is decided here rather than by every caller: ``add`` of one
+    records nothing, ``remove`` of its name is ``None``, and a host can
+    hand over whatever :func:`~athanore.plugins.registry.collect`
+    produced without looking inside.
+
+    **No lock.** Every mutation is synchronous and runs on the loop
+    thread between awaits. A request in flight holds the spec its
+    endpoint closed over and finishes on it, which is the rule 22
+    §Replace gives an attempt in flight; the next request sees the new
+    surface. ``specs`` is a fresh tuple per call for the same reason: a
+    reader iterating a snapshot cannot have the list change under it.
+
+    The builtin entry (``_builtin``) is not a workflow: it is added like
+    any spec and refused by ``remove`` and ``replace``, because nothing
+    in 22 removes it and a server without its own views is not one 09
+    describes.
     """
 
-    mount_manifest(app)
-    # Before the per-workflow routers, so that a workflow which happens
-    # to declare a route at `/actions/...` cannot shadow the endpoint
-    # every action is invoked through — 08 §Plugins lists the two in
-    # that order for the same reason.
-    mount_actions(app)
-    for spec in specs:
-        mount(app, spec)
+    def __init__(
+        self,
+        app: FastAPI,
+        settings: AthanoreSettings,
+        bus: EventBus | None = None,
+        host: PluginHost | None = None,
+    ) -> None:
+        self._app = app
+        self._settings = settings
+        #: The held specs, one per workflow, in the order they were added.
+        self._specs: list[PluginSpec] = []
+        #: The router :func:`mount` built for each held workflow, which is
+        #: what its entry on the application's router refers to.
+        self._routers: dict[str, APIRouter] = {}
+        mount_manifest(app)
+        # Before the per-workflow routers, so that a workflow which
+        # happens to declare a route at `/actions/...` cannot shadow the
+        # endpoint every action is invoked through — 08 §Plugins lists the
+        # two in that order for the same reason.
+        mount_actions(app)
+        #: The one subscription's dispatcher, or ``None`` on an
+        #: application with no engine and therefore no bus: the OpenAPI
+        #: dump and a test that mounts routes alone are that application,
+        #: and they have no events to deliver.
+        self.dispatch: HandlerDispatch | None = (
+            HandlerDispatch(bus, (), host) if bus is not None else None
+        )
+
+    @property
+    def specs(self) -> tuple[PluginSpec, ...]:
+        """The held specs, in the order they were added. A fresh tuple."""
+
+        return tuple(self._specs)
+
+    def get(self, workflow: str) -> PluginSpec | None:
+        """The spec held under ``workflow``, if one is."""
+
+        return next((spec for spec in self._specs if spec.workflow == workflow), None)
+
+    def add(self, spec: PluginSpec) -> None:
+        """Mount ``spec``'s surface, after everything already held.
+
+        Raises ``ValueError`` for a workflow already held — the host
+        refuses a duplicate name before this is reached, so this is a
+        guard against a caller's mistake rather than a policy. An empty
+        spec is accepted and held nowhere (see the class).
+        """
+
+        if self.get(spec.workflow) is not None:
+            raise ValueError(f"workflow {spec.workflow!r} is already mounted")
+        self._insert(spec, len(self._specs))
+
+    def remove(self, workflow: str) -> PluginSpec | None:
+        """Unmount ``workflow``'s surface, and return the spec that was held.
+
+        ``None`` when nothing was — a workflow whose spec was empty was
+        never held, and removing it is a no-op rather than an error.
+        Raises ``ValueError`` for the builtin entry.
+        """
+
+        if workflow == BUILTIN_WORKFLOW:
+            raise ValueError(f"the {BUILTIN_WORKFLOW!r} entry cannot be removed")
+        return self._drop(workflow)
+
+    def replace(self, spec: PluginSpec) -> None:
+        """Swap the surface held under ``spec.workflow`` for ``spec``.
+
+        Remove, then add at the position the old one had (22 §Replace,
+        step 2: same position in the manifest). A name not currently
+        held is appended — the workflow may have declared nothing before
+        and something now — and an empty ``spec`` removes what was there
+        and holds nothing. Raises ``ValueError`` for the builtin entry.
+        """
+
+        if spec.workflow == BUILTIN_WORKFLOW:
+            raise ValueError(f"the {BUILTIN_WORKFLOW!r} entry cannot be replaced")
+        index = next(
+            (i for i, held in enumerate(self._specs) if held.workflow == spec.workflow),
+            None,
+        )
+        self._drop(spec.workflow)
+        self._insert(spec, index if index is not None else len(self._specs))
+
+    def _insert(self, spec: PluginSpec, index: int) -> None:
+        """Mount ``spec`` and hold it at ``index``; nothing for an empty one.
+
+        The router first, then the assets mount, then the record, then
+        the handlers. Should either mount raise — a route FastAPI cannot
+        build, a directory that is not there — what was put in place is
+        taken out again before the error leaves, so a refusal leaves the
+        application exactly as it was (22 §Effects).
+        """
+
+        if not spec:
+            return
+        try:
+            self._routers[spec.workflow] = mount(self._app, spec)
+            directory = spec.assets_dir()
+            if directory is not None:
+                mount_plugin_assets(self._app, spec.workflow, directory, self._settings)
+        except Exception:
+            self._unmount(spec.workflow)
+            raise
+        self._specs.insert(index, spec)
+        if self.dispatch is not None:
+            self.dispatch.set(spec.workflow, spec)
+        self._app.openapi_schema = None
+
+    def _drop(self, workflow: str) -> PluginSpec | None:
+        """Unmount ``workflow`` and forget it; the spec that was held."""
+
+        self._unmount(workflow)
+        held = self.get(workflow)
+        if held is not None:
+            self._specs.remove(held)
+        if self.dispatch is not None:
+            self.dispatch.set(workflow, None)
+        self._app.openapi_schema = None
+        return held
+
+    def _unmount(self, workflow: str) -> None:
+        """Take ``workflow``'s routes and assets mount off the router.
+
+        The list Starlette iterates is filtered in place rather than the
+        router rebuilt: the SPA fallback, the MCP mount and the
+        middleware stack all hang off the router object. Three shapes
+        are the workflow's — the entry FastAPI's ``include_router``
+        appends, which refers to the router :func:`mount` built (0.141
+        onward); a route carried flat with the name ``plugin:{wf}:…``
+        (the name prefix keeps the colon, so ``plugin:a:`` never matches
+        ``plugin:ab:…``); and the ``Mount`` at ``/plugins/{wf}/static``.
+        """
+
+        router = self._routers.pop(workflow, None)
+        prefix = f"plugin:{workflow}:"
+        assets = ASSETS_URL.format(workflow=workflow)
+
+        def belongs(route: BaseRoute) -> bool:
+            if isinstance(route, Mount):
+                return route.path == assets
+            if router is not None and getattr(route, "original_router", None) is router:
+                return True
+            name = getattr(route, "name", None)
+            return isinstance(name, str) and name.startswith(prefix)
+
+        routes = self._app.router.routes
+        routes[:] = [route for route in routes if not belongs(route)]
 
 
 def mount(app: FastAPI, spec: PluginSpec) -> APIRouter:
@@ -279,9 +479,11 @@ def mount_manifest(app: FastAPI) -> APIRouter:
     """Add ``GET /api/plugins`` to ``app``, reading ``app.state.plugins``.
 
     Read per request rather than closed over, like every other
-    collaborator in the API (08 §Endpoints) — and because the asset list
-    is read off disk when it is asked for, so a build that lands under a
-    running server needs no restart to be listed.
+    collaborator in the API (08 §Endpoints) — which is what makes a spec
+    :class:`MountedPlugins` added or removed a moment ago the one this
+    lists (22 §Live mounting) — and because the asset list is read off
+    disk when it is asked for, so a build that lands under a running
+    server needs no restart to be listed.
     """
 
     router = APIRouter(prefix=MANIFEST_PATH, tags=["plugins"])
@@ -301,10 +503,10 @@ def mount_manifest(app: FastAPI) -> APIRouter:
         manifest changes only when the process does (09 §Wire contract).
         """
 
-        specs: Sequence[PluginSpec] = getattr(request.app.state, "plugins", None) or ()
+        plugins: MountedPlugins = request.app.state.plugins
         return [
             PluginManifestEntry.model_validate(manifest_entry(spec))
-            for spec in _builtins_first(specs)
+            for spec in _builtins_first(plugins.specs)
         ]
 
     secure(router, OPERATOR_BEARER)
@@ -317,8 +519,10 @@ def mount_actions(app: FastAPI) -> APIRouter:
 
     **One endpoint, not a route per action** (09 §Mounting). The
     workflow and the action are path parameters, the specs are read off
-    ``app.state.plugins`` per request like everywhere else in the API,
-    and the four steps 08 §Plugins fixes happen in this order:
+    ``app.state.plugins`` per request like everywhere else in the API —
+    so an action added or removed live is found or not on the next call
+    (22 §Live mounting) — and the four steps 08 §Plugins fixes happen in
+    this order:
 
     1. **find the action**, or 404. A workflow this server does not
        carry and an action it does not declare are the same answer —
@@ -375,8 +579,8 @@ def mount_actions(app: FastAPI) -> APIRouter:
         with whatever the handler returned, as JSON.
         """
 
-        specs: Sequence[PluginSpec] = getattr(request.app.state, "plugins", None) or ()
-        action = _action(specs, wf, name)
+        plugins: MountedPlugins = request.app.state.plugins
+        action = _action(plugins.specs, wf, name)
         value = _action_input(action, body.input)
         host = PluginHost.from_app(request.app)
         context = await host.context(
@@ -643,10 +847,23 @@ def _context_dependency(
 class HandlerDispatch:
     """One subscription, and the ``on`` handlers it feeds.
 
-    Constructed by :func:`dispatch_handlers`, which also starts it.
-    ``aclose()`` closes the subscription and waits for the consumer task,
-    so a host that stops the application does not leave one draining the
-    bus into handlers whose store is being torn down.
+    Owned by :class:`MountedPlugins`, which starts it from the
+    application's lifespan; :func:`dispatch_handlers` builds and starts
+    one on its own for a host that has no application. ``aclose()``
+    closes the subscription and waits for the consumer task, so a host
+    that stops the application does not leave one draining the bus into
+    handlers whose store is being torn down.
+
+    **The subscription outlives every swap** (22 §Live mounting). The
+    handler-bearing specs are a map by workflow name that :meth:`set`
+    mutates and :meth:`_deliver` reads per event; adding, replacing and
+    removing a workflow's handlers never touch the subscription or the
+    task, so the event published during a swap reaches whichever
+    handlers are in the map when it is delivered and none is lost to a
+    subscription closing and reopening. The subscription is therefore
+    taken whenever :meth:`start` is called — whether or not anything
+    subscribes yet — because a spec with handlers may arrive later and
+    there is one place that subscribes (D236).
     """
 
     def __init__(
@@ -656,9 +873,12 @@ class HandlerDispatch:
         host: PluginHost | None = None,
     ) -> None:
         self._bus = bus
-        #: Only the specs that subscribe to anything: a workflow with no
-        #: ``on`` handler costs nothing per event.
-        self.specs = tuple(spec for spec in specs if spec.handlers)
+        #: Only the specs that subscribe to anything, by workflow name
+        #: and in registration order: a workflow with no ``on`` handler
+        #: costs nothing per event. Mutable, through :meth:`set`.
+        self.specs: dict[str, PluginSpec] = {
+            spec.workflow: spec for spec in specs if spec.handlers
+        }
         self._host = host if host is not None else PluginHost(None)
         self._subscription: Subscription | None = None
         self._task: asyncio.Task[None] | None = None
@@ -669,11 +889,31 @@ class HandlerDispatch:
 
         return self._task is not None and not self._task.done()
 
-    def start(self) -> None:
-        """Subscribe and begin delivering. Idempotent, and a no-op if
-        nothing subscribes."""
+    @property
+    def subscription(self) -> Subscription | None:
+        """The bus subscription, from :meth:`start` until :meth:`aclose`."""
 
-        if self._task is not None or not self.specs:
+        return self._subscription
+
+    def set(self, workflow: str, spec: PluginSpec | None) -> None:
+        """Swap the handlers delivered to under ``workflow``.
+
+        A spec with handlers is set under its name — an existing name
+        keeps its position in delivery order, a new one goes last —
+        and ``None``, or a spec with no handlers, drops the name. The
+        subscription and the task are untouched either way: the next
+        event delivered reads the map as it is then.
+        """
+
+        if spec is not None and spec.handlers:
+            self.specs[workflow] = spec
+        else:
+            self.specs.pop(workflow, None)
+
+    def start(self) -> None:
+        """Subscribe and begin delivering. Idempotent."""
+
+        if self._task is not None:
             return
         # Before the first delivery, and to everything: the filtering is
         # per handler, and one subscription is what 09 asks for.
@@ -741,7 +981,7 @@ class HandlerDispatch:
         """
 
         matched: list[tuple[PluginSpec, list[Handler]]] = []
-        for spec in self.specs:
+        for spec in list(self.specs.values()):
             handlers = [
                 handler
                 for handler in spec.handlers
@@ -855,11 +1095,13 @@ def dispatch_handlers(
     """Subscribe once, and deliver committed events to the ``on`` handlers.
 
     Returns the started :class:`HandlerDispatch`; the caller closes it
-    (``await dispatch.aclose()``), which is what the application's
-    lifespan does. Requires a running event loop, because delivery is a
-    task: everything this function subscribes to arrives after a commit,
-    and there is nothing to deliver before the loop that does the
-    committing exists.
+    (``await dispatch.aclose()``). An application does not call this —
+    its :class:`MountedPlugins` owns a dispatcher and its lifespan starts
+    that one — so it is the convenience for a host, or a test, that has
+    a bus and specs and no application. Requires a running event loop,
+    because delivery is a task: everything this function subscribes to
+    arrives after a commit, and there is nothing to deliver before the
+    loop that does the committing exists.
     """
 
     dispatch = HandlerDispatch(bus, specs, host)

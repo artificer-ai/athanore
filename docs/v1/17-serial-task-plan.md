@@ -4076,6 +4076,7 @@ different one.
 **Done.** Plugin surface follows registration on a running
 application; gate green; snapshot unchanged (the dump application
 registers nothing).
+**Status.** Done.
 
 ### T085 — Loader, server verbs, events (A8.3)
 

@@ -10,6 +10,9 @@ import pytest
 from fastapi import FastAPI
 
 from athanore.api.app import VERSION, create_app
+from athanore.plugins.decl import Route
+from athanore.plugins.mount import MountedPlugins
+from athanore.plugins.registry import PluginSpec
 
 
 @pytest.fixture
@@ -25,6 +28,29 @@ def test_create_app_takes_the_published_signature() -> None:
     """The collaborators are the shape T042 onward fills in (02)."""
     app = create_app(settings=None, engine=None, store=None, plugins=None)
     assert isinstance(app, FastAPI)
+
+
+def test_create_app_holds_its_plugins_in_a_live_collection() -> None:
+    """`app.state.plugins` is the `MountedPlugins` of 22 §Live mounting.
+
+    Empty for a bare `create_app()`, and with no dispatcher: no engine
+    means no bus and nothing to deliver. A sequence handed in — list or
+    tuple — is what the collection starts with.
+    """
+
+    bare = create_app()
+    assert isinstance(bare.state.plugins, MountedPlugins)
+    assert bare.state.plugins.specs == ()
+    assert bare.state.plugins.dispatch is None
+
+    async def words() -> dict[str, str]:
+        return {"word": "athanor"}
+
+    spec = PluginSpec(workflow="gamedev", routes=(Route("/words", ("GET",), words),))
+    for plugins in ([spec], (spec,)):
+        app = create_app(plugins=plugins)
+        assert app.state.plugins.get("gamedev") is spec
+        assert app.state.plugins.specs == (spec,)
 
 
 def test_the_version_is_the_installed_distribution() -> None:
