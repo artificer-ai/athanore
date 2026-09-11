@@ -5,12 +5,20 @@
 
     server = Server()                       # settings from env / athanore.toml
     server.register(feature_build, Pool("local", 1))
+    server.register_configured()            # the [workflows.<name>].target rows
     server.serve()                          # blocking
     # ...or `await server.start()` / `await server.stop()` in a test
+    # ...and, on a serving server (22 §Server surface):
+    await server.add(wf, target="workflows/chat.py:wf", persist=True)
+    await server.replace(wf)
+    await server.remove("chat")
 
 This is the composition root and nothing else. Every object it wires
 together already exists and already knows how to do its job; what lives
-here is the *order* they are built in, and the two refusals that keep a
+here is the *order* they are built in — at boot, and again for each of
+the three live verbs, which sequence what the engine, the plugin host
+and the store each provide exactly as 22 §Effects lists (engine step,
+mount step, recovery, event, notify) — and the two refusals that keep a
 misconfigured install from running at all:
 
 - **A non-loopback bind with no operator token refuses to start.**
@@ -45,6 +53,8 @@ import contextlib
 import signal
 import socket
 from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import uvicorn
@@ -55,14 +65,41 @@ from sse_starlette.sse import AppStatus
 from athanore.api.app import create_app
 from athanore.api.deps import MissingOperatorToken, check_operator_token
 from athanore.cli.verbs import RESERVED
-from athanore.engine import SHUTDOWN_BUDGET, Engine, Pool
+from athanore.engine import SHUTDOWN_BUDGET, Engine, Pool, recover
 from athanore.events.bus import EventBus
-from athanore.graph import GraphError
+from athanore.events.model import Event
+from athanore.events.names import EventName
+from athanore.events.payloads import (
+    EventModel,
+    WorkflowRegistered,
+    WorkflowReplaced,
+    WorkflowUnregistered,
+)
+from athanore.graph import Graph, GraphError
 from athanore.logging import configure_logging, get_logger
 from athanore.plugins.builtin import with_builtins
-from athanore.plugins.registry import PluginSpec, collect, validate
+from athanore.plugins.decl import PluginError
+from athanore.plugins.discovery import (
+    Layout,
+    LayoutError,
+    LoadError,
+    LoadStage,
+    Registered,
+    RemovedWorkflow,
+    load_target,
+    read_layout,
+)
+from athanore.plugins.mount import MountedPlugins
+from athanore.plugins.persist import remove_row, write_row
+from athanore.plugins.registry import (
+    PluginSpec,
+    PluginValidationError,
+    collect,
+    validate,
+)
 from athanore.requests.service import RequestService
 from athanore.settings import AthanoreSettings
+from athanore.store.clock import now
 from athanore.store.engine import make_engine
 from athanore.store.migrate import is_v0_database, upgrade
 from athanore.store.retention import retention_loop
@@ -76,7 +113,14 @@ from athanore.workflow import Workflow
 # the one from `api` itself — `api` and `cli` are independent siblings of
 # the same tier (02 §Layering) — and the composition root, where both are
 # already raised, is the one place that names both.
-__all__ = ["AthanoreServer", "MissingOperatorToken", "Server", "V0Database"]
+__all__ = [
+    "AthanoreServer",
+    "ConfiguredRows",
+    "MissingOperatorToken",
+    "Server",
+    "Skipped",
+    "V0Database",
+]
 
 _log = get_logger(__name__)
 
@@ -97,6 +141,34 @@ _BIND_POLL = 0.01
 #: at one, so :attr:`Server.url` reports loopback instead — the MVP's
 #: behaviour, and the reason 12 §S6 gave ``public_url`` to agents.
 _WILDCARD = frozenset({"0.0.0.0", "::", "[::]", ""})
+
+
+#: The file every ``[workflows.<name>]`` row lives in, under the root path
+#: the settings resolved (02 §``athanore.toml`` layout, 22 §Persistence).
+TOML_NAME = "athanore.toml"
+
+
+@dataclass(frozen=True)
+class Skipped:
+    """A ``[workflows.<name>].target`` row a prior registration shadowed.
+
+    22 §Persistence: a positional that loads the same name wins and the
+    row is skipped with a warning naming both targets. ``registered`` is
+    the target of the registration that won, or ``None`` for a
+    programmatic one.
+    """
+
+    name: str
+    target: str
+    registered: str | None
+
+
+@dataclass(frozen=True)
+class ConfiguredRows:
+    """What :meth:`Server.register_configured` did, in the file's order."""
+
+    registered: tuple[str, ...]
+    skipped: tuple[Skipped, ...]
 
 
 class V0Database(RuntimeError):
@@ -157,6 +229,9 @@ class Server:
         )
         self.app: FastAPI | None = None
         self._workflows: dict[str, Workflow] = {}
+        #: The target each registration was loaded from, or ``None`` for
+        #: a programmatic one (22 §Terms); kept in step with `_workflows`.
+        self._targets: dict[str, str | None] = {}
         self._specs: list[PluginSpec] = []
         self._config: uvicorn.Config | None = None
         self._uvicorn: _QuietUvicorn | None = None
@@ -168,11 +243,15 @@ class Server:
 
     # -- registration ------------------------------------------------------
 
-    def register(self, wf: Workflow, pool: Pool | None = None) -> Server:
+    def register(
+        self, wf: Workflow, pool: Pool | None = None, *, target: str | None = None
+    ) -> Server:
         """Finalize ``wf``, check its name, and run it on ``pool``.
 
-        Three names must not collide, and all three are checked here
-        rather than at the moment the collision would be felt:
+        The boot-time idiom (22 §Server surface): sync, strict about
+        duplicates, chains. Three names must not collide, and all three
+        are checked here rather than at the moment the collision would
+        be felt:
 
         1. a **CLI verb** (:data:`athanore.cli.verbs.RESERVED`), because
            ``athanore <workflow> "title"`` is the MVP's shorthand for
@@ -190,38 +269,458 @@ class Server:
         a workflow whose panel names a node it does not have is refused
         at registration rather than mounted broken (09).
 
+        ``target`` is the string the workflow was loaded from, recorded
+        for :attr:`targets`; ``None`` for a workflow the host built.
+        After :meth:`start` this raises ``RuntimeError`` — the call
+        would enter the graph and mount nothing (D226); :meth:`add` is
+        the live verb.
+
         Returns the server, so registrations chain.
         """
 
-        graph = wf.finalize()
+        self._before_start("register")
+        graph = self._finalize(wf)
         name = graph.name
-        if name in RESERVED:
-            raise GraphError(
-                f"workflow name {name!r} is a CLI verb; workflow names cannot "
-                f"shadow verbs (11 §Verbs)"
-            )
-        if name in self._workflows:
-            raise GraphError(f"workflow {name!r} is already registered")
-        if name in self.engine.pools:
-            raise GraphError(f"workflow name {name!r} is already the name of a pool")
-        spec = collect(wf)
-        validate(spec, graph)
+        self._check_name(name)
+        spec = self._check_plugins(wf, graph)
         # Last, because it is the only step that mutates anything: a
         # refusal above leaves the server exactly as it was.
         self.engine.register(graph, pool)
-        self._workflows[name] = wf
-        # A workflow that declares nothing contributes nothing: an empty
-        # spec would be an empty router and a manifest entry with no
-        # panels, actions or assets in it (09 §Wire contract).
-        if spec:
-            self._specs.append(spec)
+        self._record(name, wf, target, spec)
         return self
+
+    def register_configured(self) -> ConfiguredRows:
+        """Register the ``[workflows.<name>].target`` rows (22 §Persistence).
+
+        Reads the file the settings resolved (``root_path /
+        athanore.toml``) and, for each row with a ``target`` in the
+        file's order, loads it through :func:`load_target` and calls
+        :meth:`register` with its target and, when the row names one,
+        the pool ``[pools]`` declares for it. The rules a row is held to:
+
+        - its key MUST be the loaded workflow's name — the row is the
+          registration, and one under the wrong name is a typo that
+          would register something the operator did not write down;
+          ``LoadError`` (stage ``register``) otherwise;
+        - a name already registered wins — ``athanore serve``'s
+          positional, or a ``register`` the host made first — and the
+          row is skipped, reported in ``skipped`` and logged at WARNING
+          naming both targets;
+        - a pool ``[pools]`` does not declare is a ``LayoutError``, the
+          price ``athanore serve`` puts on any binding it cannot honour.
+
+        A file with no such rows registers nothing; a missing file is
+        not an error. Rows without a target are bindings only and are
+        not read here. Before :meth:`start` only, as :meth:`register`.
+        """
+
+        self._before_start("register_configured")
+        path = self.toml_path
+        layout = read_layout(path)
+        registered: list[str] = []
+        skipped: list[Skipped] = []
+        for key, target in layout.targets.items():
+            wf = load_target(target)
+            if wf.name != key:
+                detail = (
+                    f"`[workflows.{key}]` in {path} names {target}, which is the "
+                    f"workflow {wf.name!r}; a row's key must be the workflow's "
+                    f"name."
+                )
+                raise LoadError(detail, stage="register", target=target, detail=detail)
+            if key in self._workflows:
+                shadowed = Skipped(key, target, self._targets[key])
+                skipped.append(shadowed)
+                _log.warning(
+                    "a registered workflow shadows an athanore.toml row",
+                    workflow=key,
+                    row_target=target,
+                    registered_target=shadowed.registered,
+                    path=str(path),
+                )
+                continue
+            self.register(wf, _pool_of(layout, key, path), target=target)
+            registered.append(key)
+        return ConfiguredRows(tuple(registered), tuple(skipped))
+
+    async def add(
+        self,
+        wf: Workflow,
+        pool: str | Pool | None = None,
+        *,
+        target: str | None = None,
+        persist: bool = False,
+    ) -> Registered:
+        """Register ``wf`` on a server that may already be serving (22 §Add).
+
+        Every refusal :meth:`register` makes, this makes first — a verb
+        or pool name, a duplicate, a graph that does not finalize, a
+        declaration that does not validate — each as a :class:`LoadError`
+        naming its stage, and a duplicate with ``conflict`` set. Then,
+        with ``persist``, the row is written (see :meth:`_persist_row`).
+        Only then is anything mutated, in 22 §Effects' order: the engine
+        registers the graph on ``pool`` — a name, or a :class:`Pool`
+        whose name is read (:meth:`_resolve_pool`); serving, the plugin
+        spec is mounted into the live application, the name's orphaned
+        rows are recovered (``engine.recovered``, when there were any),
+        ``workflow.registered`` is emitted, and the scheduler is notified.
+        Before :meth:`start` only the registries change and nothing is
+        emitted — there is no application to mount into and no store to
+        emit to.
+
+        A mount the application refuses undoes the engine step, so a
+        failed ``add`` leaves the server as it was.
+        """
+
+        graph, spec = self._validate(wf, target, replacing=False)
+        name = graph.name
+        resolved = self._resolve_pool(pool)
+        persisted = self._persist_row(name, target, pool, persist)
+        self.engine.register(graph, resolved)
+        self._record(name, wf, target, spec)
+        if self._serving:
+            try:
+                self._plugins.add(spec)
+            except Exception:
+                await self.engine.unregister(name)
+                self._forget(name)
+                raise
+            await recover(self.engine, [name])
+            await self._emit(
+                EventName.workflow_registered,
+                WorkflowRegistered(
+                    workflow=name, pool=self._pool_name(name), target=target
+                ),
+            )
+            self.engine.notify()
+            _log.info("workflow registered", workflow=name, target=target)
+        return Registered(name, persisted)
+
+    async def replace(
+        self,
+        wf: Workflow,
+        pool: str | Pool | None = None,
+        *,
+        target: str | None = None,
+        persist: bool = False,
+    ) -> Registered:
+        """Swap the registration under ``wf``'s name (22 §Replace).
+
+        The name must be registered (``LoadError``, stage ``register``);
+        the graph and the plugins are validated as :meth:`add` validates
+        them; with ``persist`` the row is written; then the engine swaps
+        the graph — the next claim dispatches on it, an attempt in flight
+        finishes on the body it started with — keeping the pool binding
+        unless ``pool`` names another, in which case the move is refused
+        with ``ValueError`` while any attempt of the workflow is in
+        flight (22 §Pools; ``KeyError`` for a pool that does not exist).
+        Serving, the old plugin spec is unmounted and the new one mounted
+        in its place, ``workflow.replaced`` is emitted, and the scheduler
+        is notified. No recovery runs: the name's orphaned rows were
+        reset at boot or at its ``add``, and the rows in flight belong to
+        attempts still running.
+
+        ``target=None`` keeps the recorded target: a host replacing a
+        workflow with an object it built does not lose the record of
+        where it first came from.
+        """
+
+        graph, spec = self._validate(wf, target, replacing=True)
+        name = graph.name
+        resolved = self._resolve_pool(pool)
+        pool_name = resolved.name if resolved is not None else None
+        self._refuse_move_in_flight(name, pool_name)
+        recorded = target if target is not None else self._targets[name]
+        persisted = self._persist_row(name, recorded, pool, persist)
+        await self.engine.replace(graph, pool_name)
+        self._workflows[name] = wf
+        self._targets[name] = recorded
+        self._swap_spec(name, spec)
+        if self._serving:
+            self._plugins.replace(spec)
+            await self._emit(
+                EventName.workflow_replaced,
+                WorkflowReplaced(
+                    workflow=name, pool=self._pool_name(name), target=recorded
+                ),
+            )
+            self.engine.notify()
+            _log.info("workflow replaced", workflow=name, target=recorded)
+        return Registered(name, persisted)
+
+    async def remove(self, name: str, *, persist: bool = False) -> RemovedWorkflow:
+        """Drop the workflow ``name`` (22 §Remove).
+
+        The name must be registered (``LoadError``, stage ``register``).
+        With ``persist`` its row is removed first — a name with no row is
+        not an error. Then the engine unregisters it: every attempt of
+        it this process is running is cancelled the way a shutdown
+        cancels, no task status is written, the graph is dropped and the
+        name unbound from its pool, which stays. Serving, the plugin
+        spec is unmounted and ``workflow.unregistered`` is emitted naming
+        the interrupted attempts. Nothing is deleted and nothing is
+        notified — nothing became ready.
+        """
+
+        if name not in self._workflows:
+            message = f"workflow {name!r} is not registered"
+            raise LoadError(message, stage="register", target="", detail=message)
+        persisted: Path | None = None
+        if persist:
+            path = self.toml_path
+            persisted = path if remove_row(path, name) else None
+        task_ids = await self.engine.unregister(name)
+        self._forget(name)
+        if self._serving:
+            self._plugins.remove(name)
+            await self._emit(
+                EventName.workflow_unregistered,
+                WorkflowUnregistered(workflow=name, task_ids=list(task_ids)),
+            )
+            _log.info("workflow unregistered", workflow=name, task_ids=task_ids)
+        return RemovedWorkflow(name, tuple(task_ids), persisted)
 
     @property
     def workflows(self) -> dict[str, Workflow]:
         """The registered workflows by name, in registration order."""
 
         return dict(self._workflows)
+
+    @property
+    def targets(self) -> dict[str, str | None]:
+        """The target each workflow was loaded from, in registration order.
+
+        ``None`` for a programmatic registration (22 §Terms).
+        """
+
+        return dict(self._targets)
+
+    @property
+    def toml_path(self) -> Path:
+        """The ``athanore.toml`` the rows are read from and written to."""
+
+        return self.settings.root_path / TOML_NAME
+
+    # -- what the verbs are made of ----------------------------------------
+
+    @property
+    def _serving(self) -> bool:
+        """Is there a live application to mount into and a store to emit to?"""
+
+        return self._serve_task is not None and self.app is not None
+
+    @property
+    def _plugins(self) -> MountedPlugins:
+        """The live application's plugin surface (22 §Live mounting)."""
+
+        app = self.app
+        if app is None:  # pragma: no cover - guarded by `_serving`
+            raise RuntimeError("the server is not serving")
+        plugins: MountedPlugins = app.state.plugins
+        return plugins
+
+    def _before_start(self, verb: str) -> None:
+        """Refuse a boot-time verb on a serving server (D226)."""
+
+        if self._serve_task is not None:
+            raise RuntimeError(
+                f"the server is serving; {verb}() is for before start() — "
+                f"use add(), replace() or remove()"
+            )
+
+    def _finalize(self, wf: Workflow) -> Graph:
+        """``wf``'s graph; ``GraphError`` when it does not finalize."""
+
+        return wf.finalize()
+
+    def _check_name(self, name: str, *, replacing: bool = False) -> None:
+        """The three name refusals of :meth:`register`, as ``GraphError``.
+
+        ``replacing`` skips the duplicate check — the name is expected
+        to be registered — and adds the reverse one.
+        """
+
+        if name in RESERVED:
+            raise GraphError(
+                f"workflow name {name!r} is a CLI verb; workflow names cannot "
+                f"shadow verbs (11 §Verbs)"
+            )
+        if replacing:
+            if name not in self._workflows:
+                raise GraphError(f"workflow {name!r} is not registered")
+            return
+        if name in self._workflows:
+            raise GraphError(f"workflow {name!r} is already registered")
+        if name in self.engine.pools:
+            raise GraphError(f"workflow name {name!r} is already the name of a pool")
+
+    def _check_plugins(self, wf: Workflow, graph: Graph) -> PluginSpec:
+        """``wf``'s declarations, collected and validated against ``graph``."""
+
+        spec = collect(wf)
+        validate(spec, graph)
+        return spec
+
+    def _validate(
+        self, wf: Workflow, target: str | None, *, replacing: bool
+    ) -> tuple[Graph, PluginSpec]:
+        """What :meth:`register` checks, each refusal as a :class:`LoadError`.
+
+        The stages 22 §Wire gives the server: ``finalize`` for a graph
+        that does not close, ``register`` for a name that is a verb, a
+        pool, already registered (``conflict``) or — replacing — not
+        registered, ``plugins`` for a declaration that does not validate.
+        """
+
+        shown = target if target is not None else ""
+        try:
+            graph = self._finalize(wf)
+        except GraphError as exc:
+            raise _load_error(exc, "finalize", shown) from exc
+        try:
+            self._check_name(graph.name, replacing=replacing)
+        except GraphError as exc:
+            conflict = not replacing and graph.name in self._workflows
+            raise _load_error(exc, "register", shown, conflict=conflict) from exc
+        try:
+            spec = self._check_plugins(wf, graph)
+        except (PluginValidationError, PluginError) as exc:
+            raise _load_error(exc, "plugins", shown) from exc
+        return graph, spec
+
+    def _resolve_pool(self, pool: str | Pool | None) -> Pool | None:
+        """The pool a live verb names, or ``None`` for the default binding.
+
+        A name must be a registered pool — ``KeyError`` naming the known
+        ones otherwise (D234; the API's ``422 unknown_pool``). A
+        :class:`Pool` object before :meth:`start` is passed through as
+        :meth:`register` passes it, the boot-time idiom by which a host
+        declares capacity; while serving it contributes only its name
+        and must exist, because a live registration never creates or
+        resizes a pool (22 §Pools, D233).
+        """
+
+        if pool is None:
+            return None
+        if isinstance(pool, Pool) and self._serve_task is None:
+            return pool
+        name = pool if isinstance(pool, str) else pool.name
+        if name not in self.engine.pools:
+            raise KeyError(
+                f"no pool named {name!r}; known pools are "
+                f"{sorted(state.name for state in self.engine.pools)}"
+            )
+        return self.engine.pools.get(name).pool
+
+    def _refuse_move_in_flight(self, name: str, pool_name: str | None) -> None:
+        """The engine's pool-move refusal, before the row is written.
+
+        :meth:`Engine.replace` makes the authoritative check between
+        ticks; this one runs first so that a ``persist=True`` replace
+        refused for its pool move has written nothing (22 §Persistence:
+        a write happens after every validation).
+        """
+
+        if pool_name is None or pool_name == self._pool_name(name):
+            return
+        live = self.engine.attempts_of(name)
+        if live:
+            raise ValueError(
+                f"workflow {name!r} cannot move from pool "
+                f"{self._pool_name(name)!r} to {pool_name!r} with attempts in "
+                f"flight: tasks {live}"
+            )
+
+    def _pool_name(self, name: str) -> str:
+        """The pool ``name`` is bound to, read off the engine."""
+
+        return self.engine.pools.for_workflow(name).name
+
+    def _persist_row(
+        self, name: str, target: str | None, pool: str | Pool | None, persist: bool
+    ) -> Path | None:
+        """Write the row ``persist`` asks for; the path written, or ``None``.
+
+        After every validation and before anything is mutated, so a
+        target that does not load is never written down and a write
+        that fails (``PersistError``) leaves the server as it was. The
+        row carries ``pool`` only when the caller named one — a
+        default-pool workflow stays on the default pool if ``workers``
+        changes (22 §Persistence). ``persist`` without a target is a
+        ``ValueError``: a ``Workflow`` object cannot be written to a file.
+        """
+
+        if not persist:
+            return None
+        if target is None:
+            raise ValueError(
+                "persist=True needs a target; a Workflow object cannot be "
+                "written to athanore.toml"
+            )
+        path = self.toml_path
+        pool_name = pool if isinstance(pool, str) or pool is None else pool.name
+        write_row(path, name, target, pool_name)
+        return path
+
+    def _record(
+        self, name: str, wf: Workflow, target: str | None, spec: PluginSpec
+    ) -> None:
+        """Hold ``wf`` under ``name``, with its target and its spec.
+
+        A workflow that declares nothing contributes nothing: an empty
+        spec would be an empty router and a manifest entry with no
+        panels, actions or assets in it (09 §Wire contract). ``_specs``
+        is what :meth:`start` hands ``create_app``, so it is kept true
+        before and after start alike.
+        """
+
+        self._workflows[name] = wf
+        self._targets[name] = target
+        if spec:
+            self._specs.append(spec)
+
+    def _forget(self, name: str) -> None:
+        """Drop every record of ``name``."""
+
+        self._workflows.pop(name, None)
+        self._targets.pop(name, None)
+        self._specs[:] = [spec for spec in self._specs if spec.workflow != name]
+
+    def _swap_spec(self, name: str, spec: PluginSpec) -> None:
+        """``spec`` in place of the one held under ``name``.
+
+        At the old one's index; appended when the old was empty and so
+        never held; dropped when the new one is empty (D237).
+        """
+
+        index = next(
+            (i for i, held in enumerate(self._specs) if held.workflow == name), None
+        )
+        if index is not None:
+            del self._specs[index]
+        if not spec:
+            return
+        self._specs.insert(index if index is not None else len(self._specs), spec)
+
+    async def _emit(self, name: EventName, payload: EventModel) -> None:
+        """Record one ``workflow.*`` event in its own transaction.
+
+        No ``run_id``: like ``engine.*``, these are about the server (22
+        §Events). Stored — they are part of the audit trail and the SSE
+        cursor needs their ids — and published to every subscriber by
+        the store's outbox.
+        """
+
+        async with self.store.uow() as uow:
+            uow.emit(
+                Event(
+                    run_id=None,
+                    task_id=None,
+                    name=name,
+                    data=payload.model_dump(),
+                    created=now(),
+                )
+            )
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -644,6 +1143,35 @@ def _socket_port(sock: socket.socket) -> int | None:
     if isinstance(address, tuple) and len(address) >= 2:
         return int(address[1])
     return None
+
+
+def _load_error(
+    exc: Exception, stage: LoadStage, target: str, *, conflict: bool = False
+) -> LoadError:
+    """A refusal of the server's, as the one exception type 22 §Wire names."""
+
+    return LoadError(
+        str(exc), stage=stage, target=target, detail=str(exc), conflict=conflict
+    )
+
+
+def _pool_of(layout: Layout, name: str, path: Path) -> Pool | None:
+    """The pool a ``[workflows.<name>]`` row binds, or ``None`` for the default.
+
+    A pool ``[pools]`` does not declare is refused with the sentence
+    ``athanore serve`` prints for any binding it cannot honour.
+    """
+
+    bound = layout.bindings.get(name)
+    if bound is None:
+        return None
+    if bound not in layout.pools:
+        raise LayoutError(
+            path,
+            f"workflow `{name}` is bound to pool `{bound}`, which `[pools]` in "
+            f"{path} does not declare.",
+        )
+    return Pool(bound, layout.pools[bound])
 
 
 #: The MVP's name for the host, kept for one minor version (14

@@ -103,9 +103,12 @@ def test_athanore_serve_discovers_both() -> None:
     assert advertised["claude_acp"] == "claude_acp:wf"
     assert advertised["docker_acp"] == "docker_acp:wf"
 
-    found = {workflow.name: workflow for workflow in discover()}
-    assert found["claude_acp"] is claude_acp.wf
-    assert found["docker_acp"] is docker_acp.wf
+    found = {entry.workflow.name: entry for entry in discover()}
+    assert found["claude_acp"].workflow is claude_acp.wf
+    assert found["docker_acp"].workflow is docker_acp.wf
+    # Each paired with the target a reload re-resolves (22 §Terms).
+    assert found["claude_acp"].target == "claude_acp:wf"
+    assert found["docker_acp"].target == "docker_acp:wf"
 
 
 # --------------------------------------------------------------------------

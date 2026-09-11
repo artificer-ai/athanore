@@ -4130,6 +4130,15 @@ extended); `register_configured()` on a host.
 22's effects and events; gate green; `tests/snapshots/openapi.json` and
 `web/src/api/gen` regenerated for the three new envelopes in the event
 union (the SPA's discriminated union is what T087 switches on).
+**Status.** Done. The loader (`load_target(target, reload=)`, `LoadError`
+with `stage`/`target`/`detail`/`conflict`, `Discovered` pairs,
+`read_layout`/`LayoutError`) lives in `plugins.discovery`;
+`plugins.persist` edits `athanore.toml` with `tomlkit`; `Server` gains
+`add`/`replace`/`remove`/`targets`/`register_configured` and records a
+target on `register`; `serve` loads positionals, then the `target`
+rows, then discovery; the three `workflow.*` events are end to end
+through the snapshot, the generated client, the SPA's runtime list and
+the site's reference. D238–D247.
 
 ### T086 — Wire: routes, registrar port, CLI verbs (A8.4)
 

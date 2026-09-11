@@ -393,6 +393,33 @@ no route: that is T086.
     `guide/deployment.md`'s `[workflows]` example gains a `target` row
     with one sentence; nothing about CLI verbs or routes (T086).
 
+### As built (refinements the code made to the steps above)
+
+- Step 11/22, the order in the events table on `add`: `engine.recovered`
+  (when anything was reset) precedes `workflow.registered`, because 22
+  §Add numbers recovery step 3 and the event step 4 and the verb runs
+  the steps in that order; the test in `tests/test_server.py` asserts
+  that sequence (D247). 17 § T085's "emits `workflow.registered` then
+  `engine.recovered`" is read as a list.
+- Step 11, `replace`: a pool move is pre-checked against
+  `engine.attempts_of(name)` *before* the row is written, so a
+  `persist=True` replace refused for its move has written nothing;
+  `Engine.replace` stays the authoritative check between ticks (D245).
+- Step 15, `remove_row` returns whether a row was removed, and
+  `RemovedWorkflow.persisted` is `None` when there was none to remove
+  (D244) — 22 §Server surface's "`None` when no file was touched".
+- Step 13, `ConfiguredRows` and `Skipped` live in `athanore/server.py`
+  (they are the composition root's result types; only `serve` and a
+  host read them). `Server.toml_path` is the one spelling of
+  `root_path / "athanore.toml"`.
+- Step 4, `_load_file` wraps what `exec_module` raises (a `SyntaxError`,
+  an `ImportError` from the file's own code, any `Exception`) in
+  `LoadError(stage="import")` after popping the half-built entry, as
+  `_load_module` does for a module target.
+- Step 14, `serve`'s discovery loop filters against the names registered
+  by the positionals and the rows only — two distributions advertising
+  one name still collide at `register` (exit 1), as before.
+
 ## What this task is not
 
 - No route, no registrar port, no `WorkflowOut.target`, no `ErrorCode`,

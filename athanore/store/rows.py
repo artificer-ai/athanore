@@ -437,9 +437,9 @@ class EventRow(ReadModel):
 
     ``id`` is the monotonic SSE cursor, so a stored event always has one —
     unlike the in-flight envelope on the bus, where it is assigned by the
-    insert. ``run_id`` is absent on ``engine.*`` events and ``task_id`` on
-    everything that is not task-scoped. ``task.stream`` is never stored, so
-    it never appears as a row.
+    insert. ``run_id`` is absent on ``engine.*`` and ``workflow.*`` events
+    and ``task_id`` on everything that is not task-scoped. ``task.stream``
+    is never stored, so it never appears as a row.
     """
 
     id: int

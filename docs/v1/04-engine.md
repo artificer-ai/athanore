@@ -543,3 +543,28 @@ server.serve()                           # blocking; or `await server.start()` /
 `wf.run(**settings)` remains the one-workflow shorthand. `athanore serve`
 (11) is the CLI wrapper that discovers workflows and reads pools from
 `athanore.toml`.
+
+Registration does not end at `start()` (22 §Server surface). `register`
+is the boot-time idiom — sync, strict about duplicates, chains — and
+raises `RuntimeError` naming `add` once the server is serving (D226);
+`register(wf, pool, target=...)` records the string the workflow was
+loaded from, read back as `server.targets` (name → target, `None` for a
+programmatic one, in registration order like `workflows`).
+`server.register_configured()`, before `start()`, loads the
+`[workflows.<name>].target` rows of the resolved `athanore.toml`
+through the same loader `athanore serve` uses, registers each with its
+target and its pool, skips a name the host already registered with a
+warning, and returns what it did (`ConfiguredRows(registered, skipped)`;
+22 §Persistence). The three coroutines — `await server.add(wf, pool,
+target=, persist=)`, `await server.replace(...)`, `await
+server.remove(name, persist=)` — are the live verbs: before `start()`
+they touch only the registries; on a serving server they do everything
+22 §Effects lists, in its order, around §Live registration's engine
+verbs — mount or unmount the plugin surface (09 §Mounting), recover the
+name's orphaned rows on an `add`, emit `workflow.registered` /
+`workflow.replaced` / `workflow.unregistered` (18 §Workflows), and wake
+the scheduler. `add` and `replace` return `Registered(name,
+persisted)`, `remove` a `RemovedWorkflow(workflow, task_ids,
+persisted)`; every refusal is the loader's `LoadError` naming its
+stage (22 §Wire), a pool that does not exist is `KeyError`, and a pool
+move with attempts in flight is `ValueError` (D234).

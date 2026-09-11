@@ -358,6 +358,160 @@ def test_layout_reads_both_tables_and_tolerates_neither(tmp_path: Path) -> None:
     assert bindings == {"feature_build": "local"}
 
 
+# --------------------------------------------------------------------------
+# targets and the `[workflows.<name>].target` rows (T085, 22 §Persistence)
+# --------------------------------------------------------------------------
+
+
+@pytest.fixture
+def served(monkeypatch: pytest.MonkeyPatch) -> list[Server]:
+    """Capture the server `serve` built instead of running it.
+
+    The same capture `tests/cli/test_discovery.py` makes, for the same
+    reason: what these tests are about — which targets were recorded,
+    which rows were loaded, which one won — is settled before the socket
+    is bound.
+    """
+
+    captured: list[Server] = []
+
+    def capture(self: Server, on_start: object = None) -> None:
+        captured.append(self)
+
+    monkeypatch.setattr(Server, "serve", capture)
+    return captured
+
+
+def write_named(tmp_path: Path, stem: str, name: str, node: str = "only") -> Path:
+    """A file with one workflow called ``name`` whose node is ``node``."""
+
+    path = tmp_path / f"{stem}.py"
+    path.write_text(
+        "from athanore.workflow import Workflow\n"
+        "\n"
+        f'wf = Workflow("{name}")\n'
+        "\n"
+        "\n"
+        "@wf.node(start=True)\n"
+        f"async def {node}():\n"
+        "    return None\n"
+    )
+    return path
+
+
+def test_serve_records_each_positional_as_it_was_typed(
+    tmp_path: Path, served: list[Server]
+) -> None:
+    """22 §Terms: the target on record is the string the operator gave."""
+
+    write_workflow(tmp_path)
+    write_named(tmp_path, "other", "other")
+    assert main(["serve", "flows.py:demo", "./other.py:wf", "--no-discover"]) == 0
+    assert served[0].targets == {"demo": "flows.py:demo", "other": "./other.py:wf"}
+
+
+def test_a_row_with_a_target_is_a_registration(
+    tmp_path: Path, served: list[Server]
+) -> None:
+    """Loaded through the same loader, bound to the pool the row names."""
+
+    write_named(tmp_path, "chat", "chat")
+    write_named(tmp_path, "hello", "hello")
+    (tmp_path / "athanore.toml").write_text(
+        "[pools]\nplay = 3\n\n[workflows]\n"
+        'chat = { target = "chat.py:wf", pool = "play" }\n'
+        'hello = { target = "hello.py:wf" }\n'
+    )
+    assert main(["serve", "--no-discover", "--port", "0"]) == EXIT_OK
+    server = served[0]
+    assert list(server.workflows) == ["chat", "hello"]
+    assert server.targets == {"chat": "chat.py:wf", "hello": "hello.py:wf"}
+    assert server.engine.pools.for_workflow("chat").name == "play"
+    assert server.engine.snapshot()["play"]["capacity"] == 3
+    assert server.engine.pools.for_workflow("hello").name == "default"
+
+
+def test_rows_are_loaded_after_the_positionals(
+    tmp_path: Path, served: list[Server]
+) -> None:
+    write_workflow(tmp_path)
+    write_named(tmp_path, "chat", "chat")
+    (tmp_path / "athanore.toml").write_text(
+        '[workflows]\nchat = { target = "chat.py:wf" }\n'
+    )
+    assert main(["serve", "flows.py:demo", "--no-discover", "--port", "0"]) == 0
+    assert list(served[0].workflows) == ["demo", "chat"]
+
+
+def test_a_row_whose_key_is_not_the_workflows_name_is_a_usage_error(
+    tmp_path: Path, served: list[Server], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The row is the registration; a mismatch is a typo, priced at 2."""
+
+    write_named(tmp_path, "chat", "chat")
+    (tmp_path / "athanore.toml").write_text(
+        '[workflows]\ntypo = { target = "chat.py:wf" }\n'
+    )
+    assert main(["serve", "--no-discover", "--port", "0"]) == EXIT_USAGE
+    said = " ".join(capsys.readouterr().err.split())
+    assert "typo" in said
+    assert "'chat'" in said
+    assert "chat.py:wf" in said
+    assert served == []
+
+
+def test_a_row_whose_target_will_not_load_is_a_usage_error(
+    tmp_path: Path, served: list[Server], capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "athanore.toml").write_text(
+        '[workflows]\nchat = { target = "nowhere.py:wf" }\n'
+    )
+    assert main(["serve", "--no-discover", "--port", "0"]) == EXIT_USAGE
+    assert "nowhere.py:wf" in " ".join(capsys.readouterr().err.split())
+    assert served == []
+
+
+def test_a_positional_of_the_same_name_wins_over_a_row_with_a_warning(
+    tmp_path: Path, served: list[Server], capsys: pytest.CaptureFixture[str]
+) -> None:
+    """22 §Persistence: the positional is the working copy."""
+
+    write_workflow(tmp_path)
+    write_named(tmp_path, "copy", "demo", node="from_the_row")
+    (tmp_path / "athanore.toml").write_text(
+        '[workflows]\ndemo = { target = "copy.py:wf" }\n'
+    )
+    assert main(["serve", "flows.py:demo", "--no-discover", "--port", "0"]) == 0
+    server = served[0]
+    assert server.targets == {"demo": "flows.py:demo"}
+    assert set(server.workflows["demo"].finalize().nodes) == {"only"}
+    said = " ".join(capsys.readouterr().err.split())
+    assert "Warning" in said
+    assert "copy.py:wf" in said
+    assert "flows.py:demo" in said
+
+
+def test_a_row_bound_to_an_undeclared_pool_is_a_usage_error(
+    tmp_path: Path, served: list[Server], capsys: pytest.CaptureFixture[str]
+) -> None:
+    write_named(tmp_path, "chat", "chat")
+    (tmp_path / "athanore.toml").write_text(
+        "[pools]\nlocal = 1\n\n[workflows]\n"
+        'chat = { target = "chat.py:wf", pool = "sandbox" }\n'
+    )
+    assert main(["serve", "--no-discover", "--port", "0"]) == EXIT_USAGE
+    assert "sandbox" in capsys.readouterr().err
+    assert served == []
+
+
+def test_a_row_with_a_target_that_is_not_one_is_refused(
+    tmp_path: Path, served: list[Server]
+) -> None:
+    (tmp_path / "athanore.toml").write_text("[workflows]\nchat = { target = 3 }\n")
+    assert main(["serve", "--no-discover", "--port", "0"]) == EXIT_USAGE
+    assert served == []
+
+
 def test_a_workflow_name_that_shadows_a_verb_is_reported(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

@@ -918,7 +918,10 @@
           "log.appended",
           "agent.stats",
           "engine.recovered",
-          "engine.stopping"
+          "engine.stopping",
+          "workflow.registered",
+          "workflow.replaced",
+          "workflow.unregistered"
         ],
         "title": "EventName",
         "type": "string"
@@ -1682,7 +1685,7 @@
         "type": "string"
       },
       "PanelOut": {
-        "description": "One panel of the manifest (09 \u00a7Wire contract).\n\n``source`` is the mounted URL of the route the panel's data comes\nfrom, or \u2014 for a ``form`` panel \u2014 the name of the action whose model\nis the form. ``node`` is present only on a panel that follows one;\nwhether that node is *live* travels on the run's graph rather than\nhere, because the manifest changes only on restart (08 \u00a7Graph\nsemantics).",
+        "description": "One panel of the manifest (09 \u00a7Wire contract).\n\n``source`` is the mounted URL of the route the panel's data comes\nfrom, or \u2014 for a ``form`` panel \u2014 the name of the action whose model\nis the form. ``node`` is present only on a panel that follows one;\nwhether that node is *live* travels on the run's graph rather than\nhere, because the manifest changes only when a workflow is\nregistered, replaced or removed, never per run (08 \u00a7Graph semantics,\n22 \u00a7Live mounting).",
         "properties": {
           "element": {
             "anyOf": [
@@ -1844,7 +1847,7 @@
             "type": "array"
           },
           "assets": {
-            "description": "URLs of the JavaScript modules the SPA injects for it.",
+            "description": "URLs of the JavaScript modules the SPA injects for it, each carrying a `?v=` that changes when the file's bytes do.",
             "items": {
               "type": "string"
             },
@@ -5310,6 +5313,268 @@
         "title": "WorkflowPlugin",
         "type": "object"
       },
+      "WorkflowRegistered": {
+        "additionalProperties": false,
+        "description": "A workflow added to a serving server (22 \u00a7Add). No ``run_id``.\n\n``target`` is the string it was loaded from, absent for a\nprogrammatic registration.",
+        "properties": {
+          "pool": {
+            "title": "Pool",
+            "type": "string"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "workflow": {
+            "title": "Workflow",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow",
+          "pool"
+        ],
+        "title": "WorkflowRegistered",
+        "type": "object"
+      },
+      "WorkflowRegisteredEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/WorkflowRegistered"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "workflow.registered",
+            "default": "workflow.registered",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "name",
+          "data"
+        ],
+        "title": "WorkflowRegisteredEvent",
+        "type": "object"
+      },
+      "WorkflowReplaced": {
+        "additionalProperties": false,
+        "description": "A workflow's graph and plugins swapped (22 \u00a7Replace). No ``run_id``.",
+        "properties": {
+          "pool": {
+            "title": "Pool",
+            "type": "string"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "workflow": {
+            "title": "Workflow",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow",
+          "pool"
+        ],
+        "title": "WorkflowReplaced",
+        "type": "object"
+      },
+      "WorkflowReplacedEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/WorkflowReplaced"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "workflow.replaced",
+            "default": "workflow.replaced",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "name",
+          "data"
+        ],
+        "title": "WorkflowReplacedEvent",
+        "type": "object"
+      },
+      "WorkflowUnregistered": {
+        "additionalProperties": false,
+        "description": "A workflow removed (22 \u00a7Remove). No ``run_id``.\n\n``task_ids`` are the attempts the removal interrupted.",
+        "properties": {
+          "task_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Task Ids",
+            "type": "array"
+          },
+          "workflow": {
+            "title": "Workflow",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow",
+          "task_ids"
+        ],
+        "title": "WorkflowUnregistered",
+        "type": "object"
+      },
+      "WorkflowUnregisteredEvent": {
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "format": "date-time",
+            "title": "Created",
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/WorkflowUnregistered"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "name": {
+            "const": "workflow.unregistered",
+            "default": "workflow.unregistered",
+            "title": "Name",
+            "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "task_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Task Id"
+          }
+        },
+        "required": [
+          "created",
+          "name",
+          "data"
+        ],
+        "title": "WorkflowUnregisteredEvent",
+        "type": "object"
+      },
       "athanore__api__schemas__tasks__BranchFrame": {
         "description": "One frame of a task's fan-out stack (04 \u00a7Branch frames).\n\nFrames nest, outermost first: a branch that fans out again pushes a\nsecond frame. ``key`` is the payload that branch was given, which is\nthe branch's identity in every list the SPA groups by it.",
         "properties": {
@@ -5960,7 +6225,7 @@
     },
     "/api/plugins": {
       "get": {
-        "description": "The plugin manifest: panels, actions and assets, per workflow.\n\nBuiltins first, then the workflows in registration order. The\nSPA fetches this at boot and again whenever the SSE stream\nreconnects onto a server with a new ``started_at``, because a\nmanifest changes only when the process does (09 \u00a7Wire contract).",
+        "description": "The plugin manifest: panels, actions and assets, per workflow.\n\nBuiltins first, then the workflows in registration order. The\nSPA fetches this at boot, again whenever the SSE stream reconnects\nonto a server with a new ``started_at``, and on every\n``workflow.*`` event, because a manifest changes when a workflow\nis registered, replaced or removed (09 \u00a7Wire contract, 22 \u00a7Live\nmounting).",
         "operationId": "manifest_api_plugins_get",
         "responses": {
           "200": {
@@ -6762,6 +7027,15 @@
                       },
                       {
                         "$ref": "#/components/schemas/EngineStoppingEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/WorkflowRegisteredEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/WorkflowReplacedEvent"
+                      },
+                      {
+                        "$ref": "#/components/schemas/WorkflowUnregisteredEvent"
                       },
                       {
                         "$ref": "#/components/schemas/PluginEvent"

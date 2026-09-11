@@ -88,7 +88,8 @@ athanore/                      Python package (distribution "athanore")
     registry.py                collect, validate, build manifest
     context.py                 PluginContext: what a handler is handed, and its scope
     mount.py                   mount routers, actions, assets
-    discovery.py               entry-point discovery (09 §Discovery)
+    discovery.py               targets, entry-point discovery, the athanore.toml tables (09 §Discovery, 22)
+    persist.py                 writing [workflows.<name>] rows in place with tomlkit (22 §Persistence)
     builtin/                   the core-shipped panes (overview, log, agent, graph, requests)
   api/                         (08)
     app.py                     create_app(settings, engine, store, plugins)
@@ -207,6 +208,7 @@ name is told the same thing as the first — and none of them is in
 | IDs | `python-ulid` | Sortable, URL-safe, no coordination |
 | Logging | structlog (JSON in prod, pretty in dev) | Structured, contextual (run_id/task_id bound per attempt) |
 | CLI | typer + rich | Argument parsing with help, tables, colors, low ceremony |
+| Editing `athanore.toml` | `tomlkit` | Writing a `[workflows.<name>]` row in place with the operator's comments, order and formatting kept (22 §Persistence, D228). One module imports it (`plugins.persist`); `tomllib` stays the reader everywhere |
 | Retries in clients | httpx transport `retries=` | Connection-level retries only, in the CLI; never in the engine (rule 3 owns retries) |
 | Tests | pytest, pytest-asyncio, hypothesis (graph parsing), respx, freezegun, pytest-cov | See 13 |
 | Lint / types | ruff, pyright (strict on `graph`, `engine`, `store`), import-linter; oxlint for the SPA, the linter its own scaffold ships (D77) | |
@@ -363,12 +365,22 @@ cloud = 8
 feature_build = { pool = "local" }
 gamedev       = { pool = "local" }
 msgtest       = { }                      # default pool
+chat          = { target = "workflows/chat.py:wf", pool = "cloud" }
+hello         = { target = "workflows/hello.py:wf" }   # default pool
 ```
 
-Unknown top-level keys are an error at startup (a typo must not silently
-fall back to a default); unknown keys inside `[workflows.<name>]` are an
-error too. `operator_token` and `agent_command` are refused in the file:
-the first belongs in `.athanore/token` (12), the second is a test hook.
+A `[workflows.<name>]` row takes `pool` and `target`. A row with only a
+`pool` binds a workflow that arrives some other way; a row with a
+`target` **is a registration** — read by `athanore serve` after the
+positionals and before the entry points, and by
+`Server.register_configured()` for a programmatic host — and is written
+on request by a live registration asked to persist (22 §Persistence).
+The file is edited in place with `tomlkit` then, so the rest of it
+survives byte for byte. Unknown top-level keys are an error at startup
+(a typo must not silently fall back to a default); unknown keys inside
+`[workflows.<name>]` are an error too. `operator_token` and
+`agent_command` are refused in the file: the first belongs in
+`.athanore/token` (12), the second is a test hook.
 
 ## Observability
 

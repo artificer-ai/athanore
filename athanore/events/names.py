@@ -70,6 +70,11 @@ class EventName(StrEnum):
     engine_recovered = "engine.recovered"
     engine_stopping = "engine.stopping"
 
+    # Workflows
+    workflow_registered = "workflow.registered"
+    workflow_replaced = "workflow.replaced"
+    workflow_unregistered = "workflow.unregistered"
+
 
 #: Events that are published and streamed but never stored (03). At two to
 #: three flushes per second per streaming task, `task.stream` would be most

@@ -19,8 +19,8 @@ class Event(BaseModel):
 
     ``id`` is the SSE cursor, assigned by the store; it is ``None`` before
     the insert and on ephemeral events (`task.stream`), which are never
-    stored. ``run_id`` is absent on ``engine.*`` and ``task_id`` on every
-    event that is not task-scoped.
+    stored. ``run_id`` is absent on ``engine.*`` and ``workflow.*`` and
+    ``task_id`` on every event that is not task-scoped.
     """
 
     id: int | None = None

@@ -15,7 +15,8 @@ Every event, stored or ephemeral, is:
 ```
 
 - `id` is the SSE cursor; absent on ephemeral events (`task.stream`).
-- `run_id` is present on every event except `engine.*`.
+- `run_id` is present on every event except `engine.*` and `workflow.*`
+  (22 §Events: both are about the server, not about a run).
 - `task_id` is present on every `task.*`, `submission.*`, `request.*`,
   `agent.*` event and on `log.appended` when the entry has a task.
 - `data` is one of the objects below. Fields marked `?` may be absent;
@@ -92,6 +93,20 @@ against it (13 §Contract tests).
 |---|---|
 | `engine.recovered` | `{task_ids: [int]}` — rows reset to `ready` at startup (no `run_id`) |
 | `engine.stopping` | `{task_ids: [int]}` — attempts interrupted by a shutdown (04 §Shutdown; no `run_id`) |
+
+### Workflows
+
+The three registrations a serving server performs (22 §Events). None
+carries a `run_id`; they are stored, so the SSE cursor has their ids,
+and they reach every `on` subscriber as an event that names no run does
+(09 §Mounting). Emitted only by a serving server — before `start()`
+there is no store to keep them.
+
+| Event | data |
+|---|---|
+| `workflow.registered` | `{workflow, pool, target?}` — `pool` is the pool the name is bound to; `target` the string it was loaded from, absent for a programmatic registration (22 §Add) |
+| `workflow.replaced` | `{workflow, pool, target?}` — the same three, after the graph and the plugin surface were swapped (22 §Replace) |
+| `workflow.unregistered` | `{workflow, task_ids: [int]}` — the attempts 22 §Remove step 1 interrupted |
 
 ### Plugins
 

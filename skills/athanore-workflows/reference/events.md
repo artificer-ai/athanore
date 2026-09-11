@@ -54,6 +54,12 @@ Driving the API (see the athanore-api skill).
 - `engine.recovered` — `task_ids: list[int]`
 - `engine.stopping` — `task_ids: list[int]`
 
+## Workflows
+
+- `workflow.registered` — `workflow: str`, `pool: str`, `target?: str | None`
+- `workflow.replaced` — `workflow: str`, `pool: str`, `target?: str | None`
+- `workflow.unregistered` — `workflow: str`, `task_ids: list[int]`
+
 ## Published but never stored
 
 `EPHEMERAL` in `athanore/events/names.py`:

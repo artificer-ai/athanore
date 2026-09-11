@@ -104,6 +104,9 @@ const EVENT_NAME_TABLE: Record<EventName, true> = {
   'agent.stats': true,
   'engine.recovered': true,
   'engine.stopping': true,
+  'workflow.registered': true,
+  'workflow.replaced': true,
+  'workflow.unregistered': true,
 }
 
 /** The names the feed subscribes to before any plugin is loaded. */
