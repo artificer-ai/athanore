@@ -44,7 +44,10 @@ is in [Driving the API](guide-http-api.md).
 | `POST` | `/api/tasks/{task_id}/status` | tasks | `set_status_api_tasks__task_id__status_post` | operatorBearer | Write a task's status |
 | `GET` | `/api/tasks/{task_id}/stream` | tasks | `get_stream_api_tasks__task_id__stream_get` | operatorBearer | A page of a task's agent transcript |
 | `GET` | `/api/workflows` | workflows | `list_workflows_api_workflows_get` | operatorBearer | Every workflow this server can run |
+| `POST` | `/api/workflows` | workflows | `register_workflow_api_workflows_post` | operatorBearer | Register a workflow from a target |
+| `DELETE` | `/api/workflows/{name}` | workflows | `remove_workflow_api_workflows__name__delete` | operatorBearer | Unregister a workflow |
 | `GET` | `/api/workflows/{name}` | workflows | `get_workflow_api_workflows__name__get` | operatorBearer | One workflow |
+| `PUT` | `/api/workflows/{name}` | workflows | `reload_workflow_api_workflows__name__put` | operatorBearer | Reload a registered workflow |
 | `POST` | `/api/workflows/{name}/runs` | workflows | `submit_run_api_workflows__name__runs_post` | operatorBearer | Submit a run |
 | `GET` | `/api/workflows/{name}/source` | workflows | `get_source_api_workflows__name__source_get` | operatorBearer | The Python a workflow is defined in |
 | `POST` | `/mcp/agent` | agent | `mcp_agent` | taskToken | Model Context Protocol server (streamable HTTP) |
@@ -73,6 +76,69 @@ rather than a failure.
 | `200` | `array` of [`WorkflowOut`](#schema-WorkflowOut) | Successful Response |
 | `401` | [`ApiError`](#schema-ApiError) | No operator token, on a bind that requires one. |
 
+### `POST /api/workflows` {#op-register_workflow_api_workflows_post}
+
+Register a workflow from a target
+
+Credential: operatorBearer. Operation id: `register_workflow_api_workflows_post`.
+
+Load `target` and register the workflow it names, without a restart.
+
+The name it registers under is the loaded workflow's own. Answers 201
+with the workflow as `GET /api/workflows/{name}` reports it; 409
+`conflict` if that name is already registered; 422
+`workflow_load_failed` when the load stopped — its body carries
+`target`, `stage` (`target`, `import`, `attribute`, `finalize`,
+`plugins` or `register`) and `detail`, the underlying error's full
+message; 422 `unknown_pool` for a `pool` the engine does not have,
+naming the ones it does; 500 `persist_failed` (`path`, `detail`) when
+`persist` was asked for and the row could not be written, in which
+case nothing was registered; 503 `registration_unavailable` from an
+application built without a registrar. A response that wrote the row
+carries `X-Athanore-Persisted: <path>`.
+
+**Request body** (required) — `application/json`, [`RegisterWorkflow`](#schema-RegisterWorkflow)
+
+**Responses**
+
+| Status | Body | Description |
+|---|---|---|
+| `201` | [`WorkflowOut`](#schema-WorkflowOut) | Successful Response |
+| `401` | [`ApiError`](#schema-ApiError) | No operator token, on a bind that requires one. |
+| `422` | [`ApiError`](#schema-ApiError) | The request did not validate. `code` is `validation` and `errors` names each field that failed. |
+
+### `DELETE /api/workflows/{name}` {#op-remove_workflow_api_workflows__name__delete}
+
+Unregister a workflow
+
+Credential: operatorBearer. Operation id: `remove_workflow_api_workflows__name__delete`.
+
+Drop the workflow `name`, interrupting whatever it was running.
+
+Every attempt of it in flight is cancelled and left where it was — no
+task status is written, and the run reads `unregistered: true` until
+the workflow is registered again, at which point those rows are
+recovered. Nothing is deleted. Answers 200 with the interrupted task
+ids; 404 `unknown_workflow`; 500 `persist_failed`; 503
+`registration_unavailable`. A response that removed the row carries
+`X-Athanore-Persisted: <path>`; one that found no row to remove
+carries no such header.
+
+**Parameters**
+
+| Parameter | In | Type | Required | Description |
+|---|---|---|---|---|
+| `name` | path | `string` | yes | The registered workflow's name. |
+| `persist` | query | `boolean` | no | Remove the `[workflows.<name>]` row of `athanore.toml` too; a name with no row is not an error. |
+
+**Responses**
+
+| Status | Body | Description |
+|---|---|---|
+| `200` | [`RemovedWorkflowOut`](#schema-RemovedWorkflowOut) | Successful Response |
+| `401` | [`ApiError`](#schema-ApiError) | No operator token, on a bind that requires one. |
+| `422` | [`ApiError`](#schema-ApiError) | The request did not validate. `code` is `validation` and `errors` names each field that failed. |
+
 ### `GET /api/workflows/{name}` {#op-get_workflow_api_workflows__name__get}
 
 One workflow
@@ -86,6 +152,42 @@ One registered workflow, or 404 `unknown_workflow`.
 | Parameter | In | Type | Required | Description |
 |---|---|---|---|---|
 | `name` | path | `string` | yes | The registered workflow's name. |
+
+**Responses**
+
+| Status | Body | Description |
+|---|---|---|
+| `200` | [`WorkflowOut`](#schema-WorkflowOut) | Successful Response |
+| `401` | [`ApiError`](#schema-ApiError) | No operator token, on a bind that requires one. |
+| `422` | [`ApiError`](#schema-ApiError) | The request did not validate. `code` is `validation` and `errors` names each field that failed. |
+
+### `PUT /api/workflows/{name}` {#op-reload_workflow_api_workflows__name__put}
+
+Reload a registered workflow
+
+Credential: operatorBearer. Operation id: `reload_workflow_api_workflows__name__put`.
+
+Load `target` — or the registration's recorded one — and replace `name`.
+
+The next task of every run of the workflow dispatches on the new
+graph; an attempt already running finishes on the body it started
+with. Answers 200 with the workflow as `GET /api/workflows/{name}`
+now reports it; 404 `unknown_workflow`; 409 `conflict` if the target
+now defines a differently named workflow (that is a new workflow —
+`POST` it) or `pool` would move the workflow while attempts of it are
+in flight; 422 `workflow_load_failed` as `POST` answers, with `stage:
+"target"` when `target` was omitted and the registration has no
+recorded one; 422 `unknown_pool`; 500 `persist_failed`; 503
+`registration_unavailable`. A response that rewrote the row carries
+`X-Athanore-Persisted: <path>`.
+
+**Parameters**
+
+| Parameter | In | Type | Required | Description |
+|---|---|---|---|---|
+| `name` | path | `string` | yes | The registered workflow's name. |
+
+**Request body** (required) — `application/json`, [`ReloadWorkflow`](#schema-ReloadWorkflow)
 
 **Responses**
 
@@ -1470,6 +1572,10 @@ module alone.
 - `'unknown_node'`
 - `'payload_too_large'`
 - `'plugin_error'`
+- `'workflow_load_failed'`
+- `'unknown_pool'`
+- `'registration_unavailable'`
+- `'persist_failed'`
 
 ### `EventName` {#schema-EventName}
 
@@ -1885,6 +1991,54 @@ Where a run sits in the dispatch list after a move.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `position` | `integer` | yes | The run's place in the dispatch list after the move, numbered from 1. The `index` that asked for it is zero-based. |
+
+### `RegisterWorkflow` {#schema-RegisterWorkflow}
+
+Register a workflow on the running server (`POST /api/workflows`).
+
+``target`` names the workflow as `athanore serve` would: `module:attr`
+or `path/to/file.py:attr`. The name it registers under is the loaded
+``Workflow``'s own. ``pool`` must already exist on the engine — a
+live registration never creates one — and ``persist`` writes the
+`[workflows.<name>]` row of `athanore.toml` before anything is
+mutated, so a target that does not load is never written down.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `persist` | `boolean` | no | Write the registration as a `[workflows.<name>]` row of `athanore.toml`; the response then carries `X-Athanore-Persisted`. |
+| `pool` | `string` \| `null` | no | The pool to bind the workflow to; the default pool when omitted. |
+| `target` | `string` | yes | The workflow to load: `module:attr` or `path/to/file.py:attr`. |
+
+### `ReloadWorkflow` {#schema-ReloadWorkflow}
+
+Replace a registered workflow (`PUT /api/workflows/{name}`).
+
+``target`` omitted re-resolves the registration's recorded target —
+what `athanore serve` or an earlier registration loaded it from — and
+is refused when there is none. A target that now defines a differently
+named workflow is refused too: that is a new workflow, and `POST` is
+how it arrives. ``pool`` omitted keeps the binding the name has.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `persist` | `boolean` | no | Rewrite the `[workflows.<name>]` row of `athanore.toml`; the response then carries `X-Athanore-Persisted`. |
+| `pool` | `string` \| `null` | no | The pool to move the workflow to; the current binding when omitted. Refused while any attempt of the workflow is in flight. |
+| `target` | `string` \| `null` | no | The workflow to load; the registration's recorded target when omitted. |
+
+### `RemovedWorkflowOut` {#schema-RemovedWorkflowOut}
+
+What `DELETE /api/workflows/{name}` did.
+
+A body rather than a 204, because the body is the point: the caller
+wants to know what it interrupted. Whether a row of
+`athanore.toml` was removed is the response's `X-Athanore-Persisted`
+header, not a field — a receipt about the request belongs on the
+response.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `task_ids` | `array` of `integer` | yes | The attempts that were interrupted, in spawn order; empty when nothing of the workflow was in flight. |
+| `workflow` | `string` | yes | The name that was unregistered. |
 
 ### `RequestAnswered` {#schema-RequestAnswered}
 
@@ -2762,6 +2916,7 @@ One registered workflow: its graph, its capacity, its plugins.
 | `plugin` | [`WorkflowPlugin`](#schema-WorkflowPlugin) | yes | What this workflow contributes to the UI. |
 | `pool` | `string` | yes | The pool this workflow's tasks are dispatched on. |
 | `start` | `string` | yes | The node a new run begins at. |
+| `target` | `string` \| `null` | no | The target this workflow was loaded from (`module:attr` or `path.py:attr`), and what `PUT /api/workflows/{name}` without a `target` reloads; `null` for a programmatic registration. |
 
 ### `WorkflowPlugin` {#schema-WorkflowPlugin}
 

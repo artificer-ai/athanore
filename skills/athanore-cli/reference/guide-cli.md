@@ -60,6 +60,9 @@ athanore show <run>
 athanore logs <run> [-f]
 athanore stream <task> [-f]
 athanore workflows
+athanore workflows add <target> [--pool NAME] [--persist]
+athanore workflows reload <name> [<target>] [--pool NAME] [--persist]
+athanore workflows rm <name> [--persist]
 ```
 
 ```sh
@@ -86,6 +89,21 @@ athanore token show | rotate
 The bare form `athanore <workflow> "title"` is an alias for `submit`,
 which is why a workflow may not be named after a verb — that is refused
 when it is registered rather than resolved by precedence later.
+
+The three `workflows` subcommands change what a running server serves,
+without a restart. `add` loads a target — `module:attr` or
+`path/to/file.py:attr`, as `serve` takes them — and registers the
+workflow it names; `reload` loads a registered workflow again, from the
+target given or from the one the server loaded it from, so the next
+task of every run dispatches on the new code while an attempt already
+running finishes on the old; `rm` unregisters it, printing the ids of
+the attempts it interrupted, and leaves its runs listed as
+unregistered until it is added back. Each prints the workflow as the
+table does, with the target beside the pool. `--persist` asks the server
+to write the registration into its own `athanore.toml` (or remove it),
+and the verb prints the path it wrote. A target that does not load
+exits 2, with the stage the load stopped at and the underlying error
+under the message; a pool the server does not have exits 2 too.
 
 ## JSON out
 

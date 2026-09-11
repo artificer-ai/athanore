@@ -104,6 +104,9 @@ athanore show <run>                                        run + tasks + log
 athanore logs <run> [-f]                                   events; -f follows via SSE
 athanore stream <task> [-f]                                agent transcript
 athanore workflows                                         graphs + pools
+athanore workflows add <target> [--pool NAME] [--persist]             → POST   /api/workflows
+athanore workflows reload <name> [<target>] [--pool NAME] [--persist] → PUT    /api/workflows/{name}
+athanore workflows rm <name> [--persist]                              → DELETE /api/workflows/{name}
 athanore requests [run]                                    pending requests
 athanore answer <req> <option-id | text | json>
 athanore permit <req> [option-id]     athanore deny <req>
@@ -132,6 +135,21 @@ string it is (D145). `permit` and `deny` choose an option by kind
 tests use, keeping the last stored event id they saw so a stream that
 drops resumes with `after=` instead of replaying from zero. Ctrl-C ends a
 follow successfully; a server that cannot be reconnected to is exit 3.
+
+`athanore workflows` stays the table it is, and is a group: its three
+subcommands are thin clients of the three live-registration routes (22
+§CLI). `add` and `reload` print the workflow as the table prints one
+entry, with `target=` beside the pool when the server reports one;
+`rm` prints the interrupted task ids, one per line, so the operator
+sees what stopped. `--persist` is the body's `persist` (`?persist=` on
+`rm`), and a verb whose response carries `X-Athanore-Persisted` prints
+`persisted to <path>` / `removed from <path>` as its last line — on
+stderr under `--json`, so stdout stays the API's JSON (D252). A
+`workflow_load_failed` prints `stage` and `detail` under the message
+and exits 2 — the same price §Exit codes puts on a target `serve` could
+not resolve, because it is the same mistake — and an `unknown_pool`
+exits 2 for the reason §Server refuses a binding to one (D252). Every
+other refusal is the server's sentence and exit 1.
 
 ## Exit codes
 

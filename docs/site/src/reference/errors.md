@@ -20,3 +20,7 @@ branches on, so it outlives any wording change to the human
 - `unknown_node`
 - `payload_too_large`
 - `plugin_error`
+- `workflow_load_failed`
+- `unknown_pool`
+- `registration_unavailable`
+- `persist_failed`

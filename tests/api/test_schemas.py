@@ -509,3 +509,42 @@ def test_a_stream_page_says_how_far_it_got_and_whether_more_is_coming() -> None:
         {"seq": 4, "kind": "text", "text": "hello", "created": STAMP}
     ]
     assert (page.last_seq, page.live) == (9, True)
+
+
+def test_a_workflow_carries_the_target_it_was_loaded_from() -> None:
+    """22 §Terms: `target` on `WorkflowOut`, `None` for a programmatic one."""
+
+    from athanore.workflow import Workflow
+
+    wf = Workflow("demo")
+
+    @wf.node(start=True)
+    async def only() -> None:
+        return None
+
+    graph = wf.finalize()
+    plain = schemas.WorkflowOut.of(graph, pool="default", capacity=1, in_flight=0)
+    assert plain.model_dump()["target"] is None
+    loaded = schemas.WorkflowOut.of(
+        graph, pool="default", capacity=1, in_flight=0, target="flows/demo.py:wf"
+    )
+    assert loaded.model_dump()["target"] == "flows/demo.py:wf"
+    assert "target" in schemas.WorkflowOut.model_fields
+
+
+def test_the_registration_bodies_strip_their_target() -> None:
+    """`RegisterWorkflow` needs a target; `ReloadWorkflow` may omit it (22 §Wire)."""
+
+    body = schemas.RegisterWorkflow(target="  flows/demo.py:wf  ")
+    assert body.target == "flows/demo.py:wf"
+    assert body.pool is None and body.persist is False
+    with pytest.raises(ValidationError):
+        schemas.RegisterWorkflow(target="  ")
+    with pytest.raises(ValidationError):
+        schemas.RegisterWorkflow()  # type: ignore[call-arg]
+    reload = schemas.ReloadWorkflow()
+    assert reload.target is None and reload.pool is None and reload.persist is False
+    with pytest.raises(ValidationError):
+        schemas.ReloadWorkflow(target="")
+    removed = schemas.RemovedWorkflowOut(workflow="demo", task_ids=[3, 4])
+    assert removed.model_dump() == {"workflow": "demo", "task_ids": [3, 4]}

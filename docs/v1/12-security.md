@@ -152,6 +152,14 @@ neither of them an origin:
 
 Fonts are bundled (10), so nothing loads from a third party.
 
+`POST`, `PUT` and `DELETE /api/workflows` (22 §Wire) execute Python the
+caller named. That is not a new power: the operator door already admits
+every plugin action, every operator op, and — on a loopback bind — no
+credential at all, because the process is the operator's (§Posture).
+The routes are operator routes, sit behind `operator_auth` like the
+rest of `/api/workflows`, and are not on the agent surface: a task
+token reaches nothing under `/api/workflows` and never will.
+
 ## Beyond the LAN
 
 v1 is HTTP. For remote access terminate TLS in a reverse proxy, keep the

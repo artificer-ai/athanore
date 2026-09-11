@@ -89,6 +89,15 @@ class ErrorCode(StrEnum):
     unknown_node = "unknown_node"
     payload_too_large = "payload_too_large"
     plugin_error = "plugin_error"
+    # The four of 22 §Wire, in that document's order. They are raised by
+    # the workflows router alone, which maps the loader's and the
+    # server's refusals itself rather than through `DOMAIN_ERRORS`: the
+    # 409-or-422 split on a `LoadError` is a fact about those three
+    # routes, and `ValueError` is too broad a type for a global row.
+    workflow_load_failed = "workflow_load_failed"
+    unknown_pool = "unknown_pool"
+    registration_unavailable = "registration_unavailable"
+    persist_failed = "persist_failed"
 
 
 #: The two keys the error shape owns. An extra may not take one of them:

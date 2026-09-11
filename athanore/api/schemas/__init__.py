@@ -45,6 +45,8 @@ from athanore.api.schemas.bodies import (
     Move,
     NewRun,
     Position,
+    RegisterWorkflow,
+    ReloadWorkflow,
     Rerun,
     SetStatus,
 )
@@ -79,6 +81,7 @@ from athanore.api.schemas.tasks import (
 )
 from athanore.api.schemas.workflows import (
     NodeOut,
+    RemovedWorkflowOut,
     SourceNode,
     SourceOut,
     WorkflowOut,
@@ -113,6 +116,9 @@ __all__ = [
     "Ok",
     "Position",
     "PositionOut",
+    "RegisterWorkflow",
+    "ReloadWorkflow",
+    "RemovedWorkflowOut",
     "RequestOption",
     "RequestView",
     "Rerun",

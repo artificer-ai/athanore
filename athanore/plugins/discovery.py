@@ -93,6 +93,7 @@ __all__ = [
     "LoadStage",
     "Registered",
     "RemovedWorkflow",
+    "UnknownPool",
     "discover",
     "load_target",
     "read_layout",
@@ -132,9 +133,11 @@ class LoadError(Exception):
     that was being loaded (``""`` for a programmatic object the server's
     verbs refused); ``detail`` is the underlying error's full text,
     untouched — for ``target``, where there is no underlying error, it is
-    the message again. ``conflict`` is set only by ``Server.add`` on a
-    name that is already registered, so the API can answer 409 without
-    parsing text.
+    the message again. ``conflict`` marks the two refusals the wire
+    answers 409 rather than 422: ``Server.add`` sets it on a name that
+    is already registered, and ``Server.reload_target`` on a target whose
+    workflow is not the one named in the URL — so the API can tell them
+    apart without parsing text.
     """
 
     def __init__(
@@ -152,6 +155,30 @@ class LoadError(Exception):
         self.target = target
         self.detail = detail
         self.conflict = conflict
+
+
+class UnknownPool(KeyError):
+    """A live registration named a pool the engine does not have (22 §Pools).
+
+    A ``KeyError``, as the server's verbs have always raised for one
+    (D234, D239), with the pool that was asked for and the pools that
+    exist as attributes; ``str(exc)`` is the sentence naming both, which
+    is what the API's ``422 unknown_pool`` and ``athanore serve``'s exit
+    2 both print. Pools are never removed while serving, so the engine's
+    own ``KeyError`` for a pool that vanished between the server's check
+    and its own cannot happen; this is the one type a caller has to
+    catch.
+    """
+
+    def __init__(self, pool: str, known: tuple[str, ...]) -> None:
+        super().__init__(f"no pool named {pool!r}; known pools are {list(known)}")
+        self.pool = pool
+        self.known = known
+
+    def __str__(self) -> str:
+        # `KeyError.__str__` reprs its one argument, which would wrap the
+        # sentence in quotes; the sentence is the message.
+        return str(self.args[0])
 
 
 class LayoutError(Exception):

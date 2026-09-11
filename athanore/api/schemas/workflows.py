@@ -23,6 +23,7 @@ from athanore.graph import Graph, Node
 
 __all__ = [
     "NodeOut",
+    "RemovedWorkflowOut",
     "SourceNode",
     "SourceOut",
     "WorkflowOut",
@@ -111,6 +112,12 @@ class WorkflowOut(BaseModel):
     plugin: WorkflowPlugin = Field(
         description="What this workflow contributes to the UI (09)."
     )
+    target: str | None = Field(
+        default=None,
+        description="The target this workflow was loaded from (`module:attr` or "
+        "`path.py:attr`), and what `PUT /api/workflows/{name}` without a "
+        "`target` reloads; `null` for a programmatic registration.",
+    )
 
     @classmethod
     def of(
@@ -121,6 +128,7 @@ class WorkflowOut(BaseModel):
         capacity: int,
         in_flight: int,
         plugin: WorkflowPlugin | None = None,
+        target: str | None = None,
     ) -> WorkflowOut:
         """The wire view of ``graph`` running on the named pool."""
 
@@ -132,7 +140,25 @@ class WorkflowOut(BaseModel):
             in_flight=in_flight,
             nodes={name: NodeOut.of(node) for name, node in graph.nodes.items()},
             plugin=plugin if plugin is not None else WorkflowPlugin(),
+            target=target,
         )
+
+
+class RemovedWorkflowOut(BaseModel):
+    """What `DELETE /api/workflows/{name}` did (22 §Wire).
+
+    A body rather than a 204, because the body is the point: the caller
+    wants to know what it interrupted (D227). Whether a row of
+    `athanore.toml` was removed is the response's `X-Athanore-Persisted`
+    header, not a field — a receipt about the request belongs on the
+    response.
+    """
+
+    workflow: str = Field(description="The name that was unregistered.")
+    task_ids: list[int] = Field(
+        description="The attempts that were interrupted, in spawn order; empty "
+        "when nothing of the workflow was in flight."
+    )
 
 
 class SourceNode(BaseModel):

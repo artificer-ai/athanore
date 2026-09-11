@@ -215,4 +215,28 @@ Print the operator token this installation would use.
 
 ### `athanore workflows`
 
-The workflows this server runs: their graphs and their pools.
+The workflows this server runs, and the verbs that change the set.
+
+#### `athanore workflows add`
+
+Register a workflow on the running server, from a target.
+
+- `TARGET` (required) — The workflow to register: `module:attr` or `path/to/file.py:attr`.
+- `--pool` — Bind it to this pool; the default pool otherwise.
+- `--persist` — Write the registration to the server's athanore.toml too.
+
+#### `athanore workflows reload`
+
+Load a registered workflow again, so the next task runs the new code.
+
+- `NAME` (required) — The registered workflow to reload.
+- `TARGET` — The target to load it from; what the server loaded it from when omitted.
+- `--pool` — Move it to this pool; keep its pool otherwise.
+- `--persist` — Rewrite the registration in the server's athanore.toml too.
+
+#### `athanore workflows rm`
+
+Unregister a workflow, interrupting whatever it was running.
+
+- `NAME` (required) — The registered workflow to remove.
+- `--persist` — Remove its registration from the server's athanore.toml too.

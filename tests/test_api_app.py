@@ -26,8 +26,11 @@ async def client() -> AsyncIterator[httpx.AsyncClient]:
 
 def test_create_app_takes_the_published_signature() -> None:
     """The collaborators are the shape T042 onward fills in (02)."""
-    app = create_app(settings=None, engine=None, store=None, plugins=None)
+    app = create_app(
+        settings=None, engine=None, store=None, plugins=None, registrar=None
+    )
     assert isinstance(app, FastAPI)
+    assert app.state.registrar is None
 
 
 def test_create_app_holds_its_plugins_in_a_live_collection() -> None:

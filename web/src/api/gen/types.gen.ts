@@ -660,7 +660,7 @@ export type EngineStoppingEvent = {
  * one is a change to 08 and to the TypeScript mirror, never to this
  * module alone.
  */
-export type ErrorCode = 'not_found' | 'conflict' | 'forbidden' | 'unauthorized' | 'validation' | 'invalid_option' | 'already_answered' | 'stale_request' | 'graph_error' | 'unknown_workflow' | 'unknown_node' | 'payload_too_large' | 'plugin_error';
+export type ErrorCode = 'not_found' | 'conflict' | 'forbidden' | 'unauthorized' | 'validation' | 'invalid_option' | 'already_answered' | 'stale_request' | 'graph_error' | 'unknown_workflow' | 'unknown_node' | 'payload_too_large' | 'plugin_error' | 'workflow_load_failed' | 'unknown_pool' | 'registration_unavailable' | 'persist_failed';
 
 /**
  * EventName
@@ -1456,6 +1456,97 @@ export type PositionOut = {
      * The run's place in the dispatch list after the move, numbered from 1. The `index` that asked for it is zero-based (D57).
      */
     position: number;
+};
+
+/**
+ * RegisterWorkflow
+ *
+ * Register a workflow on the running server (`POST /api/workflows`, 22 §Wire).
+ *
+ * ``target`` names the workflow as `athanore serve` would: `module:attr`
+ * or `path/to/file.py:attr`. The name it registers under is the loaded
+ * ``Workflow``'s own. ``pool`` must already exist on the engine — a
+ * live registration never creates one — and ``persist`` writes the
+ * `[workflows.<name>]` row of `athanore.toml` before anything is
+ * mutated, so a target that does not load is never written down.
+ */
+export type RegisterWorkflow = {
+    /**
+     * Persist
+     *
+     * Write the registration as a `[workflows.<name>]` row of `athanore.toml`; the response then carries `X-Athanore-Persisted`.
+     */
+    persist?: boolean;
+    /**
+     * Pool
+     *
+     * The pool to bind the workflow to; the default pool when omitted.
+     */
+    pool?: string | null;
+    /**
+     * Target
+     *
+     * The workflow to load: `module:attr` or `path/to/file.py:attr`.
+     */
+    target: string;
+};
+
+/**
+ * ReloadWorkflow
+ *
+ * Replace a registered workflow (`PUT /api/workflows/{name}`, 22 §Wire).
+ *
+ * ``target`` omitted re-resolves the registration's recorded target —
+ * what `athanore serve` or an earlier registration loaded it from — and
+ * is refused when there is none. A target that now defines a differently
+ * named workflow is refused too: that is a new workflow, and `POST` is
+ * how it arrives. ``pool`` omitted keeps the binding the name has.
+ */
+export type ReloadWorkflow = {
+    /**
+     * Persist
+     *
+     * Rewrite the `[workflows.<name>]` row of `athanore.toml`; the response then carries `X-Athanore-Persisted`.
+     */
+    persist?: boolean;
+    /**
+     * Pool
+     *
+     * The pool to move the workflow to; the current binding when omitted. Refused while any attempt of the workflow is in flight.
+     */
+    pool?: string | null;
+    /**
+     * Target
+     *
+     * The workflow to load; the registration's recorded target when omitted.
+     */
+    target?: string | null;
+};
+
+/**
+ * RemovedWorkflowOut
+ *
+ * What `DELETE /api/workflows/{name}` did (22 §Wire).
+ *
+ * A body rather than a 204, because the body is the point: the caller
+ * wants to know what it interrupted (D227). Whether a row of
+ * `athanore.toml` was removed is the response's `X-Athanore-Persisted`
+ * header, not a field — a receipt about the request belongs on the
+ * response.
+ */
+export type RemovedWorkflowOut = {
+    /**
+     * Task Ids
+     *
+     * The attempts that were interrupted, in spawn order; empty when nothing of the workflow was in flight.
+     */
+    task_ids: Array<number>;
+    /**
+     * Workflow
+     *
+     * The name that was unregistered.
+     */
+    workflow: string;
 };
 
 /**
@@ -3576,6 +3667,12 @@ export type WorkflowOut = {
      * The node a new run begins at.
      */
     start: string;
+    /**
+     * Target
+     *
+     * The target this workflow was loaded from (`module:attr` or `path.py:attr`), and what `PUT /api/workflows/{name}` without a `target` reloads; `null` for a programmatic registration.
+     */
+    target?: string | null;
 };
 
 /**
@@ -5009,6 +5106,78 @@ export type ListWorkflowsApiWorkflowsGetResponses = {
 
 export type ListWorkflowsApiWorkflowsGetResponse = ListWorkflowsApiWorkflowsGetResponses[keyof ListWorkflowsApiWorkflowsGetResponses];
 
+export type RegisterWorkflowApiWorkflowsPostData = {
+    body: RegisterWorkflow;
+    path?: never;
+    query?: never;
+    url: '/api/workflows';
+};
+
+export type RegisterWorkflowApiWorkflowsPostErrors = {
+    /**
+     * No operator token, on a bind that requires one.
+     */
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
+};
+
+export type RegisterWorkflowApiWorkflowsPostError = RegisterWorkflowApiWorkflowsPostErrors[keyof RegisterWorkflowApiWorkflowsPostErrors];
+
+export type RegisterWorkflowApiWorkflowsPostResponses = {
+    /**
+     * Successful Response
+     */
+    201: WorkflowOut;
+};
+
+export type RegisterWorkflowApiWorkflowsPostResponse = RegisterWorkflowApiWorkflowsPostResponses[keyof RegisterWorkflowApiWorkflowsPostResponses];
+
+export type RemoveWorkflowApiWorkflowsNameDeleteData = {
+    body?: never;
+    path: {
+        /**
+         * Name
+         *
+         * The registered workflow's name.
+         */
+        name: string;
+    };
+    query?: {
+        /**
+         * Persist
+         *
+         * Remove the `[workflows.<name>]` row of `athanore.toml` too; a name with no row is not an error.
+         */
+        persist?: boolean;
+    };
+    url: '/api/workflows/{name}';
+};
+
+export type RemoveWorkflowApiWorkflowsNameDeleteErrors = {
+    /**
+     * No operator token, on a bind that requires one.
+     */
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
+};
+
+export type RemoveWorkflowApiWorkflowsNameDeleteError = RemoveWorkflowApiWorkflowsNameDeleteErrors[keyof RemoveWorkflowApiWorkflowsNameDeleteErrors];
+
+export type RemoveWorkflowApiWorkflowsNameDeleteResponses = {
+    /**
+     * Successful Response
+     */
+    200: RemovedWorkflowOut;
+};
+
+export type RemoveWorkflowApiWorkflowsNameDeleteResponse = RemoveWorkflowApiWorkflowsNameDeleteResponses[keyof RemoveWorkflowApiWorkflowsNameDeleteResponses];
+
 export type GetWorkflowApiWorkflowsNameGetData = {
     body?: never;
     path: {
@@ -5044,6 +5213,42 @@ export type GetWorkflowApiWorkflowsNameGetResponses = {
 };
 
 export type GetWorkflowApiWorkflowsNameGetResponse = GetWorkflowApiWorkflowsNameGetResponses[keyof GetWorkflowApiWorkflowsNameGetResponses];
+
+export type ReloadWorkflowApiWorkflowsNamePutData = {
+    body: ReloadWorkflow;
+    path: {
+        /**
+         * Name
+         *
+         * The registered workflow's name.
+         */
+        name: string;
+    };
+    query?: never;
+    url: '/api/workflows/{name}';
+};
+
+export type ReloadWorkflowApiWorkflowsNamePutErrors = {
+    /**
+     * No operator token, on a bind that requires one.
+     */
+    401: ApiError;
+    /**
+     * The request did not validate. `code` is `validation` and `errors` names each field that failed.
+     */
+    422: ApiError;
+};
+
+export type ReloadWorkflowApiWorkflowsNamePutError = ReloadWorkflowApiWorkflowsNamePutErrors[keyof ReloadWorkflowApiWorkflowsNamePutErrors];
+
+export type ReloadWorkflowApiWorkflowsNamePutResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkflowOut;
+};
+
+export type ReloadWorkflowApiWorkflowsNamePutResponse = ReloadWorkflowApiWorkflowsNamePutResponses[keyof ReloadWorkflowApiWorkflowsNamePutResponses];
 
 export type SubmitRunApiWorkflowsNameRunsPostData = {
     body: NewRun;

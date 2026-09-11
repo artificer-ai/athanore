@@ -566,5 +566,10 @@ name's orphaned rows on an `add`, emit `workflow.registered` /
 the scheduler. `add` and `replace` return `Registered(name,
 persisted)`, `remove` a `RemovedWorkflow(workflow, task_ids,
 persisted)`; every refusal is the loader's `LoadError` naming its
-stage (22 §Wire), a pool that does not exist is `KeyError`, and a pool
-move with attempts in flight is `ValueError` (D234).
+stage (22 §Wire), a pool that does not exist is `KeyError`
+(`discovery.UnknownPool`, D248), and a pool move with attempts in
+flight is `ValueError` (D234). `Server` also implements
+`athanore.api.registrar.WorkflowRegistrar` — `add_target`,
+`reload_target`, `remove`, `targets` — and hands itself to
+`create_app(registrar=...)`, so the process `athanore serve` runs
+accepts the same three verbs over `/api/workflows` (22 §Wire, T086).

@@ -157,8 +157,9 @@ before writing a line: the port is a thin adapter over what is there.
      field (the header is the receipt).
 
 7. **Mapping**, in one helper beside the routes — a context manager
-   `_registering(target: str | None)` wrapping each port call, whose
-   `except` clauses raise `ApiError`:
+   `_mapping_refusals()` wrapping each port call, whose `except`
+   clauses raise `ApiError` (`_registering(request)` is the port lookup
+   that 503s without one):
    - `LoadError` with `conflict` → **409** `conflict`, body `{error,
      code}` (`error` is `exc.message`).
    - other `LoadError` → **422** `workflow_load_failed`, body
@@ -174,8 +175,9 @@ before writing a line: the port is a thin adapter over what is there.
      **409** `conflict`, `{error, code}`.
    - `PersistError` → **500** `persist_failed`, body `{error, code,
      path: str(exc.path), detail: exc.detail}`; `error` says nothing
-     was registered ("… was not updated and the workflow was not
-     registered: …") because T085 orders the write before the mutation.
+     changed ("… was not updated and the registration was not changed:
+     …") — one wording for `POST`, `PUT` and `DELETE` — because T085
+     orders the write before the mutation.
 
    **Decision**: the mapping lives in the router, not in
    `DOMAIN_ERRORS`: `ValueError` is too broad for a global handler, and

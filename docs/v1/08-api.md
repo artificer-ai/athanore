@@ -15,10 +15,17 @@ is served at `/`, plugin assets at `/plugins/{wf}/static/`, OpenAPI at
   ...extras}`. Codes: `not_found`, `conflict`, `forbidden`,
   `unauthorized`, `validation`, `invalid_option`, `already_answered`,
   `stale_request`, `graph_error`, `unknown_workflow`, `unknown_node`,
-  `payload_too_large` (413), `plugin_error` (a `PluginError` from a handler).
+  `payload_too_large` (413), `plugin_error` (a `PluginError` from a handler),
+  and the four of a live registration (22 §Wire): `workflow_load_failed`
+  (422; the body adds `target`, `stage` and `detail` — where the load
+  stopped and the underlying error's full message), `unknown_pool` (422;
+  the message names the known pools), `registration_unavailable` (503;
+  an application built without a registrar) and `persist_failed` (500;
+  the body adds `path` and `detail`, and nothing was registered).
 - Status codes: 200/201/204, 400 (malformed), 401 (missing/invalid
   operator token on a network bind), 403 (wrong task token, policy off),
-  404, 409 (state conflict), 422 (validation), 413 (body too large).
+  404, 409 (state conflict), 422 (validation), 413 (body too large),
+  500 (`persist_failed` only), 503 (`registration_unavailable` only).
 - Timestamps are ISO-8601 UTC strings. Ids as in 03.
 - Lists paginate with `?limit=&cursor=` where noted; run lists are small
   and return whole.
@@ -59,10 +66,26 @@ information the door hands out.
 
 | Method | Path | Body → Response |
 |---|---|---|
-| GET | `/api/workflows` | `[{name, start, pool, capacity, in_flight, nodes: {name: {edges, generation, priority, retries, timeout, label, description}}, plugin: {panels, actions}}]` |
+| GET | `/api/workflows` | `[{name, start, pool, capacity, in_flight, nodes: {name: {edges, generation, priority, retries, timeout, label, description}}, plugin: {panels, actions}, target?}]` — `target` is the string the workflow was loaded from, `null` for a programmatic registration (22 §Terms) |
 | GET | `/api/workflows/{name}` | one of the above (404) |
-| GET | `/api/workflows/{name}/source` | `{file, source, nodes: {name: {line}}}` — the module source via `inspect`, for the workflow library overlay |
+| GET | `/api/workflows/{name}/source` | `{file, source, nodes: {name: {line}}}` — the module source via `inspect`, for the workflow library overlay; after a reload, the reloaded text (22 §Reloading a module) |
 | POST | `/api/workflows/{name}/runs` | `{title, description?}` → 201 `{run_id}` |
+| POST | `/api/workflows` | `{target, pool?, persist?}` → 201 `WorkflowOut`; 409 `conflict` if the name is registered; 422 `workflow_load_failed` (below); 422 `unknown_pool`; 500 `persist_failed` (22 §Wire) |
+| PUT | `/api/workflows/{name}` | `{target?, pool?, persist?}` → 200 `WorkflowOut`; 404 `unknown_workflow`; 409 `conflict` if the target's name differs, or the pool would move a workflow with attempts in flight; 422 as above; 500 `persist_failed`. `target` omitted re-resolves the registration's recorded target, and is 422 `workflow_load_failed` (`stage: "target"`) when the registration has none |
+| DELETE | `/api/workflows/{name}?persist=` | → 200 `{workflow, task_ids}` — the attempts that were interrupted; 404 `unknown_workflow`; 500 `persist_failed` |
+
+The last three are the live registrations of 22, reached through the
+registrar port (`athanore.api.registrar.WorkflowRegistrar`, implemented
+by `Server` and handed to `create_app`); an application built without
+one answers them `503 registration_unavailable`. `persist` is 22
+§Persistence: `false` by default, and with it the row in
+`athanore.toml` is written or removed before the registration changes.
+A response that wrote or removed a row carries `X-Athanore-Persisted:
+<path>`; one that touched no file carries no such header. The
+`workflow_load_failed` body is `{error, code, target, stage, detail}`,
+`stage` one of `target`, `import`, `attribute`, `finalize`, `plugins`,
+`register` (22 §Wire); the traceback is in the server log, never on
+the wire.
 
 ### Runs
 

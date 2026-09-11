@@ -43,6 +43,7 @@ from athanore.plugins.discovery import (
     LoadError,
     Registered,
     RemovedWorkflow,
+    UnknownPool,
     load_target,
 )
 from athanore.plugins.persist import PersistError
@@ -853,6 +854,10 @@ async def test_an_unknown_pool_name_is_a_key_error_naming_the_known(
         assert "'nope'" in str(raised.value)
         assert "local" in str(raised.value)
         assert "second" not in server.workflows
+        # ...and the `KeyError` is the one type the API catches (D248).
+        assert isinstance(raised.value, UnknownPool)
+        assert raised.value.pool == "nope"
+        assert raised.value.known == ("local",)
 
 
 async def test_a_mount_the_application_refuses_undoes_the_engine_step(
@@ -1115,6 +1120,112 @@ async def test_targets_are_in_registration_order_with_none_for_objects(
         ("c", "c.py:wf"),
     ]
     assert list(server.workflows) == ["b", "a", "c"]
+
+
+# -- the registrar port (T086, 22 §Wire) -----------------------------------------
+
+
+async def test_add_target_loads_and_registers(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """`add_target` is `load_target` then `add`, with the target recorded."""
+
+    target = write_target(tmp_path, "chat", "chat")
+    server = Server(make_settings(tmp_path))
+    async with serving(server):
+        registered = await server.add_target(target, None, persist=False)
+        assert registered == Registered("chat", None)
+        assert server.targets["chat"] == target
+        # A second load of the same name is the ordinary conflict, logged.
+        # `start()` replaced the root handlers, caplog's among them, so it
+        # is put back for the call under test.
+        logging.getLogger().addHandler(caplog.handler)
+        with caplog.at_level(logging.ERROR, logger="athanore.server"):
+            with pytest.raises(LoadError) as raised:
+                await server.add_target(target, None, persist=False)
+        assert raised.value.conflict is True
+        # ...with its traceback, which is in the log and never on the wire.
+        assert any(
+            "workflow registration failed" in record.getMessage()
+            and "Traceback" in record.getMessage()
+            for record in caplog.records
+        )
+
+
+async def test_add_target_reloads_a_file_posted_back_after_a_remove(
+    tmp_path: Path,
+) -> None:
+    """D250: the file as it is now, not as the process first imported it."""
+
+    target = write_target(tmp_path, "chat", "chat", "first")
+    server = Server(make_settings(tmp_path))
+    async with serving(server):
+        await server.add_target(target, None, persist=False)
+        await server.remove("chat")
+        write_target(tmp_path, "chat", "chat", "second")
+        await server.add_target(target, None, persist=False)
+        assert list(server.engine.graphs["chat"].nodes) == ["second"]
+
+
+async def test_reload_target_refuses_a_programmatic_registration_without_a_target(
+    tmp_path: Path,
+) -> None:
+    """22 §Wire: `stage: "target"` — there is no recorded target to reload."""
+
+    server = Server(make_settings(tmp_path))
+    server.register(build_workflow("obj"))
+    async with serving(server):
+        with pytest.raises(LoadError) as raised:
+            await server.reload_target("obj", None, None, persist=False)
+        assert raised.value.stage == "target"
+        assert raised.value.target == ""
+        assert raised.value.conflict is False
+        assert "no recorded target" in str(raised.value)
+        with pytest.raises(LoadError) as raised:
+            await server.reload_target("absent", None, None, persist=False)
+        assert raised.value.stage == "register"
+
+
+async def test_reload_target_re_resolves_the_recorded_target(tmp_path: Path) -> None:
+    target = write_target(tmp_path, "chat", "chat", "first")
+    server = Server(make_settings(tmp_path))
+    async with serving(server):
+        await server.add_target(target, None, persist=False)
+        write_target(tmp_path, "chat", "chat", "second")
+        registered = await server.reload_target("chat", None, None, persist=False)
+        assert registered == Registered("chat", None)
+        assert list(server.engine.graphs["chat"].nodes) == ["second"]
+        assert server.targets["chat"] == target
+        # An explicit target wins and is recorded.
+        other = write_target(tmp_path, "chat2", "chat", "third")
+        await server.reload_target("chat", other, None, persist=False)
+        assert list(server.engine.graphs["chat"].nodes) == ["third"]
+        assert server.targets["chat"] == other
+
+
+async def test_reload_target_refuses_a_target_naming_another_workflow(
+    tmp_path: Path,
+) -> None:
+    """The name check runs before `replace`, so nothing is swapped."""
+
+    chat = write_target(tmp_path, "chat", "chat", "mine")
+    other = write_target(tmp_path, "other", "other", "theirs")
+    server = Server(make_settings(tmp_path))
+    async with serving(server):
+        await server.add_target(chat, None, persist=False)
+        await server.add_target(other, None, persist=False)
+        before = (server.workflows, server.targets, set(server.engine.graphs))
+        write_target(tmp_path, "chat", "other", "swapped")
+        with pytest.raises(LoadError) as raised:
+            await server.reload_target("chat", None, None, persist=False)
+        assert raised.value.stage == "register"
+        assert raised.value.conflict is True
+        assert raised.value.target == chat
+        assert "names workflow 'other'" in str(raised.value)
+        _untouched(server, before)
+        assert list(server.engine.graphs["other"].nodes) == ["theirs"]
+        assert list(server.engine.graphs["chat"].nodes) == ["mine"]
+        assert len(await named_events(server, "workflow.replaced")) == 0
 
 
 # -- persistence ---------------------------------------------------------------
