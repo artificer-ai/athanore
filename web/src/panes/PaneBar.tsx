@@ -25,14 +25,15 @@
  *
  * On the **narrow global screen** (D216) the bar is over the global
  * cycle and `leave` is given: the left slot draws one control, `←`,
- * labelled `back to the run` or `back to runs` by what is under the
- * screen, and neither the selection's back control nor the collapse
- * toggle beside it — the screen is narrow-only and `panes.run` is
- * `undefined` there anyway. The right slot stays gated on `panes.runId`
- * and so draws nothing, exactly as the desktop's global view does. The
- * dots need no new colour: run panes and global panes are never in one
- * row, and the inbox is a builtin (neutral-800) while a plugin's global
- * pane is a plugin's (accent-800), the same mapping as everywhere.
+ * labelled `back to the run` — the screen is always over a run (D217),
+ * so the slot has one label — and neither the selection's back control
+ * nor the collapse toggle beside it, the screen being narrow-only and
+ * `panes.run` `undefined` there anyway. The right slot stays gated on
+ * `panes.runId` and so draws nothing, exactly as the desktop's global
+ * view does. The dots need no new colour: run panes and global panes
+ * are never in one row, and the inbox is a builtin (neutral-800) while
+ * a plugin's global pane is a plugin's (accent-800), the same mapping
+ * as everywhere.
  */
 import { RadioGroup } from 'radix-ui'
 
@@ -48,17 +49,6 @@ const TOUCH = 'max-md:min-h-[24px] max-md:min-w-[24px]'
 /** The classes the left slot's `←` carries, whichever way it goes. */
 const BACK =
   'text-hint flex items-center justify-center rounded-lg border border-border px-[6px] py-px text-muted-foreground hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)]'
-
-/**
- * The narrow global screen's way back: what is under the screen, and
- * what clears `?global=` (21 §Regions, narrow, D216).
- */
-export type PaneLeave = {
-  /** `run` while `?run=` is set under the screen, `list` otherwise. */
-  to: 'list' | 'run'
-  /** Put the screen away. */
-  onLeave: () => void
-}
 
 export function PaneBar({
   panes,
@@ -81,9 +71,10 @@ export function PaneBar({
   onBack?: (() => void) | undefined
   /**
    * Given while the bar is over the narrow global screen: the left slot
-   * is then that screen's `←` alone (D216).
+   * is then that screen's `←` alone, and this puts the screen away —
+   * `?global=` cleared, the run under it untouched (D216, D217).
    */
-  leave?: PaneLeave | undefined
+  leave?: (() => void) | undefined
 }) {
   const listCollapsed = usePrefs((s) => s.listCollapsed)
   const setListCollapsed = usePrefs((s) => s.setListCollapsed)
@@ -100,12 +91,12 @@ export function PaneBar({
       {leave !== undefined ? (
         // The global screen's own `←`: it clears `?global=` and nothing
         // else, so the run — and the pane of it — under the screen is
-        // where it lands (D216).
+        // where it lands (D216, D217).
         <button
           type="button"
-          onClick={leave.onLeave}
-          aria-label={leave.to === 'run' ? 'back to the run' : 'back to runs'}
-          title={leave.to === 'run' ? 'back to the run (esc)' : 'back to runs (esc)'}
+          onClick={leave}
+          aria-label="back to the run"
+          title="back to the run (esc)"
           className={`${BACK} ${TOUCH}`}
         >
           ←

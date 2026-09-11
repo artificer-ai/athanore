@@ -107,13 +107,17 @@ That layout is the one at Tailwind's `md` (768 px) and above. Below it —
 region at a time: the run list while `?run=` is unset, the detail pane
 while it is set, with the pane bar's left slot carrying a back control
 (`aria-label="back to runs"`) that clears it, and a third screen, the
-global panes over either, while `?global=` is set (21 §Narrow layout,
-D216). The splitter is not mounted there and `listWidth` /
-`listCollapsed` are inert, kept rather than cleared; the run list's rows
-become two lines; the header wraps, with the chips and the `/` filter as
-a strip that scrolls horizontally within itself; the footer drops the
-keycaps and keeps the palette button, with a `global panes` toggle
-beside it; interactive chrome carries a 24×24 px hit area (WCAG 2.5.8).
+global panes over that run, while `?global=` is set beside it (21
+§Narrow layout, D216, D217). The three are one line — list, detail,
+global — walked by a horizontal swipe: left one screen towards the
+list, right one away from it, from the detail only. The splitter is not
+mounted there and `listWidth` / `listCollapsed` are inert, kept rather
+than cleared; the run list's rows become two lines; the header wraps,
+with the chips and the `/` filter as a strip that scrolls horizontally
+within itself; the footer drops the keycaps and keeps the palette
+button, with a `global panes` toggle beside it on the detail and the
+global screen; interactive chrome carries a 24×24 px hit area (WCAG
+2.5.8).
 The keyboard map stays fully bound at every width. 21 §Narrow layout is
 normative for all of it, D194 for the breakpoint, and the shell reads
 the width through one `matchMedia` hook (`lib/useIsNarrow.ts`) so the
@@ -129,11 +133,11 @@ it is dropped or shrunk to make one line of it (D201).
 Builtins first, then the selected run's plugin panes (09). `←`/`→` cycle
 with wrap; `1`–`9` jump; the index persists across selection changes
 (it is a property of the operator's attention, not the run). Below the
-breakpoint the `global` panes are a screen of their own with an index of
-their own (`?global=`, 21 §Narrow layout, D216), so leaving it lands on
-the pane of the run the operator was on; the keys above cycle whatever
-the middle shows. At `md` and above they are what the detail shows with
-nothing selected, as before.
+breakpoint the `global` panes are a screen of their own, over the
+selected run, with an index of their own (`?global=`, 21 §Narrow layout,
+D216, D217), so leaving it lands on the pane of the run the operator was
+on; the keys above cycle whatever the middle shows. At `md` and above
+they are what the detail shows with nothing selected, as before.
 
 The order is the **manifest's** and is not hard-coded here: the builtins
 are declared like any other plugin (09 §Builtins are plugins) and the
@@ -346,7 +350,10 @@ pane (D176, D179, D204 (1)).
 
 `esc` unwinds one rung at a time, nearest outwards: an open overlay, then
 the narrow global screen (D216), then a run held by `⏎`, then the
-selection itself. That last rung is what makes the `global` panes
+selection itself. Below the breakpoint the rungs after the overlay are
+the three narrow screens, one towards the list per press — global,
+detail, list — and no key advances a screen the other way (D217 (5)).
+That last rung is what makes the `global` panes
 reachable again above the breakpoint — they are shown when no run is
 selected, and until it existed the only things that cleared `?run=` were
 the delete confirm and the narrow back control, so selecting a run was a
@@ -473,7 +480,7 @@ attributes.
 - Touch targets in the narrow chrome are at least 24×24 CSS px (WCAG
   2.5.8); the visual size stays the mock's. `web/e2e/mobile.spec.ts`
   drives the six flows of 21 §Touch operation with `tap()` alone — and
-  a CDP touch sequence for the one swipe — and asserts no horizontal
+  a CDP touch sequence for the swipes — and asserts no horizontal
   page scroll in any of them.
 
 ## Auth in the browser

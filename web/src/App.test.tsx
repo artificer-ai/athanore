@@ -701,7 +701,19 @@ describe('App', () => {
       expect(onSelectRun).toHaveBeenCalledWith('aaaa1111bbbb')
     })
 
-    /* The narrow global screen (21 §Narrow layout, D216). */
+    /*
+     * The narrow global screen (21 §Narrow layout, D216), the far end of
+     * one line — list, detail, global — and always over a run (D217).
+     */
+
+    /** A finger across the stacked middle, `from` to `to` on the x axis. */
+    const swipe = (from: number, to: number) => {
+      const main = screen.getByRole('main')
+      fireEvent.touchStart(main, { touches: [{ clientX: from, clientY: 400 }] })
+      fireEvent.touchEnd(main, { changedTouches: [{ clientX: to, clientY: 400 }] })
+    }
+    const swipeRight = () => swipe(100, 260)
+    const swipeLeft = () => swipe(260, 100)
 
     it('shows the global panes over a run while `?global=` is set', () => {
       shell({ run: 'aaaa1111bbbb', pane: 1, global: 0 })
@@ -721,13 +733,35 @@ describe('App', () => {
       expect(screen.queryByRole('region', { name: 'runs' })).toBeNull()
     })
 
-    it('shows the global panes over nothing, with the list as the way back', () => {
+    it('reads `?global=` only beside `?run=`: alone it is the list', () => {
+      // The global screen is always over a run (D217 (1)): `?global=`
+      // with no run is inert, kept rather than cleared — as it is at
+      // `md` and above — and the list is what shows.
       shell({ global: 0 })
 
-      expect(screen.getByRole('main')).toHaveAttribute('data-stacked', 'global')
-      expect(screen.getByTestId('pane-label')).toHaveTextContent('INBOX (1/1)')
-      expect(screen.getByRole('button', { name: 'back to runs' })).toBeInTheDocument()
-      expect(screen.queryByRole('region', { name: 'runs' })).toBeNull()
+      expect(screen.getByRole('main')).toHaveAttribute('data-stacked', 'list')
+      expect(screen.getByRole('region', { name: 'runs' })).toBeInTheDocument()
+      expect(screen.queryByRole('region', { name: 'detail' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'back to runs' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'back to the run' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'global panes' })).toBeNull()
+    })
+
+    it('draws no `global panes` button on the list, and reads no swipe there', () => {
+      // The button twins the swipe on the screen it is drawn on, and the
+      // list has no swipe to the global panes (D217 (4)): a run is
+      // chosen by tapping its row. Both directions are read by the
+      // stacked middle's listener and dropped by the shell (D217 (2)).
+      const onShowGlobal = vi.fn()
+      const onClearRun = vi.fn()
+      shell({}, { onShowGlobal, onClearRun })
+
+      expect(screen.queryByRole('button', { name: 'global panes' })).toBeNull()
+      swipeRight()
+      swipeLeft()
+      expect(onShowGlobal).not.toHaveBeenCalled()
+      expect(onClearRun).not.toHaveBeenCalled()
+      expect(screen.getByRole('main')).toHaveAttribute('data-stacked', 'list')
     })
 
     it('opens and closes the global screen from the footer button', async () => {
@@ -759,40 +793,48 @@ describe('App', () => {
       expect(onClearRun).not.toHaveBeenCalled()
     })
 
-    it('opens the global screen on a swipe right, and closes it on a swipe left', () => {
+    it('walks the line from the detail: a swipe right opens the global screen, a swipe left goes to the list', () => {
+      // The detail is between the list and the global panes (D217 (2)):
+      // right is one screen away from the list, left is one towards it
+      // — the same `onClearRun` write the bar's `←` makes, so the
+      // selection clears on the way (D217 (7)).
       const onShowGlobal = vi.fn()
-      const { rerender, queryClient } = shell({ run: 'aaaa1111bbbb' }, { onShowGlobal })
-      const swipe = (from: number, to: number) => {
-        const main = screen.getByRole('main')
-        fireEvent.touchStart(main, { touches: [{ clientX: from, clientY: 400 }] })
-        fireEvent.touchEnd(main, { changedTouches: [{ clientX: to, clientY: 400 }] })
-      }
+      const onClearRun = vi.fn()
+      shell({ run: 'aaaa1111bbbb' }, { onShowGlobal, onClearRun })
 
-      // On the detail: right opens, left is nothing — a swipe left on
-      // the detail does not go back to the list.
-      swipe(260, 100)
-      expect(onShowGlobal).not.toHaveBeenCalled()
-      swipe(100, 260)
+      expect(screen.getByRole('main')).toHaveAttribute('data-stacked', 'detail')
+      swipeRight()
       expect(onShowGlobal).toHaveBeenCalledExactlyOnceWith(0)
+      expect(onClearRun).not.toHaveBeenCalled()
 
-      // On the global screen: left closes, right is nothing — it does
-      // not write `0` over the pane the screen is on.
       onShowGlobal.mockClear()
-      rerender(
-        <QueryClientProvider client={queryClient}>
-          <App
-            search={{ run: 'aaaa1111bbbb', global: 1 }}
-            onSelectRun={() => {}}
-            onSelectPane={() => {}}
-            onOpenPalette={() => {}}
-            onShowGlobal={onShowGlobal}
-          />
-        </QueryClientProvider>,
-      )
-      swipe(100, 260)
+      swipeLeft()
+      expect(onClearRun).toHaveBeenCalledOnce()
       expect(onShowGlobal).not.toHaveBeenCalled()
-      swipe(260, 100)
+    })
+
+    it('walks the line from the global screen: a swipe left goes back to the run, a swipe right is nothing', () => {
+      // The global screen is the far end: left is one screen towards the
+      // list — the detail, on the pane of the run it left — and right
+      // has nowhere to go, so it does not write `0` over the pane the
+      // screen is on.
+      const onShowGlobal = vi.fn()
+      const onClearRun = vi.fn()
+      shell({ run: 'aaaa1111bbbb', global: 1 }, { onShowGlobal, onClearRun })
+
+      expect(screen.getByRole('main')).toHaveAttribute('data-stacked', 'global')
+      expect(screen.getByRole('button', { name: 'back to the run' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'back to runs' })).toBeNull()
+      expect(screen.getByRole('button', { name: 'global panes' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+      swipeRight()
+      expect(onShowGlobal).not.toHaveBeenCalled()
+      expect(onClearRun).not.toHaveBeenCalled()
+      swipeLeft()
       expect(onShowGlobal).toHaveBeenCalledExactlyOnceWith(undefined)
+      expect(onClearRun).not.toHaveBeenCalled()
     })
 
     it('unwinds the global screen on `esc`, after an overlay and before the run', () => {
@@ -837,12 +879,15 @@ describe('App', () => {
     })
 
     it('still selects with `↓` on the global screen; the route clears it', async () => {
+      // No key is rebound below the breakpoint (D217 (5)): the map is
+      // bound on the document, so `↓` selects from the global screen as
+      // it does from anywhere.
       const onSelectRun = vi.fn()
       const onShowGlobal = vi.fn()
-      shell({ global: 0 }, { onSelectRun, onShowGlobal })
+      shell({ run: 'aaaa1111bbbb', global: 0 }, { onSelectRun, onShowGlobal })
 
       await userEvent.keyboard('{ArrowDown}')
-      expect(onSelectRun).toHaveBeenCalledWith('aaaa1111bbbb')
+      expect(onSelectRun).toHaveBeenCalledWith('cccc3333dddd')
       // The write that takes the screen down is the route's, in the same
       // navigation (`routes/__tests__/AppRoute.test.tsx`).
       expect(onShowGlobal).not.toHaveBeenCalled()

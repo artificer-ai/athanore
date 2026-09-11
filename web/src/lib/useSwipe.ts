@@ -2,10 +2,11 @@
  * A horizontal swipe on one element, read by touch
  * (`docs/v1/21-design-refresh.md` §Touch operation, D216).
  *
- * The narrow global screen is entered by a swipe right on the middle
- * region and left by a swipe left (`components/Splitter.tsx`). This is
- * the recogniser and nothing else: it says which way a finger went and
- * leaves what that means to the caller.
+ * The three narrow screens — list, detail, global — are one line, and
+ * a swipe on the middle region walks it: left is one screen towards the
+ * list, right is one away from it (`components/Splitter.tsx`, D217).
+ * This is the recogniser and nothing else: it says which way a finger
+ * went and leaves what that means to the caller.
  *
  * The listeners are **native** and **passive**, and both words matter.
  * Native rather than React's `onTouchStart`, because React propagates

@@ -22,7 +22,7 @@
  * measure, so `PaneRenderer` is given the height and decides what to do
  * with it (10 §Panes).
  */
-import { PaneBar, type PaneLeave } from '../panes/PaneBar'
+import { PaneBar } from '../panes/PaneBar'
 import { PaneRenderer } from '../panes/PaneRenderer'
 import type { PaneModel } from '../panes/usePanes'
 import { useUi } from '../store/ui'
@@ -58,14 +58,14 @@ export function Detail({
    */
   onBack?: (() => void) | undefined
   /**
-   * The narrow global screen's way back (21 §Regions, narrow, D216):
-   * given while this detail is drawn over the global cycle below the
-   * breakpoint, and handed to the bar unchanged for the same reason
+   * The narrow global screen's way back (21 §Regions, narrow, D216,
+   * D217): given while this detail is drawn over the global cycle below
+   * the breakpoint, and handed to the bar unchanged for the same reason
    * `onBack` is. The empty-cycle copy below is right there too — `no
    * run selected` means the manifest answered with no global pane at
    * all, which no build with the builtins has.
    */
-  leave?: PaneLeave | undefined
+  leave?: (() => void) | undefined
 }) {
   const focused = useUi((s) => s.focus === 'detail')
   const setFocus = useUi((s) => s.setFocus)

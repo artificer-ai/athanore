@@ -109,9 +109,10 @@ describe('Detail', () => {
 
   it('hands the global screen’s way back to the bar', async () => {
     // `leave` is passed through for the same reason `onBack` is: the bar
-    // is where the left slot is (D216).
+    // is where the left slot is (D216), and it reaches it as `back to
+    // the run` — the screen is always over a run (D217).
     const onLeave = vi.fn()
-    render(<Detail panes={model()} leave={{ to: 'run', onLeave }} />)
+    render(<Detail panes={model()} leave={onLeave} />)
 
     await userEvent.click(screen.getByRole('button', { name: 'back to the run' }))
     expect(onLeave).toHaveBeenCalledOnce()

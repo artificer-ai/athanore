@@ -10,12 +10,15 @@
  * D194). Selection is already a search parameter, so the stacked
  * navigation is a render decision and not new state, and `onClearRun` —
  * which the delete confirm already had — is what the pane bar's back
- * control writes. A third narrow screen, the **global screen**, rides
- * `?global=` over either of those: it is the same `Detail` over the
+ * control writes. A third narrow screen, the **global screen**, is the
+ * far end of one line — list, detail, global — and is always over a
+ * run: `?global=` set beside `?run=` is the same `Detail` over the
  * global cycle — what the desktop draws with nothing selected — entered
- * by a swipe right or the footer's `global panes` button and left by a
- * swipe left, the bar's `←`, the button or `esc`, with `?run=` and
- * `?pane=` untouched underneath (D216).
+ * from the detail by a swipe right or the footer's `global panes` button
+ * and left by a swipe left, the bar's `←`, the button or `esc`, with
+ * `?run=` and `?pane=` untouched underneath (D216, D217). A swipe left
+ * is always one screen towards the list, a swipe right one away from
+ * it, and only the detail has one to go to.
  *
  * Everything that makes this view *this view* comes in on `search`: the
  * shell owns no selection state of its own, and `onSelectRun` hands a
@@ -145,20 +148,26 @@ export default function App({
    */
   onFocusStream?: ((taskId: number, pane: number | undefined) => void) | undefined
   /**
-   * Nothing is selected any more: `?run=` away.
+   * Nothing is selected any more: `?run=` away, and `?global=` with it.
    *
-   * The delete confirm is the one thing that calls it. A run that no
-   * longer exists cannot be the selection, and leaving `?run=` on a
-   * deleted id would point the detail pane at a 404.
+   * The delete confirm calls it, and so do the narrow detail's `←` and
+   * its swipe left. A run that no longer exists cannot be the
+   * selection, and leaving `?run=` on a deleted id would point the
+   * detail pane at a 404; the global screen is always over a run, so
+   * it goes with the thing under it (D217).
    */
   onClearRun?: (() => void) | undefined
   /**
    * The narrow global screen: `?global=` to this index, or away.
    *
-   * `0` opens it on its first pane, a larger index is `◀ ▶`, a dot or a
-   * jump key moving inside it, and `undefined` is every way off it (21
-   * §Narrow layout, D216). Nothing else in the search is touched, which
-   * is what puts a swipe back on the pane of the run it left.
+   * `0` opens it on its first pane — a swipe right on the detail, or
+   * the footer button while the screen is down; a larger index is
+   * `◀ ▶`, a dot or a jump key moving inside it; and `undefined` is a
+   * swipe left on the screen, the bar's `←`, the footer button while it
+   * is up, or `esc` (21 §Narrow layout, D216, D217). Nothing else in
+   * the search is touched, which is what puts a swipe back on the pane
+   * of the run it left. Leaving the detail for the list is
+   * `onClearRun`'s, which clears `?global=` too.
    */
   onShowGlobal?: ((index: number | undefined) => void) | undefined
 }) {
@@ -168,12 +177,14 @@ export default function App({
   // two regions are two subtrees, and below the breakpoint exactly one
   // of them is mounted (D194).
   const narrow = useIsNarrow()
-  // The narrow global screen: `?global=` set, below the breakpoint. At
-  // `md` and above the parameter is inert — kept, not cleared, as
-  // `listCollapsed` is below (D194) — because the detail is the global
-  // panes there whenever nothing is selected, and a phone's link opened
-  // on a desktop should show the run it names.
-  const showingGlobal = narrow && search.global !== undefined
+  // The narrow global screen: the far end of the narrow line and always
+  // over a run, so `?global=` is read beside `?run=` and is inert alone
+  // (D217). At `md` and above the parameter is inert either way — kept,
+  // not cleared, as `listCollapsed` is below (D194) — because the
+  // detail is the global panes there whenever nothing is selected, and
+  // a phone's link opened on a desktop should show the run it names.
+  const showingGlobal =
+    narrow && search.run !== undefined && search.global !== undefined
   const showGlobal = onShowGlobal ?? NOTHING
   // One pane model, keyed off the screen, not two: what the middle shows
   // is what the keyboard cycles, what the palette's `append log` looks
@@ -370,7 +381,9 @@ export default function App({
     // The narrow global screen is a rung between the overlay and the
     // held run (D216): a held run is never narrow, so the order between
     // those two is never exercised, but the rung sits where it reads
-    // right — the screen is nearer than the selection under it.
+    // right — the screen is nearer than the selection under it. Below
+    // the breakpoint the rungs after the overlay are the three screens
+    // of the narrow line, one towards the list per press (D217 (5)).
     close: () => {
       if (search.overlay !== undefined) {
         onCloseOverlay?.()
@@ -388,6 +401,19 @@ export default function App({
     },
   })
 
+  // The stacked middle of 21 §Narrow layout, one of three screens in a
+  // line: `?run=` unset is the list, `?run=` set is the detail, and
+  // `?run=` and `?global=` set is the global screen over that run. At
+  // `md` and above there is no stack — the splitter draws both. Read
+  // once, here, because the swipe handler below decides on it too.
+  const stacked = narrow
+    ? showingGlobal
+      ? 'global'
+      : search.run === undefined
+        ? 'list'
+        : 'detail'
+    : undefined
+
   return (
     <div className="text-body flex h-dvh flex-col overflow-hidden bg-background text-foreground">
       <Header
@@ -403,28 +429,26 @@ export default function App({
 
       <Splitter
         count={runs.rows.length}
-        // The stacked middle of 21 §Narrow layout: `?global=` set is the
-        // global screen over whichever of the other two is under it,
-        // `?run=` unset is the list, `?run=` set is the detail, and at
-        // `md` and above there is no stack — the splitter draws both.
-        stacked={
-          narrow
-            ? showingGlobal
-              ? 'global'
-              : search.run === undefined
-                ? 'list'
-                : 'detail'
-            : undefined
-        }
-        // Swipe right opens the global screen on its first pane, swipe
-        // left puts it away. Each is guarded on the screen's state, so a
-        // swipe right *on* the global screen does not write `0` over
-        // the pane it is on and a swipe left off it does not spend a
-        // history entry rewriting the same search — the guard 10
-        // §Keyboard gives `esc`.
+        stacked={stacked}
+        // One screen towards the list on a swipe left, one away from it
+        // on a swipe right, and only the detail has one to go to: right
+        // opens the global screen on its first pane, left on the global
+        // screen puts it away onto the pane of the run under it, and
+        // left on the detail is the bar's `←` — the same `onClearRun`
+        // write. A direction with no meaning on the screen it lands on
+        // — either way on the list, right on the global screen — is
+        // read and dropped: the listener is the stacked middle's and
+        // stays attached (D217 (2)), and dropping it is also what keeps
+        // a swipe from spending a history entry rewriting the same
+        // search, the guard 10 §Keyboard gives `esc`.
         onSwipe={(direction) => {
-          if (direction === 'right' && !showingGlobal) showGlobal(0)
-          else if (direction === 'left' && showingGlobal) showGlobal(undefined)
+          if (direction === 'right') {
+            if (stacked === 'detail') showGlobal(0)
+          } else if (stacked === 'global') {
+            showGlobal(undefined)
+          } else if (stacked === 'detail') {
+            onClearRun?.()
+          }
         }}
         list={
           <RunList
@@ -464,14 +488,11 @@ export default function App({
             onBack={onClearRun}
             // The global screen's own way back: `?global=` away, with
             // `?run=` left as it is, so `back to the run` is literal —
-            // and `back to runs` when nothing was selected under it.
+            // the screen is always over a run (D217).
             leave={
               showingGlobal
-                ? {
-                    to: search.run === undefined ? 'list' : 'run',
-                    onLeave: () => {
-                      showGlobal(undefined)
-                    },
+                ? () => {
+                    showGlobal(undefined)
                   }
                 : undefined
             }
@@ -482,11 +503,17 @@ export default function App({
       {/* `global` only when narrow: `App` is one of D201 (2)'s three
           `useIsNarrow()` components already, so the width is decided
           here and the footer stays a `max-md:` class away from knowing.
-          Above the breakpoint the button is not in the document at all. */}
+          Above the breakpoint the button is not in the document at all.
+          Nor is it on the list: the button is the discoverable twin of
+          the swipe on the screen it is drawn on, and the list has no
+          swipe to the global panes — 21 §Touch operation's rule cuts
+          both ways, a gesture is never the only route and a screen with
+          no gesture needs no button for it (D217 (4)). So it is drawn
+          on the detail and the global screen, the two the swipe joins. */}
       <Footer
         onOpenPalette={onOpenPalette}
         global={
-          narrow
+          narrow && search.run !== undefined
             ? {
                 pressed: showingGlobal,
                 onToggle: () => {

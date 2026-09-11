@@ -140,13 +140,14 @@ describe('the selection', () => {
     await press(router, 'clear run', '?pane=1')
   })
 
-  it('leaves the global screen where it is when the run under it goes', async () => {
-    // A run deleted from the palette while the global screen is up
-    // leaves the operator on the global screen with nothing selected
-    // under it, which is a sound state (D216).
+  it('takes the global screen down with the run', async () => {
+    // The global screen is always over a run (D217), so the screen goes
+    // with the thing under it: a run deleted from the palette while it
+    // is up lands on the list, and the narrow `←` and the swipe left
+    // that share this write leave nothing behind.
     const router = mount('/?run=aaaa1111&pane=1&global=0')
 
-    await press(router, 'clear run', '?pane=1&global=0')
+    await press(router, 'clear run', '?pane=1')
   })
 
   it('leaves the global screen alone when the run’s pane changes', async () => {
