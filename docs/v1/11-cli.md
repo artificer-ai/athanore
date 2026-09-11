@@ -25,18 +25,32 @@ the socket is bound. Replaces `python -m workflow` (examples keep a
 `__main__` that calls `Server` directly for the programmatic form).
 
 What is served, in order (09 §Discovery has the same rules from the
-plugin side):
+plugin side; 22 §Persistence gives the precedence its reason):
 
-1. **The targets given**, in the order they were given. Every failure to
-   resolve one — no such module, no such file, no such attribute, an
-   attribute that is not a `Workflow` — costs 2.
-2. **Then the entry points**, unless `--no-discover`. A discovered
-   workflow whose *workflow name* matches a target already loaded is
-   dropped: an explicit target wins, so a working copy can be served
+1. **The targets given**, in the order they were given. A target is
+   `module:attr` or `path/to/file.py:attr`, resolved by
+   `athanore.plugins.discovery.load_target` — the loader lives beside
+   the entry-point loader so the API can reach it without importing the
+   CLI (22 §Reloading a module) — and the attribute may be the
+   `Workflow` or a callable returning one, as an entry point's may.
+   Every failure to resolve one — no such module, no such file, no such
+   attribute, an attribute that is not a `Workflow` — costs 2. The name
+   registered is the workflow's own, not the target's.
+2. **Then the rows of `athanore.toml`** that carry a `target`
+   (`[workflows.<name>] = { target = "…", pool? }`), in the file's
+   order, through the same loader and at the same price: a failure to
+   load costs 2 and names the row, the target and the cause, and so
+   does a row whose key is not the loaded workflow's name — the row is
+   a registration, and one under the wrong name is a typo. A row whose
+   name a target already registered is skipped with a warning naming
+   both targets: the positional is the working copy and wins.
+3. **Then the entry points**, unless `--no-discover`. A discovered
+   workflow whose *workflow name* a target or a row already registered
+   is dropped: an explicit target wins, so a working copy can be served
    without uninstalling the package that ships it. An entry point that
    cannot be loaded is not skipped — it names itself, its distribution
    and its cause, and exits 1.
-3. **Then the pools.** `[workflows.<name>].pool` binds a workflow, by
+4. **Then the pools.** `[workflows.<name>].pool` binds a workflow, by
    workflow name, to the capacity `[pools]` declares for that name; a
    workflow nothing binds runs on the default pool, sized by `--workers`.
    A binding naming a pool `[pools]` does not declare costs 2 and names
@@ -45,6 +59,12 @@ plugin side):
    A binding for a workflow this server does not run is a warning, said
    once: an `athanore.toml` describes a project's workflows, and serving
    one of them on purpose is ordinary.
+
+`serve` records the target of every workflow it loads — each positional
+as it was given, each row's `target`, each discovered entry point as its
+`module:attr` value — on the server (`Server.targets`, 04 §Programmatic
+host), so that a later reload of the name can re-resolve what `serve`
+loaded (22 §Terms).
 
 ```
 athanore db upgrade | current | backup <path> | import-v0 <file>

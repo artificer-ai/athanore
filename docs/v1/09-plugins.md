@@ -362,9 +362,13 @@ cloud = 8
 [workflows]
 feature_build = { pool = "local" }
 gamedev = { pool = "local" }
+hello = { target = "workflows/hello.py:wf" }   # a registration, not just a binding
 ```
 
-`athanore.plugins.discovery.discover()` is the whole of it, and four
+`athanore.plugins.discovery.discover()` is the whole of it: it yields
+`Discovered(workflow, target)` pairs, `target` being the entry point's
+`module:attr` value — what a reload of a discovered workflow
+re-resolves (22 §Terms; `load_target` lives in the same module). Four
 rules make it predictable. They are the ones an operator otherwise only
 learns by being surprised, so they are written down here and in 11
 §Server.
@@ -379,9 +383,11 @@ the same string and nothing requires it.
 workflow, and a discovered workflow with the same name is dropped rather
 than registered beside it: naming a target means that target, which is
 what makes it possible to serve a working copy of an installed workflow
-without uninstalling it. `--no-discover` turns discovery off entirely, so
-the workflows served are exactly the targets given — none, if none were
-given.
+without uninstalling it. A `[workflows.<name>]` row with a `target` is
+a target written down (22 §Persistence) and shadows a discovered
+workflow of the same name exactly as a typed one does. `--no-discover`
+turns discovery off entirely, so the workflows served are exactly the
+targets given and the rows — none, if there are none.
 
 **A discovered workflow is an ordinary one.** It is bound to a pool by
 `[workflows.<name>]` exactly as a target is, runs on the default pool

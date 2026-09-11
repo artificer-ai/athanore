@@ -254,8 +254,11 @@ def test_discover_finds_an_installed_workflow(install: Callable[..., Path]) -> N
 
     install({"demo": "acme_flows:demo"})
     found = discover()
-    assert [wf.name for wf in found] == ["demo"]
-    assert set(found[0].finalize().nodes) == {"installed"}
+    assert [found_.workflow.name for found_ in found] == ["demo"]
+    assert set(found[0].workflow.finalize().nodes) == {"installed"}
+    # Paired with the target a reload of it re-resolves: the entry
+    # point's `module:attr` value, not its name (22 §Terms).
+    assert found[0].target == "acme_flows:demo"
 
 
 def test_an_entry_may_point_at_a_callable(install: Callable[..., Path]) -> None:
@@ -263,8 +266,9 @@ def test_an_entry_may_point_at_a_callable(install: Callable[..., Path]) -> None:
 
     install({"built": "acme_flows:build"})
     found = discover()
-    assert [wf.name for wf in found] == ["built"]
-    assert set(found[0].finalize().nodes) == {"made_at_serve_time"}
+    assert [found_.workflow.name for found_ in found] == ["built"]
+    assert set(found[0].workflow.finalize().nodes) == {"made_at_serve_time"}
+    assert found[0].target == "acme_flows:build"
 
 
 def test_discover_finds_nothing_when_nothing_advertises(
@@ -284,7 +288,7 @@ def test_entries_are_loaded_in_a_fixed_order(install: Callable[..., Path]) -> No
     """By entry-point name, whatever order the metadata happened to list."""
 
     install({"zeta": "acme_flows:build", "alpha": "acme_flows:demo"})
-    assert [wf.name for wf in discover()] == ["demo", "built"]
+    assert [found.workflow.name for found in discover()] == ["demo", "built"]
 
 
 @pytest.mark.parametrize(
@@ -362,6 +366,32 @@ def test_a_target_does_not_suppress_the_other_discovered_workflows(
     assert main(["serve", "flows.py:demo", "--port", "0"]) == EXIT_OK
     assert sorted(served[0].workflows) == ["built", "demo"]
     assert nodes(served[0], "demo") == {"typed"}
+
+
+def test_serve_records_a_discovered_workflows_entry_point_value(
+    install: Callable[..., Path], served: list[Server]
+) -> None:
+    """22 §Terms: the target on record is `module:attr`, not the entry's name."""
+
+    install({"anything": "acme_flows:build"})
+    assert main(["serve", "--port", "0"]) == EXIT_OK
+    assert served[0].targets == {"built": "acme_flows:build"}
+
+
+def test_a_row_with_a_target_wins_over_a_discovered_workflow(
+    tmp_path: Path, install: Callable[..., Path], served: list[Server]
+) -> None:
+    """A row is a target written down (22 §Persistence): it shadows too."""
+
+    install({"demo": "acme_flows:demo"})
+    write_typed(tmp_path)
+    (tmp_path / "athanore.toml").write_text(
+        '[workflows]\ndemo = { target = "flows.py:demo" }\n'
+    )
+    assert main(["serve", "--port", "0"]) == EXIT_OK
+    assert list(served[0].workflows) == ["demo"]
+    assert nodes(served[0], "demo") == {"typed"}
+    assert served[0].targets == {"demo": "flows.py:demo"}
 
 
 def test_a_discovered_workflow_is_bound_by_athanore_toml(

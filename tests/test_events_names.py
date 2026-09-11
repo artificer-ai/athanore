@@ -35,6 +35,9 @@ from athanore.events.payloads import (
     TaskCancelled,
     TaskStream,
     TaskStreamEvent,
+    WorkflowRegistered,
+    WorkflowReplaced,
+    WorkflowUnregistered,
 )
 
 DOC = Path(__file__).resolve().parents[1] / "docs" / "v1" / "03-domain-model.md"
@@ -310,3 +313,46 @@ def test_an_unstored_event_has_no_id() -> None:
     assert event.id is None
     assert event.run_id is None
     assert event.task_id is None
+
+
+# --------------------------------------------------------------------------
+# The workflow events (T085, 22 §Events)
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("name", "data"),
+    [
+        (EventName.engine_recovered, {"task_ids": [1]}),
+        (EventName.workflow_registered, {"workflow": "chat", "pool": "default"}),
+        (EventName.workflow_replaced, {"workflow": "chat", "pool": "default"}),
+        (EventName.workflow_unregistered, {"workflow": "chat", "task_ids": [7]}),
+    ],
+)
+def test_server_events_carry_no_run_id(name: EventName, data: dict) -> None:
+    """18 §Envelope: `run_id` is absent on `engine.*` and `workflow.*`."""
+
+    event = ENVELOPE.validate_python(
+        {"name": name.value, "created": CREATED, "data": data}
+    )
+    assert type(event) is ENVELOPES[name]
+    dumped = event.model_dump(mode="json")
+    assert "run_id" not in dumped
+    assert "task_id" not in dumped
+    assert dumped["data"] == data
+
+
+def test_a_registration_without_a_target_omits_it() -> None:
+    """`target?` is absent for a programmatic registration, never `null`."""
+
+    assert WorkflowRegistered(workflow="chat", pool="play").model_dump() == {
+        "workflow": "chat",
+        "pool": "play",
+    }
+    assert WorkflowReplaced(
+        workflow="chat", pool="play", target="chat.py:wf"
+    ).model_dump() == {"workflow": "chat", "pool": "play", "target": "chat.py:wf"}
+    assert WorkflowUnregistered(workflow="chat", task_ids=[]).model_dump() == {
+        "workflow": "chat",
+        "task_ids": [],
+    }

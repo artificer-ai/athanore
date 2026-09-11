@@ -7,20 +7,25 @@ composition root. Nothing is orchestrated here — the wiring is 04
 §Programmatic host's and belongs to that class. What lives in this module
 is the part a command line has and a library call does not:
 
-- **Where a workflow comes from.** :func:`load_target` resolves the
-  ``module:attr`` and ``path/to/file.py:attr`` forms of 11 §Server. A
-  file target is executed as a module with its own directory on
-  ``sys.path``, which is what ``python that_file.py`` would have done, so
-  a workflow that imports its siblings keeps working when it is named on
-  a command line instead of run. :func:`discovered` asks the installed
-  distributions for the rest (09 §Discovery), unless ``--no-discover``
-  says not to, and a target the operator typed wins over a discovered
-  workflow of the same name.
+- **Where a workflow comes from.** Three inputs, one precedence (22
+  §Persistence): each positional target — ``module:attr`` or
+  ``path/to/file.py:attr``, resolved by
+  :func:`athanore.plugins.discovery.load_target` through the
+  :func:`load_target` wrapper here — then the ``[workflows.<name>]``
+  rows of ``athanore.toml`` that carry a ``target``, through
+  :meth:`athanore.server.Server.register_configured`, then what the
+  installed distributions advertise (09 §Discovery) through
+  :func:`discovered`, unless ``--no-discover`` says not to. A positional
+  wins over a row of the same name (the row is skipped with a warning
+  naming both targets) and a positional or a row wins over a discovered
+  workflow (the discovered one is dropped). Every workflow's target is
+  recorded on the server, so ``athanore workflows reload <name>`` can
+  reload what ``serve`` loaded.
 - **Where the pools come from.** :func:`layout` reads ``[pools]`` and
   ``[workflows]`` out of ``athanore.toml`` (02 §``athanore.toml``
-  layout). They are not settings — ``AthanoreSettings`` ignores both
-  tables — because they name objects the host builds rather than values
-  it holds.
+  layout), through :func:`athanore.plugins.discovery.read_layout`. They
+  are not settings — ``AthanoreSettings`` ignores both tables — because
+  they name objects the host builds rather than values it holds.
 - **What the operator is told.** The bound URL is printed *after* the
   socket exists, which is the whole point on ``--port 0``: the port a
   server picked is knowable nowhere else, and ``--open`` points a browser
@@ -36,11 +41,6 @@ make that impossible.
 
 from __future__ import annotations
 
-import importlib
-import importlib.util
-import os
-import sys
-import tomllib
 import webbrowser
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated, Any
@@ -48,24 +48,20 @@ from typing import TYPE_CHECKING, Annotated, Any
 import typer
 
 from athanore.cli import app
-from athanore.cli.output import EXIT_API_ERROR, fail, warn
+from athanore.cli.output import EXIT_API_ERROR, EXIT_USAGE, fail, warn
 from athanore.settings import AthanoreSettings
 
 if TYPE_CHECKING:  # the deferred imports of the command body, for the types
     from athanore.engine import Pool
+    from athanore.plugins.discovery import Discovered
     from athanore.server import Server
     from athanore.workflow import Workflow
 
 __all__ = ["announce", "layout", "load_target", "serve"]
 
-#: The one key ``[workflows.<name>]`` takes (02 §``athanore.toml``
-#: layout). Anything else is a typo, and a typo that silently did nothing
-#: would put a workflow on the wrong pool for as long as nobody looked.
-WORKFLOW_KEYS = frozenset({"pool"})
 
-
-def discovered() -> list[Workflow]:
-    """The workflows installed packages advertise (09 §Discovery).
+def discovered() -> list[Discovered]:
+    """The workflows installed packages advertise, each with its target.
 
     The group, the ``module:attr``-or-callable form of an entry and the
     refusal of one that is neither belong to
@@ -79,7 +75,8 @@ def discovered() -> list[Workflow]:
     is applied in :func:`serve`, on the *workflow's* name rather than the
     entry point's: the left-hand side of an entry is what the
     distribution called it, and the name a run is submitted under is the
-    workflow's own.
+    workflow's own. The target recorded for a discovered workflow is the
+    entry point's ``module:attr`` value (22 §Terms).
     """
 
     from athanore.plugins.discovery import discover
@@ -90,170 +87,44 @@ def discovered() -> list[Workflow]:
 def load_target(target: str) -> Workflow:
     """The workflow ``target`` names (11 §Server).
 
-    ``package.module:wf`` imports the module; ``path/to/file.py:wf``
-    executes the file. Both forms end at an attribute, because a module
-    may define several workflows and picking one by guessing would be a
-    rule nobody could read off the command line.
-
-    Every failure here is a mistake in what was typed — a module that is
-    not importable, a file that is not there, an attribute that is not a
-    workflow — so every one of them is a :class:`typer.BadParameter`,
-    which 11 §Exit codes prices at 2.
+    :func:`athanore.plugins.discovery.load_target` does the work — the
+    loader lives beside the entry-point loader so the API can reach it
+    without importing the CLI (22 §Reloading a module). What is decided
+    here is the price: every failure is a mistake in what was typed — a
+    module that is not importable, a file that is not there, an
+    attribute that is not a workflow — so every one of them is a
+    :class:`typer.BadParameter`, which 11 §Exit codes prices at 2.
     """
 
-    from athanore.workflow import Workflow
+    from athanore.plugins.discovery import LoadError
+    from athanore.plugins.discovery import load_target as load
 
-    where, separator, attribute = target.rpartition(":")
-    if not separator or not where or not attribute:
-        raise typer.BadParameter(
-            f"{target!r} is not a workflow target; name one as `module:wf` "
-            f"or `path/to/file.py:wf`."
-        )
-    module = _load_module(where, target)
     try:
-        value = getattr(module, attribute)
-    except AttributeError:
-        raise typer.BadParameter(
-            f"{where} has no attribute {attribute!r} ({target})."
-        ) from None
-    if not isinstance(value, Workflow):
-        raise typer.BadParameter(
-            f"{target} is a {type(value).__name__}, not a Workflow."
-        )
-    return value
-
-
-def _load_module(where: str, target: str) -> Any:
-    """Import the module half of a target, from the path or from the name."""
-
-    if where.endswith(".py") or os.sep in where or (os.altsep and os.altsep in where):
-        return _load_file(Path(where), target)
-    # A console script does not put the working directory on `sys.path`
-    # the way `python -m` does, so `athanore serve mypkg.flows:wf` in a
-    # project directory would not find the project without this.
-    _prepend_sys_path(Path.cwd())
-    try:
-        return importlib.import_module(where)
-    except ImportError as exc:
-        raise typer.BadParameter(f"{target} could not be imported: {exc}") from exc
-
-
-def _load_file(path: Path, target: str) -> Any:
-    """Execute ``path`` as a module and return it.
-
-    The file's own directory goes on ``sys.path`` first, so a workflow
-    that imports a sibling module resolves it the way it would if the
-    file had been run directly. The module is registered in
-    ``sys.modules`` before it is executed, because a dataclass, a pydantic
-    model or a pickle defined in it looks itself up there by name — and
-    it is removed again if the execution fails, so a half-built module is
-    never left behind for the next import to find.
-    """
-
-    resolved = path.expanduser().resolve()
-    if not resolved.is_file():
-        raise typer.BadParameter(f"{target} names {resolved}, which is not a file.")
-    spec = importlib.util.spec_from_file_location(resolved.stem, resolved)
-    if spec is None or spec.loader is None:  # pragma: no cover - a `.py` always has one
-        raise typer.BadParameter(f"{resolved} cannot be imported as a module.")
-    _prepend_sys_path(resolved.parent)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    try:
-        spec.loader.exec_module(module)
-    except BaseException:
-        sys.modules.pop(spec.name, None)
-        raise
-    return module
-
-
-def _prepend_sys_path(directory: Path) -> None:
-    """Put ``directory`` first on ``sys.path``, once."""
-
-    entry = str(directory)
-    if entry not in sys.path:
-        sys.path.insert(0, entry)
+        return load(target)
+    except LoadError as exc:
+        raise typer.BadParameter(str(exc)) from exc
 
 
 def layout(root_path: Path) -> tuple[dict[str, int], dict[str, str]]:
     """``[pools]`` and ``[workflows]`` from ``athanore.toml`` (02).
 
     Returns the declared capacities by pool name and the pool each
-    workflow is bound to. Neither table is a setting — ``AthanoreSettings``
-    skips both, because they describe objects the host builds rather than
-    values it holds — so the file is read a second time here, resolved
-    against ``root_path`` exactly as the settings source resolves it.
-
-    A file that is not there is not an error: a server with one workflow
-    on the default pool needs no configuration at all. A file that is
-    there and says something this cannot use is refused where it can be
-    fixed, for the reason 02 gives for an unknown top-level key: a typo
-    must not silently fall back to a default.
+    workflow is bound to, read through
+    :func:`athanore.plugins.discovery.read_layout` — the one reader of
+    the two tables, which ``Server.register_configured`` reads the
+    ``target`` rows through as well. A file that says something the
+    reader cannot use is a :class:`typer.BadParameter` here, for the
+    reason 02 gives for an unknown top-level key: a typo must not
+    silently fall back to a default.
     """
 
-    toml_path = root_path / "athanore.toml"
-    if not toml_path.is_file():
-        return {}, {}
+    from athanore.plugins.discovery import LayoutError, read_layout
+
     try:
-        with toml_path.open("rb") as fh:
-            data = tomllib.load(fh)
-    except (OSError, tomllib.TOMLDecodeError) as exc:
-        raise typer.BadParameter(f"{toml_path} could not be read: {exc}") from exc
-    return _pools(data.get("pools", {}), toml_path), _bindings(
-        data.get("workflows", {}), toml_path
-    )
-
-
-def _pools(table: Any, toml_path: Path) -> dict[str, int]:
-    """``[pools]`` as capacities by name."""
-
-    if not isinstance(table, dict):
-        raise typer.BadParameter(f"`[pools]` in {toml_path} must be a table.")
-    capacities: dict[str, int] = {}
-    for name, capacity in table.items():
-        # `bool` is an `int` in Python and `local = true` is a typo, not
-        # a cap of one — the same refusal `Pool` makes of its own field.
-        if type(capacity) is not int:
-            raise typer.BadParameter(
-                f"pool `{name}` in {toml_path} must be an integer capacity, "
-                f"got {capacity!r}."
-            )
-        capacities[str(name)] = capacity
-    return capacities
-
-
-def _bindings(table: Any, toml_path: Path) -> dict[str, str]:
-    """``[workflows]`` as the pool name each workflow asked for.
-
-    A workflow with an empty table (``msgtest = { }`` in 02's example)
-    names no pool and is left to the engine's default one, so it is
-    absent from the result rather than present with a name nobody wrote.
-    """
-
-    if not isinstance(table, dict):
-        raise typer.BadParameter(f"`[workflows]` in {toml_path} must be a table.")
-    bindings: dict[str, str] = {}
-    for name, entry in table.items():
-        if not isinstance(entry, dict):
-            raise typer.BadParameter(
-                f"`[workflows.{name}]` in {toml_path} must be a table, got {entry!r}."
-            )
-        unknown = sorted(set(entry) - WORKFLOW_KEYS)
-        if unknown:
-            raise typer.BadParameter(
-                f"unknown key `{unknown[0]}` in `[workflows.{name}]` of "
-                f"{toml_path} (it takes `pool` and nothing else)."
-            )
-        pool = entry.get("pool")
-        if pool is None:
-            continue
-        if not isinstance(pool, str):
-            raise typer.BadParameter(
-                f"`pool` in `[workflows.{name}]` of {toml_path} must be a "
-                f"pool name, got {pool!r}."
-            )
-        bindings[str(name)] = pool
-    return bindings
+        read = read_layout(root_path / "athanore.toml")
+    except LayoutError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    return read.pools, read.bindings
 
 
 def _pool_for(
@@ -278,6 +149,14 @@ def _pool_for(
         return Pool(bound, capacities[bound])
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
+
+
+def _sentence(exc: Exception) -> str:
+    """``exc`` as the line to print: a ``KeyError`` without its quotes."""
+
+    if isinstance(exc, KeyError) and exc.args:
+        return str(exc.args[0])
+    return str(exc)
 
 
 def _settings(**overrides: Any) -> AthanoreSettings:
@@ -366,7 +245,7 @@ def serve(
     """Run a server for the given workflows until it is stopped."""
 
     from athanore.graph import GraphError
-    from athanore.plugins.discovery import DiscoveryError
+    from athanore.plugins.discovery import DiscoveryError, LayoutError, LoadError
     from athanore.server import MissingOperatorToken, Server, V0Database
 
     settings = _settings(
@@ -376,7 +255,47 @@ def serve(
         db_url=db,
         public_url=public_url,
     )
-    workflows = [load_target(target) for target in targets or []]
+    # The positionals are loaded before the file is read, so a mistyped
+    # target is reported before a mistyped table — the order the
+    # operator wrote them in.
+    loaded = [(target, load_target(target)) for target in targets or []]
+    capacities, bindings = layout(settings.root_path)
+    toml_path = settings.root_path / "athanore.toml"
+    server = Server(settings)
+
+    def register(wf: Workflow, target: str) -> None:
+        pool = _pool_for(wf.name, bindings, capacities, settings.root_path)
+        try:
+            server.register(wf, pool, target=target)
+        except (GraphError, ValueError, TypeError) as exc:
+            # A name that shadows a verb or a pool, a graph that does not
+            # finalize, a declaration that names a node it does not have.
+            fail(str(exc))
+            raise typer.Exit(EXIT_API_ERROR) from exc
+
+    # 1. The positionals, each recorded under the target as it was typed
+    #    (22 §Terms), so `athanore workflows reload <name>` can reload it.
+    for target, wf in loaded:
+        register(wf, target)
+    # 2. The `[workflows.<name>].target` rows (22 §Persistence): a row is a
+    #    positional written down, loaded through the same loader and
+    #    priced the same (exit 2) when it fails. A positional of the same
+    #    name has already won; the row is skipped with a warning.
+    try:
+        rows = server.register_configured()
+    except (LoadError, LayoutError, GraphError, ValueError, KeyError) as exc:
+        fail(_sentence(exc))
+        raise typer.Exit(EXIT_USAGE) from exc
+    for skipped in rows.skipped:
+        warn(
+            f"`[workflows.{skipped.name}]` in {toml_path} names "
+            f"{skipped.target}, but {skipped.name!r} is already registered from "
+            f"{skipped.registered}; the row was skipped."
+        )
+    # 3. What the installed distributions advertise, minus every name a
+    #    positional or a row already registered: an explicit target wins
+    #    over a discovered workflow of the same name, because the operator
+    #    naming a file means that file (09 §Discovery).
     if not no_discover:
         try:
             advertised = discovered()
@@ -388,22 +307,13 @@ def serve(
             # on, until the package is fixed, is `--no-discover`.
             fail(str(exc))
             raise typer.Exit(EXIT_API_ERROR) from exc
-        named = {wf.name for wf in workflows}
-        # An explicit target wins over a discovered workflow of the same
-        # name: the operator naming a file means that file (09 §Discovery).
-        workflows.extend(wf for wf in advertised if wf.name not in named)
-    capacities, bindings = layout(settings.root_path)
-
-    server = Server(settings)
-    for wf in workflows:
-        pool = _pool_for(wf.name, bindings, capacities, settings.root_path)
-        try:
-            server.register(wf, pool)
-        except (GraphError, ValueError, TypeError) as exc:
-            # A name that shadows a verb or a pool, a graph that does not
-            # finalize, a declaration that names a node it does not have.
-            fail(str(exc))
-            raise typer.Exit(EXIT_API_ERROR) from exc
+        named = set(server.workflows)
+        # Against the names registered so far only, not against each
+        # other: two distributions advertising one name are a collision
+        # the registration refuses, not a precedence to apply.
+        for found in advertised:
+            if found.workflow.name not in named:
+                register(found.workflow, found.target)
     for name in sorted(set(bindings) - set(server.workflows)):
         # Said once, and not fatal: a project's `athanore.toml` describes
         # every workflow it has, and serving one of them on purpose is

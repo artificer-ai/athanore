@@ -581,6 +581,7 @@ def _settings() -> str:
             "",
             "[workflows]",
             'feature_build = { pool = "build" }',
+            'chat = { target = "workflows/chat.py:wf" }   # a registration',
             "```",
         ],
     )

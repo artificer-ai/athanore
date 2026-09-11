@@ -28,7 +28,15 @@ build = 2
 
 [workflows]
 feature_build = { pool = "build" }
+chat = { target = "workflows/chat.py:wf" }
 ```
+
+A `[workflows.<name>]` row with a `pool` binds a workflow that arrives
+some other way; one with a `target` is a registration in its own right —
+`athanore serve` loads it after the targets on its command line and
+before the installed packages' entry points, and a registration made
+while serving with `persist` is written here as exactly such a row, the
+rest of the file kept as it was.
 
 An unknown top-level key is an error at startup rather than a default
 quietly taken — a typo in a capacity setting is worth stopping for. Two

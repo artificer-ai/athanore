@@ -258,9 +258,11 @@ export const manifestApiPluginsGetQueryKey = (options?: Options<ManifestApiPlugi
  * The plugin manifest: panels, actions and assets, per workflow.
  *
  * Builtins first, then the workflows in registration order. The
- * SPA fetches this at boot and again whenever the SSE stream
- * reconnects onto a server with a new ``started_at``, because a
- * manifest changes only when the process does (09 §Wire contract).
+ * SPA fetches this at boot, again whenever the SSE stream reconnects
+ * onto a server with a new ``started_at``, and on every
+ * ``workflow.*`` event, because a manifest changes when a workflow
+ * is registered, replaced or removed (09 §Wire contract, 22 §Live
+ * mounting).
  */
 export const manifestApiPluginsGetOptions = (options?: Options<ManifestApiPluginsGetData>) => queryOptions<ManifestApiPluginsGetResponse, ManifestApiPluginsGetError, ManifestApiPluginsGetResponse, ReturnType<typeof manifestApiPluginsGetQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {

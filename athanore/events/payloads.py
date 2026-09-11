@@ -461,6 +461,41 @@ class EngineStopping(EventModel):
 
 
 # --------------------------------------------------------------------------
+# Payloads — workflows
+# --------------------------------------------------------------------------
+
+
+class WorkflowRegistered(EventModel):
+    """A workflow added to a serving server (22 §Add). No ``run_id``.
+
+    ``target`` is the string it was loaded from, absent for a
+    programmatic registration.
+    """
+
+    workflow: str
+    pool: str
+    target: str | None = None
+
+
+class WorkflowReplaced(EventModel):
+    """A workflow's graph and plugins swapped (22 §Replace). No ``run_id``."""
+
+    workflow: str
+    pool: str
+    target: str | None = None
+
+
+class WorkflowUnregistered(EventModel):
+    """A workflow removed (22 §Remove). No ``run_id``.
+
+    ``task_ids`` are the attempts the removal interrupted.
+    """
+
+    workflow: str
+    task_ids: list[int]
+
+
+# --------------------------------------------------------------------------
 # Envelopes
 # --------------------------------------------------------------------------
 
@@ -469,8 +504,8 @@ class EventFrame(EventModel):
     """The fields every event carries; ``name`` and ``data`` are per variant.
 
     ``id`` is the SSE cursor and is absent on ephemeral events; ``run_id`` is
-    absent on ``engine.*``; ``task_id`` is present on the task-scoped events
-    and on ``log.appended`` when the entry has a task.
+    absent on ``engine.*`` and ``workflow.*``; ``task_id`` is present on the
+    task-scoped events and on ``log.appended`` when the entry has a task.
     """
 
     id: int | None = None
@@ -636,6 +671,21 @@ class EngineStoppingEvent(EventFrame):
     data: EngineStopping
 
 
+class WorkflowRegisteredEvent(EventFrame):
+    name: Literal[EventName.workflow_registered] = EventName.workflow_registered
+    data: WorkflowRegistered
+
+
+class WorkflowReplacedEvent(EventFrame):
+    name: Literal[EventName.workflow_replaced] = EventName.workflow_replaced
+    data: WorkflowReplaced
+
+
+class WorkflowUnregisteredEvent(EventFrame):
+    name: Literal[EventName.workflow_unregistered] = EventName.workflow_unregistered
+    data: WorkflowUnregistered
+
+
 class PluginEvent(EventFrame):
     """``plugin.<workflow>.<name>``: the vocabulary's open end.
 
@@ -716,6 +766,11 @@ EventEnvelope = Annotated[
         Annotated[AgentStatsEvent, Tag(EventName.agent_stats.value)],
         Annotated[EngineRecoveredEvent, Tag(EventName.engine_recovered.value)],
         Annotated[EngineStoppingEvent, Tag(EventName.engine_stopping.value)],
+        Annotated[WorkflowRegisteredEvent, Tag(EventName.workflow_registered.value)],
+        Annotated[WorkflowReplacedEvent, Tag(EventName.workflow_replaced.value)],
+        Annotated[
+            WorkflowUnregisteredEvent, Tag(EventName.workflow_unregistered.value)
+        ],
         Annotated[PluginEvent, Tag(PLUGIN_PREFIX)],
     ],
     Discriminator(_envelope_tag),

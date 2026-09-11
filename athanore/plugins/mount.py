@@ -133,11 +133,6 @@ MANIFEST_PATH = "/api/plugins"
 ACTIONS_PATH = "/{wf}/actions/{name}"
 
 
-# The docstring of `PanelOut`, the `assets` description of
-# `PluginManifestEntry` and the docstring of the `manifest` route below
-# are in `tests/snapshots/openapi.json`, and T084 leaves the snapshot
-# byte-identical. Their "changes only on restart" wording is stale since
-# 22 §Live mounting; T086, which regenerates the snapshot, corrects it.
 class PanelOut(BaseModel):
     """One panel of the manifest (09 §Wire contract).
 
@@ -145,8 +140,9 @@ class PanelOut(BaseModel):
     from, or — for a ``form`` panel — the name of the action whose model
     is the form. ``node`` is present only on a panel that follows one;
     whether that node is *live* travels on the run's graph rather than
-    here, because the manifest changes only on restart (08 §Graph
-    semantics).
+    here, because the manifest changes only when a workflow is
+    registered, replaced or removed, never per run (08 §Graph semantics,
+    22 §Live mounting).
     """
 
     name: str = Field(description="The panel's title, unique within its workflow.")
@@ -244,7 +240,8 @@ class PluginManifestEntry(BaseModel):
     )
     assets: list[str] = Field(
         default_factory=list,
-        description="URLs of the JavaScript modules the SPA injects for it.",
+        description="URLs of the JavaScript modules the SPA injects for it, "
+        "each carrying a `?v=` that changes when the file's bytes do.",
     )
 
 
@@ -498,9 +495,11 @@ def mount_manifest(app: FastAPI) -> APIRouter:
         """The plugin manifest: panels, actions and assets, per workflow.
 
         Builtins first, then the workflows in registration order. The
-        SPA fetches this at boot and again whenever the SSE stream
-        reconnects onto a server with a new ``started_at``, because a
-        manifest changes only when the process does (09 §Wire contract).
+        SPA fetches this at boot, again whenever the SSE stream reconnects
+        onto a server with a new ``started_at``, and on every
+        ``workflow.*`` event, because a manifest changes when a workflow
+        is registered, replaced or removed (09 §Wire contract, 22 §Live
+        mounting).
         """
 
         plugins: MountedPlugins = request.app.state.plugins
@@ -716,7 +715,8 @@ def _in_scope(workflow: str, owner: str | None, event: Event) -> bool:
     inherits the workflow it was declared on, and scope follows
     ownership).
 
-    An event with no run at all — the ``engine.*`` names — is about the
+    An event with no run at all — the ``engine.*`` and ``workflow.*``
+    names — is about the
     server rather than about anyone's work, and reaches every
     subscriber. An event about a run whose owner cannot be established —
     the row is gone and the payload does not name the workflow — reaches

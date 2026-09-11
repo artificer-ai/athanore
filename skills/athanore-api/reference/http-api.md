@@ -325,7 +325,7 @@ stored, so it never appears in a page.
 
 | Status | Body | Description |
 |---|---|---|
-| `200` | `array` of [`RunCreatedEvent`](#schema-RunCreatedEvent) \| [`RunStartedEvent`](#schema-RunStartedEvent) \| [`RunUpdatedEvent`](#schema-RunUpdatedEvent) \| [`RunReorderedEvent`](#schema-RunReorderedEvent) \| [`RunPausedEvent`](#schema-RunPausedEvent) \| [`RunResumedEvent`](#schema-RunResumedEvent) \| [`RunCancelledEvent`](#schema-RunCancelledEvent) \| [`RunDeletedEvent`](#schema-RunDeletedEvent) \| [`RunCompletedEvent`](#schema-RunCompletedEvent) \| [`RunFailedEvent`](#schema-RunFailedEvent) \| [`TaskEnqueuedEvent`](#schema-TaskEnqueuedEvent) \| [`JoinArrivedEvent`](#schema-JoinArrivedEvent) \| [`TaskStartedEvent`](#schema-TaskStartedEvent) \| [`TaskDoneEvent`](#schema-TaskDoneEvent) \| [`TaskFailedEvent`](#schema-TaskFailedEvent) \| [`TaskDeadLetteredEvent`](#schema-TaskDeadLetteredEvent) \| [`TaskWaitingEvent`](#schema-TaskWaitingEvent) \| [`TaskResumedEvent`](#schema-TaskResumedEvent) \| [`TaskCancelledEvent`](#schema-TaskCancelledEvent) \| [`TaskMovedEvent`](#schema-TaskMovedEvent) \| [`TaskStatusSetEvent`](#schema-TaskStatusSetEvent) \| [`TaskStreamEvent`](#schema-TaskStreamEvent) \| [`SubmissionAcceptedEvent`](#schema-SubmissionAcceptedEvent) \| [`SubmissionRejectedEvent`](#schema-SubmissionRejectedEvent) \| [`SubmissionRepairEvent`](#schema-SubmissionRepairEvent) \| [`RequestOpenedEvent`](#schema-RequestOpenedEvent) \| [`RequestAnsweredEvent`](#schema-RequestAnsweredEvent) \| [`LogAppendedEvent`](#schema-LogAppendedEvent) \| [`AgentStatsEvent`](#schema-AgentStatsEvent) \| [`EngineRecoveredEvent`](#schema-EngineRecoveredEvent) \| [`EngineStoppingEvent`](#schema-EngineStoppingEvent) \| [`PluginEvent`](#schema-PluginEvent) | Successful Response |
+| `200` | `array` of [`RunCreatedEvent`](#schema-RunCreatedEvent) \| [`RunStartedEvent`](#schema-RunStartedEvent) \| [`RunUpdatedEvent`](#schema-RunUpdatedEvent) \| [`RunReorderedEvent`](#schema-RunReorderedEvent) \| [`RunPausedEvent`](#schema-RunPausedEvent) \| [`RunResumedEvent`](#schema-RunResumedEvent) \| [`RunCancelledEvent`](#schema-RunCancelledEvent) \| [`RunDeletedEvent`](#schema-RunDeletedEvent) \| [`RunCompletedEvent`](#schema-RunCompletedEvent) \| [`RunFailedEvent`](#schema-RunFailedEvent) \| [`TaskEnqueuedEvent`](#schema-TaskEnqueuedEvent) \| [`JoinArrivedEvent`](#schema-JoinArrivedEvent) \| [`TaskStartedEvent`](#schema-TaskStartedEvent) \| [`TaskDoneEvent`](#schema-TaskDoneEvent) \| [`TaskFailedEvent`](#schema-TaskFailedEvent) \| [`TaskDeadLetteredEvent`](#schema-TaskDeadLetteredEvent) \| [`TaskWaitingEvent`](#schema-TaskWaitingEvent) \| [`TaskResumedEvent`](#schema-TaskResumedEvent) \| [`TaskCancelledEvent`](#schema-TaskCancelledEvent) \| [`TaskMovedEvent`](#schema-TaskMovedEvent) \| [`TaskStatusSetEvent`](#schema-TaskStatusSetEvent) \| [`TaskStreamEvent`](#schema-TaskStreamEvent) \| [`SubmissionAcceptedEvent`](#schema-SubmissionAcceptedEvent) \| [`SubmissionRejectedEvent`](#schema-SubmissionRejectedEvent) \| [`SubmissionRepairEvent`](#schema-SubmissionRepairEvent) \| [`RequestOpenedEvent`](#schema-RequestOpenedEvent) \| [`RequestAnsweredEvent`](#schema-RequestAnsweredEvent) \| [`LogAppendedEvent`](#schema-LogAppendedEvent) \| [`AgentStatsEvent`](#schema-AgentStatsEvent) \| [`EngineRecoveredEvent`](#schema-EngineRecoveredEvent) \| [`EngineStoppingEvent`](#schema-EngineStoppingEvent) \| [`WorkflowRegisteredEvent`](#schema-WorkflowRegisteredEvent) \| [`WorkflowReplacedEvent`](#schema-WorkflowReplacedEvent) \| [`WorkflowUnregisteredEvent`](#schema-WorkflowUnregisteredEvent) \| [`PluginEvent`](#schema-PluginEvent) | Successful Response |
 | `401` | [`ApiError`](#schema-ApiError) | No operator token, on a bind that requires one. |
 | `422` | [`ApiError`](#schema-ApiError) | The request did not validate. `code` is `validation` and `errors` names each field that failed. |
 
@@ -1014,9 +1014,10 @@ Credential: operatorBearer. Operation id: `manifest_api_plugins_get`.
 The plugin manifest: panels, actions and assets, per workflow.
 
 Builtins first, then the workflows in registration order. The
-SPA fetches this at boot and again whenever the SSE stream
-reconnects onto a server with a new ``started_at``, because a
-manifest changes only when the process does.
+SPA fetches this at boot, again whenever the SSE stream reconnects
+onto a server with a new ``started_at``, and on every
+``workflow.*`` event, because a manifest changes when a workflow
+is registered, replaced or removed.
 
 **Responses**
 
@@ -1508,6 +1509,9 @@ TypeScript mirror, never to this module alone.
 - `'agent.stats'`
 - `'engine.recovered'`
 - `'engine.stopping'`
+- `'workflow.registered'`
+- `'workflow.replaced'`
+- `'workflow.unregistered'`
 
 ### `GraphBranch` {#schema-GraphBranch}
 
@@ -1795,7 +1799,9 @@ One panel of the manifest.
 from, or — for a ``form`` panel — the name of the action whose model
 is the form. ``node`` is present only on a panel that follows one;
 whether that node is *live* travels on the run's graph rather than
-here, because the manifest changes only on restart.
+here, because the manifest changes only when a workflow is
+registered, replaced or removed, never per run (08 §Graph semantics,
+22 §Live mounting).
 
 | Field | Type | Required | Description |
 |---|---|---|---|
@@ -1843,7 +1849,7 @@ What one workflow contributes to the UI.
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `actions` | `array` of [`ActionOut`](#schema-ActionOut) | no | Its actions, in declaration order. |
-| `assets` | `array` of `string` | no | URLs of the JavaScript modules the SPA injects for it. |
+| `assets` | `array` of `string` | no | URLs of the JavaScript modules the SPA injects for it, each carrying a `?v=` that changes when the file's bytes do. |
 | `panels` | `array` of [`PanelOut`](#schema-PanelOut) | no | Its panels, in declaration order. |
 | `workflow` | `string` | yes | The workflow that declared these, or `_builtin` for the views the core ships. |
 
@@ -2770,6 +2776,73 @@ the manifest's own.
 |---|---|---|---|
 | `actions` | `array` of `object` | no | Action declarations, as `/api/plugins` lists them. |
 | `panels` | `array` of `object` | no | Panel declarations, as `/api/plugins` lists them. |
+
+### `WorkflowRegistered` {#schema-WorkflowRegistered}
+
+A workflow added to a serving server. No ``run_id``.
+
+``target`` is the string it was loaded from, absent for a
+programmatic registration.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `pool` | `string` | yes |  |
+| `target` | `string` \| `null` | no |  |
+| `workflow` | `string` | yes |  |
+
+### `WorkflowRegisteredEvent` {#schema-WorkflowRegisteredEvent}
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `created` | `string` (date-time) | yes |  |
+| `data` | [`WorkflowRegistered`](#schema-WorkflowRegistered) | yes |  |
+| `id` | `integer` \| `null` | no |  |
+| `name` | `'workflow.registered'` | yes |  |
+| `run_id` | `string` \| `null` | no |  |
+| `task_id` | `integer` \| `null` | no |  |
+
+### `WorkflowReplaced` {#schema-WorkflowReplaced}
+
+A workflow's graph and plugins swapped. No ``run_id``.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `pool` | `string` | yes |  |
+| `target` | `string` \| `null` | no |  |
+| `workflow` | `string` | yes |  |
+
+### `WorkflowReplacedEvent` {#schema-WorkflowReplacedEvent}
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `created` | `string` (date-time) | yes |  |
+| `data` | [`WorkflowReplaced`](#schema-WorkflowReplaced) | yes |  |
+| `id` | `integer` \| `null` | no |  |
+| `name` | `'workflow.replaced'` | yes |  |
+| `run_id` | `string` \| `null` | no |  |
+| `task_id` | `integer` \| `null` | no |  |
+
+### `WorkflowUnregistered` {#schema-WorkflowUnregistered}
+
+A workflow removed. No ``run_id``.
+
+``task_ids`` are the attempts the removal interrupted.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `task_ids` | `array` of `integer` | yes |  |
+| `workflow` | `string` | yes |  |
+
+### `WorkflowUnregisteredEvent` {#schema-WorkflowUnregisteredEvent}
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `created` | `string` (date-time) | yes |  |
+| `data` | [`WorkflowUnregistered`](#schema-WorkflowUnregistered) | yes |  |
+| `id` | `integer` \| `null` | no |  |
+| `name` | `'workflow.unregistered'` | yes |  |
+| `run_id` | `string` \| `null` | no |  |
+| `task_id` | `integer` \| `null` | no |  |
 
 ### `athanore__api__schemas__tasks__BranchFrame` {#schema-athanore__api__schemas__tasks__BranchFrame}
 

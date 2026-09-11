@@ -212,6 +212,26 @@ Both are the same thing the command line does. The `athanore serve`
 form, which also reads pools from a configuration file and finds
 installed workflows, is in [The command line](cli.md).
 
+Registration does not stop when serving starts. `register` is for
+before `start()`; on a serving server the same host awaits three verbs
+— `add`, `replace` and `remove` — which register a workflow, swap its
+graph and plugins under the same name, or drop it, without a restart
+and without touching the other workflows' runs:
+
+```python
+await server.add(chat, target="workflows/chat.py:wf", persist=True)
+await server.replace(chat)          # the next task of every run dispatches on the new graph
+removed = await server.remove("chat")
+removed.task_ids                    # the attempts that were interrupted
+```
+
+`persist=True` writes the registration as a `[workflows.chat]` row of
+`athanore.toml` (see [Deployment](deployment.md)), and
+`server.register_configured()` before `start()` is how a programmatic
+host loads such rows back. An attempt already running finishes on the
+body it started with; a removed workflow's runs stay listed, flagged
+`unregistered`, and resume when it is added back.
+
 ## Next
 
 - [Dispatching agents](agents.md) — the object most bodies await.

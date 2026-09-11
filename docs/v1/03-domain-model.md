@@ -187,6 +187,9 @@ applicable, `task_id`.
 | `agent.stats` | stats dict | façade |
 | `engine.recovered` | task ids | startup |
 | `engine.stopping` | task ids | shutdown (04 §Shutdown) |
+| `workflow.registered` | workflow, pool, target | live registration (22 §Events) |
+| `workflow.replaced` | workflow, pool, target | live registration (22 §Events) |
+| `workflow.unregistered` | workflow, task ids | live registration (22 §Events) |
 | `plugin.<wf>.<name>` | free | plugin handlers (namespaced) |
 
 Payload shapes per event are fixed in 18. Persisted events are the SSE feed (08). `task.stream` is the one

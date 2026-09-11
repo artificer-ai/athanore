@@ -670,7 +670,7 @@ export type ErrorCode = 'not_found' | 'conflict' | 'forbidden' | 'unauthorized' 
  * Values are ``subject.verb``. Adding one is a change to 03 and to the
  * TypeScript mirror, never to this module alone.
  */
-export type EventName = 'run.created' | 'run.started' | 'run.updated' | 'run.reordered' | 'run.paused' | 'run.resumed' | 'run.cancelled' | 'run.deleted' | 'run.completed' | 'run.failed' | 'task.enqueued' | 'join.arrived' | 'task.started' | 'task.done' | 'task.failed' | 'task.dead_lettered' | 'task.waiting' | 'task.resumed' | 'task.cancelled' | 'task.moved' | 'task.status_set' | 'task.stream' | 'submission.accepted' | 'submission.rejected' | 'submission.repair' | 'request.opened' | 'request.answered' | 'log.appended' | 'agent.stats' | 'engine.recovered' | 'engine.stopping';
+export type EventName = 'run.created' | 'run.started' | 'run.updated' | 'run.reordered' | 'run.paused' | 'run.resumed' | 'run.cancelled' | 'run.deleted' | 'run.completed' | 'run.failed' | 'task.enqueued' | 'join.arrived' | 'task.started' | 'task.done' | 'task.failed' | 'task.dead_lettered' | 'task.waiting' | 'task.resumed' | 'task.cancelled' | 'task.moved' | 'task.status_set' | 'task.stream' | 'submission.accepted' | 'submission.rejected' | 'submission.repair' | 'request.opened' | 'request.answered' | 'log.appended' | 'agent.stats' | 'engine.recovered' | 'engine.stopping' | 'workflow.registered' | 'workflow.replaced' | 'workflow.unregistered';
 
 /**
  * GraphBranch
@@ -1261,8 +1261,9 @@ export type PanelKind = 'markdown' | 'kv' | 'table' | 'log' | 'chart' | 'dashboa
  * from, or — for a ``form`` panel — the name of the action whose model
  * is the form. ``node`` is present only on a panel that follows one;
  * whether that node is *live* travels on the run's graph rather than
- * here, because the manifest changes only on restart (08 §Graph
- * semantics).
+ * here, because the manifest changes only when a workflow is
+ * registered, replaced or removed, never per run (08 §Graph semantics,
+ * 22 §Live mounting).
  */
 export type PanelOut = {
     /**
@@ -1379,7 +1380,7 @@ export type PluginManifestEntry = {
     /**
      * Assets
      *
-     * URLs of the JavaScript modules the SPA injects for it.
+     * URLs of the JavaScript modules the SPA injects for it, each carrying a `?v=` that changes when the file's bytes do.
      */
     assets?: Array<string>;
     /**
@@ -3607,6 +3608,148 @@ export type WorkflowPlugin = {
 };
 
 /**
+ * WorkflowRegistered
+ *
+ * A workflow added to a serving server (22 §Add). No ``run_id``.
+ *
+ * ``target`` is the string it was loaded from, absent for a
+ * programmatic registration.
+ */
+export type WorkflowRegistered = {
+    /**
+     * Pool
+     */
+    pool: string;
+    /**
+     * Target
+     */
+    target?: string | null;
+    /**
+     * Workflow
+     */
+    workflow: string;
+};
+
+/**
+ * WorkflowRegisteredEvent
+ */
+export type WorkflowRegisteredEvent = {
+    /**
+     * Created
+     */
+    created: string;
+    data: WorkflowRegistered;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name: 'workflow.registered';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
+};
+
+/**
+ * WorkflowReplaced
+ *
+ * A workflow's graph and plugins swapped (22 §Replace). No ``run_id``.
+ */
+export type WorkflowReplaced = {
+    /**
+     * Pool
+     */
+    pool: string;
+    /**
+     * Target
+     */
+    target?: string | null;
+    /**
+     * Workflow
+     */
+    workflow: string;
+};
+
+/**
+ * WorkflowReplacedEvent
+ */
+export type WorkflowReplacedEvent = {
+    /**
+     * Created
+     */
+    created: string;
+    data: WorkflowReplaced;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name: 'workflow.replaced';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
+};
+
+/**
+ * WorkflowUnregistered
+ *
+ * A workflow removed (22 §Remove). No ``run_id``.
+ *
+ * ``task_ids`` are the attempts the removal interrupted.
+ */
+export type WorkflowUnregistered = {
+    /**
+     * Task Ids
+     */
+    task_ids: Array<number>;
+    /**
+     * Workflow
+     */
+    workflow: string;
+};
+
+/**
+ * WorkflowUnregisteredEvent
+ */
+export type WorkflowUnregisteredEvent = {
+    /**
+     * Created
+     */
+    created: string;
+    data: WorkflowUnregistered;
+    /**
+     * Id
+     */
+    id?: number | null;
+    /**
+     * Name
+     */
+    name: 'workflow.unregistered';
+    /**
+     * Run Id
+     */
+    run_id?: string | null;
+    /**
+     * Task Id
+     */
+    task_id?: number | null;
+};
+
+/**
  * BranchFrame
  *
  * One frame of a task's fan-out stack (04 §Branch frames).
@@ -4349,7 +4492,7 @@ export type GetEventsApiRunsRunIdEventsGetResponses = {
      *
      * Successful Response
      */
-    200: Array<RunCreatedEvent | RunStartedEvent | RunUpdatedEvent | RunReorderedEvent | RunPausedEvent | RunResumedEvent | RunCancelledEvent | RunDeletedEvent | RunCompletedEvent | RunFailedEvent | TaskEnqueuedEvent | JoinArrivedEvent | TaskStartedEvent | TaskDoneEvent | TaskFailedEvent | TaskDeadLetteredEvent | TaskWaitingEvent | TaskResumedEvent | TaskCancelledEvent | TaskMovedEvent | TaskStatusSetEvent | TaskStreamEvent | SubmissionAcceptedEvent | SubmissionRejectedEvent | SubmissionRepairEvent | RequestOpenedEvent | RequestAnsweredEvent | LogAppendedEvent | AgentStatsEvent | EngineRecoveredEvent | EngineStoppingEvent | PluginEvent>;
+    200: Array<RunCreatedEvent | RunStartedEvent | RunUpdatedEvent | RunReorderedEvent | RunPausedEvent | RunResumedEvent | RunCancelledEvent | RunDeletedEvent | RunCompletedEvent | RunFailedEvent | TaskEnqueuedEvent | JoinArrivedEvent | TaskStartedEvent | TaskDoneEvent | TaskFailedEvent | TaskDeadLetteredEvent | TaskWaitingEvent | TaskResumedEvent | TaskCancelledEvent | TaskMovedEvent | TaskStatusSetEvent | TaskStreamEvent | SubmissionAcceptedEvent | SubmissionRejectedEvent | SubmissionRepairEvent | RequestOpenedEvent | RequestAnsweredEvent | LogAppendedEvent | AgentStatsEvent | EngineRecoveredEvent | EngineStoppingEvent | WorkflowRegisteredEvent | WorkflowReplacedEvent | WorkflowUnregisteredEvent | PluginEvent>;
 };
 
 export type GetEventsApiRunsRunIdEventsGetResponse = GetEventsApiRunsRunIdEventsGetResponses[keyof GetEventsApiRunsRunIdEventsGetResponses];
