@@ -1,6 +1,6 @@
 [project]
 name = "athanore"
-version = "1.1.0"
+version = "1.2.0"
 description = "Code-defined AI agent workflows over ACP"
 readme = "README.md"
 requires-python = ">=3.11"
