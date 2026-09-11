@@ -303,8 +303,9 @@ surface panel, 1 px neutral-800 border, 8 px radius, `--shadow-lg`.
   `submit run`.
 - **Workflow library** (`w`): `WORKFLOW LIBRARY · defined in python`,
   a left list (name, node count, run count, file) and a right source
-  viewer (`GET /api/workflows/{name}/source`, 08). The mock's
-  "hot-reloaded" claim is a later seam; v1 requires a restart.
+  viewer (`GET /api/workflows/{name}/source`, 08). The list and the
+  viewer follow `workflow.*` live (22 §SPA, §Realtime and caching);
+  registering from the overlay is a later seam.
 - **Edit run** (`e`): title and description only.
 - **Pickers** (`t`, `m`, `x`, `r`): a palette-style list of the selected
   run's tasks (node, attempt, status) and, for move/rerun, a second list
@@ -395,6 +396,7 @@ const invalidations: Record<string, (e: Event) => QueryKey[]> = {
   "log.appended": e => [["log", e.run_id]],
   "request.*":    e => [["runs"], ["run", e.run_id], ["requests", e.run_id], ["inbox"]],
   "agent.stats":  e => [["run", e.run_id]],
+  "workflow.*":   e => [["workflows"], ["workflow"], ["source"], ["plugins"], ["runs"]],
   "plugin.*":     e => panelsRefreshingOn(e.name),
 };
 ```
@@ -423,6 +425,35 @@ until something unrelated moved (D208). Server down: the header
 counts grey out, a banner shows a reconnect countdown, the last data stays
 visible (the mock's `server-down placeholder` behaviour).
 
+The `workflow.*` row is a live registration followed (22 §SPA): a
+workflow added, reloaded or removed makes the workflow list, the
+single-workflow and source queries and the manifest stale, and that one
+refetch is what refreshes the library overlay's list and viewer, the
+new-run chip group, the palette's plugin rows and the selected run's
+pane cycle — whose index §Panes already clamps when the count changes.
+The two name-keyed queries are invalidated for every name at once: the
+prefix is the generated key with its `path` taken off (D253). The run
+list is in the row too, for D208's reason once more: `GET /api/runs`
+answers `unregistered` per request from the live registry (08 §Runs),
+and a removal writes no run or task status and emits no `run.*`/`task.*`
+(22 §Remove), so a list refetched only on those would draw the `⊘` of
+§Attention only when something unrelated moved.
+
+A manifest refetch is also where the one thing a document cannot follow
+is noticed. A newly registered workflow's assets are injected as any
+workflow's are, when a pane that needs them mounts. A **replaced**
+workflow's are not: the manifest lists the same path at a new `?v=` (22
+§Live mounting), and a module this page already ran cannot run again —
+the second `customElements.define` would throw inside the plugin's
+module and the pane would draw nothing. The SPA never re-injects
+(D225). At manifest load, a URL whose path is injected under a
+different `?v=` is recorded against its workflow in `useUi.staleAssets`,
+never cleared, and the shell raises the persistent `plugin code changed
+— reload the page` strip of §Attention with a reload control; the pane
+keeps rendering the element it has until then. A removed workflow's
+scripts stay loaded and inert; its panels leave the cycle with its
+manifest entry (D253).
+
 ## Plugin renderers
 
 `PaneRenderer` switches on `kind` (markdown, kv, table, log, chart,
@@ -440,13 +471,27 @@ that lands raises a toast, and any refusal stays on the form (T070).
 elicitations (06). The agent pane maps `StreamChunk.kind` onto the
 mock's blocks: `notice` → system, `text` → assistant, `thought` →
 assistant (dimmed, collapsible), `tool_call` / `tool_result` → tool. `CustomElementHost`
-injects manifest assets once and mounts the plugin's tag with scope
-attributes.
+injects manifest assets once — never a second version of one path
+(D225): its mount is keyed on the assets' paths, so a `?v=` that moved
+neither injects nor rebuilds the element — and mounts the plugin's tag
+with scope attributes.
 
 ## Attention
 
 - A run with open requests shows `⚠` after its NODE cell and its status
   pill gains the gate colour.
+- A run whose workflow this server does not have — `unregistered` on
+  `GET /api/runs` (08 §Runs, 22 §Remove) — shows `⊘` after its WORKFLOW
+  cell, in the muted colour, with the word as its accessible name and a
+  `title` saying what it means. The status pill is left as it is: the
+  run's status is whatever it was, and nothing here can move it until
+  the workflow is back (D253).
+- A plugin whose JavaScript changed under this page — a workflow
+  reloaded with a different `?v=` for an asset the page already ran —
+  raises a persistent strip under the header, beside the server-down
+  banner: `plugin code changed — reload the page`, the workflows it is
+  about, and a reload button. It never dismisses; the reload is what
+  takes it down (22 §SPA, D225, D253).
 - A new request on the selected run switches the pane to **agent** once
   (opt-out in settings). **Not built as of the Phase 4 checkpoint**: the
   preference is persisted (`usePrefs.autoSwitchOnRequest`, on by

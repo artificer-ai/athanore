@@ -21,6 +21,15 @@
  * - **`type="module"`, `src`, and nothing inline.** 12 §Plugins' policy
  *   is `script-src 'self'`: a same-origin `src` loads, an inline script
  *   would not, and there is nothing here that writes one.
+ * - **a second version of one path is never injected.** A manifest URL
+ *   carries the file's content version as `?v=` (22 §Live mounting), so
+ *   a workflow reloaded with different JavaScript lists a URL whose
+ *   *path* this document already ran under another `?v=`. Injecting it
+ *   would run the plugin's `customElements.define` a second time and
+ *   throw inside its module; the document cannot follow, and says so
+ *   instead — {@link staleAssets} is what finds those URLs, the shell
+ *   raises the notice (`components/PluginAssetsBanner.tsx`), and a
+ *   reload is the only thing that makes a new document (D225).
  *
  * There is no guard for a document that does not exist. This is a
  * browser SPA and nothing renders it anywhere else (10 §Stack), and a
@@ -36,7 +45,43 @@ export function assetLoaded(url: string): boolean {
 }
 
 /**
+ * The part of an asset URL that names the file: everything before its
+ * first `?`.
+ *
+ * Two manifest URLs with one path are one module at two content
+ * versions (22 §Live mounting), which is the whole of what the banner
+ * and the pane host need to know about a URL.
+ */
+export function assetPath(url: string): string {
+  const query = url.indexOf('?')
+  return query < 0 ? url : url.slice(0, query)
+}
+
+/**
+ * The URLs in `urls` whose path this document has already injected
+ * under a different full URL — the same file at another `?v=`.
+ *
+ * Read from the document, as {@link assetLoaded} reads. Empty for a
+ * first injection (the path is absent), for an identical list (the
+ * full URL is what is loaded), and for a removal (nothing new is
+ * listed); a workflow that is reloaded with the same bytes lists the
+ * same `?v=` and is not stale either.
+ */
+export function staleAssets(urls: readonly string[]): string[] {
+  const loaded = new Map(injectedAssets().map((url) => [assetPath(url), url]))
+  return urls.filter((url) => {
+    const current = loaded.get(assetPath(url))
+    return current !== undefined && current !== url
+  })
+}
+
+/**
  * Inject every asset in `urls` that this document does not already have.
+ *
+ * A URL whose path is loaded under another `?v=` is skipped too: never
+ * a second version of one module (D225). The pane host keys its mount
+ * on asset paths so that such a URL does not reach here; this is the
+ * last line of defence, not the first.
  *
  * A script that fails to load is reported and nothing else happens: the
  * element it would have defined never appears, and the pane draws the
@@ -44,8 +89,9 @@ export function assetLoaded(url: string): boolean {
  * broken build is not the app's crash.
  */
 export function injectAssets(urls: readonly string[]): void {
+  const stale = new Set(staleAssets(urls))
   for (const url of urls) {
-    if (assetLoaded(url)) continue
+    if (assetLoaded(url) || stale.has(url)) continue
     const script = document.createElement('script')
     script.type = 'module'
     script.setAttribute(ASSET_ATTRIBUTE, url)

@@ -112,6 +112,27 @@ describe('RunList', () => {
     expect(screen.getByTitle('2 waiting on you')).toBeInTheDocument()
   })
 
+  it('marks a run of an unregistered workflow with ⊘ after its name, and no other', () => {
+    // 22 §Remove: the run reads `running` and `unregistered: true`, and
+    // the row is the surface that says so. A word would not fit the
+    // column; the glyph carries the word for a screen reader.
+    list({
+      rows: [
+        row({ id: 'A', workflow: 'tempo', unregistered: true }),
+        row({ id: 'B', workflow: 'probe', unregistered: false }),
+        row({ id: 'C', workflow: 'probe' }),
+      ],
+    })
+
+    const marked = within(rows()[0]!).getByRole('img', { name: 'unregistered' })
+    expect(marked).toHaveTextContent('⊘')
+    expect(marked).toHaveAttribute('data-testid', 'run-unregistered')
+    expect(marked).toHaveAttribute('title', 'this server has no workflow of that name')
+    expect(marked.parentElement).toHaveTextContent('tempo⊘')
+    expect(within(rows()[1]!).queryByTestId('run-unregistered')).toBeNull()
+    expect(within(rows()[2]!).queryByTestId('run-unregistered')).toBeNull()
+  })
+
   it.each<[RunStatus, string]>([
     ['queued', 'text-status-queued'],
     ['running', 'text-status-active'],
@@ -306,6 +327,20 @@ describe('RunList', () => {
       expect(within(rows()[1]!).getByTestId('narrow-meta')).not.toHaveTextContent('⚠')
       expect(screen.getByTitle('2 waiting on you')).toBeInTheDocument()
       expect(rows()[0]).toHaveAttribute('title', 'A')
+    })
+
+    it('keeps the ⊘ beside the workflow on the meta line', () => {
+      list({
+        rows: [
+          row({ id: 'A', workflow: 'tempo', unregistered: true }),
+          row({ id: 'B', workflow: 'probe' }),
+        ],
+      })
+
+      const meta = within(rows()[0]!).getByTestId('narrow-meta')
+      expect(within(meta).getByTestId('run-unregistered')).toHaveTextContent('⊘')
+      expect(meta).toHaveTextContent('tempo⊘')
+      expect(within(rows()[1]!).queryByTestId('run-unregistered')).toBeNull()
     })
 
     it('selects on a tap exactly as the grid does on a click', async () => {

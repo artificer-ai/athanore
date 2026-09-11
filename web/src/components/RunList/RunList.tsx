@@ -56,6 +56,9 @@ const HEADINGS = ['RUN', 'WORKFLOW', 'TITLE', 'STATUS', 'NODE', 'AGE']
 /** The glyph a run with unanswered requests carries after its node. */
 const PENDING_GLYPH = '⚠'
 
+/** The glyph a run of an unregistered workflow carries after its name. */
+const UNREGISTERED_GLYPH = '⊘'
+
 /** The separator between the narrow row's second line's four facts. */
 const NARROW_SEPARATOR = '·'
 
@@ -79,6 +82,33 @@ type RowProps = {
  */
 function rowTitle(row: RunRow): string {
   return row.title === '' ? row.shortId : row.title
+}
+
+/**
+ * The `⊘` of 10 §Attention, or nothing to draw: the run's workflow is not
+ * registered on this server (22 §Remove, 08 §Runs).
+ *
+ * A glyph with a title rather than a word, because the WORKFLOW column
+ * is 104 px and `⚠` is the precedent; it is an `img` with the word as
+ * its name, which is what a glyph standing for a word is to a screen
+ * reader — `aria-label` on a bare `span` is what axe refuses. It is
+ * drawn in the muted colour and not a status tone: the run's status is
+ * whatever it was, and the honest report is that nothing here can move
+ * it until the workflow is back (D253).
+ */
+function Unregistered({ row }: { row: RunRow }) {
+  if (!row.unregistered) return null
+  return (
+    <span
+      role="img"
+      className="ml-[4px] text-muted-foreground"
+      title="this server has no workflow of that name"
+      aria-label="unregistered"
+      data-testid="run-unregistered"
+    >
+      {UNREGISTERED_GLYPH}
+    </span>
+  )
 }
 
 /** The `⚠` of 10 §Attention, or nothing to draw. */
@@ -160,7 +190,10 @@ function Row({ row, zebra, selected, focused, onSelect }: RowProps) {
       )}
     >
       <span className={cn('truncate', muted)}>{row.shortId}</span>
-      <span className="truncate text-[var(--color-accent-2-400)]">{row.workflow}</span>
+      <span className="truncate text-[var(--color-accent-2-400)]">
+        {row.workflow}
+        <Unregistered row={row} />
+      </span>
       <span className="truncate">{row.title}</span>
       <StatusPill status={row.status} tone={row.tone} className="justify-self-start" />
       <span className={cn('truncate', muted)}>
@@ -217,6 +250,7 @@ function NarrowRow({ row, zebra, selected, focused, onSelect }: RowProps) {
         </span>
         <span className="flex-none truncate text-[var(--color-accent-2-400)]">
           {row.workflow}
+          <Unregistered row={row} />
         </span>
         <span aria-hidden className="flex-none">
           {NARROW_SEPARATOR}

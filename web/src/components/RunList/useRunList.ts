@@ -45,6 +45,8 @@ export type RunRow = {
   tone: StatusTone
   node: string
   pendingRequests: number
+  /** Whether this server has no workflow of the run's name (08 §Runs). */
+  unregistered: boolean
   age: string
 }
 
@@ -119,6 +121,7 @@ export function toRow(run: RunSummary, now: number): RunRow {
     tone: statusTone(run.status, pendingRequests),
     node: nodes.length === 0 ? NO_NODE : nodes.join(' · '),
     pendingRequests,
+    unregistered: run.unregistered === true,
     age: humaniseAge(run.created, now),
   }
 }

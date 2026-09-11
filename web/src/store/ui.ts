@@ -28,6 +28,13 @@
  * keystroke goes, and the palette command that asks for it and the
  * composer that takes it are the shell and a pane inside a pane, with no
  * prop between them that is about focus.
+ *
+ * `staleAssets` is a fact about *this document* and nothing else: which
+ * plugins' JavaScript the manifest now lists at a content version this
+ * page already ran another of (22 §SPA). The manifest reader writes it,
+ * as the feed writes `feed`, and the banner reads it. It is never
+ * cleared, because nothing but a reload makes a document with the new
+ * module in it — and a reload starts the store over (D253).
  */
 import { create } from 'zustand'
 
@@ -139,6 +146,19 @@ export type Ui = {
   focusLogComposer: (runId: string) => void
   /** The composer has taken it; there is nothing left to serve. */
   clearLogComposer: () => void
+
+  /**
+   * Workflow → the manifest URLs this document cannot follow (22 §SPA).
+   *
+   * A workflow is a key here once the manifest has listed, for it, a
+   * URL whose path this document injected under a different `?v=`
+   * (`plugins/assets.ts`). The banner draws the keys; the URLs are what
+   * it is about, kept so a later manifest for the same workflow merges
+   * in rather than overwriting what an earlier one found.
+   */
+  staleAssets: Record<string, readonly string[]>
+  /** The manifest reader found `urls` stale for `workflow`: merge them in. */
+  markStaleAssets: (workflow: string, urls: readonly string[]) => void
 }
 
 export const useUi = create<Ui>()((set) => ({
@@ -165,4 +185,15 @@ export const useUi = create<Ui>()((set) => ({
   logComposerFor: null,
   focusLogComposer: (runId) => set({ logComposerFor: runId }),
   clearLogComposer: () => set({ logComposerFor: null }),
+
+  staleAssets: {},
+  markStaleAssets: (workflow, urls) =>
+    set((state) => {
+      const known = state.staleAssets[workflow] ?? []
+      const added = urls.filter((url) => !known.includes(url))
+      if (added.length === 0) return state
+      return {
+        staleAssets: { ...state.staleAssets, [workflow]: [...known, ...added] },
+      }
+    }),
 }))

@@ -6,8 +6,13 @@
  * The mock's panel: `WORKFLOW LIBRARY · defined in python` over a
  * 230 px left list — `name · n nodes` and `k runs · file` — and a source
  * viewer beside it. The mock's second clause, "hot-reloaded from
- * `workflows/`", is deliberately not written: v1 requires a restart, and
- * hot reload is a later seam (D35). The viewer is the valuable part.
+ * `workflows/`", is still not written: nothing here watches a
+ * directory. What the list and the viewer *do* follow is a live
+ * registration — `workflow.*` invalidates the list and every source
+ * entry (22 §SPA, `realtime/invalidate.ts`), so a workflow added,
+ * reloaded or removed over the API or the CLI is on screen without a
+ * reload; registering from this overlay is a later seam. The viewer is
+ * the valuable part.
  *
  * **This is read-only, and it is where "the signature is the graph"
  * becomes legible** to somebody who did not write the workflow. Nothing
@@ -78,7 +83,7 @@ import {
 /** The dialog's accessible name, and the mock's header kicker. */
 export const LIBRARY_TITLE = 'workflow library'
 
-/** The mock's second header word, without its hot-reload claim (D35). */
+/** The mock's second header word, without its hot-reload claim (D35, 22 §Scope). */
 export const LIBRARY_GLOSS = 'defined in python'
 
 /** What the viewer highlights. Every workflow is a Python module. */

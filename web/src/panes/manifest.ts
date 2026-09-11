@@ -3,21 +3,32 @@
  *
  * `GET /api/plugins` is the whole of it — the builtins included, because
  * the core's own panes are declared through the same API (09 §Builtins
- * are plugins). It is fetched at boot and again whenever the event feed
- * reconnects to a process with a new `started_at`: the manifest only
- * changes on restart, so there is no event for it, and
- * `src/realtime/sse.ts` is what refetches it.
+ * are plugins). It is fetched at boot, again whenever the event feed
+ * reconnects to a process with a new `started_at` (`src/realtime/sse.ts`
+ * refetches it: a restart is the one change no event announces), and
+ * on every `workflow.*` — a registration, a reload or a removal changes
+ * what the manifest lists, and the invalidation table's row for those
+ * names is what refetches it (22 §SPA, `src/realtime/invalidate.ts`).
  *
  * Reading it is also what registers the panels' `refresh_on` names in
  * the invalidation table — "at manifest load" (10 §Realtime and
  * caching), which is here and nowhere else, so a manifest that is
- * replaced replaces the registrations with it.
+ * replaced replaces the registrations with it. And it is where the one
+ * thing a document cannot follow is noticed: a workflow reloaded with
+ * different JavaScript lists its asset at a new `?v=`, and a module this
+ * page already ran cannot run again. {@link useStaleAssets} finds those
+ * URLs at manifest load — here, not only when a custom pane happens to
+ * mount, because a pane viewed earlier and cycled away from has its
+ * module in the document all the same — and puts them where the shell's
+ * notice reads them (`store/ui.ts`, `components/PluginAssetsBanner.tsx`).
  */
 import { useQuery } from '@tanstack/react-query'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 
 import { manifestApiPluginsGetOptions } from '../api/gen/@tanstack/react-query.gen'
 import type { PluginManifestEntry } from '../api/gen/types.gen'
+import { staleAssets } from '../plugins'
+import { useUi } from '../store/ui'
 import { usePanelRefreshRegistry } from './source'
 
 /** The manifest entry the core's own panes are declared on (09). */
@@ -71,9 +82,32 @@ export function useManifestEntries(): ManifestRead {
   return { manifest, isPending, isError }
 }
 
-/** The manifest, as the pane host reads it: read, and registered. */
+/**
+ * Mark, for each workflow the manifest lists, the asset URLs this
+ * document cannot follow (22 §SPA).
+ *
+ * Keyed on the manifest, so it runs once per manifest that arrived and
+ * not per render. A first load finds nothing injected, an identical
+ * refetch finds every URL loaded as listed, and a removed workflow lists
+ * nothing — all three are empty and mark nothing (`plugins/assets.ts`).
+ */
+export function useStaleAssets(manifest: readonly PluginManifestEntry[]): void {
+  const markStaleAssets = useUi((state) => state.markStaleAssets)
+  useEffect(() => {
+    for (const entry of manifest) {
+      const stale = staleAssets(entry.assets ?? [])
+      if (stale.length > 0) markStaleAssets(entry.workflow, stale)
+    }
+  }, [manifest, markStaleAssets])
+}
+
+/**
+ * The manifest, as the pane host reads it: read, registered, and
+ * checked against what this document has already run.
+ */
 export function useManifest(): ManifestRead {
   const read = useManifestEntries()
   usePanelRefreshRegistry(read.manifest)
+  useStaleAssets(read.manifest)
   return read
 }

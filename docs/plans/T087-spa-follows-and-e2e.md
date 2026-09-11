@@ -195,10 +195,13 @@ The run row's `unregistered` marker: `useRunList.ts`'s `RunRow` gains
 `unregistered: boolean` (`run.unregistered === true`); `RunList.tsx`
 gains `Unregistered`, the twin of `Pending`: after the WORKFLOW cell's
 name, `⊘` with `title="this server has no workflow of that name"`,
-`aria-label="unregistered"`, `data-testid="run-unregistered"`, in the
-muted colour — in `Row` and in `NarrowRow`'s meta line. A glyph with a
-title rather than a word, because the column is 104 px and `⚠` is the
-precedent; the `aria-label` is the word for a screen reader. **Decision
+`role="img"` and `aria-label="unregistered"`,
+`data-testid="run-unregistered"`, in the muted colour — in `Row` and in
+`NarrowRow`'s meta line. A glyph with a title rather than a word,
+because the column is 104 px and `⚠` is the precedent; the `img` role
+named by the word is what a glyph standing for one is to a screen
+reader (`aria-label` on a bare `span` is a prohibited attribute to axe,
+which the e2e gate below would refuse). **Decision
 to record** (10 says nothing about drawing the flag; 22 §Remove says
 the run "reads `running` and `unregistered: true`, which is the honest
 report", and the SPA has to be able to show it).
@@ -314,6 +317,14 @@ does`:**
    cycle followed the manifest and the index clamped — the pane body
    shows a builtin); the banner stays absent.
 
+Both tests put the page through the axe gate of `a11y.spec.ts` in the
+state that shows the new surface — the `⊘` beside a `running` pill in
+test 1 step 3, the banner in test 2 step 2 — under
+`prefers-reduced-motion`, because a `running` pill pulses and axe reads
+the quarter-opacity keyframe as a contrast failure of the pill, which
+is the design's and is already answered by the media query
+`theme.css` honours.
+
 Both tests run in the suite's default configuration (`workers: 2`,
 Chromium). `RUN_TIMEOUT` bounds every state wait.
 
@@ -337,10 +348,11 @@ Chromium). `RUN_TIMEOUT` bounds every state wait.
 - `docs/v1/22-live-registration.md` §SPA: "…the single-workflow and
   source queries, the manifest, and the run list — whose `unregistered`
   flag is computed per request (08 §Runs)". Nothing else in 22 moves.
-- `docs/v1/15-decisions.md`: rows for the decisions marked above
-  (`runs` in the row; the path-less prefix; the flag in `useUi`, never
-  cleared; the host keyed on asset paths; the `⊘` marker; the
-  spec-controlled stall gate; the check at manifest load).
+- `docs/v1/15-decisions.md`: one row, D253, numbering the decisions
+  marked above (`runs` in the row; the path-less prefix; the flag in
+  `useUi`, never cleared; the check at manifest load; the host keyed on
+  asset paths; the `⊘` marker; the spec-controlled stall gate and the
+  axe check under reduced motion).
 - `docs/v1/17-serial-task-plan.md` § T087: the `**Status.** Done.` line,
   in the same commit.
 - `docs/site/src/guide/workflows.md`, the live-registration paragraph:

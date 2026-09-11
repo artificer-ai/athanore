@@ -35,8 +35,14 @@
  * `run-id` / `task-id` / `node` onto the element that is already there —
  * `attributeChangedCallback` is how a web component follows the
  * selection, and tearing the element down would throw away whatever it
- * had built. Only the tag, the workflow or the workflow's assets
- * changing rebuilds it.
+ * had built. Only the tag, the workflow or the workflow's asset *paths*
+ * changing rebuilds it: a manifest refetched after a reload of the
+ * workflow lists the same file at a new `?v=` (22 §Live mounting), and
+ * that is neither a new asset to inject — a module this document has
+ * run cannot run again, D225 — nor a reason to rebuild the element. The
+ * host keeps drawing the one it has; the shell's notice says the code
+ * moved (`panes/manifest.ts`, D253). A path added or taken away is a
+ * different asset list and rebuilds as before.
  *
  * **What it draws when there is nothing to mount.** A workflow that
  * ships no assets can define no element, so the tag would sit there
@@ -50,7 +56,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { PlaceholderCard } from './kinds'
 import { useManifestEntries } from './manifest'
 import type { PanelScope } from './source'
-import { bindPluginBridge, injectAssets, pluginBridge } from '../plugins'
+import { assetPath, bindPluginBridge, injectAssets, pluginBridge } from '../plugins'
 
 /** An element with the bridge the host put on it (09 §Escape hatch). */
 type PluginElement = HTMLElement & { athanore?: ReturnType<typeof pluginBridge> }
@@ -113,6 +119,11 @@ export function CustomElementHost({
   // dependencies: the element's lifetime is the pane's, and a selection
   // change writes attributes onto the element that is already there.
   const latest = useRef(attributes)
+  // The assets too, for the same reason one step over: the effect is
+  // keyed on their *paths*, so a `?v=` bump does not re-run it, and the
+  // list it injects on a real change is the current one.
+  const latestAssets = useRef(assets)
+  const assetPaths = assets.map(assetPath).join('\n')
   const wrapper = useRef<HTMLDivElement | null>(null)
   const element = useRef<PluginElement | null>(null)
   const nothing = assets.length === 0 && !defined(tag)
@@ -124,6 +135,10 @@ export function CustomElementHost({
     latest.current = attributes
     if (element.current !== null) applyScope(element.current, attributes)
   }, [attributes])
+
+  useEffect(() => {
+    latestAssets.current = assets
+  }, [assets])
 
   useEffect(() => {
     const parent = wrapper.current
@@ -143,13 +158,13 @@ export function CustomElementHost({
     parent.append(mounted)
     // Last: this is the only line here that can run a plugin's code, and
     // everything that code reads is in place above it.
-    injectAssets(assets)
+    injectAssets(latestAssets.current)
     return () => {
       mounted.remove()
       element.current = null
       release()
     }
-  }, [tag, workflow, assets, nothing])
+  }, [tag, workflow, assetPaths, nothing])
 
   if (nothing) {
     return (
