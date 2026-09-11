@@ -477,9 +477,9 @@ def test_a_positional_of_the_same_name_wins_over_a_row_with_a_warning(
     """22 §Persistence: the positional is the working copy."""
 
     write_workflow(tmp_path)
-    write_named(tmp_path, "copy", "demo", node="from_the_row")
+    write_named(tmp_path, "row", "demo", node="from_the_row")
     (tmp_path / "athanore.toml").write_text(
-        '[workflows]\ndemo = { target = "copy.py:wf" }\n'
+        '[workflows]\ndemo = { target = "row.py:wf" }\n'
     )
     assert main(["serve", "flows.py:demo", "--no-discover", "--port", "0"]) == 0
     server = served[0]
@@ -487,7 +487,7 @@ def test_a_positional_of_the_same_name_wins_over_a_row_with_a_warning(
     assert set(server.workflows["demo"].finalize().nodes) == {"only"}
     said = " ".join(capsys.readouterr().err.split())
     assert "Warning" in said
-    assert "copy.py:wf" in said
+    assert "row.py:wf" in said
     assert "flows.py:demo" in said
 
 
