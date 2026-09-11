@@ -119,6 +119,11 @@ def test_the_codes_are_the_vocabulary_of_08() -> None:
         "unknown_node",
         "payload_too_large",
         "plugin_error",
+        # The four of a live registration (22 §Wire, T086).
+        "workflow_load_failed",
+        "unknown_pool",
+        "registration_unavailable",
+        "persist_failed",
     }
 
 

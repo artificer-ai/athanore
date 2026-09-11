@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { answerRequestApiRequestsRequestIdAnswerPost, appendLogApiAgentTasksTaskIdLogPost, appendLogApiRunsRunIdLogPost, askApiAgentTasksTaskIdAskPost, cancelRunApiRunsRunIdCancelPost, deleteRunApiRunsRunIdDelete, editRunApiRunsRunIdPatch, getEventsApiRunsRunIdEventsGet, getGraphApiRunsRunIdGraphGet, getLogApiRunsRunIdLogGet, getRequestApiRequestsRequestIdGet, getRequestsApiRunsRunIdRequestsGet, getRunApiRunsRunIdGet, getSourceApiWorkflowsNameSourceGet, getStreamApiTasksTaskIdStreamGet, getTaskApiAgentTasksTaskIdGet, getTaskApiTasksTaskIdGet, getWorkflowApiWorkflowsNameGet, healthApiHealthGet, listRequestsApiRequestsGet, listRunsApiRunsGet, listWorkflowsApiWorkflowsGet, manifestApiPluginsGet, mcpAgent, meApiMeGet, moveRunApiRunsRunIdPositionPost, moveTaskApiTasksTaskIdMovePost, type Options, pauseRunApiRunsRunIdPausePost, pollRequestApiAgentTasksTaskIdRequestsRequestIdGet, rerunNodeApiRunsRunIdRerunPost, resumeRunApiRunsRunIdResumePost, retryTaskApiTasksTaskIdRetryPost, runActionApiPluginsWfActionsNamePost, setStatusApiTasksTaskIdStatusPost, submitApiAgentTasksTaskIdSubmitPost, submitRunApiWorkflowsNameRunsPost } from '../sdk.gen';
-import type { AnswerRequestApiRequestsRequestIdAnswerPostData, AnswerRequestApiRequestsRequestIdAnswerPostError, AnswerRequestApiRequestsRequestIdAnswerPostResponse, AppendLogApiAgentTasksTaskIdLogPostData, AppendLogApiAgentTasksTaskIdLogPostError, AppendLogApiAgentTasksTaskIdLogPostResponse, AppendLogApiRunsRunIdLogPostData, AppendLogApiRunsRunIdLogPostError, AppendLogApiRunsRunIdLogPostResponse, AskApiAgentTasksTaskIdAskPostData, AskApiAgentTasksTaskIdAskPostError, AskApiAgentTasksTaskIdAskPostResponse, CancelRunApiRunsRunIdCancelPostData, CancelRunApiRunsRunIdCancelPostError, CancelRunApiRunsRunIdCancelPostResponse, DeleteRunApiRunsRunIdDeleteData, DeleteRunApiRunsRunIdDeleteError, DeleteRunApiRunsRunIdDeleteResponse, EditRunApiRunsRunIdPatchData, EditRunApiRunsRunIdPatchError, EditRunApiRunsRunIdPatchResponse, GetEventsApiRunsRunIdEventsGetData, GetEventsApiRunsRunIdEventsGetError, GetEventsApiRunsRunIdEventsGetResponse, GetGraphApiRunsRunIdGraphGetData, GetGraphApiRunsRunIdGraphGetError, GetGraphApiRunsRunIdGraphGetResponse, GetLogApiRunsRunIdLogGetData, GetLogApiRunsRunIdLogGetError, GetLogApiRunsRunIdLogGetResponse, GetRequestApiRequestsRequestIdGetData, GetRequestApiRequestsRequestIdGetError, GetRequestApiRequestsRequestIdGetResponse, GetRequestsApiRunsRunIdRequestsGetData, GetRequestsApiRunsRunIdRequestsGetError, GetRequestsApiRunsRunIdRequestsGetResponse, GetRunApiRunsRunIdGetData, GetRunApiRunsRunIdGetError, GetRunApiRunsRunIdGetResponse, GetSourceApiWorkflowsNameSourceGetData, GetSourceApiWorkflowsNameSourceGetError, GetSourceApiWorkflowsNameSourceGetResponse, GetStreamApiTasksTaskIdStreamGetData, GetStreamApiTasksTaskIdStreamGetError, GetStreamApiTasksTaskIdStreamGetResponse, GetTaskApiAgentTasksTaskIdGetData, GetTaskApiAgentTasksTaskIdGetError, GetTaskApiAgentTasksTaskIdGetResponse, GetTaskApiTasksTaskIdGetData, GetTaskApiTasksTaskIdGetError, GetTaskApiTasksTaskIdGetResponse, GetWorkflowApiWorkflowsNameGetData, GetWorkflowApiWorkflowsNameGetError, GetWorkflowApiWorkflowsNameGetResponse, HealthApiHealthGetData, HealthApiHealthGetResponse, ListRequestsApiRequestsGetData, ListRequestsApiRequestsGetError, ListRequestsApiRequestsGetResponse, ListRunsApiRunsGetData, ListRunsApiRunsGetError, ListRunsApiRunsGetResponse, ListWorkflowsApiWorkflowsGetData, ListWorkflowsApiWorkflowsGetError, ListWorkflowsApiWorkflowsGetResponse, ManifestApiPluginsGetData, ManifestApiPluginsGetError, ManifestApiPluginsGetResponse, McpAgentData, McpAgentError, MeApiMeGetData, MeApiMeGetResponse, MoveRunApiRunsRunIdPositionPostData, MoveRunApiRunsRunIdPositionPostError, MoveRunApiRunsRunIdPositionPostResponse, MoveTaskApiTasksTaskIdMovePostData, MoveTaskApiTasksTaskIdMovePostError, MoveTaskApiTasksTaskIdMovePostResponse, PauseRunApiRunsRunIdPausePostData, PauseRunApiRunsRunIdPausePostError, PauseRunApiRunsRunIdPausePostResponse, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetData, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetError, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetResponse, RerunNodeApiRunsRunIdRerunPostData, RerunNodeApiRunsRunIdRerunPostError, RerunNodeApiRunsRunIdRerunPostResponse, ResumeRunApiRunsRunIdResumePostData, ResumeRunApiRunsRunIdResumePostError, ResumeRunApiRunsRunIdResumePostResponse, RetryTaskApiTasksTaskIdRetryPostData, RetryTaskApiTasksTaskIdRetryPostError, RetryTaskApiTasksTaskIdRetryPostResponse, RunActionApiPluginsWfActionsNamePostData, RunActionApiPluginsWfActionsNamePostError, SetStatusApiTasksTaskIdStatusPostData, SetStatusApiTasksTaskIdStatusPostError, SetStatusApiTasksTaskIdStatusPostResponse, SubmitApiAgentTasksTaskIdSubmitPostData, SubmitApiAgentTasksTaskIdSubmitPostError, SubmitApiAgentTasksTaskIdSubmitPostResponse, SubmitRunApiWorkflowsNameRunsPostData, SubmitRunApiWorkflowsNameRunsPostError, SubmitRunApiWorkflowsNameRunsPostResponse } from '../types.gen';
+import { answerRequestApiRequestsRequestIdAnswerPost, appendLogApiAgentTasksTaskIdLogPost, appendLogApiRunsRunIdLogPost, askApiAgentTasksTaskIdAskPost, cancelRunApiRunsRunIdCancelPost, deleteRunApiRunsRunIdDelete, editRunApiRunsRunIdPatch, getEventsApiRunsRunIdEventsGet, getGraphApiRunsRunIdGraphGet, getLogApiRunsRunIdLogGet, getRequestApiRequestsRequestIdGet, getRequestsApiRunsRunIdRequestsGet, getRunApiRunsRunIdGet, getSourceApiWorkflowsNameSourceGet, getStreamApiTasksTaskIdStreamGet, getTaskApiAgentTasksTaskIdGet, getTaskApiTasksTaskIdGet, getWorkflowApiWorkflowsNameGet, healthApiHealthGet, listRequestsApiRequestsGet, listRunsApiRunsGet, listWorkflowsApiWorkflowsGet, manifestApiPluginsGet, mcpAgent, meApiMeGet, moveRunApiRunsRunIdPositionPost, moveTaskApiTasksTaskIdMovePost, type Options, pauseRunApiRunsRunIdPausePost, pollRequestApiAgentTasksTaskIdRequestsRequestIdGet, registerWorkflowApiWorkflowsPost, reloadWorkflowApiWorkflowsNamePut, removeWorkflowApiWorkflowsNameDelete, rerunNodeApiRunsRunIdRerunPost, resumeRunApiRunsRunIdResumePost, retryTaskApiTasksTaskIdRetryPost, runActionApiPluginsWfActionsNamePost, setStatusApiTasksTaskIdStatusPost, submitApiAgentTasksTaskIdSubmitPost, submitRunApiWorkflowsNameRunsPost } from '../sdk.gen';
+import type { AnswerRequestApiRequestsRequestIdAnswerPostData, AnswerRequestApiRequestsRequestIdAnswerPostError, AnswerRequestApiRequestsRequestIdAnswerPostResponse, AppendLogApiAgentTasksTaskIdLogPostData, AppendLogApiAgentTasksTaskIdLogPostError, AppendLogApiAgentTasksTaskIdLogPostResponse, AppendLogApiRunsRunIdLogPostData, AppendLogApiRunsRunIdLogPostError, AppendLogApiRunsRunIdLogPostResponse, AskApiAgentTasksTaskIdAskPostData, AskApiAgentTasksTaskIdAskPostError, AskApiAgentTasksTaskIdAskPostResponse, CancelRunApiRunsRunIdCancelPostData, CancelRunApiRunsRunIdCancelPostError, CancelRunApiRunsRunIdCancelPostResponse, DeleteRunApiRunsRunIdDeleteData, DeleteRunApiRunsRunIdDeleteError, DeleteRunApiRunsRunIdDeleteResponse, EditRunApiRunsRunIdPatchData, EditRunApiRunsRunIdPatchError, EditRunApiRunsRunIdPatchResponse, GetEventsApiRunsRunIdEventsGetData, GetEventsApiRunsRunIdEventsGetError, GetEventsApiRunsRunIdEventsGetResponse, GetGraphApiRunsRunIdGraphGetData, GetGraphApiRunsRunIdGraphGetError, GetGraphApiRunsRunIdGraphGetResponse, GetLogApiRunsRunIdLogGetData, GetLogApiRunsRunIdLogGetError, GetLogApiRunsRunIdLogGetResponse, GetRequestApiRequestsRequestIdGetData, GetRequestApiRequestsRequestIdGetError, GetRequestApiRequestsRequestIdGetResponse, GetRequestsApiRunsRunIdRequestsGetData, GetRequestsApiRunsRunIdRequestsGetError, GetRequestsApiRunsRunIdRequestsGetResponse, GetRunApiRunsRunIdGetData, GetRunApiRunsRunIdGetError, GetRunApiRunsRunIdGetResponse, GetSourceApiWorkflowsNameSourceGetData, GetSourceApiWorkflowsNameSourceGetError, GetSourceApiWorkflowsNameSourceGetResponse, GetStreamApiTasksTaskIdStreamGetData, GetStreamApiTasksTaskIdStreamGetError, GetStreamApiTasksTaskIdStreamGetResponse, GetTaskApiAgentTasksTaskIdGetData, GetTaskApiAgentTasksTaskIdGetError, GetTaskApiAgentTasksTaskIdGetResponse, GetTaskApiTasksTaskIdGetData, GetTaskApiTasksTaskIdGetError, GetTaskApiTasksTaskIdGetResponse, GetWorkflowApiWorkflowsNameGetData, GetWorkflowApiWorkflowsNameGetError, GetWorkflowApiWorkflowsNameGetResponse, HealthApiHealthGetData, HealthApiHealthGetResponse, ListRequestsApiRequestsGetData, ListRequestsApiRequestsGetError, ListRequestsApiRequestsGetResponse, ListRunsApiRunsGetData, ListRunsApiRunsGetError, ListRunsApiRunsGetResponse, ListWorkflowsApiWorkflowsGetData, ListWorkflowsApiWorkflowsGetError, ListWorkflowsApiWorkflowsGetResponse, ManifestApiPluginsGetData, ManifestApiPluginsGetError, ManifestApiPluginsGetResponse, McpAgentData, McpAgentError, MeApiMeGetData, MeApiMeGetResponse, MoveRunApiRunsRunIdPositionPostData, MoveRunApiRunsRunIdPositionPostError, MoveRunApiRunsRunIdPositionPostResponse, MoveTaskApiTasksTaskIdMovePostData, MoveTaskApiTasksTaskIdMovePostError, MoveTaskApiTasksTaskIdMovePostResponse, PauseRunApiRunsRunIdPausePostData, PauseRunApiRunsRunIdPausePostError, PauseRunApiRunsRunIdPausePostResponse, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetData, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetError, PollRequestApiAgentTasksTaskIdRequestsRequestIdGetResponse, RegisterWorkflowApiWorkflowsPostData, RegisterWorkflowApiWorkflowsPostError, RegisterWorkflowApiWorkflowsPostResponse, ReloadWorkflowApiWorkflowsNamePutData, ReloadWorkflowApiWorkflowsNamePutError, ReloadWorkflowApiWorkflowsNamePutResponse, RemoveWorkflowApiWorkflowsNameDeleteData, RemoveWorkflowApiWorkflowsNameDeleteError, RemoveWorkflowApiWorkflowsNameDeleteResponse, RerunNodeApiRunsRunIdRerunPostData, RerunNodeApiRunsRunIdRerunPostError, RerunNodeApiRunsRunIdRerunPostResponse, ResumeRunApiRunsRunIdResumePostData, ResumeRunApiRunsRunIdResumePostError, ResumeRunApiRunsRunIdResumePostResponse, RetryTaskApiTasksTaskIdRetryPostData, RetryTaskApiTasksTaskIdRetryPostError, RetryTaskApiTasksTaskIdRetryPostResponse, RunActionApiPluginsWfActionsNamePostData, RunActionApiPluginsWfActionsNamePostError, SetStatusApiTasksTaskIdStatusPostData, SetStatusApiTasksTaskIdStatusPostError, SetStatusApiTasksTaskIdStatusPostResponse, SubmitApiAgentTasksTaskIdSubmitPostData, SubmitApiAgentTasksTaskIdSubmitPostError, SubmitApiAgentTasksTaskIdSubmitPostResponse, SubmitRunApiWorkflowsNameRunsPostData, SubmitRunApiWorkflowsNameRunsPostError, SubmitRunApiWorkflowsNameRunsPostResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -973,6 +973,66 @@ export const listWorkflowsApiWorkflowsGetOptions = (options?: Options<ListWorkfl
     queryKey: listWorkflowsApiWorkflowsGetQueryKey(options)
 });
 
+/**
+ * Register a workflow from a target
+ *
+ * Load `target` and register the workflow it names, without a restart.
+ *
+ * The name it registers under is the loaded workflow's own. Answers 201
+ * with the workflow as `GET /api/workflows/{name}` reports it; 409
+ * `conflict` if that name is already registered; 422
+ * `workflow_load_failed` when the load stopped — its body carries
+ * `target`, `stage` (`target`, `import`, `attribute`, `finalize`,
+ * `plugins` or `register`) and `detail`, the underlying error's full
+ * message; 422 `unknown_pool` for a `pool` the engine does not have,
+ * naming the ones it does; 500 `persist_failed` (`path`, `detail`) when
+ * `persist` was asked for and the row could not be written, in which
+ * case nothing was registered; 503 `registration_unavailable` from an
+ * application built without a registrar. A response that wrote the row
+ * carries `X-Athanore-Persisted: <path>`.
+ */
+export const registerWorkflowApiWorkflowsPostMutation = (options?: Partial<Options<RegisterWorkflowApiWorkflowsPostData>>): UseMutationOptions<RegisterWorkflowApiWorkflowsPostResponse, RegisterWorkflowApiWorkflowsPostError, Options<RegisterWorkflowApiWorkflowsPostData>> => {
+    const mutationOptions: UseMutationOptions<RegisterWorkflowApiWorkflowsPostResponse, RegisterWorkflowApiWorkflowsPostError, Options<RegisterWorkflowApiWorkflowsPostData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await registerWorkflowApiWorkflowsPost({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Unregister a workflow
+ *
+ * Drop the workflow `name`, interrupting whatever it was running.
+ *
+ * Every attempt of it in flight is cancelled and left where it was — no
+ * task status is written, and the run reads `unregistered: true` until
+ * the workflow is registered again, at which point those rows are
+ * recovered. Nothing is deleted. Answers 200 with the interrupted task
+ * ids; 404 `unknown_workflow`; 500 `persist_failed`; 503
+ * `registration_unavailable`. A response that removed the row carries
+ * `X-Athanore-Persisted: <path>`; one that found no row to remove
+ * carries no such header.
+ */
+export const removeWorkflowApiWorkflowsNameDeleteMutation = (options?: Partial<Options<RemoveWorkflowApiWorkflowsNameDeleteData>>): UseMutationOptions<RemoveWorkflowApiWorkflowsNameDeleteResponse, RemoveWorkflowApiWorkflowsNameDeleteError, Options<RemoveWorkflowApiWorkflowsNameDeleteData>> => {
+    const mutationOptions: UseMutationOptions<RemoveWorkflowApiWorkflowsNameDeleteResponse, RemoveWorkflowApiWorkflowsNameDeleteError, Options<RemoveWorkflowApiWorkflowsNameDeleteData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await removeWorkflowApiWorkflowsNameDelete({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
 export const getWorkflowApiWorkflowsNameGetQueryKey = (options: Options<GetWorkflowApiWorkflowsNameGetData>) => createQueryKey('getWorkflowApiWorkflowsNameGet', options);
 
 /**
@@ -992,6 +1052,37 @@ export const getWorkflowApiWorkflowsNameGetOptions = (options: Options<GetWorkfl
     },
     queryKey: getWorkflowApiWorkflowsNameGetQueryKey(options)
 });
+
+/**
+ * Reload a registered workflow
+ *
+ * Load `target` — or the registration's recorded one — and replace `name`.
+ *
+ * The next task of every run of the workflow dispatches on the new
+ * graph; an attempt already running finishes on the body it started
+ * with. Answers 200 with the workflow as `GET /api/workflows/{name}`
+ * now reports it; 404 `unknown_workflow`; 409 `conflict` if the target
+ * now defines a differently named workflow (that is a new workflow —
+ * `POST` it) or `pool` would move the workflow while attempts of it are
+ * in flight; 422 `workflow_load_failed` as `POST` answers, with `stage:
+ * "target"` when `target` was omitted and the registration has no
+ * recorded one; 422 `unknown_pool`; 500 `persist_failed`; 503
+ * `registration_unavailable`. A response that rewrote the row carries
+ * `X-Athanore-Persisted: <path>`.
+ */
+export const reloadWorkflowApiWorkflowsNamePutMutation = (options?: Partial<Options<ReloadWorkflowApiWorkflowsNamePutData>>): UseMutationOptions<ReloadWorkflowApiWorkflowsNamePutResponse, ReloadWorkflowApiWorkflowsNamePutError, Options<ReloadWorkflowApiWorkflowsNamePutData>> => {
+    const mutationOptions: UseMutationOptions<ReloadWorkflowApiWorkflowsNamePutResponse, ReloadWorkflowApiWorkflowsNamePutError, Options<ReloadWorkflowApiWorkflowsNamePutData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await reloadWorkflowApiWorkflowsNamePut({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
 
 /**
  * Submit a run

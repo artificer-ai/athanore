@@ -44,6 +44,7 @@ from athanore.api.openapi import (
     install_openapi,
     secure,
 )
+from athanore.api.registrar import WorkflowRegistrar
 from athanore.api.routers import agent, requests, runs, system, tasks, workflows
 from athanore.api.sse import router as sse_router
 from athanore.api.static import install_cors, mount_spa
@@ -93,6 +94,7 @@ def create_app(
     engine: Engine | None = None,
     store: Store | None = None,
     plugins: Sequence[PluginSpec] | None = None,
+    registrar: WorkflowRegistrar | None = None,
 ) -> FastAPI:
     """Build the ASGI application.
 
@@ -104,7 +106,12 @@ def create_app(
     entries of the :class:`~athanore.plugins.mount.MountedPlugins` on
     ``app.state.plugins``, which is where a host adds, replaces and
     removes a workflow's surface while the application serves (22 §Live
-    mounting).
+    mounting). `registrar` is the host's end of the three registration
+    routes (:class:`~athanore.api.registrar.WorkflowRegistrar`, 22
+    §Wire): every application a :class:`~athanore.server.Server` builds
+    has one, and one built without — the OpenAPI dump, a test that wants
+    none — answers ``POST``, ``PUT`` and ``DELETE /api/workflows`` with
+    ``503 registration_unavailable``.
 
     Raises :class:`~athanore.api.deps.MissingOperatorToken` when the
     settings turn operator auth on without a token to check against —
@@ -130,6 +137,7 @@ def create_app(
     app.state.settings = settings
     app.state.engine = engine
     app.state.store = store
+    app.state.registrar = registrar
     # When this process came up. `/api/me` reports it and the SPA
     # refetches the plugin manifest whenever it changes (09).
     app.state.started_at = now()

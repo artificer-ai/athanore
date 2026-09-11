@@ -880,7 +880,11 @@
           "unknown_workflow",
           "unknown_node",
           "payload_too_large",
-          "plugin_error"
+          "plugin_error",
+          "workflow_load_failed",
+          "unknown_pool",
+          "registration_unavailable",
+          "persist_failed"
         ],
         "title": "ErrorCode",
         "type": "string"
@@ -1943,6 +1947,102 @@
           "position"
         ],
         "title": "PositionOut",
+        "type": "object"
+      },
+      "RegisterWorkflow": {
+        "description": "Register a workflow on the running server (`POST /api/workflows`, 22 \u00a7Wire).\n\n``target`` names the workflow as `athanore serve` would: `module:attr`\nor `path/to/file.py:attr`. The name it registers under is the loaded\n``Workflow``'s own. ``pool`` must already exist on the engine \u2014 a\nlive registration never creates one \u2014 and ``persist`` writes the\n`[workflows.<name>]` row of `athanore.toml` before anything is\nmutated, so a target that does not load is never written down.",
+        "properties": {
+          "persist": {
+            "default": false,
+            "description": "Write the registration as a `[workflows.<name>]` row of `athanore.toml`; the response then carries `X-Athanore-Persisted`.",
+            "title": "Persist",
+            "type": "boolean"
+          },
+          "pool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The pool to bind the workflow to; the default pool when omitted.",
+            "title": "Pool"
+          },
+          "target": {
+            "description": "The workflow to load: `module:attr` or `path/to/file.py:attr`.",
+            "minLength": 1,
+            "title": "Target",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target"
+        ],
+        "title": "RegisterWorkflow",
+        "type": "object"
+      },
+      "ReloadWorkflow": {
+        "description": "Replace a registered workflow (`PUT /api/workflows/{name}`, 22 \u00a7Wire).\n\n``target`` omitted re-resolves the registration's recorded target \u2014\nwhat `athanore serve` or an earlier registration loaded it from \u2014 and\nis refused when there is none. A target that now defines a differently\nnamed workflow is refused too: that is a new workflow, and `POST` is\nhow it arrives. ``pool`` omitted keeps the binding the name has.",
+        "properties": {
+          "persist": {
+            "default": false,
+            "description": "Rewrite the `[workflows.<name>]` row of `athanore.toml`; the response then carries `X-Athanore-Persisted`.",
+            "title": "Persist",
+            "type": "boolean"
+          },
+          "pool": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The pool to move the workflow to; the current binding when omitted. Refused while any attempt of the workflow is in flight.",
+            "title": "Pool"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The workflow to load; the registration's recorded target when omitted.",
+            "title": "Target"
+          }
+        },
+        "title": "ReloadWorkflow",
+        "type": "object"
+      },
+      "RemovedWorkflowOut": {
+        "description": "What `DELETE /api/workflows/{name}` did (22 \u00a7Wire).\n\nA body rather than a 204, because the body is the point: the caller\nwants to know what it interrupted (D227). Whether a row of\n`athanore.toml` was removed is the response's `X-Athanore-Persisted`\nheader, not a field \u2014 a receipt about the request belongs on the\nresponse.",
+        "properties": {
+          "task_ids": {
+            "description": "The attempts that were interrupted, in spawn order; empty when nothing of the workflow was in flight.",
+            "items": {
+              "type": "integer"
+            },
+            "title": "Task Ids",
+            "type": "array"
+          },
+          "workflow": {
+            "description": "The name that was unregistered.",
+            "title": "Workflow",
+            "type": "string"
+          }
+        },
+        "required": [
+          "workflow",
+          "task_ids"
+        ],
+        "title": "RemovedWorkflowOut",
         "type": "object"
       },
       "RequestAnswered": {
@@ -5274,6 +5374,18 @@
             "description": "The node a new run begins at.",
             "title": "Start",
             "type": "string"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The target this workflow was loaded from (`module:attr` or `path.py:attr`), and what `PUT /api/workflows/{name}` without a `target` reloads; `null` for a programmatic registration.",
+            "title": "Target"
           }
         },
         "required": [
@@ -7983,9 +8095,134 @@
         "tags": [
           "workflows"
         ]
+      },
+      "post": {
+        "description": "Load `target` and register the workflow it names, without a restart.\n\nThe name it registers under is the loaded workflow's own. Answers 201\nwith the workflow as `GET /api/workflows/{name}` reports it; 409\n`conflict` if that name is already registered; 422\n`workflow_load_failed` when the load stopped \u2014 its body carries\n`target`, `stage` (`target`, `import`, `attribute`, `finalize`,\n`plugins` or `register`) and `detail`, the underlying error's full\nmessage; 422 `unknown_pool` for a `pool` the engine does not have,\nnaming the ones it does; 500 `persist_failed` (`path`, `detail`) when\n`persist` was asked for and the row could not be written, in which\ncase nothing was registered; 503 `registration_unavailable` from an\napplication built without a registrar. A response that wrote the row\ncarries `X-Athanore-Persisted: <path>`.",
+        "operationId": "register_workflow_api_workflows_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterWorkflow"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
+          }
+        },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
+        "summary": "Register a workflow from a target",
+        "tags": [
+          "workflows"
+        ]
       }
     },
     "/api/workflows/{name}": {
+      "delete": {
+        "description": "Drop the workflow `name`, interrupting whatever it was running.\n\nEvery attempt of it in flight is cancelled and left where it was \u2014 no\ntask status is written, and the run reads `unregistered: true` until\nthe workflow is registered again, at which point those rows are\nrecovered. Nothing is deleted. Answers 200 with the interrupted task\nids; 404 `unknown_workflow`; 500 `persist_failed`; 503\n`registration_unavailable`. A response that removed the row carries\n`X-Athanore-Persisted: <path>`; one that found no row to remove\ncarries no such header.",
+        "operationId": "remove_workflow_api_workflows__name__delete",
+        "parameters": [
+          {
+            "description": "The registered workflow's name.",
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "description": "The registered workflow's name.",
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Remove the `[workflows.<name>]` row of `athanore.toml` too; a name with no row is not an error.",
+            "in": "query",
+            "name": "persist",
+            "required": false,
+            "schema": {
+              "default": false,
+              "description": "Remove the `[workflows.<name>]` row of `athanore.toml` too; a name with no row is not an error.",
+              "title": "Persist",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemovedWorkflowOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
+          }
+        },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
+        "summary": "Unregister a workflow",
+        "tags": [
+          "workflows"
+        ]
+      },
       "get": {
         "description": "One registered workflow, or 404 `unknown_workflow`.",
         "operationId": "get_workflow_api_workflows__name__get",
@@ -8040,6 +8277,74 @@
           }
         ],
         "summary": "One workflow",
+        "tags": [
+          "workflows"
+        ]
+      },
+      "put": {
+        "description": "Load `target` \u2014 or the registration's recorded one \u2014 and replace `name`.\n\nThe next task of every run of the workflow dispatches on the new\ngraph; an attempt already running finishes on the body it started\nwith. Answers 200 with the workflow as `GET /api/workflows/{name}`\nnow reports it; 404 `unknown_workflow`; 409 `conflict` if the target\nnow defines a differently named workflow (that is a new workflow \u2014\n`POST` it) or `pool` would move the workflow while attempts of it are\nin flight; 422 `workflow_load_failed` as `POST` answers, with `stage:\n\"target\"` when `target` was omitted and the registration has no\nrecorded one; 422 `unknown_pool`; 500 `persist_failed`; 503\n`registration_unavailable`. A response that rewrote the row carries\n`X-Athanore-Persisted: <path>`.",
+        "operationId": "reload_workflow_api_workflows__name__put",
+        "parameters": [
+          {
+            "description": "The registered workflow's name.",
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "description": "The registered workflow's name.",
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReloadWorkflow"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkflowOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "No operator token, on a bind that requires one."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            },
+            "description": "The request did not validate. `code` is `validation` and `errors` names each field that failed."
+          }
+        },
+        "security": [
+          {
+            "operatorBearer": []
+          }
+        ],
+        "summary": "Reload a registered workflow",
         "tags": [
           "workflows"
         ]

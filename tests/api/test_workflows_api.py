@@ -181,6 +181,63 @@ async def test_a_server_with_no_engine_runs_no_workflows(
     assert unknown.json()["code"] == "unknown_workflow"
 
 
+async def test_a_programmatic_registration_has_no_target(
+    client: httpx.AsyncClient, registered: Graph
+) -> None:
+    """22 §Terms: `target` is `null` for a workflow the host built (D249)."""
+
+    body = (await client.get("/api/workflows/demo")).json()
+    assert "target" in body
+    assert body["target"] is None
+
+
+# -- live registration without a registrar (22 §Wire) -----------------------
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "body"),
+    [
+        ("POST", "/api/workflows", {"target": "x.py:wf"}),
+        ("PUT", "/api/workflows/demo", {}),
+        ("DELETE", "/api/workflows/demo", None),
+    ],
+)
+async def test_an_application_without_a_registrar_answers_503(
+    client: httpx.AsyncClient, registered: Graph, method: str, path: str, body: Any
+) -> None:
+    """The ASGI fixture is built with no registrar, like the OpenAPI dump."""
+
+    response = await client.request(method, path, json=body)
+    assert response.status_code == 503, response.text
+    assert response.json() == {
+        "error": "this application was built without a registrar; workflows "
+        "cannot be registered over the API",
+        "code": "registration_unavailable",
+    }
+
+
+async def test_a_registration_body_is_validated_first(
+    client: httpx.AsyncClient, registered: Graph
+) -> None:
+    """A `target` that is empty is the 422 of 08 §Conventions, before the port."""
+
+    response = await client.post("/api/workflows", json={"target": "   "})
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation"
+    assert response.json()["errors"][0]["loc"] == ["body", "target"]
+
+
+async def test_an_unknown_name_is_a_404_before_the_port(
+    client: httpx.AsyncClient, registered: Graph
+) -> None:
+    """`PUT` and `DELETE` of an unregistered name never reach the registrar."""
+
+    for method in ("PUT", "DELETE"):
+        response = await client.request(method, "/api/workflows/nope", json={})
+        assert response.status_code == 404, method
+        assert response.json()["code"] == "unknown_workflow"
+
+
 # -- one workflow -----------------------------------------------------------
 
 

@@ -45,6 +45,9 @@ from athanore.cli.client import (
     read_config,
     resolve,
 )
+from athanore.cli.client import (
+    Reply as ClientReply,
+)
 from athanore.cli.output import (
     EXIT_API_ERROR,
     EXIT_OK,
@@ -71,6 +74,8 @@ class Reply:
     #: SSE chunks, written in order and then the connection closed. Each
     #: is raw stream text, so a test writes the framing it means to test.
     sse: Sequence[str] | None = None
+    #: Extra response headers, for a receipt the body does not carry.
+    headers: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -126,6 +131,9 @@ class _Handler(BaseHTTPRequestHandler):
     def do_PATCH(self) -> None:
         self._answer("PATCH")
 
+    def do_PUT(self) -> None:
+        self._answer("PUT")
+
     def do_DELETE(self) -> None:
         self._answer("DELETE")
 
@@ -158,6 +166,8 @@ class _Handler(BaseHTTPRequestHandler):
         if payload:
             self.send_header("content-type", reply.content_type)
         self.send_header("content-length", str(len(payload)))
+        for name, value in reply.headers.items():
+            self.send_header(name, value)
         self.end_headers()
         if payload:
             self.wfile.write(payload)
@@ -333,6 +343,32 @@ def test_a_post_sends_json_and_reads_the_answer(stub: Stub, client: Client) -> N
     answer = client.post("/api/workflows/demo/runs", {"title": "t"})
     assert answer == {"run_id": "01H"}
     assert json.loads(stub.last.body) == {"title": "t"}
+
+
+def test_a_put_sends_json_and_reads_the_answer(stub: Stub, client: Client) -> None:
+    stub.route("/api/workflows/demo", Reply(200, {"name": "demo"}))
+    answer = client.put("/api/workflows/demo", {"target": "demo.py:wf"})
+    assert answer == {"name": "demo"}
+    assert stub.last.method == "PUT"
+    assert json.loads(stub.last.body) == {"target": "demo.py:wf"}
+
+
+def test_an_exchange_keeps_the_headers_beside_the_body(
+    stub: Stub, client: Client
+) -> None:
+    """The registration verbs read `X-Athanore-Persisted` off the response."""
+
+    stub.route(
+        "/api/workflows",
+        Reply(201, {"name": "demo"}, headers={"X-Athanore-Persisted": "/x/a.toml"}),
+    )
+    reply = client.exchange("POST", "/api/workflows", body={"target": "d.py:wf"})
+    assert isinstance(reply, ClientReply)
+    assert reply.body == {"name": "demo"}
+    assert reply.headers["x-athanore-persisted"] == "/x/a.toml"
+    assert reply.headers.get("X-Athanore-Persisted") == "/x/a.toml"
+    # `request` is `exchange`'s body, no more.
+    assert client.post("/api/workflows", {"target": "d.py:wf"}) == {"name": "demo"}
 
 
 def test_no_content_decodes_to_none(stub: Stub, client: Client) -> None:

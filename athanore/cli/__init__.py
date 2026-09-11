@@ -237,3 +237,4 @@ from athanore.cli import inspect as _inspect  # noqa: E402, F401
 from athanore.cli import serve as _serve  # noqa: E402, F401
 from athanore.cli import steer as _steer  # noqa: E402, F401
 from athanore.cli import token as _token  # noqa: E402, F401
+from athanore.cli import workflows as _workflows  # noqa: E402, F401

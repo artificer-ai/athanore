@@ -1,8 +1,10 @@
 """The read-only verbs: submit work, then look at what happened (11 §Verbs).
 
 Every verb here is one or more ``GET``s and a rendering of what came
-back. Three rules run through all of them, and they are what make the
-set feel like one tool rather than eight:
+back — ``workflows``, which grew subcommands that write, lives in
+:mod:`athanore.cli.workflows` and shares these projections. Three rules
+run through all of them, and they are what make the set feel like one
+tool rather than eight:
 
 - **``--json`` is the API's own shape.** Not a second rendering of the
   table through another code path: the value the server sent, whole and
@@ -50,22 +52,26 @@ from athanore.cli.output import Column, TableSpec, emit
 __all__ = [
     "EVENTS",
     "LOG",
-    "NODES",
     "PAGE",
     "RECONNECT_DELAY",
     "REQUESTS",
     "RESYNC",
     "RUNS",
     "TASKS",
+    "console",
     "follow",
+    "join",
+    "line",
     "logs",
     "ls",
+    "mapping",
+    "mappings",
     "open_spa",
+    "render",
     "requests",
     "show",
     "stream",
     "submit",
-    "workflows",
 ]
 
 #: How many rows a paging read asks for at a time. The API caps a page of
@@ -136,16 +142,6 @@ EVENTS: Final[TableSpec] = (
     Column("TASK", "task_id"),
     Column("CREATED", "created"),
     Column("DATA", "data"),
-)
-
-#: One workflow's nodes (`workflows`), which is the graph 11 asks for.
-NODES: Final[TableSpec] = (
-    Column("NODE", "name"),
-    Column("GEN", "generation"),
-    Column("EDGES", "edges"),
-    Column("PRIORITY", "priority"),
-    Column("RETRIES", "retries"),
-    Column("TIMEOUT", "timeout"),
 )
 
 #: The requests waiting on a person (`requests`).
@@ -264,21 +260,26 @@ def follow(
 # --------------------------------------------------------------------------
 
 
-def _mappings(value: Any) -> list[Mapping[str, Any]]:
-    """``value`` as the list of objects the API documents it to be."""
+def mappings(value: Any) -> list[Mapping[str, Any]]:
+    """``value`` as the list of objects the API documents it to be.
+
+    Public, with :func:`mapping`, because :mod:`athanore.cli.workflows`
+    projects the same wire shapes and should not reach for a private
+    name to do it.
+    """
 
     if not isinstance(value, list):
         return []
     return [item for item in value if isinstance(item, Mapping)]
 
 
-def _mapping(value: Any) -> Mapping[str, Any]:
+def mapping(value: Any) -> Mapping[str, Any]:
     """``value`` as the object the API documents it to be."""
 
     return value if isinstance(value, Mapping) else {}
 
 
-def _join(value: Any) -> str:
+def join(value: Any) -> str:
     """A list field as one cell: comma-separated, empty when it is empty."""
 
     if not isinstance(value, list):
@@ -317,22 +318,9 @@ def _run_row(run: Mapping[str, Any]) -> dict[str, Any]:
         "id": run.get("id"),
         "workflow": workflow,
         "status": run.get("status"),
-        "node": _join(run.get("current_nodes")),
+        "node": join(run.get("current_nodes")),
         "requests": run.get("pending_requests"),
         "title": run.get("title"),
-    }
-
-
-def _node_row(name: str, node: Mapping[str, Any]) -> dict[str, Any]:
-    """One node of a workflow's graph, projected onto :data:`NODES`."""
-
-    return {
-        "name": name,
-        "generation": node.get("generation"),
-        "edges": _join(node.get("edges")) or "(terminal)",
-        "priority": node.get("priority"),
-        "retries": node.get("retries"),
-        "timeout": node.get("timeout"),
     }
 
 
@@ -341,7 +329,7 @@ def _request_row(view: Mapping[str, Any]) -> dict[str, Any]:
 
     options = [
         str(option.get("option_id"))
-        for option in _mappings(view.get("options"))
+        for option in mappings(view.get("options"))
         if "option_id" in option
     ]
     return {
@@ -381,7 +369,7 @@ def _event_line(event: Mapping[str, Any]) -> str:
 def _events_page(client: Client, run: str, after: int) -> list[Mapping[str, Any]]:
     """One page of ``GET /api/runs/{id}/events`` after ``after``."""
 
-    return _mappings(
+    return mappings(
         client.get(f"/api/runs/{run}/events", params={"after": after, "limit": PAGE})
     )
 
@@ -473,7 +461,7 @@ def _draw_runs(options: Options, client: Client, params: Mapping[str, Any]) -> N
     """One rendering of the run list, table or JSON."""
 
     runs = client.get("/api/runs", params=params)
-    render(options, runs, RUNS, [_run_row(run) for run in _mappings(runs)])
+    render(options, runs, RUNS, [_run_row(run) for run in mappings(runs)])
 
 
 @app.command()
@@ -491,8 +479,8 @@ def show(
 
     options = Options.of(ctx)
     with options.client() as client:
-        detail = _mapping(client.get(f"/api/runs/{run}"))
-        log = _mappings(client.get(f"/api/runs/{run}/log"))
+        detail = mapping(client.get(f"/api/runs/{run}"))
+        log = mappings(client.get(f"/api/runs/{run}/log"))
     if options.json:
         emit({**detail, "log": log}, json_flag=True)
         return
@@ -505,7 +493,7 @@ def show(
         line(f"description: {detail['description']}")
     if detail.get("output") is not None:
         line(f"output: {detail['output']}")
-    tasks = _mappings(detail.get("tasks"))
+    tasks = mappings(detail.get("tasks"))
     if tasks:
         console().print()
         emit(tasks, TASKS)
@@ -544,7 +532,7 @@ def logs(
                         _print_event(options, missed)
                         cursor = missed.get("id") or cursor
                     continue
-                _print_event(options, _mapping(frame.data))
+                _print_event(options, mapping(frame.data))
                 if frame.id is not None:
                     cursor = frame.id
 
@@ -591,7 +579,7 @@ def stream(
 
     options = Options.of(ctx)
     with options.client() as client:
-        detail = _mapping(client.get(f"/api/tasks/{task}"))
+        detail = mapping(client.get(f"/api/tasks/{task}"))
         chunks, page = _all_chunks(client, task)
         _emit_chunks(options, chunks, page)
         if not follow_ or not page.get("live"):
@@ -604,7 +592,7 @@ def stream(
                 # `task_id` (18 §Typing), and a `resync` carries none —
                 # which is the one frame worth reacting to blindly, since
                 # it says a transcript may have grown unobserved.
-                if frame.name != RESYNC and _mapping(frame.data).get("task_id") != task:
+                if frame.name != RESYNC and mapping(frame.data).get("task_id") != task:
                     continue
                 seq, live = _drain(options, client, task, seq)
                 if not live:
@@ -614,7 +602,7 @@ def stream(
 def _chunks_page(client: Client, task: int, after: int) -> Mapping[str, Any]:
     """One page of ``GET /api/tasks/{id}/stream`` after ``after``."""
 
-    return _mapping(
+    return mapping(
         client.get(f"/api/tasks/{task}/stream", params={"after": after, "limit": PAGE})
     )
 
@@ -635,7 +623,7 @@ def _all_chunks(
     chunks: list[Mapping[str, Any]] = []
     while True:
         page = _chunks_page(client, task, after)
-        got = _mappings(page.get("chunks"))
+        got = mappings(page.get("chunks"))
         chunks.extend(got)
         if len(got) < PAGE:
             return chunks, page
@@ -707,32 +695,6 @@ def _drain(options: Options, client: Client, task: int, seq: int) -> tuple[int, 
 
 
 @app.command()
-def workflows(ctx: typer.Context) -> None:
-    """The workflows this server runs: their graphs and their pools."""
-
-    options = Options.of(ctx)
-    with options.client() as client:
-        listed = client.get("/api/workflows")
-    if options.json:
-        emit(listed, json_flag=True)
-        return
-    out = console()
-    for index, workflow in enumerate(_mappings(listed)):
-        if index:
-            out.print()
-        line(
-            f"{workflow.get('name')}  start={workflow.get('start')}  "
-            f"pool={workflow.get('pool')} "
-            f"{workflow.get('in_flight')}/{workflow.get('capacity')}"
-        )
-        nodes = _mapping(workflow.get("nodes"))
-        emit(
-            [_node_row(name, _mapping(node)) for name, node in nodes.items()],
-            NODES,
-        )
-
-
-@app.command()
 def requests(
     ctx: typer.Context,
     run: Annotated[
@@ -749,7 +711,7 @@ def requests(
     options = Options.of(ctx)
     with options.client() as client:
         views = client.get("/api/requests", params={"pending": True, "run": run})
-    render(options, views, REQUESTS, [_request_row(v) for v in _mappings(views)])
+    render(options, views, REQUESTS, [_request_row(v) for v in mappings(views)])
 
 
 @app.command("open")

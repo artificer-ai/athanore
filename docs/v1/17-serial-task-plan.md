@@ -4176,6 +4176,16 @@ fixture, `--pool`, `--persist` (the row and the printed path), exit
 codes, the printed ids.
 **Done.** The three routes and verbs work end to end against a served
 process; snapshot and client regenerated and committed; gate green.
+**Status.** Done. `api/registrar.py` (`WorkflowRegistrar`), implemented
+by `Server.add_target` / `reload_target` / `remove` / `targets` and
+handed to `create_app(registrar=)`; the three routes and their
+route-local mapping in `api/routers/workflows.py` (D251),
+`ErrorCode`'s four new members, `WorkflowOut.target` (`null` for a
+programmatic registration, D249), `RegisterWorkflow` / `ReloadWorkflow`
+/ `RemovedWorkflowOut`, `X-Athanore-Persisted`; `discovery.UnknownPool`
+(D248); `cli/workflows.py` — the `workflows` group with `add`, `reload`,
+`rm` (D252) — and `Client.exchange` / `put`; snapshot, TypeScript client,
+site reference and skills regenerated; 02, 04, 08, 11, 12 folded.
 
 ### T087 — SPA follows; end to end (A8.5)
 

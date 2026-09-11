@@ -53,6 +53,7 @@ __all__ = [
     "ApiClientError",
     "Client",
     "Config",
+    "Reply",
     "ServerEvent",
     "config_path",
     "is_http_url",
@@ -151,6 +152,23 @@ class Config:
 
     url: str
     token: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Reply:
+    """A successful answer: its decoded body and its headers.
+
+    :meth:`Client.request` hands back the body alone, which is all but
+    one verb wants. The registration verbs read a receipt the server
+    puts on the *response* rather than in the body —
+    ``X-Athanore-Persisted``, the ``athanore.toml`` a row was written to
+    or removed from (22 §Wire) — so :meth:`Client.exchange` keeps the
+    headers beside the body. Header names are case-insensitive on the
+    wire and ``headers`` looks them up that way.
+    """
+
+    body: Any
+    headers: Mapping[str, str]
 
 
 @dataclass(frozen=True, slots=True)
@@ -413,15 +431,15 @@ class Client:
 
         self._http.close()
 
-    def request(
+    def exchange(
         self,
         method: str,
         path: str,
         *,
         params: Mapping[str, Any] | None = None,
         body: Any = None,
-    ) -> Any:
-        """One call, decoded, or the refusal it was.
+    ) -> Reply:
+        """One call: the decoded body and the headers, or the refusal it was.
 
         ``params`` drops its ``None`` values, so a verb passes its
         optional filters straight through without assembling a dict of
@@ -431,7 +449,19 @@ class Client:
         response = self._http.request(
             method.upper(), path, params=_params(params), json=body
         )
-        return _result(response)
+        return Reply(_result(response), response.headers)
+
+    def request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Mapping[str, Any] | None = None,
+        body: Any = None,
+    ) -> Any:
+        """One call, decoded, or the refusal it was — :meth:`exchange`'s body."""
+
+        return self.exchange(method, path, params=params, body=body).body
 
     def get(self, path: str, *, params: Mapping[str, Any] | None = None) -> Any:
         return self.request("GET", path, params=params)
@@ -444,6 +474,15 @@ class Client:
         params: Mapping[str, Any] | None = None,
     ) -> Any:
         return self.request("POST", path, params=params, body=body)
+
+    def put(
+        self,
+        path: str,
+        body: Any = None,
+        *,
+        params: Mapping[str, Any] | None = None,
+    ) -> Any:
+        return self.request("PUT", path, params=params, body=body)
 
     def patch(
         self,

@@ -12,6 +12,9 @@
     await server.add(wf, target="workflows/chat.py:wf", persist=True)
     await server.replace(wf)
     await server.remove("chat")
+    # ...which the API reaches through the registrar port (22 §Wire):
+    await server.add_target("workflows/chat.py:wf", None, persist=True)
+    await server.reload_target("chat", None, None, persist=False)
 
 This is the composition root and nothing else. Every object it wires
 together already exists and already knows how to do its job; what lives
@@ -52,7 +55,7 @@ import asyncio
 import contextlib
 import signal
 import socket
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -86,6 +89,7 @@ from athanore.plugins.discovery import (
     LoadStage,
     Registered,
     RemovedWorkflow,
+    UnknownPool,
     load_target,
     read_layout,
 )
@@ -480,6 +484,99 @@ class Server:
             _log.info("workflow unregistered", workflow=name, task_ids=task_ids)
         return RemovedWorkflow(name, tuple(task_ids), persisted)
 
+    # -- the registrar port (22 §Wire) ---------------------------------------
+    #
+    # `Server` is the `athanore.api.registrar.WorkflowRegistrar` the
+    # application it builds is handed: the wire carries a target string
+    # and a name, and these two methods turn them into the `add` and
+    # `replace` above. Each loads, checks what only the wire's caller can
+    # get wrong, hands over to the ordinary verb and lets its refusals
+    # through unchanged; `remove` and `targets` are the port's already.
+    # Every `LoadError` that leaves them is logged at ERROR with its
+    # traceback first — 22 §Wire: the traceback is in the server log,
+    # never on the wire.
+
+    async def add_target(
+        self, target: str, pool: str | None, *, persist: bool
+    ) -> Registered:
+        """Load ``target`` and :meth:`add` it (``POST /api/workflows``).
+
+        Loaded with ``reload=True``: a target ``POST``ed after a
+        ``DELETE`` of its name is the second load of it in this process,
+        and the caller expects the file as it is now; on a first load
+        the purge finds nothing and is a no-op (22 §Reloading a module,
+        D250).
+        """
+
+        with self._logging_load_failures(target):
+            wf = load_target(target, reload=True)
+            return await self.add(wf, pool, target=target, persist=persist)
+
+    async def reload_target(
+        self, name: str, target: str | None, pool: str | None, *, persist: bool
+    ) -> Registered:
+        """Load ``target`` and :meth:`replace` ``name`` with it (``PUT``).
+
+        ``target`` of ``None`` re-resolves the registration's recorded
+        one, and is a ``LoadError`` of stage ``target`` when there is
+        none — a programmatic registration has nothing to reload from.
+        The loaded workflow's name must be ``name``: a target that now
+        defines another workflow is a new workflow, and ``POST`` is how it
+        arrives (22 §Reloading a module) — refused with ``conflict`` set,
+        **before** anything is handed to :meth:`replace`, because
+        ``replace`` would otherwise swap whichever registration bears the
+        loaded name. The target is then passed explicitly, so D240's
+        "keep the recorded target" never applies from the wire.
+        """
+
+        with self._logging_load_failures(target or self._targets.get(name) or ""):
+            if name not in self._workflows:
+                message = f"workflow {name!r} is not registered"
+                raise LoadError(message, stage="register", target="", detail=message)
+            resolved = target if target is not None else self._targets[name]
+            if resolved is None:
+                message = (
+                    f"workflow {name!r} has no recorded target to reload; it was "
+                    f"registered as an object, so give the target to load it from"
+                )
+                raise LoadError(message, stage="target", target="", detail=message)
+            wf = load_target(resolved, reload=True)
+            if wf.name != name:
+                message = (
+                    f"{resolved} names workflow {wf.name!r}; PUT /api/workflows/"
+                    f"{name} is for {name!r} — POST it to register it as a new "
+                    f"workflow"
+                )
+                raise LoadError(
+                    message,
+                    stage="register",
+                    target=resolved,
+                    detail=message,
+                    conflict=True,
+                )
+            return await self.replace(wf, pool, target=resolved, persist=persist)
+
+    @contextlib.contextmanager
+    def _logging_load_failures(self, target: str) -> Iterator[None]:
+        """Log every ``LoadError`` of a wire registration, then let it go.
+
+        At ERROR with the target, the stage and the traceback — the
+        same report a discovery failure at boot gets (09 §Discovery) —
+        so the caller who reads the 422 can find the rest in the log.
+        """
+
+        try:
+            yield
+        except LoadError as exc:
+            _log.error(
+                "workflow registration failed",
+                target=target,
+                stage=exc.stage,
+                detail=exc.detail,
+                exc_info=True,
+            )
+            raise
+
     @property
     def workflows(self) -> dict[str, Workflow]:
         """The registered workflows by name, in registration order."""
@@ -591,8 +688,9 @@ class Server:
     def _resolve_pool(self, pool: str | Pool | None) -> Pool | None:
         """The pool a live verb names, or ``None`` for the default binding.
 
-        A name must be a registered pool — ``KeyError`` naming the known
-        ones otherwise (D234; the API's ``422 unknown_pool``). A
+        A name must be a registered pool — :class:`UnknownPool`, a
+        ``KeyError`` naming the known ones, otherwise (D234, D248; the
+        API's ``422 unknown_pool``). A
         :class:`Pool` object before :meth:`start` is passed through as
         :meth:`register` passes it, the boot-time idiom by which a host
         declares capacity; while serving it contributes only its name
@@ -606,9 +704,8 @@ class Server:
             return pool
         name = pool if isinstance(pool, str) else pool.name
         if name not in self.engine.pools:
-            raise KeyError(
-                f"no pool named {name!r}; known pools are "
-                f"{sorted(state.name for state in self.engine.pools)}"
+            raise UnknownPool(
+                name, tuple(sorted(state.name for state in self.engine.pools))
             )
         return self.engine.pools.get(name).pool
 
@@ -754,6 +851,7 @@ class Server:
                 engine=self.engine,
                 store=self.store,
                 plugins=with_builtins(self._specs),
+                registrar=self,
             )
             await self._serve_http(self._bind(self.app))
             self._retention_task = asyncio.create_task(

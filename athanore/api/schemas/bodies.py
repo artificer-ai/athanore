@@ -34,6 +34,8 @@ __all__ = [
     "Move",
     "NewRun",
     "Position",
+    "RegisterWorkflow",
+    "ReloadWorkflow",
     "Rerun",
     "SetStatus",
 ]
@@ -148,4 +150,56 @@ class Answer(BaseModel):
     )
     value: Any = Field(
         default=None, description="The answer, for a `text` or `form` request."
+    )
+
+
+class RegisterWorkflow(BaseModel):
+    """Register a workflow on the running server (`POST /api/workflows`, 22 §Wire).
+
+    ``target`` names the workflow as `athanore serve` would: `module:attr`
+    or `path/to/file.py:attr`. The name it registers under is the loaded
+    ``Workflow``'s own. ``pool`` must already exist on the engine — a
+    live registration never creates one — and ``persist`` writes the
+    `[workflows.<name>]` row of `athanore.toml` before anything is
+    mutated, so a target that does not load is never written down.
+    """
+
+    target: Text = Field(
+        description="The workflow to load: `module:attr` or `path/to/file.py:attr`."
+    )
+    pool: str | None = Field(
+        default=None,
+        description="The pool to bind the workflow to; the default pool when omitted.",
+    )
+    persist: bool = Field(
+        default=False,
+        description="Write the registration as a `[workflows.<name>]` row of "
+        "`athanore.toml`; the response then carries `X-Athanore-Persisted`.",
+    )
+
+
+class ReloadWorkflow(BaseModel):
+    """Replace a registered workflow (`PUT /api/workflows/{name}`, 22 §Wire).
+
+    ``target`` omitted re-resolves the registration's recorded target —
+    what `athanore serve` or an earlier registration loaded it from — and
+    is refused when there is none. A target that now defines a differently
+    named workflow is refused too: that is a new workflow, and `POST` is
+    how it arrives. ``pool`` omitted keeps the binding the name has.
+    """
+
+    target: Text | None = Field(
+        default=None,
+        description="The workflow to load; the registration's recorded target "
+        "when omitted.",
+    )
+    pool: str | None = Field(
+        default=None,
+        description="The pool to move the workflow to; the current binding when "
+        "omitted. Refused while any attempt of the workflow is in flight.",
+    )
+    persist: bool = Field(
+        default=False,
+        description="Rewrite the `[workflows.<name>]` row of `athanore.toml`; the "
+        "response then carries `X-Athanore-Persisted`.",
     )

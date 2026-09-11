@@ -234,6 +234,18 @@ host loads such rows back. An attempt already running finishes on the
 body it started with; a removed workflow's runs stay listed, flagged
 `unregistered`, and resume when it is added back.
 
+The same three verbs are on the wire and on the command line, so an
+agent or a script can do what the host does: `POST /api/workflows`
+with a target, `PUT /api/workflows/{name}` to reload one, `DELETE
+/api/workflows/{name}` to drop it — or `athanore workflows add`,
+`reload` and `rm` (see The command line (see the athanore-cli skill)). A target that does
+not load is answered `422 workflow_load_failed`, and the thing to read
+in that body is `stage`: `target` (the string is not `where:attr`),
+`import` (the file would not load), `attribute` (no such attribute, or
+not a workflow), `finalize` (the graph does not close), `plugins` (a
+declaration does not validate) or `register` (the name is a verb or a
+pool). `detail` is the underlying error, in full.
+
 ## Next
 
 - [Dispatching agents](guide-agents.md) — the object most bodies await.
