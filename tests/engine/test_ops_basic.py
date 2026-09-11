@@ -169,6 +169,33 @@ async def test_submit_queues_a_run_and_its_start_task(engines, store: Store) -> 
     assert task.lineage == {"reason": START_REASON}
 
 
+async def test_submit_reads_the_graph_from_the_registry_at_each_call(
+    engines, store: Store
+) -> None:
+    """The start node is the registered edition's, per call (T083).
+
+    A live ``replace`` swaps ``engine.graphs[name]``; the operations
+    never cache a graph, so the next ``submit`` queues the new start
+    node with nothing else changing.
+    """
+
+    engine = parked(engines, trivial())
+    before = await engine.ops.submit("trivial", "before")
+
+    renamed = Workflow("trivial")
+
+    @renamed.node(start=True)
+    async def begin() -> str:
+        return "done"
+
+    engine.graphs["trivial"] = renamed.finalize()
+    after = await engine.ops.submit("trivial", "after")
+
+    (old,) = await tasks_of(store, before.id)
+    (new,) = await tasks_of(store, after.id)
+    assert (old.node, new.node) == ("only", "begin")
+
+
 async def test_submit_announces_the_run_and_the_task(engines, store: Store) -> None:
     """One transaction, two events, in the order they happened (18)."""
 

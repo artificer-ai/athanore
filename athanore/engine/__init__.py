@@ -11,6 +11,9 @@ whether a restart loses work.
     engine.register(feature_build.finalize(), Pool("local", 1))
     await engine.start()      # recovery, then the dispatch loop
     ...
+    await engine.replace(feature_build.finalize())   # the next claim runs this
+    await engine.unregister("feature_build")         # cancel, unbind, drop
+    ...
     await engine.stop()       # stop claiming, announce, cancel, wait
 
 Everything above the engine reaches it through this object —
@@ -19,6 +22,16 @@ registered, ``engine.pools`` for the capacity report — and everything
 below it is reached *by* it. It holds no state of its own beyond those
 registries: the store is the truth, and a restart rebuilds this object
 from an empty one.
+
+The registries are live (04 §Live registration, 22 §Effects).
+:meth:`Engine.register` is the boot-time verb and refuses a name it
+has; :meth:`Engine.replace` swaps the graph under a name while the
+engine runs, and :meth:`Engine.unregister` cancels the name's attempts
+and drops it. Every mutation that has to be exact about what is in
+flight runs between two scheduler ticks
+(:meth:`~athanore.engine.scheduler.Scheduler.quiescent`), because a
+claim is an await inside a tick and anything checked across one can be
+stale by exactly the attempt that claim is about to spawn.
 
 Two orderings here are load-bearing and neither is arbitrary.
 
@@ -132,8 +145,9 @@ class Engine:
         Registering the same graph twice is refused: the pool registry
         already rejects a re-bind to a different pool, and a silent
         rebind of the graph itself would leave running attempts
-        executing the object this call replaced. Name clashes between a
-        pool and a workflow are the registry's to refuse (04 §Pools).
+        executing the object this call replaced — :meth:`replace` is the
+        verb for a swap. Name clashes between a pool and a workflow are
+        the registry's to refuse (04 §Pools).
         """
 
         name = graph.name
@@ -146,6 +160,114 @@ class Engine:
             self.pools.add(pool)
         self.pools.bind(name, pool.name)
         self.graphs[name] = graph
+
+    async def replace(self, graph: Graph, pool: str | Pool | None = None) -> None:
+        """Swap the graph registered under ``graph.name`` (22 §Replace step 1).
+
+        The next claim of the workflow dispatches on ``graph``; an
+        attempt in flight finishes on the graph it started with, routing
+        included, because the runner read the registry at its claim and
+        holds the object (04 §Live registration). A task whose node the
+        new graph does not declare dead-letters at its attempt with
+        ``GraphError`` (D42), exactly as it would after a restart.
+
+        ``pool`` is ``None`` to keep the binding, else the *name* of a
+        registered pool to move the workflow to; a :class:`Pool` object
+        contributes only its name, since creating or resizing a pool is
+        not a registration's to do (22 §Scope, D233). The move is refused
+        with ``ValueError`` while any attempt of the workflow is in
+        flight (22 §Pools): its leases belong to the pool they were
+        claimed on. ``KeyError`` for a name that is not registered and
+        for a pool that does not exist — both lookups, checked before
+        the in-flight refusal so a typo is reported as a typo. A refusal
+        leaves the engine exactly as it was.
+
+        A coroutine because the in-flight check is exact only between
+        ticks (:meth:`~athanore.engine.scheduler.Scheduler.quiescent`).
+        """
+
+        name = graph.name
+        if name not in self.graphs:
+            raise KeyError(f"workflow {name!r} is not registered")
+        if pool is None:
+            self.graphs[name] = graph
+            return
+        pool_name = pool if isinstance(pool, str) else pool.name
+        async with self.scheduler.quiescent():
+            if pool_name != self.pools.for_workflow(name).name:
+                if pool_name not in self.pools:
+                    raise KeyError(
+                        f"no pool named {pool_name!r}; known pools are "
+                        f"{sorted(state.name for state in self.pools)}"
+                    )
+                live = self.scheduler.attempts_of(name)
+                if live:
+                    raise ValueError(
+                        f"workflow {name!r} cannot move from pool "
+                        f"{self.pools.for_workflow(name).name!r} to {pool_name!r} "
+                        f"with attempts in flight: tasks {live}"
+                    )
+                self.pools.rebind(name, pool_name)
+            self.graphs[name] = graph
+
+    async def unregister(self, name: str) -> list[int]:
+        """Drop the workflow ``name``, cancelling what it is running.
+
+        22 §Remove steps 1–2, in this order and between ticks: the name
+        is unbound from its pool, so no claim from here selects its
+        tasks (04 §Dispatch order); every attempt this process holds —
+        running, parked on a human, still loading, or the second attempt
+        of a row re-dispatched under a live one — is cancelled the way
+        :meth:`stop` cancels them; the graph is dropped; then, with
+        the loop free to tick again, the cancelled attempts are waited
+        for so their slots are back and their contexts gone when this
+        returns. Returns the task ids that were interrupted, in spawn
+        order — what ``workflow.unregistered`` announces.
+
+        What each cancellation does is the attempt's own cancellation
+        path: the agent subprocess terminated then killed under the grace
+        period, the transcript flushed, the façade's stats entry written
+        as for any cancellation (``status=failed reason=shutdown``),
+        ``released()`` re-raising with no resume. **No task status is
+        written** and the run row is not touched (D52, D221): the rows
+        stay ``in_progress`` / ``waiting`` for the next ``add`` of the
+        name, or the next process, to recover. The pool stays: it is the
+        host's capacity, and other workflows may be on it.
+
+        ``KeyError`` for a name that is not registered. Safe on an engine
+        that was never started — nothing is in flight, and the registries
+        are simply edited.
+        """
+
+        if name not in self.graphs:
+            raise KeyError(f"workflow {name!r} is not registered")
+        async with self.scheduler.quiescent():
+            self.pools.unbind(name)
+            # Every live attempt of the name — the set `wait_for` waits
+            # on — not `cancel_attempts`' one-per-id ledger, which has
+            # no entry for the younger attempt of a re-dispatched row
+            # once the older one has ended (D107).
+            task_ids = self.scheduler.cancel_attempts_of(name)
+            # Dropped synchronously with the cancellations: an attempt
+            # still loading its run is cancelled at that await and never
+            # looks the graph up; one before its first line never runs.
+            del self.graphs[name]
+        await self.scheduler.wait_for(task_ids)
+        if task_ids:
+            _log.info(
+                "unregistered with attempts in flight", workflow=name, task_ids=task_ids
+            )
+        return task_ids
+
+    def attempts_of(self, workflow: str) -> list[int]:
+        """The task ids of the attempts of ``workflow`` this process is running.
+
+        In spawn order, each once; a snapshot, exact between ticks. What
+        the server's ``remove`` reports and what ``replace`` refuses a
+        pool move over (22 §Effects).
+        """
+
+        return self.scheduler.attempts_of(workflow)
 
     def snapshot(self) -> dict[str, PoolSnapshot]:
         """Every pool's capacity and in-flight count (08 §System)."""

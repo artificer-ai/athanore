@@ -538,6 +538,27 @@ def test_a_claimed_task_unpacks_as_the_tuple_it_is_specified_as() -> None:
         created=T0,
     )
 
-    task, token, run_started = ClaimedTask(row, "clear-text", True)
+    task, token, run_started, workflow = ClaimedTask(row, "clear-text", True, "demo")
 
-    assert (task, token, run_started) == (row, "clear-text", True)
+    assert (task, token, run_started, workflow) == (row, "clear-text", True, "demo")
+
+
+async def test_a_claimed_task_carries_its_runs_workflow(store: Store) -> None:
+    """The fourth field is the run's workflow, read in the claiming uow.
+
+    The scheduler records it against the attempt it spawns, so "every
+    attempt of this workflow" is answerable from the claim onwards (22
+    §Remove, D229) — a claim over two workflows names each correctly.
+    """
+
+    mine = await make_run(store, workflow="demo")
+    theirs = await make_run(store, workflow="other")
+    ours = await enqueue(store, mine, "build")
+    not_ours = await enqueue(store, theirs, "build")
+
+    claimed = await claim(store, 10, ["demo", "other"])
+
+    assert {one.task.id: one.workflow for one in claimed} == {
+        ours: "demo",
+        not_ours: "other",
+    }

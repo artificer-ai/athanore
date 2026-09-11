@@ -243,12 +243,16 @@ class PoolRegistry:
     confused, ``athanore.toml``'s ``[pools]`` and ``[workflows]`` tables
     could not name their subject.
 
-    A workflow is bound to exactly one pool. Re-binding it to the same
+    A workflow is bound to exactly one pool. :meth:`bind` to the same
     pool is a no-op (registering a workflow twice is the host's error to
-    report, not a capacity change); re-binding it to a different one
+    report, not a capacity change); :meth:`bind` to a different one
     raises, because a task's pool is derived from ``run.workflow`` and
-    never changes — moving a workflow would strand the tasks already
-    leased against the old pool.
+    a move under the attempts already leased against the old pool would
+    charge one pool's work to another's capacity. A live registration
+    (22 §Pools) moves a binding through :meth:`rebind` and drops one
+    through :meth:`unbind`; neither looks at what is in flight, because
+    the registry does not know — the engine does, and it refuses the
+    move before it calls here (04 §Pools).
     """
 
     def __init__(self) -> None:
@@ -283,6 +287,39 @@ class PoolRegistry:
             raise ValueError(
                 f"workflow {workflow!r} is already bound to pool {bound!r} and "
                 f"cannot be moved to {pool_name!r}"
+            )
+        self._bindings[workflow] = pool_name
+        return self._pools[pool_name]
+
+    def unbind(self, workflow: str) -> None:
+        """Drop ``workflow``'s binding; the pool stays (22 §Remove step 2).
+
+        Raises ``KeyError`` for a name that is not bound, as
+        :meth:`for_workflow` does: this is a lookup that found nothing,
+        not a registration that is wrong. Afterwards :meth:`workflows_of`
+        no longer lists the name, so no claim selects its tasks (04
+        §Dispatch order), and :meth:`for_workflow` raises for it.
+        """
+        try:
+            del self._bindings[workflow]
+        except KeyError:
+            raise KeyError(f"workflow {workflow!r} is not bound to a pool") from None
+
+    def rebind(self, workflow: str, pool_name: str) -> PoolState:
+        """Move ``workflow`` to ``pool_name``; return that pool's state.
+
+        The one way a binding changes pools (22 §Replace step 1). Both
+        failures are ``KeyError`` — an unbound workflow, an unknown pool —
+        because both are lookups, and the caller that maps errors to the
+        wire has to tell "no such pool" from the engine's own refusal of
+        a move with attempts in flight, which is a ``ValueError``. The
+        same pool is a no-op.
+        """
+        if workflow not in self._bindings:
+            raise KeyError(f"workflow {workflow!r} is not bound to a pool")
+        if pool_name not in self._pools:
+            raise KeyError(
+                f"no pool named {pool_name!r}; known pools are {sorted(self._pools)}"
             )
         self._bindings[workflow] = pool_name
         return self._pools[pool_name]

@@ -97,11 +97,17 @@ class ClaimedTask(NamedTuple):
     else. ``run_started`` is ``True`` on exactly one claimed task per run
     this claim moved ``queued → running``, so ``run.started`` is emitted
     once however many of that run's tasks were claimed together.
+    ``workflow`` is the run's, read in the claiming transaction: the
+    scheduler records it against the attempt it spawns, so "every
+    attempt of this workflow" is answerable from the moment of the
+    claim rather than from the moment the runner binds a context (22
+    §Remove, D229).
     """
 
     task: TaskRow
     token: str
     run_started: bool
+    workflow: str
 
 
 def token_hash(token: str) -> str:
@@ -390,7 +396,7 @@ class TaskRepo(Repo):
         return sorted(rows, key=lambda row: (branch_path(row), row.id))
 
     async def reset_for_recovery(
-        self, workflows: Sequence[str] | None = None
+        self, workflows: Sequence[str] | None = None, *, exclude: Sequence[int] = ()
     ) -> list[int]:
         """Return every interrupted attempt to ``ready``; report which.
 
@@ -414,6 +420,13 @@ class TaskRepo(Repo):
         which is what a caller with no registry (a migration, a test) is
         asking for; an **empty sequence** is a registry with nothing in
         it and resets nothing, so the two cannot be conflated here.
+
+        ``exclude`` names task ids the sweep must not touch, whatever
+        their status. A recovery run *after* start — one workflow added
+        to a serving engine (22 §Add) — can find a row of that workflow
+        already held by an attempt of this very process, and resetting
+        it would put a second attempt on the task; the engine passes
+        the ids it is running and the row stays as it is (D229).
         """
 
         statement = tasks.update().where(tasks.c.status.in_(INTERRUPTED))
@@ -423,6 +436,8 @@ class TaskRepo(Repo):
                     select(runs.c.id).where(runs.c.workflow.in_(list(workflows)))
                 )
             )
+        if exclude:
+            statement = statement.where(tasks.c.id.notin_(list(exclude)))
         result = await self.conn.execute(
             statement.values(
                 status=TaskStatus.ready.value,
@@ -451,7 +466,7 @@ class TaskRepo(Repo):
            flag the first claimed task of each one it moved, so the
            caller emits ``run.started`` once per run.
         5. Re-select the claimed rows and return them in claimed order,
-           each with its clear-text token.
+           each with its clear-text token and its run's workflow.
 
         An empty ``workflows`` — a pool with nothing registered on it —
         and a non-positive ``limit`` — a pool with no free slot — claim
@@ -494,16 +509,24 @@ class TaskRepo(Repo):
         rows = {row.id: row for row in self._rows(TaskRow, claimed)}
 
         ordered = [(rows[task_id], token) for task_id, token in won]
-        started = await self._start_runs(
-            list(dict.fromkeys(row.run_id for row, _ in ordered)), stamp
-        )
+        run_ids = list(dict.fromkeys(row.run_id for row, _ in ordered))
+        started = await self._start_runs(run_ids, stamp)
+        workflows_of = await self._workflows_of(run_ids)
         announced: set[str] = set()
         result: list[ClaimedTask] = []
         for row, token in ordered:
             first = row.run_id in started and row.run_id not in announced
             announced.add(row.run_id)
-            result.append(ClaimedTask(row, token, first))
+            result.append(ClaimedTask(row, token, first, workflows_of[row.run_id]))
         return result
+
+    async def _workflows_of(self, run_ids: Sequence[str]) -> dict[str, str]:
+        """The workflow of each run in ``run_ids``, by run id."""
+
+        result = await self.conn.execute(
+            select(runs.c.id, runs.c.workflow).where(runs.c.id.in_(list(run_ids)))
+        )
+        return {str(run_id): str(workflow) for run_id, workflow in result.all()}
 
     async def _start_runs(self, run_ids: Sequence[str], stamp: datetime) -> set[str]:
         """Flip each ``queued`` run in ``run_ids`` to ``running``.

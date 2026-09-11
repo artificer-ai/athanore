@@ -4040,6 +4040,11 @@ flight and accepted without; `workflows_of(pool)` no longer lists the
 name.
 **Done.** The engine can swap and drop a workflow live with the
 semantics 22 §Effects names; gate green; snapshot unchanged.
+**Status.** Done. `Engine.replace` is a coroutine (its in-flight check
+runs between ticks); `attempts_of` is sourced from the scheduler via
+`ClaimedTask.workflow`, so `LiveContext` is unchanged; `recover(engine,
+[name])` refuses unregistered names and excludes rows held by live
+attempts. See D229–D235.
 
 ### T084 — Live plugin mounting (A8.2)
 

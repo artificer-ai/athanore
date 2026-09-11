@@ -43,8 +43,8 @@ that goes on to run, and the runner publishes both (D102, D107).
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterable, Sequence
-from contextlib import suppress
+from collections.abc import AsyncGenerator, Iterable, Sequence
+from contextlib import asynccontextmanager, suppress
 from typing import Final, NamedTuple, Protocol
 
 from athanore.engine.pools import Lease, PoolRegistry, PoolState
@@ -62,10 +62,17 @@ DEFAULT_TICK: Final = 1.0
 
 
 class _Attempt(NamedTuple):
-    """What the scheduler holds for one spawned attempt."""
+    """What the scheduler holds for one spawned attempt.
+
+    ``workflow`` is recorded at spawn from the claim, so
+    :meth:`Scheduler.attempts_of` can answer for an attempt that has
+    not yet bound its context — the live registry learns of one only
+    after the runner's first await (D229).
+    """
 
     task_id: int
     lease: Lease
+    workflow: str
 
 
 class SchedulerEngine(RunnerEngine, Protocol):
@@ -108,6 +115,9 @@ class Scheduler:
         self._attempts: dict[int, asyncio.Task[None]] = {}
         self._live: dict[asyncio.Task[None], _Attempt] = {}
         self._loop_task: asyncio.Task[None] | None = None
+        # Held around every tick, so `quiescent()` can put a caller
+        # between two of them. Free whenever the loop is not running.
+        self._ticking = asyncio.Lock()
 
     # -- state -------------------------------------------------------------
 
@@ -125,6 +135,86 @@ class Scheduler:
         (04 §Shutdown, T027).
         """
         return tuple(self._attempts)
+
+    def attempts_of(self, workflow: str) -> list[int]:
+        """The task ids of the live attempts of ``workflow``, in spawn order.
+
+        Every attempt this process is running for the workflow — one
+        inside its body, one parked in ``released()`` on a human (its
+        row reads ``waiting``; the attempt is no less live), and one
+        still loading before its first line. Each id once: a row
+        re-dispatched under a live attempt has two attempts and one id.
+        Exact only between ticks — a claim in progress may be about to
+        add to it — which is what :meth:`quiescent` is for.
+        """
+        seen: dict[int, None] = {}
+        for attempt, entry in self._live.items():
+            if entry.workflow == workflow and not attempt.done():
+                seen.setdefault(entry.task_id, None)
+        return list(seen)
+
+    def cancel_attempts_of(self, workflow: str) -> list[int]:
+        """Cancel every live attempt of ``workflow``; the task ids, in spawn order.
+
+        The cancel half of ``unregister`` (22 §Remove step 1). It reads
+        the same ledger :meth:`attempts_of` and :meth:`wait_for` read —
+        ``_live``, every attempt, not ``_attempts``, one per id — so the
+        set it cancels is exactly the set that will be waited for. The
+        difference is a row re-dispatched under a live attempt: the
+        younger attempt never takes the id from the older one (D107),
+        and once the older has ended it is the row's only attempt with
+        no entry for :meth:`cancel_attempts` to find. It is still an
+        attempt of the workflow, and it is cancelled here.
+
+        Synchronous like :meth:`cancel_attempts`, and for the same
+        reason: called between ticks, the set is closed, and the
+        attempts reap themselves.
+        """
+        seen: dict[int, None] = {}
+        for attempt, entry in self._live.items():
+            if entry.workflow == workflow and not attempt.done():
+                attempt.cancel()
+                seen.setdefault(entry.task_id, None)
+        return list(seen)
+
+    async def wait_for(self, task_ids: Iterable[int]) -> None:
+        """Wait for the attempts of ``task_ids`` to end, and reap them.
+
+        The tail of a shutdown for a chosen set: every live attempt of
+        those ids is awaited — the runner's ``finally`` and the façade's
+        cleanup run to completion under it — and then reaped, so the
+        slots are back and :attr:`in_flight` no longer lists them when
+        this returns. Ids nothing is running are skipped. This does not
+        cancel; the caller did, with :meth:`cancel_attempts` or
+        :meth:`cancel_attempts_of`.
+        """
+        wanted = set(task_ids)
+        attempts = [
+            attempt for attempt, entry in self._live.items() if entry.task_id in wanted
+        ]
+        if attempts:
+            await asyncio.gather(*attempts, return_exceptions=True)
+        self._reap()
+
+    @asynccontextmanager
+    async def quiescent(self) -> AsyncGenerator[None]:
+        """A block between ticks: no tick in progress, none starts.
+
+        The tick in progress at entry finishes first, so every attempt a
+        claim before now produced has been spawned (spawning is
+        synchronous within the tick) and :meth:`attempts_of` is exact
+        for the length of the block. The loop waits at its next tick
+        until the block ends; ``notify()`` still works and is honoured
+        by that tick. Free when the loop is not running, so it costs
+        nothing before ``start()`` and after ``stop()``.
+
+        Not reentrant, and meant to be short: a registry mutation, a
+        cancellation, one store transaction. Never wait on an attempt
+        inside it — an attempt's ``finally`` may be what the next tick
+        is waiting to reap.
+        """
+        async with self._ticking:
+            yield
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -228,7 +318,8 @@ class Scheduler:
             # tick that had already looked is kept and wakes the next one.
             self._wake.clear()
             try:
-                await self._dispatch_all()
+                async with self._ticking:
+                    await self._dispatch_all()
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -313,7 +404,7 @@ class Scheduler:
             run_attempt(self._engine, claimed, lease),
             name=f"athanore-attempt-{task_id}",
         )
-        self._live[attempt] = _Attempt(task_id, lease)
+        self._live[attempt] = _Attempt(task_id, lease, claimed.workflow)
         previous = self._attempts.get(task_id)
         if previous is None or previous.done():
             # An attempt still running this task keeps the id. The row was
@@ -347,7 +438,7 @@ class Scheduler:
         record against the task from here, so it is logged with its
         traceback and the slot is recovered.
         """
-        for attempt, (task_id, lease) in list(self._live.items()):
+        for attempt, (task_id, lease, _workflow) in list(self._live.items()):
             if not attempt.done():
                 continue
             del self._live[attempt]

@@ -269,6 +269,37 @@ async def test_current_task_is_bound_inside_the_body_and_gone_after(harness) -> 
         current_task()
 
 
+async def test_the_graph_is_read_from_the_registry_at_each_attempt(harness) -> None:
+    """``engine.graphs[name]`` is looked up per claim, never cached (T083).
+
+    What makes a live ``replace`` work without the runner changing: two
+    editions of one workflow, the registry entry swapped between two
+    attempts, and each attempt runs the edition registered at its claim.
+    """
+
+    marks: list[str] = []
+
+    def edition(tag: str) -> Workflow:
+        wf = Workflow("editioned")
+
+        @wf.node(start=True)
+        async def only():
+            marks.append(tag)
+            return []
+
+        return wf
+
+    harness.register(edition("first"))
+    await harness.submit("editioned")
+    await harness.submit("editioned")
+
+    await harness.attempt()
+    harness.engine.graphs["editioned"] = edition("second").finalize()
+    await harness.attempt()
+
+    assert marks == ["first", "second"]
+
+
 async def test_the_context_carries_the_claimed_token_and_is_live_while_it_runs(
     harness,
 ) -> None:

@@ -247,6 +247,16 @@ an attempt. `human_input` releases the lease while waiting and re-acquires
 it before returning into the body (below). Leases are in-memory; a crash
 frees them by definition.
 
+A binding can be dropped (`PoolRegistry.unbind`) or moved
+(`PoolRegistry.rebind`) by a live registration (22 §Effects, §Live
+registration below). A move is refused while any attempt of the
+workflow is in flight — running, or waiting on a human — because the
+leases those attempts hold belong to the pool they were claimed on, and
+re-binding under them would charge one pool's work to another's
+capacity (22 §Pools); the engine checks between two ticks, so the
+answer is exact. A live registration names a pool that exists and
+never creates or resizes one: capacity is the host's decision.
+
 ### Dispatch order (per pool)
 
 ```sql
@@ -473,6 +483,44 @@ drain, and the CLI documents that recipe.
 2. Runs whose workflow is not registered stay as they are and are flagged
    `unregistered` in the API; they never dispatch.
 3. Requests opened by a now-dead agent session stay in history as stale.
+
+### Live registration
+
+The registries are operable after `start()` (22). Three engine verbs,
+each the engine-tier half of a server verb 22 §Effects sequences:
+
+- **`recover(engine, [name])`** runs step 1 above for one workflow when
+  it is added to a running server, between two ticks, and skips any row
+  an attempt of this process already holds — the name is bound before
+  recovery is asked for, so a tick in between may have claimed one. The
+  same `engine.recovered {task_ids}` event, nothing emitted when nothing
+  was reset, `KeyError` for a name that is not registered (resetting the
+  rows of a workflow nothing can claim is rule 2's defect).
+- **`Engine.replace(graph, pool=None)`** swaps the graph under its name.
+  The next claim of the workflow dispatches on the new graph; an attempt
+  in flight finishes on the one it started with, routing included,
+  because the runner read the registry at its claim and holds that
+  object. A task whose node the new graph lacks dead-letters with
+  `GraphError` (D42). With `pool` given, the name is rebound to it, or
+  the move is refused with `ValueError` while attempts are in flight
+  (§Pools); `KeyError` for an unknown pool or an unregistered name.
+- **`Engine.unregister(name)`** unbinds the name from its pool (no claim
+  after this selects its tasks — §Dispatch order filters by the bound
+  names), cancels every attempt of it this process holds — running,
+  parked on a human, still loading, or the younger attempt of a row
+  re-dispatched under a live one, which holds no task id of its own
+  (D107, D235) — exactly as §Shutdown step 3 does, writes no status
+  (step 4), drops the graph and keeps the pool. The set cancelled is the
+  set waited for. It returns the interrupted task ids; the rows stay
+  `in_progress` / `waiting` for `recover(engine, [name])` at the next
+  registration of the name, or for the next process.
+
+`Engine.attempts_of(name)` is the in-flight set the last two read,
+sourced from the scheduler, which records the workflow of every attempt
+at its spawn (D229). `register` is unchanged and still refuses a name it
+has: `replace` is the verb for a swap. 22 §Effects is the server's
+sequence around these — plugin mounting, the `workflow.*` events and
+the scheduler wake.
 
 ## Durability posture (unchanged decision)
 
