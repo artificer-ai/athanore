@@ -57,14 +57,15 @@ export type Overlay = (typeof OVERLAYS)[number]
  *   the overlay says so when the manifest carries none by that name.
  * - `global` — the narrow global screen's pane index: the zero-based
  *   index into the `global` cycle, present exactly while that screen is
- *   up. Read only beside `run` — the global screen is always over a
- *   run (D217) — and inert alone, as it is at `md` and above, where the
- *   detail is the global panes whenever nothing is selected (21 §Narrow
- *   layout, D216). Kept whatever `run` is, for the reason
- *   `listCollapsed` is kept below the breakpoint: dropping it would
- *   make a phone's link opened at another width forget where it was.
- *   It is not `pane` reused, so a visit to the global panes leaves the
- *   run's own pane where it was.
+ *   up. Read only while `run` is unset — the global screen sits beside
+ *   the list, never over a run (D218) — and inert beside `run`, as it
+ *   is at `md` and above, where the detail is the global panes
+ *   whenever nothing is selected (21 §Narrow layout, D216). Kept
+ *   whatever `run` is, for the reason `listCollapsed` is kept below
+ *   the breakpoint: dropping it would make a phone's link opened at
+ *   another width forget where it was. It is not `pane` reused, so a
+ *   visit to the global panes leaves the operator's pane index where
+ *   it was.
  */
 export type AppSearch = {
   run?: string

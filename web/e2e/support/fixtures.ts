@@ -292,7 +292,10 @@ export class Dashboard {
     await expect(palette).toBeHidden()
   }
 
-  /** The pane bar's back control, below the breakpoint (21 §Narrow). */
+  /**
+   * The pane bar's back control, below the breakpoint (21 §Narrow): the
+   * detail's `←`, and the global screen's — both go to the list (D218).
+   */
   back(): Locator {
     return this.page.getByRole('button', { name: 'back to runs' })
   }
@@ -305,10 +308,6 @@ export class Dashboard {
     return this.page.getByRole('button', { name: 'global panes' })
   }
 
-  /** The global screen's `←`, while a run is selected under it. */
-  backToRun(): Locator {
-    return this.page.getByRole('button', { name: 'back to the run' })
-  }
 
   /**
    * A horizontal swipe across the middle of the screen, as a finger

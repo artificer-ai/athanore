@@ -702,8 +702,9 @@ describe('App', () => {
     })
 
     /*
-     * The narrow global screen (21 §Narrow layout, D216), the far end of
-     * one line — list, detail, global — and always over a run (D217).
+     * The narrow global screen (21 §Narrow layout, D216): beside the
+     * list, never over a run, in the row global | list | detail that a
+     * swipe walks one screen at a time (D218).
      */
 
     /** A finger across the stacked middle, `from` to `to` on the x axis. */
@@ -715,11 +716,11 @@ describe('App', () => {
     const swipeRight = () => swipe(100, 260)
     const swipeLeft = () => swipe(260, 100)
 
-    it('shows the global panes over a run while `?global=` is set', () => {
-      shell({ run: 'aaaa1111bbbb', pane: 1, global: 0 })
+    it('shows the global panes beside the list while `?global=` is set', () => {
+      shell({ pane: 1, global: 0 })
 
-      // The detail region, over the global cycle: the inbox, and nothing
-      // about the run that is still selected underneath.
+      // The detail region, over the global cycle: the inbox, and no run
+      // — nothing is selected.
       expect(screen.getByRole('main')).toHaveAttribute('data-stacked', 'global')
       expect(screen.getByRole('region', { name: 'detail' })).toBeInTheDocument()
       expect(screen.getByTestId('pane-label')).toHaveTextContent('INBOX (1/1)')
@@ -728,45 +729,44 @@ describe('App', () => {
         '_builtin:inbox',
       )
       expect(screen.queryByTestId('selected-run')).toBeNull()
-      expect(screen.getByRole('button', { name: 'back to the run' })).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: 'back to runs' })).toBeNull()
+      expect(screen.getByRole('button', { name: 'back to runs' })).toBeInTheDocument()
       expect(screen.queryByRole('region', { name: 'runs' })).toBeNull()
     })
 
-    it('reads `?global=` only beside `?run=`: alone it is the list', () => {
-      // The global screen is always over a run (D217 (1)): `?global=`
-      // with no run is inert, kept rather than cleared — as it is at
-      // `md` and above — and the list is what shows.
-      shell({ global: 0 })
+    it('reads `?global=` only while `?run=` is unset: beside a run it is the detail', () => {
+      // The global screen is never over a run (D218 (1)): `?global=`
+      // beside `?run=` is inert, kept rather than cleared — as it is at
+      // `md` and above — and the run's detail is what shows.
+      shell({ run: 'aaaa1111bbbb', global: 0 }, { onClearRun: vi.fn() })
 
-      expect(screen.getByRole('main')).toHaveAttribute('data-stacked', 'list')
-      expect(screen.getByRole('region', { name: 'runs' })).toBeInTheDocument()
-      expect(screen.queryByRole('region', { name: 'detail' })).toBeNull()
-      expect(screen.queryByRole('button', { name: 'back to runs' })).toBeNull()
-      expect(screen.queryByRole('button', { name: 'back to the run' })).toBeNull()
+      expect(screen.getByRole('main')).toHaveAttribute('data-stacked', 'detail')
+      expect(screen.getByRole('region', { name: 'detail' })).toBeInTheDocument()
+      expect(screen.getByTestId('pane-label')).toHaveTextContent('OVERVIEW (1/3)')
+      expect(screen.getByTestId('selected-run')).toHaveTextContent('aaaa1111bbbb')
+      expect(screen.getByRole('button', { name: 'back to runs' })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'global panes' })).toBeNull()
     })
 
-    it('draws no `global panes` button on the list, and reads no swipe there', () => {
+    it('draws no `global panes` button on the detail, and a swipe left there is nothing', () => {
       // The button twins the swipe on the screen it is drawn on, and the
-      // list has no swipe to the global panes (D217 (4)): a run is
-      // chosen by tapping its row. Both directions are read by the
-      // stacked middle's listener and dropped by the shell (D217 (2)).
+      // detail has no swipe to the global panes (D218 (4)): the row
+      // global | list | detail puts the list between them. A swipe left
+      // on the detail is the row's far end — read by the stacked
+      // middle's listener and dropped by the shell (D218 (2)).
       const onShowGlobal = vi.fn()
       const onClearRun = vi.fn()
-      shell({}, { onShowGlobal, onClearRun })
+      shell({ run: 'aaaa1111bbbb' }, { onShowGlobal, onClearRun })
 
       expect(screen.queryByRole('button', { name: 'global panes' })).toBeNull()
-      swipeRight()
       swipeLeft()
       expect(onShowGlobal).not.toHaveBeenCalled()
       expect(onClearRun).not.toHaveBeenCalled()
-      expect(screen.getByRole('main')).toHaveAttribute('data-stacked', 'list')
+      expect(screen.getByRole('main')).toHaveAttribute('data-stacked', 'detail')
     })
 
     it('opens and closes the global screen from the footer button', async () => {
       const onShowGlobal = vi.fn()
-      shell({ run: 'aaaa1111bbbb' }, { onShowGlobal })
+      shell({}, { onShowGlobal })
 
       const button = screen.getByRole('button', { name: 'global panes' })
       expect(button).toHaveAttribute('aria-pressed', 'false')
@@ -775,7 +775,7 @@ describe('App', () => {
 
       cleanup()
       onShowGlobal.mockClear()
-      shell({ run: 'aaaa1111bbbb', global: 0 }, { onShowGlobal })
+      shell({ global: 0 }, { onShowGlobal })
 
       const pressed = screen.getByRole('button', { name: 'global panes' })
       expect(pressed).toHaveAttribute('aria-pressed', 'true')
@@ -783,48 +783,44 @@ describe('App', () => {
       expect(onShowGlobal).toHaveBeenCalledExactlyOnceWith(undefined)
     })
 
-    it('leaves the global screen from the bar’s `←`, and the run stays', async () => {
+    it('leaves the global screen from the bar’s `←`, by clearing `?global=` alone', async () => {
       const onShowGlobal = vi.fn()
       const onClearRun = vi.fn()
-      shell({ run: 'aaaa1111bbbb', global: 0 }, { onShowGlobal, onClearRun })
+      shell({ global: 0 }, { onShowGlobal, onClearRun })
 
-      await userEvent.click(screen.getByRole('button', { name: 'back to the run' }))
+      await userEvent.click(screen.getByRole('button', { name: 'back to runs' }))
       expect(onShowGlobal).toHaveBeenCalledExactlyOnceWith(undefined)
       expect(onClearRun).not.toHaveBeenCalled()
     })
 
-    it('walks the line from the detail: a swipe right opens the global screen, a swipe left goes to the list', () => {
-      // The detail is between the list and the global panes (D217 (2)):
-      // right is one screen away from the list, left is one towards it
-      // — the same `onClearRun` write the bar's `←` makes, so the
-      // selection clears on the way (D217 (7)).
+    it('swipes from the list: right opens the global screen, left is nothing', () => {
+      // The list is the middle of the row (D218 (2)): right reaches the
+      // global screen on its first pane, and left would be the detail,
+      // which is never swiped to — a run is chosen by tapping its row.
       const onShowGlobal = vi.fn()
       const onClearRun = vi.fn()
-      shell({ run: 'aaaa1111bbbb' }, { onShowGlobal, onClearRun })
+      shell({}, { onShowGlobal, onClearRun })
 
-      expect(screen.getByRole('main')).toHaveAttribute('data-stacked', 'detail')
+      expect(screen.getByRole('main')).toHaveAttribute('data-stacked', 'list')
+      swipeLeft()
+      expect(onShowGlobal).not.toHaveBeenCalled()
+      expect(onClearRun).not.toHaveBeenCalled()
+      expect(screen.getByRole('main')).toHaveAttribute('data-stacked', 'list')
+
       swipeRight()
       expect(onShowGlobal).toHaveBeenCalledExactlyOnceWith(0)
       expect(onClearRun).not.toHaveBeenCalled()
-
-      onShowGlobal.mockClear()
-      swipeLeft()
-      expect(onClearRun).toHaveBeenCalledOnce()
-      expect(onShowGlobal).not.toHaveBeenCalled()
     })
 
-    it('walks the line from the global screen: a swipe left goes back to the run, a swipe right is nothing', () => {
-      // The global screen is the far end: left is one screen towards the
-      // list — the detail, on the pane of the run it left — and right
-      // has nowhere to go, so it does not write `0` over the pane the
-      // screen is on.
+    it('swipes from the global screen: left goes back to the list, right is nothing', () => {
+      // The global screen is the row's left end: left puts it away, and
+      // right has nowhere to go, so it does not write `0` over the pane
+      // the screen is on.
       const onShowGlobal = vi.fn()
       const onClearRun = vi.fn()
-      shell({ run: 'aaaa1111bbbb', global: 1 }, { onShowGlobal, onClearRun })
+      shell({ global: 1 }, { onShowGlobal, onClearRun })
 
       expect(screen.getByRole('main')).toHaveAttribute('data-stacked', 'global')
-      expect(screen.getByRole('button', { name: 'back to the run' })).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: 'back to runs' })).toBeNull()
       expect(screen.getByRole('button', { name: 'global panes' })).toHaveAttribute(
         'aria-pressed',
         'true',
@@ -837,14 +833,26 @@ describe('App', () => {
       expect(onClearRun).not.toHaveBeenCalled()
     })
 
-    it('unwinds the global screen on `esc`, after an overlay and before the run', () => {
+    it('swipes from the detail: right goes back to the list, through `onClearRun`', () => {
+      // The detail is the row's right end: right is one screen back to
+      // the list — the same write the bar's `←` makes, so the selection
+      // clears on the way (D218 (3)) — and the global screen is never
+      // reached from here.
+      const onShowGlobal = vi.fn()
+      const onClearRun = vi.fn()
+      shell({ run: 'aaaa1111bbbb' }, { onShowGlobal, onClearRun })
+
+      expect(screen.getByRole('main')).toHaveAttribute('data-stacked', 'detail')
+      swipeRight()
+      expect(onClearRun).toHaveBeenCalledOnce()
+      expect(onShowGlobal).not.toHaveBeenCalled()
+    })
+
+    it('unwinds the global screen on `esc`, after an overlay', () => {
       const onShowGlobal = vi.fn()
       const onClearRun = vi.fn()
       const onCloseOverlay = vi.fn()
-      shell(
-        { run: 'aaaa1111bbbb', global: 0, overlay: 'keys' },
-        { onShowGlobal, onClearRun, onCloseOverlay },
-      )
+      shell({ global: 0, overlay: 'keys' }, { onShowGlobal, onClearRun, onCloseOverlay })
 
       fireEvent.keyDown(document.body, { key: 'Escape' })
       expect(onCloseOverlay).toHaveBeenCalledOnce()
@@ -852,10 +860,7 @@ describe('App', () => {
 
       cleanup()
       onCloseOverlay.mockClear()
-      shell(
-        { run: 'aaaa1111bbbb', global: 0 },
-        { onShowGlobal, onClearRun, onCloseOverlay },
-      )
+      shell({ global: 0 }, { onShowGlobal, onClearRun, onCloseOverlay })
 
       fireEvent.keyDown(document.body, { key: 'Escape' })
       expect(onShowGlobal).toHaveBeenCalledExactlyOnceWith(undefined)
@@ -863,15 +868,13 @@ describe('App', () => {
       expect(onCloseOverlay).not.toHaveBeenCalled()
     })
 
-    it('cycles the global panes with the keyboard, not the run’s', () => {
+    it('cycles the global panes with the keyboard, on `?global=`', () => {
       // One pane model, keyed off the screen: `→` moves `?global=`, and
-      // `?pane=` — the run's own pane — is never written from here.
+      // `?pane=` — the operator's run-pane index — is never written from
+      // here.
       const onShowGlobal = vi.fn()
       const onSelectPane = vi.fn()
-      shell(
-        { run: 'aaaa1111bbbb', pane: 1, global: 0 },
-        { onShowGlobal, onSelectPane },
-      )
+      shell({ pane: 1, global: 0 }, { onShowGlobal, onSelectPane })
 
       fireEvent.keyDown(document.body, { key: 'ArrowRight' })
       expect(onShowGlobal).toHaveBeenCalledExactlyOnceWith(0)
@@ -879,15 +882,15 @@ describe('App', () => {
     })
 
     it('still selects with `↓` on the global screen; the route clears it', async () => {
-      // No key is rebound below the breakpoint (D217 (5)): the map is
+      // No key is rebound below the breakpoint (D218 (5)): the map is
       // bound on the document, so `↓` selects from the global screen as
-      // it does from anywhere.
+      // it does from the list.
       const onSelectRun = vi.fn()
       const onShowGlobal = vi.fn()
-      shell({ run: 'aaaa1111bbbb', global: 0 }, { onSelectRun, onShowGlobal })
+      shell({ global: 0 }, { onSelectRun, onShowGlobal })
 
       await userEvent.keyboard('{ArrowDown}')
-      expect(onSelectRun).toHaveBeenCalledWith('cccc3333dddd')
+      expect(onSelectRun).toHaveBeenCalledWith('aaaa1111bbbb')
       // The write that takes the screen down is the route's, in the same
       // navigation (`routes/__tests__/AppRoute.test.tsx`).
       expect(onShowGlobal).not.toHaveBeenCalled()
@@ -904,7 +907,18 @@ describe('App', () => {
       expect(screen.getByTestId('pane-label')).toHaveTextContent('OVERVIEW (1/3)')
       expect(screen.getByTestId('selected-run')).toHaveTextContent('aaaa1111bbbb')
       expect(screen.queryByRole('button', { name: 'global panes' })).toBeNull()
-      expect(screen.queryByRole('button', { name: 'back to the run' })).toBeNull()
+    })
+
+    it('is inert with no run too: the desktop’s global view, and no button', () => {
+      // With nothing selected the detail is the global panes at `md`
+      // and above anyway; `?global=` adds nothing to it and is left in
+      // the URL for the phone that wrote it.
+      shell({ global: 0 })
+
+      expect(screen.getByTestId('pane-label')).toHaveTextContent('INBOX (1/1)')
+      expect(screen.getByRole('region', { name: 'runs' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'global panes' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'back to runs' })).toBeNull()
     })
 
     it('is not a rung for `esc`: the selection clears straight away', () => {
@@ -1046,7 +1060,7 @@ describe('the palette’s plugin actions', () => {
     try {
       const onOpenAction = vi.fn()
       shell(
-        { overlay: 'palette', run: 'aaaa1111bbbb', global: 0 },
+        { overlay: 'palette', global: 0 },
         { manifest: WITH_ACTIONS, onOpenAction },
       )
 

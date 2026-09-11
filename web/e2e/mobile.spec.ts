@@ -1,7 +1,7 @@
 /**
  * The dashboard on a phone: the six flows of `docs/v1/21-design-refresh.md`
  * §Touch operation, and every overlay of 10 §Overlays, at 390×844 with a
- * finger (T082, D194, D197, D216, D217).
+ * finger (T082, D194, D197, D216, D218).
  *
  * **Everything here is a `tap()`.** A `click()` that passes says nothing
  * about whether a touch device can operate the app: it is dispatched at
@@ -163,7 +163,7 @@ test('the five touch flows: list, detail, panes, an answer, a new run', async ({
   await noHorizontalScroll(page)
 })
 
-test('the sixth touch flow: the line — list, detail, global — and back along it', async ({
+test('the sixth touch flow: the three screens — global | list | detail — and the swipes between them', async ({
   dashboard,
 }) => {
   const page = dashboard.page
@@ -175,31 +175,19 @@ test('the sixth touch flow: the line — list, detail, global — and back along
   const row = dashboard.row(TITLE)
   await expect(row).toBeVisible()
 
-  // -- the list is the root of the line (D217): there is no `global
-  //    panes` button on it, and a swipe either way moves nothing — a
-  //    run is chosen by tapping its row.
+  // -- the list is the middle of the row (D218): a swipe left would be
+  //    the detail, which is never swiped to — a run is chosen by tapping
+  //    its row — so the list stays.
   const list = page.locator('main[data-stacked="list"]')
   await expect(list).toBeVisible()
-  await expect(dashboard.globalPanes()).toHaveCount(0)
-  await dashboard.swipe('right')
-  await expect(list).toBeVisible()
-  expect(new URL(page.url()).searchParams.get('run')).toBeNull()
   await dashboard.swipe('left')
   await expect(list).toBeVisible()
   expect(new URL(page.url()).searchParams.get('run')).toBeNull()
+  expect(new URL(page.url()).searchParams.get('global')).toBeNull()
   await noHorizontalScroll(page)
 
-  await row.tap()
-  const runId = new URL(page.url()).searchParams.get('run')
-  expect(runId).not.toBeNull()
-
-  // Two panes in, so that coming back has somewhere to come back *to*.
-  await dashboard.nextPane().tap()
-  await expect(dashboard.paneLabel()).toHaveText(/\(2\/\d+\)/)
-  const paneUrl = new URL(page.url()).searchParams.get('pane')
-
   // -- the button: the discoverable route (21 §Touch operation: nothing
-  //    reachable only via a gesture), drawn on the detail and the global
+  //    reachable only via a gesture), drawn on the list and the global
   //    screen — the two the swipe joins.
   await tappable(dashboard.globalPanes())
   await expect(dashboard.globalPanes()).toHaveAttribute('aria-pressed', 'false')
@@ -212,10 +200,10 @@ test('the sixth touch flow: the line — list, detail, global — and back along
     '_builtin:inbox',
   )
   await expect(dashboard.paneLabel()).toHaveText(/INBOX \(1\/\d+\)/)
-  // `?run=` and `?pane=` are untouched underneath; `?global=` is up.
+  // Nothing is selected — the screen sits beside the list; `?global=`
+  // is up.
   let url = new URL(page.url())
-  expect(url.searchParams.get('run')).toBe(runId)
-  expect(url.searchParams.get('pane')).toBe(paneUrl)
+  expect(url.searchParams.get('run')).toBeNull()
   expect(url.searchParams.get('global')).toBe('0')
   await contained(page, page.locator('[data-region="detail"]'))
 
@@ -232,23 +220,20 @@ test('the sixth touch flow: the line — list, detail, global — and back along
   await expect(dashboard.openRequest('question')).toBeVisible({ timeout: RUN_TIMEOUT })
   await noHorizontalScroll(page)
 
-  // -- `←` in the bar: back to the run, on the pane it was on. The
-  //    screen is always over a run, so that is the control's one label.
-  await tappable(dashboard.backToRun())
-  await dashboard.backToRun().tap()
-  const detail = page.locator('main[data-stacked="detail"]')
-  await expect(detail).toBeVisible()
-  await expect(dashboard.paneLabel()).toHaveText(/\(2\/\d+\)/)
+  // -- `←` in the bar: back to the list, labelled as the detail's is
+  //    because both go there (D218).
+  await tappable(dashboard.back())
+  await dashboard.back().tap()
+  await expect(list).toBeVisible()
+  await expect(row).toBeVisible()
   url = new URL(page.url())
   expect(url.searchParams.get('global')).toBeNull()
-  expect(url.searchParams.get('run')).toBe(runId)
+  expect(url.searchParams.get('run')).toBeNull()
   await noHorizontalScroll(page)
 
-  // -- the gesture walks the line: a swipe right on the detail is one
-  //    screen away from the list, a swipe left is one towards it. From
-  //    the global screen, left lands on the pane of the run it left;
-  //    from the detail, left is the `←` — the list, with nothing
-  //    selected.
+  // -- the gesture, from the list: a swipe right reaches the global
+  //    screen; another swipe right there is the row's end and moves
+  //    nothing; a swipe left puts the screen away.
   await dashboard.swipe('right')
   await expect(global).toBeVisible()
   await expect(dashboard.paneLabel()).toHaveText(/INBOX/)
@@ -256,25 +241,42 @@ test('the sixth touch flow: the line — list, detail, global — and back along
   await dashboard.swipe('right')
   await expect(global).toBeVisible()
   await expect(dashboard.paneLabel()).toHaveText(/INBOX/)
-  await dashboard.swipe('left')
-  await expect(detail).toBeVisible()
-  await expect(dashboard.paneLabel()).toHaveText(/\(2\/\d+\)/)
-  await noHorizontalScroll(page)
   await dashboard.swipe('left')
   await expect(list).toBeVisible()
   await expect(row).toBeVisible()
-  await expect(dashboard.back()).toHaveCount(0)
-  await expect(dashboard.globalPanes()).toHaveCount(0)
-  url = new URL(page.url())
-  expect(url.searchParams.get('run')).toBeNull()
-  expect(url.searchParams.get('global')).toBeNull()
+  expect(new URL(page.url()).searchParams.get('global')).toBeNull()
   await noHorizontalScroll(page)
 
-  // -- a swipe that starts in the edge is the browser's, not ours — and
-  //    on the list a swipe right goes nowhere anyway: the list stays.
+  // -- a swipe that starts in the edge is the browser's, not ours: the
+  //    list stays, and the global screen is not opened.
   await dashboard.swipe('right', 8)
   await expect(list).toBeVisible()
   await expect(global).toHaveCount(0)
+  await noHorizontalScroll(page)
+
+  // -- the detail: reached only by a tap; no `global panes` button, a
+  //    swipe left is the row's other end, and a swipe right is the `←`
+  //    — the list, with nothing selected.
+  await row.tap()
+  const detail = page.locator('main[data-stacked="detail"]')
+  await expect(detail).toBeVisible()
+  const runId = new URL(page.url()).searchParams.get('run')
+  expect(runId).not.toBeNull()
+  await expect(dashboard.globalPanes()).toHaveCount(0)
+  await dashboard.nextPane().tap()
+  await expect(dashboard.paneLabel()).toHaveText(/\(2\/\d+\)/)
+  await dashboard.swipe('left')
+  await expect(detail).toBeVisible()
+  await expect(dashboard.paneLabel()).toHaveText(/\(2\/\d+\)/)
+  expect(new URL(page.url()).searchParams.get('run')).toBe(runId)
+  await noHorizontalScroll(page)
+  await dashboard.swipe('right')
+  await expect(list).toBeVisible()
+  await expect(row).toBeVisible()
+  await expect(dashboard.back()).toHaveCount(0)
+  url = new URL(page.url())
+  expect(url.searchParams.get('run')).toBeNull()
+  expect(url.searchParams.get('global')).toBeNull()
   await noHorizontalScroll(page)
 })
 

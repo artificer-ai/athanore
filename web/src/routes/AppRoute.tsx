@@ -23,9 +23,10 @@ export function AppRoute() {
         // its own, so a click and a pasted link end in the same state.
         // `?node=` goes with it: a node filter is one run's graph, and
         // carrying it to the next run would filter that run's log to a
-        // node it may not have. `?global=` goes too: selecting a run is
-        // how the detail stops showing the global panes and starts
-        // showing the run's (21 §Narrow layout, D216).
+        // node it may not have. `?global=` goes too: `↓` on the narrow
+        // global screen selects a run, and selecting one is how the
+        // middle stops showing the global panes and starts showing the
+        // run's (21 §Narrow layout, D216, D218).
         void navigate({
           search: (prev) => ({ ...prev, run: runId, node: undefined, global: undefined }),
         })
@@ -120,24 +121,25 @@ export function AppRoute() {
         // The narrow global screen (21 §Narrow layout, D216): `?global=`
         // is the global cycle's own index, present while the screen is
         // up. `undefined` is how it is left — the router drops the key,
-        // as it does for `overlay` — and `?run=` and `?pane=` are not
-        // touched either way, which is what lands a swipe back on the
-        // pane of the run the operator was on.
+        // as it does for `overlay` — and `?pane=` is not touched either
+        // way: it is the operator's attention (10 §Panes) and the next
+        // run they open lands on it, as it would had they never left
+        // the list (D218).
         void navigate({ search: (prev) => ({ ...prev, global: index }) })
       }}
       onClearRun={() => {
         // Nothing is selected any more. Three callers say that: the
         // delete confirm, once the run is gone — a selection that no
         // longer exists would point the detail pane at a 404 — and the
-        // pane bar's narrow back control and the swipe left that shares
+        // pane bar's narrow back control and the swipe right that shares
         // its write, for which "back to the list" *is* "nothing is
         // selected" (21 §Narrow layout). Either way `?node=` and
-        // `?task=` were about that run too, and so is `?global=`: the
-        // narrow global screen is always over a run (D217), so the
-        // screen goes with the thing under it — a run deleted from the
-        // palette while it is up lands on the list, and the `←` and the
-        // swipe leave nothing behind. At `md` and above the key is
-        // inert and clearing it is harmless.
+        // `?task=` were about that run too, and `?global=` goes with
+        // them: it is inert beside `?run=` (D218 (1)), and were it left
+        // in place, clearing the run would land the operator on the
+        // global screen instead of the list the `←` and the swipe
+        // promise (D218 (3)). At `md` and above the key is inert and
+        // clearing it is harmless.
         void navigate({
           search: (prev) => ({
             ...prev,

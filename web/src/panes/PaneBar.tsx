@@ -25,10 +25,11 @@
  *
  * On the **narrow global screen** (D216) the bar is over the global
  * cycle and `leave` is given: the left slot draws one control, `←`,
- * labelled `back to the run` — the screen is always over a run (D217),
- * so the slot has one label — and neither the selection's back control
- * nor the collapse toggle beside it, the screen being narrow-only and
- * `panes.run` `undefined` there anyway. The right slot stays gated on
+ * labelled `back to runs` like the detail's — the screen sits beside
+ * the list and the list is where both go (D218) — and neither the
+ * selection's back control nor the collapse toggle beside it, the
+ * screen being narrow-only and `panes.run` `undefined` there anyway.
+ * The right slot stays gated on
  * `panes.runId` and so draws nothing, exactly as the desktop's global
  * view does. The dots need no new colour: run panes and global panes
  * are never in one row, and the inbox is a builtin (neutral-800) while
@@ -72,7 +73,7 @@ export function PaneBar({
   /**
    * Given while the bar is over the narrow global screen: the left slot
    * is then that screen's `←` alone, and this puts the screen away —
-   * `?global=` cleared, the run under it untouched (D216, D217).
+   * `?global=` cleared, the list beside it shown (D216, D218).
    */
   leave?: (() => void) | undefined
 }) {
@@ -90,13 +91,12 @@ export function PaneBar({
           are different wishes. */}
       {leave !== undefined ? (
         // The global screen's own `←`: it clears `?global=` and nothing
-        // else, so the run — and the pane of it — under the screen is
-        // where it lands (D216, D217).
+        // else, and the list is what shows (D216, D218).
         <button
           type="button"
           onClick={leave}
-          aria-label="back to the run"
-          title="back to the run (esc)"
+          aria-label="back to runs"
+          title="back to runs (esc)"
           className={`${BACK} ${TOUCH}`}
         >
           ←

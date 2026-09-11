@@ -110,11 +110,11 @@ describe('Detail', () => {
   it('hands the global screen’s way back to the bar', async () => {
     // `leave` is passed through for the same reason `onBack` is: the bar
     // is where the left slot is (D216), and it reaches it as `back to
-    // the run` — the screen is always over a run (D217).
+    // runs` — the screen sits beside the list (D218).
     const onLeave = vi.fn()
     render(<Detail panes={model()} leave={onLeave} />)
 
-    await userEvent.click(screen.getByRole('button', { name: 'back to the run' }))
+    await userEvent.click(screen.getByRole('button', { name: 'back to runs' }))
     expect(onLeave).toHaveBeenCalledOnce()
     // ...and the empty-cycle copy is right here too: no global pane at
     // all is a manifest with no `inbox`, which reads as nothing selected.

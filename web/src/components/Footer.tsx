@@ -22,9 +22,9 @@
  * touch target there. It is a toggle, `aria-pressed` while the screen
  * is up, and the discoverable route: the swipe that does the same is
  * not one a screen reader has, and 21 §Touch operation lets nothing be
- * reachable only via a gesture. It is drawn on the detail and the
+ * reachable only via a gesture. It is drawn on the list and the
  * global screen — the two narrow screens the swipe joins — and not on
- * the list, which has no gesture to twin (D217 (4)); the shell decides
+ * the detail, which has no gesture to twin (D218 (4)); the shell decides
  * when to pass `global` (D201 (2)), and the class hides the button
  * above the breakpoint regardless, so a desktop render is what it was.
  * It carries no request count — the tab title and the inbox's own
@@ -52,8 +52,8 @@ export function Footer({
   /**
    * The narrow global screen's button: whether the screen is up, and
    * what flips it. Absent above the breakpoint, where there is no such
-   * screen (D216), and on the narrow list, which has no swipe to it
-   * (D217).
+   * screen (D216), and on the narrow detail, which has no swipe to it
+   * (D218).
    */
   global?: { pressed: boolean; onToggle: () => void } | undefined
 }) {

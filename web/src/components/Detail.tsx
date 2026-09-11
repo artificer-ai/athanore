@@ -59,7 +59,7 @@ export function Detail({
   onBack?: (() => void) | undefined
   /**
    * The narrow global screen's way back (21 §Regions, narrow, D216,
-   * D217): given while this detail is drawn over the global cycle below
+   * D218): given while this detail is drawn over the global cycle below
    * the breakpoint, and handed to the bar unchanged for the same reason
    * `onBack` is. The empty-cycle copy below is right there too — `no
    * run selected` means the manifest answered with no global pane at
