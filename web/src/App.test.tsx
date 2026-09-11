@@ -57,7 +57,11 @@ const RUNS: RunSummary[] = [
   },
 ]
 
-/** The three builtin panes a pane bar has something to cycle with. */
+/**
+ * The three builtin run panes a pane bar has something to cycle with,
+ * and the one global pane every build has: the inbox (09 §Builtins),
+ * which is what the narrow global screen shows (D216).
+ */
 const MANIFEST: PluginManifestEntry[] = [
   {
     workflow: '_builtin',
@@ -65,6 +69,14 @@ const MANIFEST: PluginManifestEntry[] = [
       { name: 'overview', slot: 'run', placement: 'pane', scope: 'run', kind: 'custom' },
       { name: 'log', slot: 'run', placement: 'pane', scope: 'run', kind: 'custom' },
       { name: 'agent', slot: 'run', placement: 'pane', scope: 'run', kind: 'custom' },
+      {
+        name: 'inbox',
+        slot: 'global',
+        placement: 'pane',
+        scope: 'global',
+        kind: 'custom',
+        element: 'ath-requests',
+      },
     ],
   },
 ]
@@ -176,6 +188,7 @@ function shell(
     onOpenNode?: (node: string, pane: number | undefined) => void
     onOpenAction?: (action: string) => void
     onClearRun?: () => void
+    onShowGlobal?: (index: number | undefined) => void
     manifest?: PluginManifestEntry[]
   } = {},
 ) {
@@ -223,6 +236,9 @@ function shell(
           ? {}
           : { onOpenAction: over.onOpenAction })}
         {...(over.onClearRun === undefined ? {} : { onClearRun: over.onClearRun })}
+        {...(over.onShowGlobal === undefined
+          ? {}
+          : { onShowGlobal: over.onShowGlobal })}
       />
     </QueryClientProvider>,
   )
@@ -684,6 +700,177 @@ describe('App', () => {
       await userEvent.keyboard('{ArrowDown}')
       expect(onSelectRun).toHaveBeenCalledWith('aaaa1111bbbb')
     })
+
+    /* The narrow global screen (21 §Narrow layout, D216). */
+
+    it('shows the global panes over a run while `?global=` is set', () => {
+      shell({ run: 'aaaa1111bbbb', pane: 1, global: 0 })
+
+      // The detail region, over the global cycle: the inbox, and nothing
+      // about the run that is still selected underneath.
+      expect(screen.getByRole('main')).toHaveAttribute('data-stacked', 'global')
+      expect(screen.getByRole('region', { name: 'detail' })).toBeInTheDocument()
+      expect(screen.getByTestId('pane-label')).toHaveTextContent('INBOX (1/1)')
+      expect(screen.getByTestId('pane-body')).toHaveAttribute(
+        'data-pane',
+        '_builtin:inbox',
+      )
+      expect(screen.queryByTestId('selected-run')).toBeNull()
+      expect(screen.getByRole('button', { name: 'back to the run' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'back to runs' })).toBeNull()
+      expect(screen.queryByRole('region', { name: 'runs' })).toBeNull()
+    })
+
+    it('shows the global panes over nothing, with the list as the way back', () => {
+      shell({ global: 0 })
+
+      expect(screen.getByRole('main')).toHaveAttribute('data-stacked', 'global')
+      expect(screen.getByTestId('pane-label')).toHaveTextContent('INBOX (1/1)')
+      expect(screen.getByRole('button', { name: 'back to runs' })).toBeInTheDocument()
+      expect(screen.queryByRole('region', { name: 'runs' })).toBeNull()
+    })
+
+    it('opens and closes the global screen from the footer button', async () => {
+      const onShowGlobal = vi.fn()
+      shell({ run: 'aaaa1111bbbb' }, { onShowGlobal })
+
+      const button = screen.getByRole('button', { name: 'global panes' })
+      expect(button).toHaveAttribute('aria-pressed', 'false')
+      await userEvent.click(button)
+      expect(onShowGlobal).toHaveBeenCalledExactlyOnceWith(0)
+
+      cleanup()
+      onShowGlobal.mockClear()
+      shell({ run: 'aaaa1111bbbb', global: 0 }, { onShowGlobal })
+
+      const pressed = screen.getByRole('button', { name: 'global panes' })
+      expect(pressed).toHaveAttribute('aria-pressed', 'true')
+      await userEvent.click(pressed)
+      expect(onShowGlobal).toHaveBeenCalledExactlyOnceWith(undefined)
+    })
+
+    it('leaves the global screen from the bar’s `←`, and the run stays', async () => {
+      const onShowGlobal = vi.fn()
+      const onClearRun = vi.fn()
+      shell({ run: 'aaaa1111bbbb', global: 0 }, { onShowGlobal, onClearRun })
+
+      await userEvent.click(screen.getByRole('button', { name: 'back to the run' }))
+      expect(onShowGlobal).toHaveBeenCalledExactlyOnceWith(undefined)
+      expect(onClearRun).not.toHaveBeenCalled()
+    })
+
+    it('opens the global screen on a swipe right, and closes it on a swipe left', () => {
+      const onShowGlobal = vi.fn()
+      const { rerender, queryClient } = shell({ run: 'aaaa1111bbbb' }, { onShowGlobal })
+      const swipe = (from: number, to: number) => {
+        const main = screen.getByRole('main')
+        fireEvent.touchStart(main, { touches: [{ clientX: from, clientY: 400 }] })
+        fireEvent.touchEnd(main, { changedTouches: [{ clientX: to, clientY: 400 }] })
+      }
+
+      // On the detail: right opens, left is nothing — a swipe left on
+      // the detail does not go back to the list.
+      swipe(260, 100)
+      expect(onShowGlobal).not.toHaveBeenCalled()
+      swipe(100, 260)
+      expect(onShowGlobal).toHaveBeenCalledExactlyOnceWith(0)
+
+      // On the global screen: left closes, right is nothing — it does
+      // not write `0` over the pane the screen is on.
+      onShowGlobal.mockClear()
+      rerender(
+        <QueryClientProvider client={queryClient}>
+          <App
+            search={{ run: 'aaaa1111bbbb', global: 1 }}
+            onSelectRun={() => {}}
+            onSelectPane={() => {}}
+            onOpenPalette={() => {}}
+            onShowGlobal={onShowGlobal}
+          />
+        </QueryClientProvider>,
+      )
+      swipe(100, 260)
+      expect(onShowGlobal).not.toHaveBeenCalled()
+      swipe(260, 100)
+      expect(onShowGlobal).toHaveBeenCalledExactlyOnceWith(undefined)
+    })
+
+    it('unwinds the global screen on `esc`, after an overlay and before the run', () => {
+      const onShowGlobal = vi.fn()
+      const onClearRun = vi.fn()
+      const onCloseOverlay = vi.fn()
+      shell(
+        { run: 'aaaa1111bbbb', global: 0, overlay: 'keys' },
+        { onShowGlobal, onClearRun, onCloseOverlay },
+      )
+
+      fireEvent.keyDown(document.body, { key: 'Escape' })
+      expect(onCloseOverlay).toHaveBeenCalledOnce()
+      expect(onShowGlobal).not.toHaveBeenCalled()
+
+      cleanup()
+      onCloseOverlay.mockClear()
+      shell(
+        { run: 'aaaa1111bbbb', global: 0 },
+        { onShowGlobal, onClearRun, onCloseOverlay },
+      )
+
+      fireEvent.keyDown(document.body, { key: 'Escape' })
+      expect(onShowGlobal).toHaveBeenCalledExactlyOnceWith(undefined)
+      expect(onClearRun).not.toHaveBeenCalled()
+      expect(onCloseOverlay).not.toHaveBeenCalled()
+    })
+
+    it('cycles the global panes with the keyboard, not the run’s', () => {
+      // One pane model, keyed off the screen: `→` moves `?global=`, and
+      // `?pane=` — the run's own pane — is never written from here.
+      const onShowGlobal = vi.fn()
+      const onSelectPane = vi.fn()
+      shell(
+        { run: 'aaaa1111bbbb', pane: 1, global: 0 },
+        { onShowGlobal, onSelectPane },
+      )
+
+      fireEvent.keyDown(document.body, { key: 'ArrowRight' })
+      expect(onShowGlobal).toHaveBeenCalledExactlyOnceWith(0)
+      expect(onSelectPane).not.toHaveBeenCalled()
+    })
+
+    it('still selects with `↓` on the global screen; the route clears it', async () => {
+      const onSelectRun = vi.fn()
+      const onShowGlobal = vi.fn()
+      shell({ global: 0 }, { onSelectRun, onShowGlobal })
+
+      await userEvent.keyboard('{ArrowDown}')
+      expect(onSelectRun).toHaveBeenCalledWith('aaaa1111bbbb')
+      // The write that takes the screen down is the route's, in the same
+      // navigation (`routes/__tests__/AppRoute.test.tsx`).
+      expect(onShowGlobal).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('`?global=` above the breakpoint', () => {
+    it('is inert: the run’s panes show, and there is no button', () => {
+      // Kept, not cleared, like `listCollapsed` below the breakpoint
+      // (D194): a phone's link opened on a desktop shows the run it
+      // names, and narrowing the window again brings the screen back.
+      shell({ run: 'aaaa1111bbbb', global: 0 })
+
+      expect(screen.getByTestId('pane-label')).toHaveTextContent('OVERVIEW (1/3)')
+      expect(screen.getByTestId('selected-run')).toHaveTextContent('aaaa1111bbbb')
+      expect(screen.queryByRole('button', { name: 'global panes' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'back to the run' })).toBeNull()
+    })
+
+    it('is not a rung for `esc`: the selection clears straight away', () => {
+      const onShowGlobal = vi.fn()
+      const onClearRun = vi.fn()
+      shell({ run: 'aaaa1111bbbb', global: 0 }, { onShowGlobal, onClearRun })
+
+      fireEvent.keyDown(document.body, { key: 'Escape' })
+      expect(onClearRun).toHaveBeenCalledOnce()
+      expect(onShowGlobal).not.toHaveBeenCalled()
+    })
   })
 
   it('opens a picker on the selected run', async () => {
@@ -801,6 +988,32 @@ describe('the palette’s plugin actions', () => {
       'data-action',
       'override',
     )
+  })
+
+  it('lists the global view’s catalogue on the narrow global screen', () => {
+    // The screen shows every workflow's global panes, so the palette
+    // lists every workflow's actions, resolved against no run — the
+    // catalogue the desktop's global view has (D216). `gamedev`'s
+    // global action is what a `gamedev` global pane's operator wants;
+    // `feature_build`'s run-scoped one is listed and disabled, as it is
+    // on the desktop with nothing selected.
+    narrowViewport()
+    try {
+      const onOpenAction = vi.fn()
+      shell(
+        { overlay: 'palette', run: 'aaaa1111bbbb', global: 0 },
+        { manifest: WITH_ACTIONS, onOpenAction },
+      )
+
+      expect(screen.getByRole('group', { name: 'plugin: gamedev' })).toBeInTheDocument()
+      expect(command('Reseed the dictionary')).not.toHaveAttribute(
+        'aria-disabled',
+        'true',
+      )
+      expect(command('Override secret word')).toHaveAttribute('aria-disabled', 'true')
+    } finally {
+      wideViewport()
+    }
   })
 })
 

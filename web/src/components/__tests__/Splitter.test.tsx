@@ -1,6 +1,6 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   DEFAULT_LIST_WIDTH,
@@ -146,5 +146,69 @@ describe('Splitter', () => {
     expect(usePrefs.getState().listCollapsed).toBe(false)
     expect(screen.getByText('the runs')).toBeInTheDocument()
     expect(screen.getByRole('separator')).toBeInTheDocument()
+  })
+
+  describe('stacked', () => {
+    /** A finger down at `from`, up at `to`, on the stacked middle. */
+    function drag(from: number, to: number) {
+      const main = screen.getByRole('main')
+      fireEvent.touchStart(main, { touches: [{ clientX: from, clientY: 400 }] })
+      fireEvent.touchEnd(main, { changedTouches: [{ clientX: to, clientY: 400 }] })
+    }
+
+    it('draws the detail slot as the global screen, and says so', () => {
+      // The third stacked state (D216): the same `detail` slot — the
+      // shell hands it a `Detail` over the global cycle — marked for
+      // the test that wants to know which screen this is.
+      render(
+        <Splitter
+          count={34}
+          list={<p>the runs</p>}
+          detail={<p>the pane</p>}
+          stacked="global"
+        />,
+      )
+
+      expect(screen.getByRole('main')).toHaveAttribute('data-stacked', 'global')
+      expect(screen.getByText('the pane')).toBeInTheDocument()
+      expect(screen.queryByText('the runs')).toBeNull()
+      expect(screen.queryByRole('separator')).toBeNull()
+    })
+
+    it('reads a swipe on the stacked middle', () => {
+      const onSwipe = vi.fn()
+      render(
+        <Splitter
+          count={34}
+          list={<p>the runs</p>}
+          detail={<p>the pane</p>}
+          stacked="list"
+          onSwipe={onSwipe}
+        />,
+      )
+
+      drag(100, 260)
+      expect(onSwipe).toHaveBeenCalledExactlyOnceWith('right')
+      onSwipe.mockClear()
+      drag(260, 100)
+      expect(onSwipe).toHaveBeenCalledExactlyOnceWith('left')
+    })
+
+    it('listens to nothing in the split layout', () => {
+      // The gesture is a property of the stacked middle; the desktop
+      // split has none, however the shell is called.
+      const onSwipe = vi.fn()
+      render(
+        <Splitter
+          count={34}
+          list={<p>the runs</p>}
+          detail={<p>the pane</p>}
+          onSwipe={onSwipe}
+        />,
+      )
+
+      drag(100, 260)
+      expect(onSwipe).not.toHaveBeenCalled()
+    })
   })
 })

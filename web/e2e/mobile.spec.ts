@@ -1,7 +1,7 @@
 /**
- * The dashboard on a phone: the five flows of `docs/v1/21-design-refresh.md`
+ * The dashboard on a phone: the six flows of `docs/v1/21-design-refresh.md`
  * §Touch operation, and every overlay of 10 §Overlays, at 390×844 with a
- * finger (T082, D194, D197).
+ * finger (T082, D194, D197, D216).
  *
  * **Everything here is a `tap()`.** A `click()` that passes says nothing
  * about whether a touch device can operate the app: it is dispatched at
@@ -160,6 +160,100 @@ test('the five touch flows: list, detail, panes, an answer, a new run', async ({
   await expect(dashboard.status(TITLE)).toHaveText('completed', {
     timeout: RUN_TIMEOUT,
   })
+  await noHorizontalScroll(page)
+})
+
+test('the sixth touch flow: the global panes, from a run and back to its pane', async ({
+  dashboard,
+}) => {
+  const page = dashboard.page
+  await dashboard.open()
+  // `probe`'s first node asks for a permission, which lands in the inbox
+  // — the one global pane every build has (09 §Builtins) and the one
+  // that was unreachable at this width before D216.
+  await dashboard.submit('probe', TITLE, 'tap')
+  await dashboard.row(TITLE).tap()
+  const runId = new URL(page.url()).searchParams.get('run')
+  expect(runId).not.toBeNull()
+
+  // Two panes in, so that coming back has somewhere to come back *to*.
+  await dashboard.nextPane().tap()
+  await expect(dashboard.paneLabel()).toHaveText(/\(2\/\d+\)/)
+  const paneUrl = new URL(page.url()).searchParams.get('pane')
+
+  // -- the button: the discoverable route (21 §Touch operation: nothing
+  //    reachable only via a gesture).
+  await tappable(dashboard.globalPanes())
+  await expect(dashboard.globalPanes()).toHaveAttribute('aria-pressed', 'false')
+  await dashboard.globalPanes().tap()
+  const global = page.locator('main[data-stacked="global"]')
+  await expect(global).toBeVisible()
+  await expect(dashboard.globalPanes()).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByTestId('pane-body')).toHaveAttribute(
+    'data-pane',
+    '_builtin:inbox',
+  )
+  await expect(dashboard.paneLabel()).toHaveText(/INBOX \(1\/\d+\)/)
+  // `?run=` and `?pane=` are untouched underneath; `?global=` is up.
+  let url = new URL(page.url())
+  expect(url.searchParams.get('run')).toBe(runId)
+  expect(url.searchParams.get('pane')).toBe(paneUrl)
+  expect(url.searchParams.get('global')).toBe('0')
+  await contained(page, page.locator('[data-region="detail"]'))
+
+  // -- the controls work from here: the permission is answered in the
+  //    inbox, by tapping the option the server offered (D10).
+  const permission = dashboard.openRequest('permission')
+  await expect(permission).toBeVisible({ timeout: RUN_TIMEOUT })
+  await expect(page.getByTestId('pane-inbox')).toBeVisible()
+  await contained(page, permission)
+  await dashboard.answer(permission, 'allow', 'tap')
+  // The inbox holds open requests only, so the answer shows as the next
+  // thing the run asks: the node after it puts a question to the
+  // operator, which lands here too.
+  await expect(dashboard.openRequest('question')).toBeVisible({ timeout: RUN_TIMEOUT })
+  await noHorizontalScroll(page)
+
+  // -- `←` in the bar: back to the run, on the pane it was on.
+  await tappable(dashboard.backToRun())
+  await dashboard.backToRun().tap()
+  await expect(page.locator('main[data-stacked="detail"]')).toBeVisible()
+  await expect(dashboard.paneLabel()).toHaveText(/\(2\/\d+\)/)
+  url = new URL(page.url())
+  expect(url.searchParams.get('global')).toBeNull()
+  expect(url.searchParams.get('run')).toBe(runId)
+  await noHorizontalScroll(page)
+
+  // -- the gesture: swipe right opens, swipe left closes, and the run's
+  //    pane is still where it was.
+  await dashboard.swipe('right')
+  await expect(global).toBeVisible()
+  await expect(dashboard.paneLabel()).toHaveText(/INBOX/)
+  await noHorizontalScroll(page)
+  await dashboard.swipe('left')
+  await expect(page.locator('main[data-stacked="detail"]')).toBeVisible()
+  await expect(dashboard.paneLabel()).toHaveText(/\(2\/\d+\)/)
+  await noHorizontalScroll(page)
+
+  // -- over the list: the same screen with nothing selected under it,
+  //    and `back to runs` as its way back.
+  await dashboard.back().tap()
+  await expect(page.locator('main[data-stacked="list"]')).toBeVisible()
+  await dashboard.swipe('right')
+  await expect(global).toBeVisible()
+  await expect(dashboard.back()).toBeVisible()
+  await expect(dashboard.backToRun()).toHaveCount(0)
+  await noHorizontalScroll(page)
+  await dashboard.swipe('left')
+  await expect(page.locator('main[data-stacked="list"]')).toBeVisible()
+  await expect(dashboard.row(TITLE)).toBeVisible()
+  await noHorizontalScroll(page)
+
+  // -- a swipe that starts in the edge is the browser's, not ours: the
+  //    list stays where it is.
+  await dashboard.swipe('right', 8)
+  await expect(page.locator('main[data-stacked="list"]')).toBeVisible()
+  await expect(global).toHaveCount(0)
   await noHorizontalScroll(page)
 })
 

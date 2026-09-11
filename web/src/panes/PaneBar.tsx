@@ -22,6 +22,17 @@
  * route through the pane cycle — and grow to the 24×24 px hit area WCAG
  * 2.5.8 asks of a touch target, the dots by way of a transparent box
  * around the 14×3 px bar rather than by drawing a bigger bar.
+ *
+ * On the **narrow global screen** (D216) the bar is over the global
+ * cycle and `leave` is given: the left slot draws one control, `←`,
+ * labelled `back to the run` or `back to runs` by what is under the
+ * screen, and neither the selection's back control nor the collapse
+ * toggle beside it — the screen is narrow-only and `panes.run` is
+ * `undefined` there anyway. The right slot stays gated on `panes.runId`
+ * and so draws nothing, exactly as the desktop's global view does. The
+ * dots need no new colour: run panes and global panes are never in one
+ * row, and the inbox is a builtin (neutral-800) while a plugin's global
+ * pane is a plugin's (accent-800), the same mapping as everywhere.
  */
 import { RadioGroup } from 'radix-ui'
 
@@ -34,9 +45,25 @@ import type { PaneModel } from './usePanes'
 /** The touch target of WCAG 2.5.8, on the controls narrow chrome has. */
 const TOUCH = 'max-md:min-h-[24px] max-md:min-w-[24px]'
 
+/** The classes the left slot's `←` carries, whichever way it goes. */
+const BACK =
+  'text-hint flex items-center justify-center rounded-lg border border-border px-[6px] py-px text-muted-foreground hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)]'
+
+/**
+ * The narrow global screen's way back: what is under the screen, and
+ * what clears `?global=` (21 §Regions, narrow, D216).
+ */
+export type PaneLeave = {
+  /** `run` while `?run=` is set under the screen, `list` otherwise. */
+  to: 'list' | 'run'
+  /** Put the screen away. */
+  onLeave: () => void
+}
+
 export function PaneBar({
   panes,
   onBack,
+  leave,
 }: {
   panes: PaneModel
   /**
@@ -52,6 +79,11 @@ export function PaneBar({
    * handler.
    */
   onBack?: (() => void) | undefined
+  /**
+   * Given while the bar is over the narrow global screen: the left slot
+   * is then that screen's `←` alone (D216).
+   */
+  leave?: PaneLeave | undefined
 }) {
   const listCollapsed = usePrefs((s) => s.listCollapsed)
   const setListCollapsed = usePrefs((s) => s.setListCollapsed)
@@ -65,18 +97,34 @@ export function PaneBar({
           rather than a mode of the collapse toggle: wide, both are
           useful at once — hide the list, and stop looking at this run
           are different wishes. */}
-      {onBack !== undefined && run !== undefined && (
+      {leave !== undefined ? (
+        // The global screen's own `←`: it clears `?global=` and nothing
+        // else, so the run — and the pane of it — under the screen is
+        // where it lands (D216).
         <button
           type="button"
-          onClick={onBack}
-          aria-label={narrow ? 'back to runs' : 'clear the selected run'}
-          title={narrow ? 'back to runs' : 'clear the selected run (esc)'}
-          className={`text-hint flex items-center justify-center rounded-lg border border-border px-[6px] py-px text-muted-foreground hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)] ${TOUCH}`}
+          onClick={leave.onLeave}
+          aria-label={leave.to === 'run' ? 'back to the run' : 'back to runs'}
+          title={leave.to === 'run' ? 'back to the run (esc)' : 'back to runs (esc)'}
+          className={`${BACK} ${TOUCH}`}
         >
           ←
         </button>
+      ) : (
+        onBack !== undefined &&
+        run !== undefined && (
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label={narrow ? 'back to runs' : 'clear the selected run'}
+            title={narrow ? 'back to runs' : 'clear the selected run (esc)'}
+            className={`${BACK} ${TOUCH}`}
+          >
+            ←
+          </button>
+        )
       )}
-      {!narrow && !listCollapsed && (
+      {leave === undefined && !narrow && !listCollapsed && (
         <button
           type="button"
           onClick={() => setListCollapsed(true)}

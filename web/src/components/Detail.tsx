@@ -22,7 +22,7 @@
  * measure, so `PaneRenderer` is given the height and decides what to do
  * with it (10 §Panes).
  */
-import { PaneBar } from '../panes/PaneBar'
+import { PaneBar, type PaneLeave } from '../panes/PaneBar'
 import { PaneRenderer } from '../panes/PaneRenderer'
 import type { PaneModel } from '../panes/usePanes'
 import { useUi } from '../store/ui'
@@ -36,6 +36,7 @@ export function Detail({
   onOpenNode,
   onOpenLibrary,
   onBack,
+  leave,
 }: {
   panes: PaneModel
   /** The focused attempt, from `?task=`: a `task`-scoped panel's id. */
@@ -56,6 +57,15 @@ export function Detail({
    * here, because the bar is where the left slot is.
    */
   onBack?: (() => void) | undefined
+  /**
+   * The narrow global screen's way back (21 §Regions, narrow, D216):
+   * given while this detail is drawn over the global cycle below the
+   * breakpoint, and handed to the bar unchanged for the same reason
+   * `onBack` is. The empty-cycle copy below is right there too — `no
+   * run selected` means the manifest answered with no global pane at
+   * all, which no build with the builtins has.
+   */
+  leave?: PaneLeave | undefined
 }) {
   const focused = useUi((s) => s.focus === 'detail')
   const setFocus = useUi((s) => s.setFocus)
@@ -69,7 +79,7 @@ export function Detail({
       onFocusCapture={() => setFocus('detail')}
       className="flex h-full min-h-0 min-w-0 flex-1 flex-col"
     >
-      <PaneBar panes={panes} onBack={onBack} />
+      <PaneBar panes={panes} onBack={onBack} leave={leave} />
 
       {/* The panel is `PaneRenderer`'s; what the host owns is the three
           states in which there is no panel to draw. */}

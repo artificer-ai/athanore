@@ -107,6 +107,19 @@ describe('Detail', () => {
     expect(usePrefs.getState().listCollapsed).toBe(true)
   })
 
+  it('hands the global screen’s way back to the bar', async () => {
+    // `leave` is passed through for the same reason `onBack` is: the bar
+    // is where the left slot is (D216).
+    const onLeave = vi.fn()
+    render(<Detail panes={model()} leave={{ to: 'run', onLeave }} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'back to the run' }))
+    expect(onLeave).toHaveBeenCalledOnce()
+    // ...and the empty-cycle copy is right here too: no global pane at
+    // all is a manifest with no `inbox`, which reads as nothing selected.
+    expect(screen.getByRole('status')).toHaveTextContent('no run selected')
+  })
+
   it('drops the collapse toggle once the list is collapsed', () => {
     usePrefs.setState({ listCollapsed: true })
     render(<Detail panes={model()} />)

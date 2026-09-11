@@ -297,6 +297,59 @@ export class Dashboard {
     return this.page.getByRole('button', { name: 'back to runs' })
   }
 
+  /**
+   * The footer's `global panes` toggle: the discoverable route to the
+   * narrow global screen (21 §Regions, narrow, D216).
+   */
+  globalPanes(): Locator {
+    return this.page.getByRole('button', { name: 'global panes' })
+  }
+
+  /** The global screen's `←`, while a run is selected under it. */
+  backToRun(): Locator {
+    return this.page.getByRole('button', { name: 'back to the run' })
+  }
+
+  /**
+   * A horizontal swipe across the middle of the screen, as a finger
+   * makes one: through CDP's touch pipeline, not a synthetic
+   * `TouchEvent`.
+   *
+   * D197's reason applies to a gesture as it does to a tap: a
+   * `dispatchEvent` from inside the page would prove the handler and
+   * nothing about the browser's touch pipeline. The suite is Chromium
+   * only (`playwright.config.ts`), so CDP is available to every test.
+   * Both ends sit inside the 24 px edges the recogniser leaves to the
+   * browser's own back gesture, with 200 px of travel between them
+   * (`src/lib/useSwipe.ts`); `startX` is for the one test that wants to
+   * start *in* the edge and see nothing happen.
+   */
+  async swipe(
+    direction: 'left' | 'right',
+    startX?: number,
+  ): Promise<void> {
+    const y = 500
+    const x0 = startX ?? (direction === 'right' ? 100 : 300)
+    const x1 = x0 + (direction === 'right' ? 200 : -200)
+    const cdp = await this.page.context().newCDPSession(this.page)
+    try {
+      await cdp.send('Input.dispatchTouchEvent', {
+        type: 'touchStart',
+        touchPoints: [{ x: x0, y }],
+      })
+      const steps = 4
+      for (let i = 1; i <= steps; i += 1) {
+        await cdp.send('Input.dispatchTouchEvent', {
+          type: 'touchMove',
+          touchPoints: [{ x: x0 + ((x1 - x0) * i) / steps, y }],
+        })
+      }
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] })
+    } finally {
+      await cdp.detach()
+    }
+  }
+
   /** The pane bar's `▶`: the touch route through the pane cycle. */
   nextPane(): Locator {
     return this.page.getByRole('button', { name: 'next pane' })

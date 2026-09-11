@@ -77,6 +77,12 @@ vi.mock('../../App', () => ({
         <button type="button" onClick={call('onClearRun')}>
           clear run
         </button>
+        <button type="button" onClick={call('onShowGlobal', 1)}>
+          show global
+        </button>
+        <button type="button" onClick={call('onShowGlobal', undefined)}>
+          leave global
+        </button>
       </div>
     )
   },
@@ -112,6 +118,14 @@ describe('the selection', () => {
     await press(router, 'select run', '?run=cccc3333&pane=1')
   })
 
+  it('takes the narrow global screen down when a run is selected', async () => {
+    // Selecting a run is how the detail stops showing the global panes
+    // and starts showing the run's (D216).
+    const router = mount('/?run=aaaa1111&pane=1&global=0')
+
+    await press(router, 'select run', '?run=cccc3333&pane=1')
+  })
+
   it('writes `?pane=` and leaves the rest of the search alone', async () => {
     const router = mount('/?run=aaaa1111&node=engineering')
 
@@ -124,6 +138,51 @@ describe('the selection', () => {
     const router = mount('/?run=aaaa1111&pane=1&node=qa&task=405')
 
     await press(router, 'clear run', '?pane=1')
+  })
+
+  it('leaves the global screen where it is when the run under it goes', async () => {
+    // A run deleted from the palette while the global screen is up
+    // leaves the operator on the global screen with nothing selected
+    // under it, which is a sound state (D216).
+    const router = mount('/?run=aaaa1111&pane=1&global=0')
+
+    await press(router, 'clear run', '?pane=1&global=0')
+  })
+
+  it('leaves the global screen alone when the run’s pane changes', async () => {
+    const router = mount('/?run=aaaa1111&global=0')
+
+    await press(router, 'select pane', '?run=aaaa1111&pane=2&global=0')
+  })
+})
+
+describe('the narrow global screen', () => {
+  it('writes `?global=` and touches neither `?run=` nor `?pane=`', async () => {
+    // One parameter carries the screen and its pane; the run's own pane
+    // is what a swipe back lands on (21 §Narrow layout, D216).
+    const router = mount('/?run=aaaa1111&pane=1')
+
+    await press(router, 'show global', '?run=aaaa1111&pane=1&global=1')
+  })
+
+  it('writes it away to leave, so back works on it', async () => {
+    const router = mount('/?run=aaaa1111&pane=1&global=1')
+
+    await press(router, 'leave global', '?run=aaaa1111&pane=1')
+  })
+
+  it('comes down when a graph row opens the log pane', async () => {
+    // `onOpenNode` names a run pane by index, which means nothing on a
+    // screen showing a different cycle.
+    const router = mount('/?run=aaaa1111&pane=0&global=0')
+
+    await press(router, 'open node', '?run=aaaa1111&pane=1&node=review')
+  })
+
+  it('comes down when the task drawer hands over to the agent pane', async () => {
+    const router = mount('/?run=aaaa1111&overlay=task&task=404&pane=0&global=0')
+
+    await press(router, 'focus stream', '?run=aaaa1111&pane=2&task=405')
   })
 })
 
