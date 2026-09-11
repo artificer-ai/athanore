@@ -1,6 +1,6 @@
 /**
  * `ActionForm`: a form generated from a JSON Schema, in the app's own
- * idiom (`docs/v1/10-frontend.md` §Plugin renderers, D49).
+ * idiom.
  *
  * RJSF and not a schema walker of our own: `@rjsf/core` with the
  * `@rjsf/shadcn` theme and `validator-ajv8` (02 §Library choices). The

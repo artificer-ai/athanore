@@ -1,7 +1,6 @@
 /**
  * Running one of a workflow's declared actions: the form, the confirm,
- * and the one POST (`docs/v1/09-plugins.md` §Declarations, §Wire
- * contract; `docs/v1/10-frontend.md` §Plugin renderers).
+ * and the one POST.
  *
  * One component in two places — the `form` panel kind
  * (`panes/kinds/Form.tsx`) and the palette's action overlay

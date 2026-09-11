@@ -1,8 +1,7 @@
 /**
  * The `placement="card"` panels of the selected run, drawn as cards
- * under the overview pane (`docs/v1/09-plugins.md` §Slots — a `run`
- * panel is "a pane in the selected run's cycle … or a card appended to
- * the overview pane"; 15, D163).
+ * under the overview pane (a `run` panel is "a pane in the selected
+ * run's cycle … or a card appended to the overview pane"; 15, D163).
  *
  * A card is a panel like any other: it declares a `kind` and a `source`,
  * it is fetched and narrowed the same way, and it draws through the same

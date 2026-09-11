@@ -1,6 +1,6 @@
 /**
  * The detail region on the right: the pane bar and the pane's scrolling
- * body (`docs/v1/10-frontend.md` §Layout).
+ * body.
  *
  * It owns neither the bar nor the cycle nor the pane. The bar is
  * `panes/PaneBar`, which panes there are comes from the manifest through

@@ -1,6 +1,6 @@
 /**
  * The pane host: which panes exist, the bar over them, and what one
- * draws (`docs/v1/10-frontend.md` §Panes, §Plugin renderers).
+ * draws.
  *
  * What the shell reaches for. The pieces inside — a panel's source, the
  * kind renderers — are imported by path from within this directory;

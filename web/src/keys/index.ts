@@ -1,6 +1,6 @@
 /**
- * The keyboard map of `docs/v1/10-frontend.md` §Keyboard: one listener,
- * and the scopes that decide when it is off (T067).
+ * The keyboard map: one listener, and the scopes that decide when it is
+ * off (T067).
  *
  * The table itself — the keycaps, their labels and the groups the `?`
  * overlay draws them under — is `lib/keys.ts`, which the footer and that

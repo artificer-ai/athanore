@@ -1,8 +1,6 @@
 /**
- * The graph pane: the run's shape as a React Flow canvas
- * (`docs/v1/10-frontend.md` §Graph pane and §Panes item 5, over `GET
- * /api/runs/{id}/graph` of `docs/v1/08-api.md` §Graph semantics, and the
- * mock's `isGraph` block in `docs/v1/design/Athanore.dc.html`).
+ * The graph pane: the run's shape as a React Flow canvas, over `GET
+ * /api/runs/{id}/graph`, drawn as the mock's `isGraph` block draws it.
  *
  * `WORKFLOW GRAPH · <workflow>` with the active / done / failed legend,
  * then one card per node — a glyph, the name, a detail line, and a chip

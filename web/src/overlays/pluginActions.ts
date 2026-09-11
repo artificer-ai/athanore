@@ -1,7 +1,6 @@
 /**
  * The palette's `plugin: <workflow>` sections: a workflow's declared
- * actions, as rows (`docs/v1/09-plugins.md` §Declarations,
- * `docs/v1/10-frontend.md` §Overlays).
+ * actions, as rows.
  *
  * `./actions.ts` is the app's own catalogue and this is the manifest's,
  * kept apart because they are decided by different things: the app's

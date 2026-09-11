@@ -1,8 +1,7 @@
 /**
  * What the four pickers are, minus the drawing of them: which of a run's
  * attempts each one may act on, which nodes it may send one to, and what
- * it says when there is nothing to pick (`docs/v1/10-frontend.md`
- * §Overlays, `docs/v1/04-engine.md` §Operator operations).
+ * it says when there is nothing to pick.
  *
  * A module of its own for the reason `./newRun.ts` and `./library.ts`
  * are: a file that exports a component and a function is one React Fast

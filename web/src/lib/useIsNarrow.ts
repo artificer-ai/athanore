@@ -1,6 +1,5 @@
 /**
- * Whether the viewport is below the SPA's one breakpoint
- * (`docs/v1/21-design-refresh.md` §Narrow layout, D194).
+ * Whether the viewport is below the SPA's one breakpoint.
  *
  * Tailwind's `md`, 768 px, splits the app into its two layouts, and
  * almost all of that split is CSS: a `max-md:` utility is the cheaper

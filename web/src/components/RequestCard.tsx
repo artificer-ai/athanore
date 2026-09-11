@@ -1,9 +1,7 @@
 /**
  * One request, as both surfaces that list them draw it: the requests
  * pane of a run (`panes/kinds/Requests.tsx`) and the global inbox
- * (`./Inbox.tsx`), which are the same card in two scopes
- * (`docs/v1/10-frontend.md` §Panes item 4, `docs/v1/06-requests.md`
- * §Surfaces).
+ * (`./Inbox.tsx`), which are the same card in two scopes.
  *
  * Who asked, when, what, and then either the answer that was given or
  * the controls that give one. The controls are `RequestPanel`, the same

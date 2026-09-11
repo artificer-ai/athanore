@@ -1,13 +1,12 @@
 /**
  * The plugin manifest: everything the browser knows about panes.
  *
- * `GET /api/plugins` is the whole of it (`docs/v1/09-plugins.md` §Wire
- * contract) — the builtins included, because the core's own panes are
- * declared through the same API (09 §Builtins are plugins). It is
- * fetched at boot and again whenever the event feed reconnects to a
- * process with a new `started_at`: the manifest only changes on restart,
- * so there is no event for it, and `src/realtime/sse.ts` is what
- * refetches it.
+ * `GET /api/plugins` is the whole of it — the builtins included, because
+ * the core's own panes are declared through the same API (09 §Builtins
+ * are plugins). It is fetched at boot and again whenever the event feed
+ * reconnects to a process with a new `started_at`: the manifest only
+ * changes on restart, so there is no event for it, and
+ * `src/realtime/sse.ts` is what refetches it.
  *
  * Reading it is also what registers the panels' `refresh_on` names in
  * the invalidation table — "at manifest load" (10 §Realtime and

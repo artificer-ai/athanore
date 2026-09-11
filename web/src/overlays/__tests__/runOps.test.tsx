@@ -1,7 +1,6 @@
 /**
- * `overlays/runOps.ts`: the five run-level operator operations of
- * `docs/v1/04-engine.md` §Operator operations that are a key and a
- * palette row rather than a panel (`docs/v1/08-api.md` §Runs).
+ * `overlays/runOps.ts`: the five run-level operator operations that are
+ * a key and a palette row rather than a panel.
  *
  * `pauseDirection` is tested without a DOM because it is a rule of 04;
  * the calls are tested through a component, because they are `useMutation`

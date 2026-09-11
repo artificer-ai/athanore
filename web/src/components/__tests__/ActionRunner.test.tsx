@@ -1,7 +1,6 @@
 /**
  * `ActionRunner`: the form, the confirm, and the one POST
- * (`components/ActionRunner.tsx`, `docs/v1/09-plugins.md` §Declarations,
- * §Wire contract).
+ * (`components/ActionRunner.tsx`).
  *
  * The suite asserts on **what went out on the wire**, because that is
  * where the rules live: `confirm=true` means nothing was sent until the

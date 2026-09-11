@@ -1,8 +1,6 @@
 /**
  * The inbox: every open request across every run, newest first, with the
- * count in its header (`components/Inbox.tsx`,
- * `docs/v1/06-requests.md` §Surfaces, `docs/v1/10-frontend.md` §Panes
- * item 4 and §Attention).
+ * count in its header (`components/Inbox.tsx`).
  *
  * Three things worth being strict about:
  *

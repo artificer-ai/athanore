@@ -1,7 +1,6 @@
 /**
  * `Pickers`: the four palette-style lists and the one `POST` each of
- * them ends in (`overlays/Pickers.tsx`, `docs/v1/10-frontend.md`
- * §Overlays, `docs/v1/04-engine.md` §Operator operations).
+ * them ends in (`overlays/Pickers.tsx`).
  *
  * The suite asserts on **what went out on the wire**, because that is
  * the whole of what a picker does and because the four look identical

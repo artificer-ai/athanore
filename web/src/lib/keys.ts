@@ -1,13 +1,13 @@
 /**
- * The keyboard map of `docs/v1/10-frontend.md` §Keyboard, as data.
+ * The keyboard map, as data.
  *
- * That section is one sentence long and exhaustive — "exactly the mock's
- * map, which is the TUI's" — and three parts of the app have to agree
- * with it: the footer strip's chips, the `?` overlay that is "the footer
- * chips, expanded" (10 §Overlays), and the handler that binds the keys
- * (T067). Three hand-written copies of one table is three places a new
- * binding can be forgotten, so there is one table and they are three
- * views of it.
+ * The specification's keyboard map is one sentence long and exhaustive —
+ * "exactly the mock's map, which is the TUI's" — and three parts of the
+ * app have to agree with it: the footer strip's chips, the `?` overlay
+ * that is "the footer chips, expanded" (10 §Overlays), and the handler
+ * that binds the keys (T067). Three hand-written copies of one table is
+ * three places a new binding can be forgotten, so there is one table
+ * and they are three views of it.
  *
  * It lives in `lib/` because of who reads it: `components/Footer.tsx`
  * and `overlays/Keys.tsx` are on either side of the app's one import

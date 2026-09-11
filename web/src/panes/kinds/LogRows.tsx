@@ -1,6 +1,6 @@
 /**
  * The rows of a log, in a scroller that follows the end: the mock's
- * `time · source · message` grid (`docs/v1/10-frontend.md` §Panes).
+ * `time · source · message` grid.
  *
  * Two panes draw it. `./LogPane.tsx` is the `log` *kind* any plugin may
  * declare (09 §Panel kinds), and `./Log.tsx` is the builtin event log,

@@ -1,5 +1,5 @@
 /**
- * The AGE column's clock (`docs/v1/10-frontend.md` §Layout, §Panes).
+ * The AGE column's clock.
  *
  * The mock writes ages as `4m`, `55m`, `1.0h`, `15.3h`, `2.6d`, `16.7d`:
  * one unit, chosen by magnitude, with a decimal once the unit is coarse

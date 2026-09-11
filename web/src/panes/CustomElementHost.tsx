@@ -1,7 +1,6 @@
 /**
  * A `custom` panel this build has no renderer for: the plugin's own web
- * component, mounted (`docs/v1/09-plugins.md` §Escape hatch, 10
- * §Plugin renderers).
+ * component, mounted.
  *
  * "A `custom` panel renders `<the-tag run-id=… task-id=… node=…>` inside
  * a thin React wrapper." This is the wrapper, and thin is the whole

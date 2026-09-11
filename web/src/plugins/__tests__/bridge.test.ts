@@ -1,6 +1,6 @@
 /**
  * `window.athanore`: the three capabilities, and the boundary around
- * each (`../bridge.ts`, `docs/v1/09-plugins.md` §Escape hatch).
+ * each (`../bridge.ts`).
  *
  * The boundary is the subject. A plugin's JavaScript runs in the
  * operator's browser with the operator's token (12 §Plugins) — that is

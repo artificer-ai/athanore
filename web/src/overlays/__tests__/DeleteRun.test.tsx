@@ -1,7 +1,6 @@
 /**
- * `DeleteRun`: the one confirm of `docs/v1/10-frontend.md` §Keyboard
- * (`overlays/DeleteRun.tsx`, `docs/v1/04-engine.md` §Operator
- * operations, `docs/v1/08-api.md` §Runs).
+ * `DeleteRun`: the one confirm in the keyboard map
+ * (`overlays/DeleteRun.tsx`).
  *
  * `delete(run)` is the only operator operation that destroys anything,
  * so the suite is mostly about what does *not* go out: an overlay that

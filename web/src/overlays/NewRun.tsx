@@ -1,7 +1,6 @@
 /**
  * The New Run overlay (`n`, and the palette's first row): the form that
- * queues a run of a workflow (`docs/v1/10-frontend.md` §Overlays, D34,
- * D57).
+ * queues a run of a workflow.
  *
  * The mock's panel, field for field — `NEW RUN` over `⌘⏎ submit · esc
  * cancel`, a WORKFLOW chip group, TITLE, DESCRIPTION, then POSITION and

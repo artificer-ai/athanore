@@ -2,8 +2,7 @@
  * What the requests pane reads out of a `RequestView`: which of the
  * three states a request is in, the order the cards are drawn in, the
  * bounded tool-call summary a permission carries, and the answer as
- * text (`docs/v1/06-requests.md` §The model, `docs/v1/10-frontend.md`
- * §Panes item 4).
+ * text.
  *
  * Separate from `./Requests.tsx` for the reason `./format.ts` is
  * separate from the renderers that use it: a module that exports both a

@@ -1,6 +1,6 @@
 /**
- * `useKeymap`: `docs/v1/10-frontend.md` §Keyboard, and the scoping that
- * is the reason 10 moved delete off `d` and onto `D` (D51).
+ * `useKeymap`: the keyboard map, and the scoping that is the reason 10
+ * moved delete off `d` and onto `D` (D51).
  *
  * The map is asserted against the catalogue it dispatches on rather than
  * against a second list written here: every palette row that carries a

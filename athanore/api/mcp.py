@@ -173,9 +173,9 @@ FREE_OBJECT: Final[dict[str, Any]] = {
 # --------------------------------------------------------------------------
 # 08 §MCP: "Tool descriptions carry the same wording as the 19 kickoff so
 # the model's instructions and its tools agree." Every line below is a
-# line of `docs/v1/19-agent-prompts.md` — the sentence that names the
-# capability, with the curl mechanics that belong to the `http` tier left
-# out, because in this tier the tool *is* the mechanics.
+# line of the kickoff prompt — the sentence that names the capability,
+# with the curl mechanics that belong to the `http` tier left out,
+# because in this tier the tool *is* the mechanics.
 # `tests/api/test_mcp.py` reads the document back and checks that each
 # line is still in it, so a change to 19 cannot leave these behind.
 

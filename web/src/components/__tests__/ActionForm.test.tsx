@@ -1,7 +1,6 @@
 /**
  * `ActionForm`: a JSON Schema in, a value out, and a server's refusal
- * landing on the field that caused it (`components/ActionForm.tsx`,
- * `docs/v1/10-frontend.md` §Plugin renderers, D49).
+ * landing on the field that caused it (`components/ActionForm.tsx`).
  *
  * Two things this suite is deliberately strict about:
  *

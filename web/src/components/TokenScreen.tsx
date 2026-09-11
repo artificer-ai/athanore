@@ -1,7 +1,6 @@
 /**
  * `TokenScreen`: what a network bind asks the operator for, and the one
- * place the answer is kept (`docs/v1/10-frontend.md` §Auth in the
- * browser, 12 §Operator token).
+ * place the answer is kept.
  *
  * On the default loopback deployment this is never drawn: `/api/me`
  * reports `auth: "off"`, nothing is asked, and 12's "a machine that

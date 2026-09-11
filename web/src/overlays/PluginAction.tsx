@@ -1,6 +1,5 @@
 /**
- * The palette's plugin actions, run (`docs/v1/09-plugins.md`
- * §Declarations, `docs/v1/10-frontend.md` §Overlays).
+ * The palette's plugin actions, run.
  *
  * The palette lists what the app can do and nothing else (`./actions.ts`),
  * so a plugin's action listed there has to be runnable from there — and

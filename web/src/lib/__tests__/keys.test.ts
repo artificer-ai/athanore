@@ -1,7 +1,7 @@
 /**
- * `lib/keys.ts` against `docs/v1/10-frontend.md` §Keyboard.
+ * `lib/keys.ts` against the specification's keyboard map.
  *
- * The section is one sentence, and it is quoted here verbatim: the test
+ * The map is one sentence, and it is quoted here verbatim: the test
  * pulls every keycap out of the quotation and asserts the table carries
  * all of them. That is the only check that catches the failure this
  * table exists to prevent — a binding in the spec that nobody

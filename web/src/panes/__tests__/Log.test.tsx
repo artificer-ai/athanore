@@ -1,7 +1,6 @@
 /**
  * The event log pane: what it draws from the builtin's merged list, what
- * `?node=` narrows it to, and what the composer does with a note
- * (`docs/v1/10-frontend.md` §Panes item 2).
+ * `?node=` narrows it to, and what the composer does with a note.
  *
  * The rows are the route's own answer (`./fixtures.ts`, `EVENT_LOG`),
  * narrowed by `asLog` exactly as the pane host narrows it, so what is

@@ -1,6 +1,5 @@
 /**
- * A horizontal swipe on one element, read by touch
- * (`docs/v1/21-design-refresh.md` §Touch operation, D216).
+ * A horizontal swipe on one element, read by touch.
  *
  * The three narrow screens fan around the list — global | list |
  * detail — and a swipe on the middle region is one screen along that

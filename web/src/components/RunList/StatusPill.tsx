@@ -1,6 +1,6 @@
 /**
- * The status pill (`docs/v1/10-frontend.md` §Components): an outlined
- * badge carrying the status word in its status colour.
+ * The status pill: an outlined badge carrying the status word in its
+ * status colour.
  *
  * The border is neutral, as it is in the mock's pane bar — the colour is
  * the text's — and the word is always there, because 10 §Accessibility

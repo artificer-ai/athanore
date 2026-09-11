@@ -1,7 +1,6 @@
 /**
  * The agent pane: which attempt it follows, what one chunk becomes, and
- * how a chunk that arrives while it is open reaches it
- * (`docs/v1/10-frontend.md` §Panes item 3 and §Plugin renderers).
+ * how a chunk that arrives while it is open reaches it.
  *
  * The third of those is the point of the task and is asserted on the
  * **request**, not on the output: a pane that refetched the whole

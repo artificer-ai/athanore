@@ -1,8 +1,7 @@
 /**
  * The graph pane: where the canvas puts each node, which arrow it draws
  * between them, the chips a fan-out gives a node, and what the detail
- * line says (`docs/v1/10-frontend.md` §Graph pane, `docs/v1/08-api.md`
- * §Graph semantics).
+ * line says.
  *
  * Three fixtures, which are the three shapes a run can have: linear with
  * a loop-back, a fan-out that never closes, and the same fan-out closed

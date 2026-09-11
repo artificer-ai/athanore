@@ -1,7 +1,7 @@
 /**
  * The event log pane: what happened to a run, in one list, and the one
- * place an operator writes into it (`docs/v1/10-frontend.md` §Panes item
- * 2, and the mock's `isLog` block in `docs/v1/design/Athanore.dc.html`).
+ * place an operator writes into it, drawn as the mock's `isLog` block
+ * draws it.
  *
  * `EVENT LOG · n lines · ● tailing/○ complete` over `time · source ·
  * message` rows, a `?node=` filter the graph pane links into, and a

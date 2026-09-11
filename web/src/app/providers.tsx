@@ -2,10 +2,9 @@
  * The providers the whole app sits inside.
  *
  * One of them, for now: TanStack Query, whose cache is the SPA's copy of
- * every server resource (`docs/v1/10-frontend.md` §Stack). The router is
- * mounted underneath it rather than around it, because `AppGate` decides
- * whether there is an app to route at all — and it decides that from a
- * query.
+ * every server resource. The router is mounted underneath it rather
+ * than around it, because `AppGate` decides whether there is an app to
+ * route at all — and it decides that from a query.
  *
  * The defaults are `src/api/client.ts`'s, and the client it makes is the
  * one the generated fetch client reads its credential from, so there is

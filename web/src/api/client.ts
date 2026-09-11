@@ -1,7 +1,6 @@
 /**
  * The SPA's one way to the server: the generated fetch client, wired to
- * this origin, and the TanStack Query client that caches what it fetches
- * (`docs/v1/10-frontend.md` §Stack, §Realtime and caching).
+ * this origin, and the TanStack Query client that caches what it fetches.
  *
  * Nothing in the app calls `fetch` itself. The client, its types and its
  * query options are generated from the committed OpenAPI snapshot

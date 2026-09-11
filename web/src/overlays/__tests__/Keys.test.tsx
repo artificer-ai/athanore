@@ -1,6 +1,5 @@
 /**
- * `Keys`: "the footer chips, expanded" (`overlays/Keys.tsx`,
- * `docs/v1/10-frontend.md` §Overlays and §Keyboard).
+ * `Keys`: "the footer chips, expanded" (`overlays/Keys.tsx`).
  *
  * The suite **iterates the table** rather than naming rows, so a binding
  * added to `lib/keys.ts` — which `lib/__tests__/keys.test.ts` holds

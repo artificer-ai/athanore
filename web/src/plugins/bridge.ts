@@ -1,6 +1,6 @@
 /**
  * `window.athanore`: the whole of what a plugin's web component may
- * reach (`docs/v1/09-plugins.md` §Escape hatch).
+ * reach.
  *
  * ```ts
  * window.athanore = {

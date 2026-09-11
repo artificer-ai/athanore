@@ -1,10 +1,10 @@
 /**
  * `usePrefs` — the operator's own settings, persisted to `localStorage`.
  *
- * The split against the URL is the one `docs/v1/10-frontend.md` §Layout
- * draws: what makes a view *that view* goes in the search params
- * (`src/routes/search.ts`), and what is personal to this browser lives
- * here. A list width is not worth putting in a link; a selected run is.
+ * The split against the URL: what makes a view *that view* goes in the
+ * search params (`src/routes/search.ts`), and what is personal to this
+ * browser lives here. A list width is not worth putting in a link; a
+ * selected run is.
  *
  * The token is here rather than in a cookie because 10 §Auth in the
  * browser says so: on a network bind the SPA stores the operator token
@@ -50,8 +50,7 @@ function viewportWidth(): number {
 }
 
 /**
- * The four steps of the UI type scale, smallest first
- * (`docs/v1/21-design-refresh.md` §Type scale, D195).
+ * The four steps of the UI type scale, smallest first.
  *
  * The whole ramp is a fraction of the `<html>` font size, so one of
  * these rescales every size in the app together; the generated

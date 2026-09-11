@@ -1,6 +1,6 @@
 /**
  * `AppRoute`: the shell's callbacks, written into the URL
- * (`../AppRoute.tsx`, `docs/v1/10-frontend.md` §Layout).
+ * (`../AppRoute.tsx`).
  *
  * The route is the one place the app navigates from. The shell holds no
  * selection state of its own — "selection is the URL" — so each of these

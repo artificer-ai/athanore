@@ -1,7 +1,5 @@
 /**
- * The `form` panel kind: the action's own form, in a pane
- * (`docs/v1/09-plugins.md` §Panel kinds, `docs/v1/10-frontend.md`
- * §Plugin renderers).
+ * The `form` panel kind: the action's own form, in a pane.
  *
  * It is the one kind whose `source` is not a URL. A `form` panel names
  * an **action** of the same workflow — registration refuses one that

@@ -2,7 +2,7 @@
  * The four pickers (`t` retry, `m` move, `x` cancel task, `r` rerun
  * node, and the palette rows that open them): "a palette-style list of
  * the selected run's tasks (node, attempt, status) and, for move/rerun,
- * a second list of nodes" (`docs/v1/10-frontend.md` §Overlays).
+ * a second list of nodes".
  *
  * One component and not four, because they are one thing: a list, a
  * choice, and the `POST` that choice names (08 §Runs, §Tasks). What each

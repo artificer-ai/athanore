@@ -2,9 +2,9 @@
  * Reading a refusal the API sent.
  *
  * The generated client throws the parsed error body — `{error, code}`,
- * the API's one error shape (`docs/v1/08-api.md` §Conventions) — rather
- * than an `Error`, so every surface that prints what a request was
- * refused with reads the same two shapes and assumes neither.
+ * the API's one error shape — rather than an `Error`, so every surface
+ * that prints what a request was refused with reads the same two shapes
+ * and assumes neither.
  */
 
 /** What a refused request said, or `fallback` when it said nothing. */

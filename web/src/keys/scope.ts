@@ -1,8 +1,8 @@
 /**
  * Who owns the keyboard, and where `a`/`d` are live.
  *
- * `docs/v1/10-frontend.md` §Keyboard is one global map with two rules
- * cut out of it: "shortcuts are suppressed inside inputs", and
+ * The keyboard map is one global map with two rules cut out of it:
+ * "shortcuts are suppressed inside inputs", and
  * "requests add `a` allow / `d` deny **when the request panel has
  * focus**". The first is a property of the event's target and belongs to
  * the handler (`./useKeymap.ts`); the other two are properties of what

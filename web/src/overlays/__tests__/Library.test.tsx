@@ -1,7 +1,6 @@
 /**
  * `Library`: the mock's panel, the source behind its right-hand column,
- * and the anchor `open definition` lands on (`overlays/Library.tsx`,
- * `docs/v1/10-frontend.md` §Overlays, D35).
+ * and the anchor `open definition` lands on (`overlays/Library.tsx`).
  *
  * Two things this suite insists on beyond "it rendered":
  *

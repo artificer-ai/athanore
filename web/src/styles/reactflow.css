@@ -1,8 +1,7 @@
 /* React Flow, in Nocturne (10 §Graph pane, D206 (1) and (8)).
  *
- * Unlike its neighbour theme.css, which is generated from
- * docs/v1/design/nocturne.css by `pnpm gen:theme`, this file is
- * hand-written. It does one thing: map the `--xy-*` variables
+ * Unlike its neighbour theme.css, which `pnpm gen:theme` generates,
+ * this file is hand-written. It does one thing: map the `--xy-*` variables
  * @xyflow/react's own stylesheet reads onto the Nocturne tokens, scoped
  * to `.react-flow`, so nothing the graph pane draws is a hex and nothing
  * here needs `!important`.

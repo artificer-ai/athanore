@@ -1,7 +1,6 @@
 /**
- * The overview pane: what a run cost, what it is, and what it did
- * (`docs/v1/10-frontend.md` §Panes item 1, and the mock's `isOverview`
- * block in `docs/v1/design/Athanore.dc.html`).
+ * The overview pane: what a run cost, what it is, and what it did,
+ * drawn as the mock's `isOverview` block draws it.
  *
  * Five sections, the mock's four in its order with one inserted — the
  * STATS tiles with the per-node token bars under them, the two-column

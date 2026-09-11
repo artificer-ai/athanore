@@ -1,7 +1,6 @@
 /**
  * `overlays/pickers.ts`: which attempts and which nodes each of the four
- * pickers may offer (`docs/v1/10-frontend.md` §Overlays,
- * `docs/v1/04-engine.md` §Operator operations).
+ * pickers may offer.
  *
  * These are the rules the server enforces, asserted on the client that
  * has to agree with it: a row the picker offers and the op refuses is a

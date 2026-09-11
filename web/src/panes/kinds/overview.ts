@@ -1,6 +1,6 @@
 /**
- * How the overview pane reads what its source sent
- * (`docs/v1/10-frontend.md` §Panes — "Field sources").
+ * How the overview pane reads what its source sent — its "field
+ * sources".
  *
  * Separate from `./Overview.tsx` for the reason `./format.ts` is
  * separate from the renderers: a component module that also exports

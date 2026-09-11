@@ -1,6 +1,6 @@
 /**
  * The app's toast surface: Sonner, bottom-right, on Nocturne's surface
- * with a neutral-800 rule (`docs/v1/10-frontend.md` §Components).
+ * with a neutral-800 rule.
  *
  * A toast is for what an operator could not have prevented and cannot
  * correct — the `409` that means somebody else answered the request they

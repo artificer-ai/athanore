@@ -1,7 +1,6 @@
 /**
  * The custom-element table: which tag this build draws itself, and what
- * it draws it with (`docs/v1/09-plugins.md` §Escape hatch, §Builtins are
- * plugins).
+ * it draws it with.
  *
  * A `custom` panel names a tag. Two kinds of tag reach the pane host and
  * both arrive the same way — through the manifest, as data:

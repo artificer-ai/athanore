@@ -1,6 +1,6 @@
 /**
- * The data shapes of `docs/v1/09-plugins.md` §Panel kinds, and the
- * narrowing that decides whether a `source` answered with one.
+ * The data shapes of the panel kinds, and the narrowing that decides
+ * whether a `source` answered with one.
  *
  * A panel's data arrives as `unknown`: it comes from a route the wire
  * contract does not describe (09 §Builtins are plugins — "a plugin route

@@ -1,7 +1,5 @@
 /**
- * The palette's `plugin: <workflow>` rows (`../pluginActions.ts`,
- * `docs/v1/09-plugins.md` §Declarations, `docs/v1/10-frontend.md`
- * §Overlays).
+ * The palette's `plugin: <workflow>` rows (`../pluginActions.ts`).
  *
  * The palette lists what the app can do and nothing else, so what is
  * asserted here is that every declared action is listed, that a row the

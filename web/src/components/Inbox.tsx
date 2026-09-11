@@ -1,7 +1,5 @@
 /**
- * The inbox: every open request across every run, newest first
- * (`docs/v1/06-requests.md` §Surfaces, `docs/v1/10-frontend.md` §Panes
- * item 4).
+ * The inbox: every open request across every run, newest first.
  *
  * The `global` twin of the requests pane. Both are the `<ath-requests>`
  * element of `athanore/plugins/builtin/requests.py`, and what tells them

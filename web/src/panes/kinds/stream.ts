@@ -1,7 +1,6 @@
 /**
  * How the agent pane reads a transcript: which attempt it is about, and
- * what one chunk becomes (`docs/v1/10-frontend.md` §Panes item 3 and
- * §Plugin renderers, over `StreamChunk` of 03 §StreamChunk).
+ * what one chunk becomes, over `StreamChunk` of 03 §StreamChunk.
  *
  * Separate from `./AgentStream.tsx` for the reason `./log.ts` is
  * separate from `./Log.tsx`: a component module that also exports

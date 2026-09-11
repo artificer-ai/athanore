@@ -34,6 +34,10 @@ KEYWORD = re.compile(r"\b(" + "|".join(KEYWORDS) + r")\b")
 #: `docs/site/mkdocs.yml` links it, and no page and no skill names it.
 SPEC = "docs/v1"
 
+#: The per-task plans, the other developer-only tree. Named beside
+#: `SPEC` wherever a user-facing tree is checked for it.
+PLANS = "docs/plans"
+
 
 def keywords(text: str) -> list[str]:
     """Every capitalised RFC 2119 keyword in ``text``."""

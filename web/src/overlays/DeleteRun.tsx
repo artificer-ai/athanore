@@ -1,6 +1,6 @@
 /**
  * The delete confirm (`D`, and the palette's `delete run`): the one
- * overlay `docs/v1/10-frontend.md` §Keyboard marks "(with confirm)".
+ * overlay the keyboard map marks "(with confirm)".
  *
  * `delete(run)` is the only operator operation of 04 that destroys
  * anything: it cancels the run and then deletes it "and **all** child

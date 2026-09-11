@@ -1,7 +1,6 @@
 /**
  * The Edit Run overlay (`e`, and the palette's `edit run`): "title and
- * description only" (`docs/v1/10-frontend.md` §Overlays), over `PATCH
- * /api/runs/{id}` (08 §Runs).
+ * description only", over `PATCH /api/runs/{id}` (08 §Runs).
  *
  * **Only two fields, and that is the whole design.** The mock's palette
  * row reads "change title, description, priority"; 10 strikes the third,

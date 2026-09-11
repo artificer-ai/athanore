@@ -1,8 +1,6 @@
 /**
  * What a panel draws: the kind dispatch, the states in which there is
- * nothing to draw yet, and the cards appended to the overview
- * (`docs/v1/09-plugins.md` §Panel kinds, `docs/v1/10-frontend.md`
- * §Plugin renderers).
+ * nothing to draw yet, and the cards appended to the overview.
  *
  * Separate from `./PaneRenderer.tsx` because two things reach for it now
  * — a pane, and a `placement="card"` panel below the overview

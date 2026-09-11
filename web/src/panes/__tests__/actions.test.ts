@@ -1,6 +1,5 @@
 /**
- * What a plugin's actions mean to the browser (`../actions.ts`,
- * `docs/v1/09-plugins.md` §Declarations, §Context and scopes).
+ * What a plugin's actions mean to the browser (`../actions.ts`).
  *
  * Every rule here has a counterpart the server enforces
  * (`tests/plugins/test_actions.py`), and the two agree on purpose: an

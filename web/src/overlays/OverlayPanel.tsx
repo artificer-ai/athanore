@@ -1,8 +1,8 @@
 /**
- * The dialog chrome the overlays of `docs/v1/10-frontend.md` §Overlays
- * share: a `rgba(10,11,18,.72)` backdrop, a surface panel with a 1 px
- * neutral-800 border, an 8 px radius and `--shadow-lg`, and a header
- * strip of `kicker · gloss … hint`.
+ * The dialog chrome the overlays share: a `rgba(10,11,18,.72)`
+ * backdrop, a surface panel with a 1 px neutral-800 border, an 8 px
+ * radius and `--shadow-lg`, and a header strip of
+ * `kicker · gloss … hint`.
  *
  * `components/Curtain.tsx` draws the same rectangle for the screens that
  * stand *instead of* the app; this one is for the dismissible dialogs
