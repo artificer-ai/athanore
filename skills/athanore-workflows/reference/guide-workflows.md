@@ -232,7 +232,12 @@ removed.task_ids                    # the attempts that were interrupted
 `server.register_configured()` before `start()` is how a programmatic
 host loads such rows back. An attempt already running finishes on the
 body it started with; a removed workflow's runs stay listed, flagged
-`unregistered`, and resume when it is added back.
+`unregistered`, and resume when it is added back. The dashboard follows
+all three without a page reload — the library, the new-run chips, the
+pane bar and the run rows move as the registration does — and when a
+plugin's JavaScript has changed under it, it says so with a reload
+notice rather than pretending: a module a page has already run cannot
+be run again.
 
 The same three verbs are on the wire and on the command line, so an
 agent or a script can do what the host does: `POST /api/workflows`
