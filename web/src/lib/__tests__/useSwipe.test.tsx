@@ -1,7 +1,6 @@
 /**
  * `useSwipe`: the recogniser behind the narrow global screen's gesture
- * (`../useSwipe.ts`, `docs/v1/21-design-refresh.md` §Touch operation,
- * D216).
+ * (`../useSwipe.ts`).
  *
  * jsdom dispatches a `TouchEvent` but performs no layout, so what is
  * driven here is the arithmetic and the refusals: travel, ratio, the

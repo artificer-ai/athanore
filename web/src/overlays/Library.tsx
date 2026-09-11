@@ -1,8 +1,7 @@
 /**
  * The workflow library overlay (`w`, the palette's `open workflow
  * library`, and the graph pane's `open definition`): the Python a
- * workflow is defined in, read in the app (`docs/v1/10-frontend.md`
- * §Overlays, D35).
+ * workflow is defined in, read in the app.
  *
  * The mock's panel: `WORKFLOW LIBRARY · defined in python` over a
  * 230 px left list — `name · n nodes` and `k runs · file` — and a source

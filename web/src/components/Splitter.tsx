@@ -1,6 +1,6 @@
 /**
  * The splitter between the run list and the detail pane, and the rail the
- * list collapses to (`docs/v1/10-frontend.md` §Layout).
+ * list collapses to.
  *
  * Two ends bound the drag and neither is negotiable: the list is never
  * narrower than 260 px, and the detail pane never narrower than 340 px,

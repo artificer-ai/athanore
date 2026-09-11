@@ -1,5 +1,5 @@
 /**
- * The status colours of `docs/v1/10-frontend.md` §Status colours.
+ * The status colours.
  *
  * The table lives beside the run list because that is what first drew a
  * status, but it is the app's and not the list's: the overview's NODES

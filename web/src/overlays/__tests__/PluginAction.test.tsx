@@ -1,7 +1,6 @@
 /**
  * `PluginAction`: the overlay a palette row for a plugin's action opens
- * (`overlays/PluginAction.tsx`, `docs/v1/09-plugins.md` §Declarations,
- * `docs/v1/10-frontend.md` §Overlays).
+ * (`overlays/PluginAction.tsx`).
  *
  * The form, the confirm and the POST are `ActionRunner`'s and are
  * asserted there. What is under test here is the overlay's own three

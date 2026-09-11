@@ -1,7 +1,6 @@
 /**
- * The invalidation table of `docs/v1/10-frontend.md` §Realtime and
- * caching: what one event makes stale, and how much of it a burst is
- * allowed to refetch.
+ * The invalidation table: what one event makes stale, and how much of
+ * it a burst is allowed to refetch.
  *
  * Freshness in this app comes from events, never from a clock: nothing
  * polls, and a view that goes stale is a row missing from the table

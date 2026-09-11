@@ -1,7 +1,7 @@
 """Athanore: code-defined AI agent workflows over the Agent Client Protocol.
 
-The package's front door: the names of `docs/v1/02-architecture.md`
-§Public API, and nothing else. An author writes
+The package's front door: the public API, and nothing else. An author
+writes
 
 .. code-block:: python
 

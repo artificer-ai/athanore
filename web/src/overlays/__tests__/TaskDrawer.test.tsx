@@ -1,8 +1,6 @@
 /**
  * `TaskDrawer`: everything about one attempt, and the three operator
- * operations that act on it (`overlays/TaskDrawer.tsx`,
- * `docs/v1/10-frontend.md` §Overlays, `docs/v1/04-engine.md` §Operator
- * operations, `docs/v1/08-api.md` §Tasks).
+ * operations that act on it (`overlays/TaskDrawer.tsx`).
  *
  * The suite asserts on **what went out on the wire** wherever it can, as
  * the pickers' does: three buttons that look the same and post to three

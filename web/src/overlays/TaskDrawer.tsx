@@ -1,9 +1,7 @@
 /**
  * The task drawer (`?overlay=task&task=`): "everything about one
  * attempt in one place" — payload, result, error, submissions, stats,
- * lineage and branch, with retry / move / set-status beside them
- * (`docs/v1/10-frontend.md` §Overlays, `docs/v1/04-engine.md` §Operator
- * operations, `docs/v1/08-api.md` §Tasks).
+ * lineage and branch, with retry / move / set-status beside them.
  *
  * It opens from the overview's NODES rows (T063a) and from nowhere else
  * — a graph row click filters the log instead (D167) — and it is reached

@@ -1,6 +1,5 @@
 /**
- * Injecting a plugin's JavaScript (`../assets.ts`, `docs/v1/09-plugins.md`
- * §Escape hatch).
+ * Injecting a plugin's JavaScript (`../assets.ts`).
  *
  * "The SPA injects them once as `<script type="module">`" is two claims,
  * and the second is the one with teeth: a module cannot be un-executed,

@@ -1,6 +1,5 @@
 /**
- * Nothing outside the ramp sets a size of its own
- * (`docs/v1/21-design-refresh.md` §Type scale, D195).
+ * Nothing outside the ramp sets a size of its own.
  *
  * `theme.test.ts` proves the six utilities of `theme.css` are exact
  * fractions of the base. That is only half of "the whole ramp

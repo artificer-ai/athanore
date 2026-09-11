@@ -1,8 +1,6 @@
 /**
  * A panel's `source`: the request it makes, the key that request is
- * cached under, and the `refresh_on` names that make it stale
- * (`docs/v1/09-plugins.md` §Wire contract, `docs/v1/10-frontend.md`
- * §Realtime and caching).
+ * cached under, and the `refresh_on` names that make it stale.
  *
  * A plugin route is *not* part of the committed wire contract — which
  * routes exist depends on what is installed (09 §Builtins are plugins) —

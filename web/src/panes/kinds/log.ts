@@ -1,6 +1,6 @@
 /**
  * How a log row is read: its tone, its author, and which rows a pane
- * shows in what order (`docs/v1/10-frontend.md` §Panes item 2).
+ * shows in what order.
  *
  * Separate from the two components that draw rows — `./LogRows.tsx` and
  * `./Log.tsx` — for the reason `./format.ts` is separate: a module that

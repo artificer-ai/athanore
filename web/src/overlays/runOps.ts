@@ -1,7 +1,6 @@
 /**
- * The five run-level operations of `docs/v1/04-engine.md` §Operator
- * operations that are a button and not a panel: `pause`, `resume`,
- * `cancel`, `reorder` and `delete` (08 §Runs).
+ * The five run-level operator operations that are a button and not a
+ * panel: `pause`, `resume`, `cancel`, `reorder` and `delete` (08 §Runs).
  *
  * They have no overlay of their own — `p`, `c` and `D` are keys and
  * palette rows, and `D` opens the one confirm (`./DeleteRun.tsx`) — so

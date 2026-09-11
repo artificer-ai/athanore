@@ -1,6 +1,5 @@
 /**
- * The element table (`../registry.ts`, `docs/v1/09-plugins.md` §Escape
- * hatch, §Builtins are plugins).
+ * The element table (`../registry.ts`).
  *
  * What matters here is not that the three builtin tags draw — that is
  * `panes/__tests__/content.test.tsx`, through the dispatch a plugin's

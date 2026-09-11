@@ -1,9 +1,7 @@
 /**
  * The requests pane: everything this run has asked a person, what they
- * said, and — from T064 — the controls that say it
- * (`docs/v1/10-frontend.md` §Panes item 4, `docs/v1/06-requests.md`
- * §Surfaces, and the mock's `isMessages` block in
- * `docs/v1/design/Athanore.dc.html`).
+ * said, and — from T064 — the controls that say it, drawn as the mock's
+ * `isMessages` block draws it.
  *
  * It is the mock's `messages` pane re-purposed (15, D33). Athanore has
  * no node-to-node messages — the work log is the inter-node channel — so

@@ -2,8 +2,7 @@
  * What the answer controls need that is not a component: how a refusal
  * of `POST /api/requests/{id}/answer` reads, how a 422's `errors[]`
  * becomes something RJSF can put beside a field, and which tone an
- * option's kind carries (`docs/v1/06-requests.md` §Service,
- * `docs/v1/10-frontend.md` §Plugin renderers).
+ * option's kind carries.
  *
  * Separate from the components for the reason `panes/kinds/format.ts` is
  * separate from the renderers that use it: a module exporting both a
@@ -169,8 +168,7 @@ export function optionClass(kind: string | null | undefined): string {
 /* -------------------------------------------------------------------- */
 
 /**
- * What `a` picks, in preference order, and what `d` picks
- * (`docs/v1/10-frontend.md` §Keyboard, `docs/v1/20-carried-findings.md`).
+ * What `a` picks, in preference order, and what `d` picks.
  *
  * ACP's four permission kinds carry the meaning; the list order a client
  * sends them in is unspecified, so the choice is by kind and never by

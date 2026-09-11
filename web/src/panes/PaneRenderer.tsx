@@ -1,7 +1,6 @@
 /**
  * One pane, drawn from its manifest entry and the data its `source`
- * answered with (`docs/v1/09-plugins.md` §Panel kinds,
- * `docs/v1/10-frontend.md` §Plugin renderers).
+ * answered with.
  *
  * This is the component that makes the plugin system visible: the host
  * knows a panel's `kind`, its `source` and its scope, and nothing else

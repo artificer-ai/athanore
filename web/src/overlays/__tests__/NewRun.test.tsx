@@ -1,7 +1,6 @@
 /**
  * `NewRun`: the mock's panel, and the submission behind its one primary
- * button (`overlays/NewRun.tsx`, `docs/v1/10-frontend.md` §Overlays,
- * D34, D57).
+ * button (`overlays/NewRun.tsx`).
  *
  * The suite asserts on **what went out on the wire** wherever it can.
  * `top` and `bottom` draw identically once the chip is pressed, and the

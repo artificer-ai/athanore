@@ -1,7 +1,5 @@
 /**
- * What the task drawer says about one attempt, minus the drawing of it
- * (`docs/v1/10-frontend.md` §Overlays, `docs/v1/04-engine.md` §Operator
- * operations, `docs/v1/03-data-model.md` §Task).
+ * What the task drawer says about one attempt, minus the drawing of it.
  *
  * A module of its own for the reason `./pickers.ts` and `./newRun.ts`
  * are: a file that exports a component and a function is one React Fast

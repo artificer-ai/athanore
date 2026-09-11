@@ -1,6 +1,5 @@
 /**
- * The footer strip: the key-hint chips and the `^p palette` button
- * (`docs/v1/10-frontend.md` §Layout and §Keyboard).
+ * The footer strip: the key-hint chips and the `^p palette` button.
  *
  * The chips are the rows of `lib/keys.ts` that carry `footer`, in the
  * map's order, so the strip and the `?` overlay that expands it cannot

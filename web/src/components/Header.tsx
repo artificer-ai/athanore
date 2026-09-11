@@ -1,6 +1,6 @@
 /**
  * The header strip: brand mark, version, the two counts, and the run
- * list's filters (`docs/v1/10-frontend.md` §Layout).
+ * list's filters.
  *
  * The counts are `GET /api/runs`, which is also what the list draws, so
  * the number in the strip and the number of rows under it can never

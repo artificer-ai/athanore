@@ -1,7 +1,6 @@
 /**
  * The strip under the header that says nothing is answering, and when
- * the next attempt is due (`docs/v1/10-frontend.md` §Realtime and
- * caching).
+ * the next attempt is due.
  *
  * It is a strip rather than an overlay on purpose: "the last data stays
  * visible" is the mock's server-down behaviour, so what a run looked

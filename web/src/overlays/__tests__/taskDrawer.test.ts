@@ -1,7 +1,6 @@
 /**
  * `overlays/taskDrawer.ts`: what the drawer says about one attempt,
- * without a DOM (`docs/v1/03-data-model.md` §Task, `docs/v1/04-engine.md`
- * §Operator operations).
+ * without a DOM.
  */
 import { describe, expect, it } from 'vitest'
 

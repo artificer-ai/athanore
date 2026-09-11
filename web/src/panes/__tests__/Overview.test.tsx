@@ -1,7 +1,6 @@
 /**
  * The overview pane over the two things it reads: the `overview`
- * builtin's route and `GET /api/runs/{id}` (`docs/v1/10-frontend.md`
- * §Panes item 1).
+ * builtin's route and `GET /api/runs/{id}`.
  *
  * The run detail is seeded into the cache rather than fetched, because
  * what is under test is what the pane *draws* from it — the attempt a

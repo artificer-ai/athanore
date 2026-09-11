@@ -1,7 +1,6 @@
 /**
  * What the New Run overlay is, minus the drawing of it: the shape a
- * submission has to fit, and the two calls that make one
- * (`docs/v1/10-frontend.md` §Overlays, D34, D57).
+ * submission has to fit, and the two calls that make one.
  *
  * It is a module of its own for the reason `components/answer.ts` is:
  * a file that exports a component and a function is one React Fast

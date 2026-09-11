@@ -1,6 +1,6 @@
 /**
  * What an answer's refusal reads as, and what the option buttons are
- * styled by (`components/answer.ts`, `docs/v1/06-requests.md` §Service).
+ * styled by (`components/answer.ts`).
  *
  * The 422 mapping is the one worth being strict about: `loc` is a path
  * into the answer (`athanore/requests/validators.py`) and RJSF's

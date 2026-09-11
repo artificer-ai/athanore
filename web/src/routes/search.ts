@@ -1,11 +1,11 @@
 /**
  * The app's search parameters: every piece of UI state worth sharing.
  *
- * `docs/v1/10-frontend.md` §Layout keeps the whole SPA on one route, so a
- * view is linkable only if the things that make it that view live in the
- * query string: which run is selected, which pane is showing, which
- * overlay is open, and which task the overlay is about. Widths and
- * preferences are personal and belong to `usePrefs` instead.
+ * The whole SPA is one route, so a view is linkable only if the things
+ * that make it that view live in the query string: which run is
+ * selected, which pane is showing, which overlay is open, and which task
+ * the overlay is about. Widths and preferences are personal and belong
+ * to `usePrefs` instead.
  *
  * Validation **drops** what it does not recognise rather than throwing. A
  * stale bookmark carrying `?overlay=crt` from an older build must open the
@@ -46,7 +46,7 @@ export type Overlay = (typeof OVERLAYS)[number]
  *   to be an index.
  * - `overlay` — the open overlay, one of {@link OVERLAYS}.
  * - `task` — the task an overlay is about; task ids are positive
- *   integers (`docs/v1/03-data-model.md`).
+ *   integers.
  * - `node` — the node the event log is filtered to. The graph pane
  *   writes it ("clicking a graph node opens this pane with `?node=`
  *   filtering to that node's entries and events", 10 §Panes), which is

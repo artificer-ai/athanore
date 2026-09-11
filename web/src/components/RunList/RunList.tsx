@@ -1,5 +1,5 @@
 /**
- * The run list on the left (`docs/v1/10-frontend.md` §Layout).
+ * The run list on the left.
  *
  * The mock's six-column grid, to the pixel: the column header, the
  * scrolling rows, and the footer strip that reports how many of them the

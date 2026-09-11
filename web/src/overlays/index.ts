@@ -1,7 +1,7 @@
 /**
- * The overlays of `docs/v1/10-frontend.md` §Overlays: the dismissible
- * dialogs `?overlay=` drives, as against the curtains of
- * `components/Curtain.tsx`, which have nothing behind them.
+ * The overlays: the dismissible dialogs `?overlay=` drives, as against
+ * the curtains of `components/Curtain.tsx`, which have nothing behind
+ * them.
  */
 export { DeleteRun, DELETE_RUN_LOSES, DELETE_RUN_TITLE } from './DeleteRun'
 export { EditRun, EDIT_RUN_FALLBACK, EDIT_RUN_TITLE } from './EditRun'

@@ -1,9 +1,7 @@
 /**
  * The shape the graph pane draws: the card one node puts on the canvas,
  * the branch chips a fan-out gives it, where every node and every edge
- * is placed, the detail line and the EDGES legend
- * (`docs/v1/10-frontend.md` §Graph pane, `docs/v1/08-api.md` §Graph
- * semantics).
+ * is placed, the detail line and the EDGES legend.
  *
  * Separate from `./GraphCanvas.tsx` for the reason `./requests.ts` is
  * separate from `./Requests.tsx`: a module that exports both a component

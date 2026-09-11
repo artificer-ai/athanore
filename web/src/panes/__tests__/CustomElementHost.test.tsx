@@ -1,6 +1,6 @@
 /**
- * `CustomElementHost`: a plugin's own tag, mounted (`../CustomElementHost.tsx`,
- * `docs/v1/09-plugins.md` §Escape hatch).
+ * `CustomElementHost`: a plugin's own tag, mounted
+ * (`../CustomElementHost.tsx`).
  *
  * Five claims, and every one of them is something an operator would
  * otherwise only find out by opening a plugin's pane and seeing nothing:

@@ -30,12 +30,10 @@ Athanore stores runs in SQLite in the directory it is started in and needs
 nothing else: no service, no login, no API key until a workflow of yours
 dispatches an agent that wants one.
 
-**Version 1.0.0 is tagged** — `v1.0.0`, the last task of
-[`docs/v1/17-serial-task-plan.md`](docs/v1/17-serial-task-plan.md). It is
-tagged in this repository and nowhere else: there is no git remote and
-nothing has been uploaded, so PyPI still carries the v0 MVP (`0.0.12`)
-and the `uv add` lines above will fetch that until 1.0.0 is published.
-Until it is, install v1 from a checkout — see
+**v1 is tagged in this repository and nowhere else**: there is no git
+remote and nothing has been uploaded, so PyPI still carries the v0 MVP
+(`0.0.12`) and the `uv add` lines above will fetch that until v1 is
+published. Until it is, install from a checkout — see
 [Development](#development).
 
 ## A first workflow
@@ -172,7 +170,7 @@ athanore token show | rotate        athanore login <url>        athanore open
 ```
 
 Every read verb takes `--json`, so the CLI composes with `jq`. Full
-reference: [`docs/v1/11-cli.md`](docs/v1/11-cli.md).
+reference: [`docs/site/src/reference/cli.md`](docs/site/src/reference/cli.md).
 
 Pools and per-workflow capacity come from an `athanore.toml` beside the
 database:
@@ -193,14 +191,13 @@ athanore/        Python package: graph, engine, requests, agents, events,
 web/             SPA source (Vite + React + TypeScript), builds into athanore/web/dist
 examples/        user-land workflows and vendor adapters (uv workspace member)
 tests/           Python tests
-docs/v1/         the design documents; docs/plans/ the per-task plans
 docs/site/       the published documentation site (MkDocs Material)
 skills/          agent skills, one per surface, self-contained; copy one into your agent
 ```
 
-See [`docs/v1/02-architecture.md`](docs/v1/02-architecture.md) for the
-per-module breakdown and the layering rule. Nothing in `athanore/` depends
-on pi, Claude, or Docker: vendor adapters are user-land, in `examples/`.
+The per-module breakdown and the layering rule are in
+[`AGENTS.md`](AGENTS.md). Nothing in `athanore/` depends on pi, Claude, or
+Docker: vendor adapters are user-land, in `examples/`.
 
 ## Development
 
@@ -240,11 +237,6 @@ a workspace member and registers them as entry points.
   docs/site/mkdocs.yml`. `.github/workflows/pages.yml` publishes it to
   GitHub Pages on every push to `main`, which — as above — is waiting on
   this repository having a remote to push to.
-- [`docs/v1/README.md`](docs/v1/README.md) — the twenty design documents,
-  in reading order. They are the specification, not a description: MUST and
-  SHOULD carry their RFC 2119 meanings.
-- [`docs/v1/15-decisions.md`](docs/v1/15-decisions.md) — every decision
-  and its reason.
 - [`skills/README.md`](skills/README.md) — five agent skills, one per
   surface you can build against. Each stands alone — the site's pages,
   republished into it — and is installed by copying its directory into

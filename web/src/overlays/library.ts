@@ -1,6 +1,6 @@
 /**
  * What the workflow library overlay is made of, without a DOM
- * (`./Library.tsx`, `docs/v1/10-frontend.md` §Overlays, D35).
+ * (`./Library.tsx`).
  *
  * The left list's rows, which workflow is selected when the overlay
  * opens, the source split into anchored lines, and the one piece of

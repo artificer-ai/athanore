@@ -1,8 +1,6 @@
 /**
  * The requests pane: the order the cards come in, what an answered card
- * says, and what a permission card shows about the call it is about
- * (`docs/v1/10-frontend.md` §Panes item 4, `docs/v1/06-requests.md`
- * §Surfaces).
+ * says, and what a permission card shows about the call it is about.
  *
  * Three things this suite is deliberately strict about:
  *

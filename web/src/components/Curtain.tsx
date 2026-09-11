@@ -1,6 +1,6 @@
 /**
- * The overlay chrome of `docs/v1/10-frontend.md` §Overlays, as three
- * pieces: the backdrop, the panel on it, and the button in the panel.
+ * The overlay chrome, as three pieces: the backdrop, the panel on it,
+ * and the button in the panel.
  *
  * The section fixes all of it — a full-screen `rgba(10,11,18,.72)`
  * backdrop, a surface panel with a 1 px neutral-800 border, an 8 px

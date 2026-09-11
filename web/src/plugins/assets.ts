@@ -1,6 +1,5 @@
 /**
- * A plugin's JavaScript, injected once (`docs/v1/09-plugins.md` §Escape
- * hatch).
+ * A plugin's JavaScript, injected once.
  *
  * The manifest carries `assets: [urls]` per workflow — every `.js` under
  * the directory the workflow declared, served by the server at

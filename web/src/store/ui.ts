@@ -4,8 +4,8 @@
  *
  * Which region has the operator's attention is neither worth a link nor
  * worth remembering across a reload: it is where the next keystroke goes
- * (`docs/v1/10-frontend.md` §Keyboard — `tab` moves it). It starts on
- * the run list, which is where a fresh page's first `↑`/`↓` should land.
+ * (`tab` moves it). It starts on the run list, which is where a fresh
+ * page's first `↑`/`↓` should land.
  *
  * `focusedRun` is the same kind of fact one step in: the run `⏎` has
  * picked up, so that `↑`/`↓` move it in the dispatch order instead of
@@ -16,7 +16,7 @@
  * Whether the operator has to produce a token belongs here for the same
  * reason: it is a fact about this tab's conversation with the server,
  * true until the next answer from it, and a reload asks again rather
- * than remembering (`docs/v1/10-frontend.md` §Auth in the browser).
+ * than remembering.
  *
  * So does the state of that tab's event stream, which is the same kind
  * of fact and reaches the store the same way — the feed writes it, as

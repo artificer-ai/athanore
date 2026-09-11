@@ -1,6 +1,6 @@
 /**
  * The router: one route, `/`, whose search parameters are the whole of
- * the app's shareable state (`docs/v1/10-frontend.md` §Layout).
+ * the app's shareable state.
  *
  * There is deliberately no second route. Overlays, the selected run and
  * the pane index are all search parameters, which is what makes every

@@ -1,7 +1,6 @@
 /**
  * One `EventSource` per tab, and everything that keeps a tab open for a
- * week honest (`docs/v1/10-frontend.md` §Realtime and caching, 08
- * §Events).
+ * week honest.
  *
  * The SPA opens exactly one stream and fans it out through
  * {@link Invalidator}: a second `EventSource` per component would be a

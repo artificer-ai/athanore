@@ -1,7 +1,6 @@
 /**
  * The attention surface outside the app's own window: the tab title, and
- * the desktop notification an operator has opted in to
- * (`docs/v1/10-frontend.md` §Attention).
+ * the desktop notification an operator has opted in to.
  *
  * "The browser tab title prefixes the open-request count; desktop
  * notifications are opt-in." Both are about the same fact and read it

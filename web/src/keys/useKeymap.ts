@@ -1,8 +1,8 @@
 /**
- * `useKeymap` — the app's one `keydown` listener, and the table of
- * `docs/v1/10-frontend.md` §Keyboard behind it.
+ * `useKeymap` — the app's one `keydown` listener, and the keyboard map
+ * behind it.
  *
- * That section is exhaustive and this hook binds exactly it: `↑`/`↓` or
+ * The map is exhaustive and this hook binds exactly it: `↑`/`↓` or
  * `j`/`k` select — or move the focused run, while one is held — `←`/`→`
  * cycle panes, `1`–`9` jump, `⏎` focus run,
  * `tab` focus, `t` retry task, `m` move task, `x` cancel task, `l`
@@ -22,8 +22,7 @@
  * **Scoping is the point.** A `d` typed into the header's `/` input must
  * not open the delete confirm, and neither must a `d` pressed inside an
  * overlay — which is the whole reason 10 moved delete off `d` and onto
- * `D` (D51). Three rules, in the order the mock applies them
- * (`docs/v1/design/Athanore.dc.html`):
+ * `D` (D51). Three rules, in the order the mock applies them:
  *
  * 1. `esc` closes whatever is up, from anywhere, including an input.
  * 2. A **chord** — `^p`, `^r` — is not typing and is not the overlay's,

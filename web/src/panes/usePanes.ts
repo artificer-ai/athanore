@@ -1,6 +1,6 @@
 /**
  * Which panes exist for the current selection, in what order, and where
- * the operator is in them (`docs/v1/10-frontend.md` §Panes).
+ * the operator is in them.
  *
  * Nothing here has a list of panes. The builtins are declared through
  * the plugin API like anything else (09 §Builtins are plugins) and the

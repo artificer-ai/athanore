@@ -1,7 +1,5 @@
 /**
- * `RequestPanel`: the controls that answer one request
- * (`docs/v1/06-requests.md` §Surfaces, `docs/v1/10-frontend.md` §Panes
- * item 3 and item 4).
+ * `RequestPanel`: the controls that answer one request.
  *
  * **The mode decides the control**, and nothing else does: `options` is
  * one outlined button per option styled by its kind, `text` is an input

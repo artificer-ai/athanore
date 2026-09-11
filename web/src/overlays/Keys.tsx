@@ -1,6 +1,6 @@
 /**
  * The keys overlay (`?`, and the palette's `keys` row): "the footer
- * chips, expanded" (`docs/v1/10-frontend.md` §Overlays).
+ * chips, expanded".
  *
  * Expanded in two directions. The footer strip has room for fourteen
  * chips and 10 §Keyboard has twenty-three bindings, so this panel is the

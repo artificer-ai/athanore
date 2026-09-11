@@ -1,8 +1,7 @@
 /**
  * A workflow's declared actions: which one a panel or a palette row
  * means, what it has to be invoked with, and the one call that invokes
- * it (`docs/v1/09-plugins.md` §Declarations, §Wire contract;
- * `docs/v1/08-api.md` §Plugins).
+ * it.
  *
  * An action is not a route. `POST /api/plugins/{wf}/actions/{name}` is
  * one endpoint for the whole server and is therefore a *generated*

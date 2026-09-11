@@ -3,10 +3,10 @@
  * chips and the `/` input have narrowed.
  *
  * One query backs the whole left half of the app and the header's two
- * counts (`docs/v1/10-frontend.md` §Layout). It is the generated one, so
- * its key is the key `src/realtime/invalidate.ts` invalidates on `run.*`
- * and `task.*` — that is the whole of "the list updates when a run is
- * submitted from the CLI", and there is no interval anywhere.
+ * counts. It is the generated one, so its key is the key
+ * `src/realtime/invalidate.ts` invalidates on `run.*` and `task.*` —
+ * that is the whole of "the list updates when a run is submitted from
+ * the CLI", and there is no interval anywhere.
  *
  * Filtering is client-side, over the list the server returned whole (08
  * §Conventions): `?status` and `?workflow` exist on the endpoint and are

@@ -1,7 +1,6 @@
 /**
  * `RequestPanel`: the mode decides the control, one POST records the
- * answer, and a 409 is a toast (`components/RequestPanel.tsx`,
- * `docs/v1/06-requests.md` §Service and §Surfaces).
+ * answer, and a 409 is a toast (`components/RequestPanel.tsx`).
  *
  * The suite asserts on **what went out on the wire** wherever it can:
  * `option_id` for an `options` request and `value` for a `text` or

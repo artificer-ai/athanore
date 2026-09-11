@@ -190,10 +190,10 @@ export function graph(live: readonly string[]): GraphOut {
 /**
  * One sample per data kind, in the shape 09 §Panel kinds gives it.
  *
- * The values are the design mock's own `PLUGINS.gamedev.playtest`
- * (`docs/v1/design/Athanore.dc.html`) — the pane 10 §Panes item 6
- * describes — so the renderers are tested against the data the design
- * was drawn for rather than against something invented here.
+ * The values are the design mock's own `PLUGINS.gamedev.playtest` — the
+ * pane 10 §Panes item 6 describes — so the renderers are tested against
+ * the data the design was drawn for rather than against something
+ * invented here.
  */
 export const SAMPLES = {
   /** `markdown`: `string`. */
@@ -323,8 +323,8 @@ export const NODE_COLUMNS: TableColumn[] = [
 /**
  * `GET /api/plugins/_builtin/overview` for a run mid-flight.
  *
- * The numbers are the mock's own first run (`docs/v1/design/
- * Athanore.dc.html`, `a4c81f20b91e`) in the shape the route sends them:
+ * The numbers are the mock's own first run (`a4c81f20b91e`) in the
+ * shape the route sends them:
  * raw counts and seconds, `meta` beside the three `dashboard` keys, and
  * **nothing zero-filled** — `review` has entered no agent, so its row
  * carries neither `tokens` nor `duration_s`.

@@ -1,10 +1,10 @@
 /* The SPA's one stylesheet entry point.
  *
- * Everything token-shaped lives in ./styles/theme.css, which is
- * generated from docs/v1/design/nocturne.css by `pnpm gen:theme`. This
+ * Everything token-shaped lives in ./styles/theme.css, which
+ * `pnpm gen:theme` generates from the design system's token sheet. This
  * file holds only what shadcn/ui's `init` puts here: the Tailwind and
  * shadcn imports, the `dark` variant its components branch on, and the
- * base layer. Theme values do not belong here — edit nocturne.css and
+ * base layer. Theme values do not belong here — edit the token sheet and
  * regenerate.
  */
 @import "tailwindcss";

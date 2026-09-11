@@ -1,7 +1,6 @@
 /**
  * `actionError`: what a refused request said, in the two shapes a
- * refusal actually arrives in (`lib/errors.ts`, `docs/v1/08-api.md`
- * §Conventions).
+ * refusal actually arrives in (`lib/errors.ts`).
  *
  * The generated client throws the **parsed body** rather than an
  * `Error`, so every surface that prints a refusal — the run ops, the

@@ -1,6 +1,5 @@
 /**
- * The app shell: the four regions of `docs/v1/10-frontend.md` §Layout —
- * header, run list, detail, footer.
+ * The app shell: its four regions — header, run list, detail, footer.
  *
  * The list and the detail pane sit either side of `Splitter`, which owns
  * the width between them and the rail the list collapses to. Below the

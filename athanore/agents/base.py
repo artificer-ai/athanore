@@ -20,9 +20,9 @@ adds to it is the part the agent cannot know: which task it is working
 on, and the four things it may do with it.
 
 **The blocks are normative.** :data:`_KICKOFF`, :data:`_HTTP_TIER`,
-:data:`_ASK` and :data:`_SUBMIT` are copies of the fenced blocks of
-``docs/v1/19-agent-prompts.md``, and ``tests/agents/test_prompt.py``
-compares them against that document rather than against a second copy.
+:data:`_ASK` and :data:`_SUBMIT` are copies of the fenced blocks of the
+agent-prompts specification, and ``tests/agents/test_prompt.py`` compares
+them against that document rather than against a second copy.
 The wording is behaviour: small models are sensitive to it, every example
 workflow was tuned against it, and ``FakeACPAgent`` parses it. Changing a
 block is a decision (15) and a minor release (19 §Rules).

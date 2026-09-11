@@ -1,7 +1,6 @@
 /**
- * The agent pane: one attempt's transcript, as it arrives
- * (`docs/v1/10-frontend.md` §Panes item 3, and the mock's `isAgent`
- * block in `docs/v1/design/Athanore.dc.html`).
+ * The agent pane: one attempt's transcript, as it arrives, drawn as the
+ * mock's `isAgent` block draws it.
  *
  * `AGENT STREAM · task N · node · streaming/finished · node → model`
  * over the blocks of `./stream.ts`, with a blinking caret while the

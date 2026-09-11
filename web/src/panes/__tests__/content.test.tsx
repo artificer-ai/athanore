@@ -1,7 +1,5 @@
 /**
- * The kind dispatch: `renderKind` and `paneContent` (`../content.tsx`,
- * `docs/v1/09-plugins.md` §Panel kinds, `docs/v1/10-frontend.md`
- * §Plugin renderers).
+ * The kind dispatch: `renderKind` and `paneContent` (`../content.tsx`).
  *
  * `PaneRenderer.test.tsx` drives the same table through the component
  * that fetches for it, which is where the manifest, the query and the

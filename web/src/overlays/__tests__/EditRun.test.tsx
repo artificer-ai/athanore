@@ -1,7 +1,6 @@
 /**
  * `EditRun`: the two fields 10 §Overlays allows, and the one `PATCH`
- * behind `save` (`overlays/EditRun.tsx`, `docs/v1/08-api.md` §Runs,
- * `docs/v1/04-engine.md` §Operator operations).
+ * behind `save` (`overlays/EditRun.tsx`).
  *
  * The suite asserts on **what went out on the wire** wherever it can. A
  * panel that sent only the field the operator touched would look

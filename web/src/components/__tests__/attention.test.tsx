@@ -1,7 +1,6 @@
 /**
  * The attention surface outside the window: the tab title and the
- * desktop notification (`components/attention.ts`,
- * `docs/v1/10-frontend.md` §Attention).
+ * desktop notification (`components/attention.ts`).
  *
  * The rule the suite exists for is the one a naive implementation gets
  * wrong: **the first answer to the inbox notifies nothing.** A page

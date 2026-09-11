@@ -1,7 +1,6 @@
 /**
  * `newRun.ts`: the shape a submission has to fit and the two calls that
- * make one (`overlays/newRun.ts`, `docs/v1/10-frontend.md` §Overlays,
- * D34, D57).
+ * make one (`overlays/newRun.ts`).
  *
  * The wire assertions live here rather than only in the component suite
  * because "top is two calls and bottom is one" is the whole of D57 and
@@ -50,7 +49,7 @@ function stub(...responses: { status: number; body: unknown }[]) {
 const VALUES: NewRunValues = {
   workflow: 'feature_build',
   title: 'port the settings module',
-  description: 'see docs/v1/11-settings.md',
+  description: 'see the settings reference',
   position: 'bottom',
 }
 
@@ -94,7 +93,7 @@ describe('submitNewRun', () => {
     expect(sent[0]?.url).toContain('/api/workflows/feature_build/runs')
     expect(sent[0]?.body).toEqual({
       title: 'port the settings module',
-      description: 'see docs/v1/11-settings.md',
+      description: 'see the settings reference',
     })
   })
 

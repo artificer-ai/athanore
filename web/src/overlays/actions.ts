@@ -1,7 +1,7 @@
 /**
  * The command palette's catalogue: every operator action the app can
  * perform and every overlay it can open, each with the key that also
- * performs it (`docs/v1/10-frontend.md` §Overlays, §Keyboard).
+ * performs it.
  *
  * The table is the design mock's `COMMANDS` with the corrections 10
  * makes to it — `edit run` is title and description only, because the

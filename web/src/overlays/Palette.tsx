@@ -1,7 +1,7 @@
 /**
  * The command palette (`^p` / `⌘p`): cmdk's `Command` inside a Radix
- * `Dialog`, drawn as the mock draws it (`docs/v1/10-frontend.md`
- * §Overlays, §Components — "Palette | `Command` (cmdk) in a `Dialog`").
+ * `Dialog`, drawn as the mock draws it — "Palette | `Command` (cmdk) in
+ * a `Dialog`".
  *
  * A `›` prompt, one input, and rows of `name · hint · key`. The key
  * column is why every action is listed whether or not the operator can
