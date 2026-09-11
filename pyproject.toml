@@ -166,14 +166,19 @@ ignore_imports = [
     "athanore.agents.stats -> athanore.engine.context",
     "athanore.agents.policies -> athanore.engine.context",
     "athanore.agents.acp -> athanore.engine.context",
-    # The two arrows back up into the API, and the only ones (D138). A
-    # plugin route is an operator route: it hangs on the API's own door
-    # (`operator_auth`) and declares the API's own security requirement,
-    # and there is no lower place to put a door that has to be the same
-    # one. Everything else `mount` needs — the specs, the context, the
-    # bus — it takes from below.
+    # The three arrows back up into the API, and the only ones (D138,
+    # D236). A plugin route is an operator route: it hangs on the API's
+    # own door (`operator_auth`) and declares the API's own security
+    # requirement, and there is no lower place to put a door that has to
+    # be the same one. A plugin's assets are served under the SPA's own
+    # content-security policy by the module that owns everything at `/`,
+    # and the live collection that mounts a workflow's routes is what
+    # mounts and unmounts its assets beside them (22 §Live mounting).
+    # Everything else `mount` needs — the specs, the context, the bus —
+    # it takes from below.
     "athanore.plugins.mount -> athanore.api.deps",
     "athanore.plugins.mount -> athanore.api.openapi",
+    "athanore.plugins.mount -> athanore.api.static",
     # `athanore serve` is the composition root's command line (11
     # §Server): it builds a `Server`, registers the workflows its targets
     # name and calls `serve()`, so it is the same arrow `Workflow.run`

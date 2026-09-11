@@ -28,6 +28,7 @@ has a hole.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
 from typing import Any
@@ -56,8 +57,11 @@ from tests.plugins.fixture_wf import (
 #: The fuse on every wait here. Reached only when something is broken.
 DEADLINE = 5.0
 
-#: The one asset the fixture ships, as the manifest spells it.
+#: The one asset the fixture ships, by path. The manifest lists it with
+#: its content version appended (22 §Live mounting); `ASSET_FILE` is the
+#: file that version is of.
 ASSET_URL = f"/plugins/{WORKFLOW}/static/playfield.js"
+ASSET_FILE = Path(__file__).parent / "assets" / "playfield.js"
 
 #: A well-formed run id that names no run.
 MISSING_RUN = "01JQNOTAREALRUNID0000000"
@@ -341,7 +345,8 @@ async def test_the_manifest_lists_the_one_asset_the_workflow_ships(
 
     entry = await entry_of(client, WORKFLOW)
 
-    assert entry["assets"] == [ASSET_URL]
+    version = hashlib.sha256(ASSET_FILE.read_bytes()).hexdigest()[:12]
+    assert entry["assets"] == [f"{ASSET_URL}?v={version}"]
 
 
 def test_the_fixture_uses_every_kind_every_slot_and_both_placements() -> None:
@@ -856,6 +861,13 @@ async def test_the_asset_is_served_under_the_workflows_prefix_with_the_policy(
     assert response.status_code == 200
     assert response.headers["content-security-policy"] == DEFAULT_POLICY
     assert f'customElements.define("{ELEMENT}"' in response.text
+
+    # The URL the manifest lists — path plus `?v=` — serves the same
+    # file: the version is for the browser's benefit, and `StaticFiles`
+    # ignores the query.
+    listed = (await entry_of(client, WORKFLOW))["assets"][0]
+    assert listed.startswith(f"{ASSET_URL}?v=")
+    assert (await client.get(listed)).text == response.text
 
 
 async def test_an_asset_that_is_not_there_is_the_apis_own_404(

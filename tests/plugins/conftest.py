@@ -6,11 +6,15 @@ registered on *and started*, because the ``on`` dispatch tests want a run
 that really completes; and the application is built from validated
 `PluginSpec`s, because that is what a host hands `create_app`.
 
-`app_with` is the one fixture the suites use: it takes the workflows,
+`app_with` is the one fixture most suites use: it takes the workflows,
 registers them, collects and validates their declarations, and returns a
 client speaking to the application that resulted. Registration through
 the real `collect` + `validate` pair is deliberate — a suite that built a
 `PluginSpec` by hand would be testing a shape no host produces.
+
+`live_app` is the other: a serving application with only the builtins
+mounted, for the suite that adds and removes a workflow's surface while
+it serves (22 §Live mounting).
 """
 
 from __future__ import annotations
@@ -29,6 +33,7 @@ from athanore.engine import Engine
 from athanore.engine.pools import Pool
 from athanore.events.bus import EventBus
 from athanore.events.names import EventName
+from athanore.plugins.builtin import with_builtins
 from athanore.plugins.registry import PluginSpec, collect, validate
 from athanore.settings import AthanoreSettings
 from athanore.store.engine import make_engine
@@ -141,6 +146,36 @@ async def app_with(
     finally:
         for close in reversed(stack):
             await close()
+        await engine.stop()
+
+
+@pytest.fixture
+async def live_app(
+    settings: AthanoreSettings, engine: Engine, store: Store
+) -> AsyncIterator[tuple[FastAPI, httpx.AsyncClient]]:
+    """A serving application with the builtins and nothing else mounted.
+
+    What `Server.serve()` has just after boot on a server with no
+    workflows: `create_app(..., plugins=with_builtins(()))`, the lifespan
+    run (so the dispatcher's one subscription is taken), the engine
+    started. A test then registers a workflow on the engine and adds its
+    spec to ``app.state.plugins``, which is the order T085's `Server.add`
+    does the two in.
+    """
+
+    app: FastAPI = create_app(
+        settings=settings, engine=engine, store=store, plugins=with_builtins(())
+    )
+    await engine.start()
+    shutdown = await _lifespan(app)
+    client = httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://testserver"
+    )
+    try:
+        yield app, client
+    finally:
+        await client.aclose()
+        await shutdown()
         await engine.stop()
 
 

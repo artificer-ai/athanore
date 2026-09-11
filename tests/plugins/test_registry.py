@@ -13,6 +13,9 @@ where the symptom is an empty pane and no error anywhere.
 
 from __future__ import annotations
 
+import hashlib
+import os
+import re
 from pathlib import Path
 
 import pytest
@@ -453,22 +456,96 @@ def test_manifest_omits_what_does_not_apply():
     assert "element" not in panel
 
 
-def test_manifest_lists_every_js_asset_as_a_url(tmp_path: Path):
+def versioned(url: str, path: Path) -> str:
+    """``url`` with the ``?v=`` the manifest gives ``path`` (22 §Live mounting)."""
+
+    return f"{url}?v={hashlib.sha256(path.read_bytes()).hexdigest()[:12]}"
+
+
+def test_manifest_lists_every_js_asset_as_a_versioned_url(tmp_path: Path):
+    """Each ``.js``, sorted by path, with the first 12 hex of its sha256."""
+
     static = tmp_path / "static"
     (static / "nested").mkdir(parents=True)
-    (static / "b.js").write_text("//", encoding="utf-8")
-    (static / "a.js").write_text("//", encoding="utf-8")
-    (static / "nested" / "c.js").write_text("//", encoding="utf-8")
+    (static / "b.js").write_text("// b", encoding="utf-8")
+    (static / "a.js").write_text("// a", encoding="utf-8")
+    (static / "nested" / "c.js").write_text("// c", encoding="utf-8")
     (static / "styles.css").write_text("/**/", encoding="utf-8")
 
     wf = build(assets=static)
     validate(collect(wf), wf.finalize())
 
-    assert manifest_entry(collect(wf))["assets"] == [
-        "/plugins/gamedev/static/a.js",
-        "/plugins/gamedev/static/b.js",
-        "/plugins/gamedev/static/nested/c.js",
+    urls = manifest_entry(collect(wf))["assets"]
+
+    assert urls == [
+        versioned("/plugins/gamedev/static/a.js", static / "a.js"),
+        versioned("/plugins/gamedev/static/b.js", static / "b.js"),
+        versioned("/plugins/gamedev/static/nested/c.js", static / "nested" / "c.js"),
     ]
+    pattern = re.compile(r"/plugins/gamedev/static/[a-z/]+\.js\?v=[0-9a-f]{12}")
+    assert all(pattern.fullmatch(url) for url in urls)
+
+
+def test_the_same_directory_gives_the_same_versions_twice(tmp_path: Path):
+    static = tmp_path / "static"
+    static.mkdir()
+    (static / "a.js").write_text("// a", encoding="utf-8")
+    wf = build(assets=static)
+    validate(collect(wf), wf.finalize())
+
+    assert (
+        manifest_entry(collect(wf))["assets"] == manifest_entry(collect(wf))["assets"]
+    )
+
+
+def test_rewriting_one_file_changes_only_its_version(tmp_path: Path):
+    """The version follows the bytes, per file, on the next manifest read."""
+
+    static = tmp_path / "static"
+    static.mkdir()
+    (static / "a.js").write_text("// a", encoding="utf-8")
+    (static / "b.js").write_text("// b", encoding="utf-8")
+    wf = build(assets=static)
+    validate(collect(wf), wf.finalize())
+    before = manifest_entry(collect(wf))["assets"]
+
+    (static / "a.js").write_text("// a, rebuilt", encoding="utf-8")
+    after = manifest_entry(collect(wf))["assets"]
+
+    assert after[0] != before[0]
+    assert after[0] == versioned("/plugins/gamedev/static/a.js", static / "a.js")
+    assert after[1] == before[1]
+
+
+def test_a_directory_with_no_module_lists_nothing(tmp_path: Path):
+    static = tmp_path / "static"
+    static.mkdir()
+    (static / "styles.css").write_text("/**/", encoding="utf-8")
+    wf = build(assets=static)
+    validate(collect(wf), wf.finalize())
+
+    assert manifest_entry(collect(wf))["assets"] == []
+
+
+@pytest.mark.skipif(os.geteuid() == 0, reason="root reads anything")
+def test_an_unreadable_module_is_omitted_rather_than_listed_unversioned(
+    tmp_path: Path,
+):
+    """A file that cannot be read cannot be served: unknown is omitted."""
+
+    static = tmp_path / "static"
+    static.mkdir()
+    (static / "a.js").write_text("// a", encoding="utf-8")
+    (static / "b.js").write_text("// b", encoding="utf-8")
+    (static / "b.js").chmod(0)
+    wf = build(assets=static)
+    validate(collect(wf), wf.finalize())
+    try:
+        urls = manifest_entry(collect(wf))["assets"]
+    finally:
+        (static / "b.js").chmod(0o644)
+
+    assert urls == [versioned("/plugins/gamedev/static/a.js", static / "a.js")]
 
 
 def test_the_builtin_workflow_name_is_reserved_looking():

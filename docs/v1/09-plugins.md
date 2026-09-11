@@ -132,9 +132,12 @@ every run and its `services.run.list()` is unfiltered.
 
 `assets="./static"` (resolved relative to the module; package data when
 installed) is served at `/plugins/{wf}/static/`. The manifest lists each
-`.js` in it; the SPA injects them once as `<script type="module">`. A
-`custom` panel renders `<the-tag run-id=… task-id=… node=…>` inside a thin
-React wrapper. The element gets `window.athanore`:
+`.js` in it as `/plugins/{wf}/static/<file>.js?v=<first 12 hex of the
+file's sha256>`, computed when the manifest is read, so a URL changes
+when the bytes behind it do (22 §Live mounting; §SPA there has what the
+SPA does with it); the SPA injects them once as `<script
+type="module">`. A `custom` panel renders `<the-tag run-id=… task-id=…
+node=…>` inside a thin React wrapper. The element gets `window.athanore`:
 
 ```ts
 window.athanore = {
@@ -250,6 +253,24 @@ committed before the bus published it, the handlers after it still run,
 and the run carries on. A handler that is merely slow costs its own
 subscription events rather than stalling a writer, because the bus never
 awaits a subscriber (D29).
+
+**Mounting follows registration on a running application** (22 §Live
+mounting). The application holds a live collection of the specs —
+`app.state.plugins`, a `MountedPlugins` — and every reader of it reads
+its current specs per request: the manifest, the actions endpoint, and
+`GET /api/workflows/{name}`. Adding a workflow's spec includes its
+router and appends its assets mount, both matched by Starlette on the
+next request; removing one drops every route named `plugin:{wf}:…` and
+the mount at `/plugins/{wf}/static`, so its routes and assets answer
+404 `not_found` like any path nobody serves; replacing one keeps its
+position in the manifest. A spec that declares nothing is held nowhere
+and has no entry, whichever verb handed it over. Every mutation drops
+the cached OpenAPI document, so `GET /openapi.json` describes the
+routes that exist. The dispatcher's one subscription outlives every
+swap: a workflow's handlers are set under its name in a map the
+dispatcher reads per event, so no event is missed across a swap (D236).
+The builtin entry is added like any other and is refused by remove and
+replace.
 
 Actions are one endpoint rather than a route each (§Wire contract), and
 assets are served under `/plugins/{wf}/static/` (§Escape hatch).

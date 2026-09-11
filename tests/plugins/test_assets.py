@@ -24,6 +24,7 @@ about assets nothing serves.
 
 from __future__ import annotations
 
+import hashlib
 import sys
 from pathlib import Path
 from typing import Any
@@ -100,6 +101,16 @@ def assets(tmp_path: Path) -> Path:
     (directory / "vendor" / "helper.js").write_text(MODULE)
     (directory / "playfield.css").write_text("gd-playfield { display: block }\n")
     return directory
+
+
+def versioned(url: str, path: Path) -> str:
+    """``url`` as the manifest lists it: with the file's content version.
+
+    22 §Live mounting: ``?v=<first 12 hex of the file's sha256>``, so the
+    SPA can tell that the bytes behind a URL it injected have changed.
+    """
+
+    return f"{url}?v={hashlib.sha256(path.read_bytes()).hexdigest()[:12]}"
 
 
 # -- serving ----------------------------------------------------------------
@@ -277,8 +288,10 @@ async def test_the_manifest_lists_every_js_and_nothing_else(
 
     entry = next(one for one in response.json() if one["workflow"] == "gamedev")
     assert entry["assets"] == [
-        "/plugins/gamedev/static/playfield.js",
-        "/plugins/gamedev/static/vendor/helper.js",
+        versioned("/plugins/gamedev/static/playfield.js", assets / "playfield.js"),
+        versioned(
+            "/plugins/gamedev/static/vendor/helper.js", assets / "vendor" / "helper.js"
+        ),
     ]
 
 
@@ -424,7 +437,10 @@ def test_an_installed_package_serves_its_assets(
     validate(spec, gamedev(None).finalize())
 
     assert manifest_entry(spec)["assets"] == [
-        "/plugins/gamedev/static/playfield.js",
+        versioned(
+            "/plugins/gamedev/static/playfield.js",
+            installed / "static" / "playfield.js",
+        ),
     ]
     create_app(settings=settings, plugins=[spec])
 
