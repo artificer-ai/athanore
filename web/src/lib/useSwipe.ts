@@ -2,9 +2,9 @@
  * A horizontal swipe on one element, read by touch
  * (`docs/v1/21-design-refresh.md` §Touch operation, D216).
  *
- * The three narrow screens — list, detail, global — are one line, and
- * a swipe on the middle region walks it: left is one screen towards the
- * list, right is one away from it (`components/Splitter.tsx`, D217).
+ * The three narrow screens fan around the list — global | list |
+ * detail — and a swipe on the middle region is one screen along that
+ * row, the way the finger moved (`components/Splitter.tsx`, D218).
  * This is the recogniser and nothing else: it says which way a finger
  * went and leaves what that means to the caller.
  *

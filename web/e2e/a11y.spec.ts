@@ -129,8 +129,10 @@ test.describe('on a phone', () => {
     expect(blocking(detail), violationReport(detail)).toEqual([])
     expect(axeScore(detail), violationReport(detail)).toBeGreaterThanOrEqual(A11Y_SCORE)
 
-    // ...and the third narrow screen: the global panes over that run,
-    // with the same request waiting in the inbox (D216).
+    // ...and the third narrow screen: the global panes, beside the list
+    // (D218), with the same request waiting in the inbox (D216).
+    await dashboard.back().tap()
+    await expect(dashboard.page.locator('main[data-stacked="list"]')).toBeVisible()
     await dashboard.globalPanes().tap()
     await expect(dashboard.page.locator('main[data-stacked="global"]')).toBeVisible()
     await expect(dashboard.openRequest('permission')).toBeVisible()

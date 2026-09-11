@@ -231,8 +231,8 @@ describe('PaneBar', () => {
     describe('over the global screen', () => {
       /**
        * The global cycle: `panes.run` unset — the model is the global
-       * view's — and `leave` given (D216). The screen itself is always
-       * over a run (D217), which is why the slot has one label.
+       * view's — and `leave` given (D216). The screen sits beside the
+       * list (D218), so its `←` reads as the detail's does.
        */
       const GLOBAL: Pane[] = [pane('inbox', true), pane('crontab', false)]
 
@@ -240,26 +240,28 @@ describe('PaneBar', () => {
         return model({ panes: GLOBAL, runId: undefined, run: undefined })
       }
 
-      it('draws `←` back to the run, and it clears the screen', async () => {
+      it('draws `←` back to runs, and it clears the screen — not the selection', async () => {
         const onLeave = vi.fn()
-        render(<PaneBar panes={global()} onBack={vi.fn()} leave={onLeave} />)
+        const onBack = vi.fn()
+        render(<PaneBar panes={global()} onBack={onBack} leave={onLeave} />)
 
-        const back = screen.getByRole('button', { name: 'back to the run' })
+        const back = screen.getByRole('button', { name: 'back to runs' })
         expect(back).toHaveClass('max-md:min-h-[24px]')
+        expect(back).toHaveAttribute('title', 'back to runs (esc)')
         await userEvent.click(back)
         expect(onLeave).toHaveBeenCalledOnce()
+        expect(onBack).not.toHaveBeenCalled()
       })
 
       it('draws one control in the left slot, and nothing about a run on the right', () => {
         // Neither the selection's back control nor the collapse toggle;
         // the right slot is gated on `runId`, as the desktop's global
-        // view is. The one control has one label: the screen is always
-        // over a run, so there is no `back to runs` here (D217).
+        // view is. The one control is the screen's own `←`, labelled as
+        // the detail's is because both go to the list (D218).
         render(<PaneBar panes={global()} onBack={vi.fn()} leave={vi.fn()} />)
 
         expect(screen.getAllByRole('button', { name: /back|clear|hide/ })).toHaveLength(1)
-        expect(screen.getByRole('button', { name: 'back to the run' })).toBeInTheDocument()
-        expect(screen.queryByRole('button', { name: 'back to runs' })).toBeNull()
+        expect(screen.getByRole('button', { name: 'back to runs' })).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'hide run list' })).toBeNull()
         expect(
           screen.queryByRole('button', { name: 'clear the selected run' }),

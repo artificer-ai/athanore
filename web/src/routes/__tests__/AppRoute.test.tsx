@@ -119,9 +119,10 @@ describe('the selection', () => {
   })
 
   it('takes the narrow global screen down when a run is selected', async () => {
-    // Selecting a run is how the detail stops showing the global panes
-    // and starts showing the run's (D216).
-    const router = mount('/?run=aaaa1111&pane=1&global=0')
+    // `↓` on the global screen selects a run, and selecting one is how
+    // the middle stops showing the global panes and starts showing the
+    // run's (D216, D218).
+    const router = mount('/?pane=1&global=0')
 
     await press(router, 'select run', '?run=cccc3333&pane=1')
   })
@@ -140,36 +141,36 @@ describe('the selection', () => {
     await press(router, 'clear run', '?pane=1')
   })
 
-  it('takes the global screen down with the run', async () => {
-    // The global screen is always over a run (D217), so the screen goes
-    // with the thing under it: a run deleted from the palette while it
-    // is up lands on the list, and the narrow `←` and the swipe left
-    // that share this write leave nothing behind.
+  it('clears a stale `?global=` with the run, so leaving the detail is the list', async () => {
+    // `?global=` beside `?run=` is inert (D218 (1)); left in place,
+    // clearing the run would land on the global screen rather than the
+    // list the narrow `←` and the swipe right promise (D218 (3)).
     const router = mount('/?run=aaaa1111&pane=1&global=0')
 
     await press(router, 'clear run', '?pane=1')
   })
 
-  it('leaves the global screen alone when the run’s pane changes', async () => {
-    const router = mount('/?run=aaaa1111&global=0')
+  it('leaves `?global=` alone when the pane changes', async () => {
+    const router = mount('/?global=0')
 
-    await press(router, 'select pane', '?run=aaaa1111&pane=2&global=0')
+    await press(router, 'select pane', '?pane=2&global=0')
   })
 })
 
 describe('the narrow global screen', () => {
-  it('writes `?global=` and touches neither `?run=` nor `?pane=`', async () => {
-    // One parameter carries the screen and its pane; the run's own pane
-    // is what a swipe back lands on (21 §Narrow layout, D216).
-    const router = mount('/?run=aaaa1111&pane=1')
+  it('writes `?global=` and touches nothing else', async () => {
+    // One parameter carries the screen and its pane; `?pane=` is the
+    // operator's attention and is where the next run opens (21 §Narrow
+    // layout, D216, D218).
+    const router = mount('/?pane=1')
 
-    await press(router, 'show global', '?run=aaaa1111&pane=1&global=1')
+    await press(router, 'show global', '?pane=1&global=1')
   })
 
   it('writes it away to leave, so back works on it', async () => {
-    const router = mount('/?run=aaaa1111&pane=1&global=1')
+    const router = mount('/?pane=1&global=1')
 
-    await press(router, 'leave global', '?run=aaaa1111&pane=1')
+    await press(router, 'leave global', '?pane=1')
   })
 
   it('comes down when a graph row opens the log pane', async () => {
