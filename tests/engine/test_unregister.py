@@ -384,6 +384,116 @@ async def test_an_attempt_spawned_by_the_racing_claim_is_cancelled_too(
 
 
 # --------------------------------------------------------------------------
+# The attempt that holds no id
+# --------------------------------------------------------------------------
+
+
+class GatedReader:
+    """The store, with the next ``reader()`` after :meth:`arm` held at a gate.
+
+    What holds an attempt inside ``_load_run`` — its first await, a read —
+    so the attempt spawned before it can be ended underneath it.
+    """
+
+    def __init__(self, store: Store) -> None:
+        self._store = store
+        self._armed = False
+        self.gate = asyncio.Event()
+        self.entered = asyncio.Event()
+
+    def arm(self) -> None:
+        self._armed = True
+
+    def reader(self) -> Any:
+        if not self._armed:
+            return self._store.reader()
+        self._armed = False
+
+        @asynccontextmanager
+        async def gated() -> AsyncGenerator[Any]:
+            self.entered.set()
+            await self.gate.wait()
+            async with self._store.reader() as reader:
+                yield reader
+
+        return gated()
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._store, name)
+
+
+async def test_unregister_cancels_the_younger_attempt_of_a_re_dispatched_row(
+    start_engine, store: Store, wait_for, wait_until
+) -> None:
+    """The attempt ``cancel_attempts`` cannot see is cancelled too, promptly.
+
+    ``set_status(task, ready)`` on a row in flight spawns a second attempt
+    under the first; the first keeps the id (D107), and once it has ended
+    the second is the row's only attempt — running its body, registered
+    live, with no id-keyed entry anywhere. ``unregister`` cancels what is
+    live, not what holds an id: it returns when that attempt has been
+    cancelled rather than when its body would have finished, and the
+    status the body would have written is never written.
+
+    The state is built from ``set_status``'s two halves — the write, then
+    the cancel — with the younger attempt's first read held between
+    them, which is what a slow ``finally`` on the older attempt (an agent
+    killed under the grace period) does unaided.
+    """
+
+    parked = Parked()
+    engine: Engine = await start_engine((parked.workflow("twice"), Pool("test", 2)))
+    run = await engine.ops.submit("twice", "a run")
+    await wait_for(parked.started)
+    task = await task_of(store, run.id)
+
+    gated = GatedReader(store)
+    engine.store = gated  # type: ignore[assignment]
+    async with store.uow() as uow:
+        await uow.tasks.set_status(task.id, TaskStatus.ready)
+    # The next read anything opens is the younger attempt's `_load_run`:
+    # the claim is a unit of work, and the older attempt is asleep.
+    gated.arm()
+    engine.notify()
+    await wait_for(gated.entered)
+
+    # The older attempt ends under it and is reaped: the id has no holder.
+    assert engine.scheduler.cancel_attempts([task.id]) == [task.id]
+    await wait_until(lambda: _reaped(engine, task.id))
+    assert parked.cancelled
+
+    # Nothing holds the id, so the younger passes the registry and runs.
+    parked.started.clear()
+    parked.cancelled = False
+    gated.gate.set()
+    await wait_for(parked.started)
+    assert parked.starts == 2
+    assert task.id in engine.live
+    assert engine.scheduler.in_flight == ()
+    assert engine.attempts_of("twice") == [task.id]
+
+    with capture_logs() as logged:
+        async with asyncio.timeout(DEADLINE):
+            assert await engine.unregister("twice") == [task.id]
+
+    assert parked.cancelled
+    assert (await task_of(store, run.id)).status is TaskStatus.in_progress
+    assert await run_status(store, run.id) is RunStatus.running
+    assert not any(
+        entry["event"] == "attempt raised past the runner" for entry in logged
+    )
+    assert "twice" not in engine.graphs
+    assert engine.attempts_of("twice") == []
+    assert engine.scheduler.in_flight == ()
+    assert engine.pools.get("test").leased == 0
+    assert engine.live.all() == []
+
+
+async def _reaped(engine: Engine, task_id: int) -> bool:
+    return task_id not in engine.scheduler.in_flight
+
+
+# --------------------------------------------------------------------------
 # Edges
 # --------------------------------------------------------------------------
 

@@ -83,7 +83,7 @@ implementer should hold them before writing a line:
    then `_reap()` so their slots are back and `in_flight` no longer
    lists them — the tail of `_cancel_all`, for a chosen set. Ids
    nothing is running are skipped. Does not cancel: the caller already
-   did, with `cancel_attempts`.
+   did, with `cancel_attempts` or `cancel_attempts_of`.
 6. **`Scheduler.quiescent()`**: an `asynccontextmanager` over a new
    `asyncio.Lock` that `_loop` holds around each `_dispatch_all()`.
    Inside the block no tick is in progress and none starts; the tick in
@@ -120,7 +120,12 @@ implementer should hold them before writing a line:
    (no claim after this point can select the workflow — 04 §Dispatch
    order filters by the pool's bound names); `task_ids =
    scheduler.attempts_of(name)` (closed set: unbound and between
-   ticks); `scheduler.cancel_attempts(task_ids)`; `del self.graphs[name]`.
+   ticks) — as one step, `task_ids = scheduler.cancel_attempts_of(name)`,
+   which walks `_live` and cancels every live attempt of the name, so the
+   set cancelled is the set `wait_for` waits on (`cancel_attempts` resolves
+   one attempt per id and cannot see the younger attempt of a
+   re-dispatched row once the older has ended — D107, D235); `del
+   self.graphs[name]`.
    Then, outside the block, `await scheduler.wait_for(task_ids)` and
    return `task_ids`. The graph is dropped *after* the cancellations are
    issued, synchronously with them, so an attempt still inside
@@ -334,8 +339,18 @@ should know beyond the text above.
   takes the lock, and the same pool is not a move.
 - `Engine.unregister` logs `unregistered with attempts in flight` at
   INFO when it interrupted anything, beside the ids it returns.
+- Review (attempt 2): `unregister` first cancelled through
+  `cancel_attempts`, whose id-keyed ledger has no entry for the younger
+  attempt of a re-dispatched row once the older has ended, while
+  `wait_for` reads the per-attempt ledger — so it could list an attempt,
+  fail to cancel it, block until its body finished and then have a
+  status written. `Scheduler.cancel_attempts_of(name)` cancels from
+  `_live`, the ledger `attempts_of` and `wait_for` read (D235). The
+  tests build the state deterministically: a store wrapper whose next
+  `reader()` blocks holds the younger attempt inside `_load_run` while
+  the older is cancelled and reaped, then lets it through to its body.
 - Tests: `tests/engine/test_replace.py` (8), `tests/engine/test_unregister.py`
-  (7), `tests/engine/test_scheduler.py` (+6), `tests/engine/test_recovery.py`
+  (8), `tests/engine/test_scheduler.py` (+8), `tests/engine/test_recovery.py`
   (+4), `tests/engine/test_pools.py` (+4), `tests/engine/test_runner.py` and
   `test_ops_basic.py` (+1 each), `tests/store/test_claim.py` (+1),
   `tests/store/test_tasks_repo.py` (+1). The raced-claim test in
@@ -346,4 +361,4 @@ should know beyond the text above.
   `test_unregister.py` (the `requests_service` fixture) and a direct
   `lease.released()` in `test_replace.py`, which is the layer the wait
   lives at.
-- Decisions D229–D234.
+- Decisions D229–D235.

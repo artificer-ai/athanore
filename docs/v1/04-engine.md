@@ -506,9 +506,12 @@ each the engine-tier half of a server verb 22 §Effects sequences:
   (§Pools); `KeyError` for an unknown pool or an unregistered name.
 - **`Engine.unregister(name)`** unbinds the name from its pool (no claim
   after this selects its tasks — §Dispatch order filters by the bound
-  names), cancels every attempt of it this process holds exactly as
-  §Shutdown step 3 does, writes no status (step 4), drops the graph and
-  keeps the pool. It returns the interrupted task ids; the rows stay
+  names), cancels every attempt of it this process holds — running,
+  parked on a human, still loading, or the younger attempt of a row
+  re-dispatched under a live one, which holds no task id of its own
+  (D107, D235) — exactly as §Shutdown step 3 does, writes no status
+  (step 4), drops the graph and keeps the pool. The set cancelled is the
+  set waited for. It returns the interrupted task ids; the rows stay
   `in_progress` / `waiting` for `recover(engine, [name])` at the next
   registration of the name, or for the next process.
 

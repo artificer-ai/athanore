@@ -153,6 +153,30 @@ class Scheduler:
                 seen.setdefault(entry.task_id, None)
         return list(seen)
 
+    def cancel_attempts_of(self, workflow: str) -> list[int]:
+        """Cancel every live attempt of ``workflow``; the task ids, in spawn order.
+
+        The cancel half of ``unregister`` (22 §Remove step 1). It reads
+        the same ledger :meth:`attempts_of` and :meth:`wait_for` read —
+        ``_live``, every attempt, not ``_attempts``, one per id — so the
+        set it cancels is exactly the set that will be waited for. The
+        difference is a row re-dispatched under a live attempt: the
+        younger attempt never takes the id from the older one (D107),
+        and once the older has ended it is the row's only attempt with
+        no entry for :meth:`cancel_attempts` to find. It is still an
+        attempt of the workflow, and it is cancelled here.
+
+        Synchronous like :meth:`cancel_attempts`, and for the same
+        reason: called between ticks, the set is closed, and the
+        attempts reap themselves.
+        """
+        seen: dict[int, None] = {}
+        for attempt, entry in self._live.items():
+            if entry.workflow == workflow and not attempt.done():
+                attempt.cancel()
+                seen.setdefault(entry.task_id, None)
+        return list(seen)
+
     async def wait_for(self, task_ids: Iterable[int]) -> None:
         """Wait for the attempts of ``task_ids`` to end, and reap them.
 
@@ -161,7 +185,8 @@ class Scheduler:
         cleanup run to completion under it — and then reaped, so the
         slots are back and :attr:`in_flight` no longer lists them when
         this returns. Ids nothing is running are skipped. This does not
-        cancel; the caller did, with :meth:`cancel_attempts`.
+        cancel; the caller did, with :meth:`cancel_attempts` or
+        :meth:`cancel_attempts_of`.
         """
         wanted = set(task_ids)
         attempts = [

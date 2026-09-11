@@ -215,9 +215,10 @@ class Engine:
 
         22 §Remove steps 1–2, in this order and between ticks: the name
         is unbound from its pool, so no claim from here selects its
-        tasks (04 §Dispatch order); the attempts this process holds —
-        running, parked on a human, or still loading — are cancelled the
-        way :meth:`stop` cancels them; the graph is dropped; then, with
+        tasks (04 §Dispatch order); every attempt this process holds —
+        running, parked on a human, still loading, or the second attempt
+        of a row re-dispatched under a live one — is cancelled the way
+        :meth:`stop` cancels them; the graph is dropped; then, with
         the loop free to tick again, the cancelled attempts are waited
         for so their slots are back and their contexts gone when this
         returns. Returns the task ids that were interrupted, in spawn
@@ -242,8 +243,11 @@ class Engine:
             raise KeyError(f"workflow {name!r} is not registered")
         async with self.scheduler.quiescent():
             self.pools.unbind(name)
-            task_ids = self.scheduler.attempts_of(name)
-            self.scheduler.cancel_attempts(task_ids)
+            # Every live attempt of the name — the set `wait_for` waits
+            # on — not `cancel_attempts`' one-per-id ledger, which has
+            # no entry for the younger attempt of a re-dispatched row
+            # once the older one has ended (D107).
+            task_ids = self.scheduler.cancel_attempts_of(name)
             # Dropped synchronously with the cancellations: an attempt
             # still loading its run is cancelled at that await and never
             # looks the graph up; one before its first line never runs.
