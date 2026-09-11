@@ -116,7 +116,10 @@ wf.panel("Playfield", slot="task", node="qa", kind="custom", element="gd-playfie
 strict content-security policy and no inline scripts. The element gets
 the ids in scope as attributes and calls back to your own routes through
 the bridge the interface exposes. One file of browser JavaScript, no
-build step.
+build step. Reload the workflow after editing that file and the
+dashboard keeps the element it has and shows a `plugin code changed —
+reload the page` notice: a browser cannot run a module a second time,
+so the page reload is what picks the new code up.
 
 If you need a library from a CDN, the deployment allows specific origins
 through `plugin_cdns`; see [Settings](../reference/settings.md). The

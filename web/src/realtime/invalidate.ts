@@ -36,9 +36,13 @@ import {
   getRequestsApiRunsRunIdRequestsGetQueryKey,
   getRunApiRunsRunIdGetQueryKey,
   getStreamApiTasksTaskIdStreamGetQueryKey,
+  getSourceApiWorkflowsNameSourceGetQueryKey,
   getTaskApiTasksTaskIdGetQueryKey,
+  getWorkflowApiWorkflowsNameGetQueryKey,
   listRequestsApiRequestsGetQueryKey,
   listRunsApiRunsGetQueryKey,
+  listWorkflowsApiWorkflowsGetQueryKey,
+  manifestApiPluginsGetQueryKey,
 } from '../api/gen/@tanstack/react-query.gen'
 import { getStreamApiTasksTaskIdStreamGet } from '../api/gen/sdk.gen'
 import type {
@@ -60,8 +64,28 @@ export type AthanoreEvent = GetEventsApiRunsRunIdEventsGetResponse[number]
 export const COALESCE_WINDOW_MS = 250
 
 /**
- * The eight cache entries the table names, each as the generated key of
- * the query that fills it.
+ * A generated key with its `path` taken off: the prefix over every
+ * name of a name-keyed resource.
+ *
+ * The two workflow helpers below type `path` as required, so there is
+ * no generated spelling of "the source of *any* workflow". The key they
+ * build is `[{ _id, baseUrl, path: { name } }]`, and TanStack's partial
+ * matching is deep over objects, so `[{ _id, baseUrl }]` reaches every
+ * one of them — the prefix property D155 gives the run keys, one
+ * parameter further up. `_id` and `baseUrl` stay the generator's rather
+ * than being written here (D49, D253).
+ */
+function withoutPath(key: QueryKey): QueryKey {
+  const [head, ...rest] = key
+  if (typeof head !== 'object' || head === null) return key
+  const prefix: Record<string, unknown> = { ...(head as Record<string, unknown>) }
+  delete prefix.path
+  return [prefix, ...rest]
+}
+
+/**
+ * The twelve cache entries the table names, each as the generated key
+ * of the query that fills it.
  */
 export const queryKeys = {
   /** `GET /api/runs` — the run list and the header's counts. */
@@ -86,6 +110,16 @@ export const queryKeys = {
   /** `GET /api/tasks/{id}/stream` — the agent pane's transcript. */
   stream: (taskId: number): QueryKey =>
     getStreamApiTasksTaskIdStreamGetQueryKey({ path: { task_id: taskId } }),
+  /** `GET /api/workflows` — the library's list and the new-run chips. */
+  workflows: (): QueryKey => listWorkflowsApiWorkflowsGetQueryKey(),
+  /** `GET /api/workflows/{name}`, for every name (`withoutPath`). */
+  workflow: (): QueryKey =>
+    withoutPath(getWorkflowApiWorkflowsNameGetQueryKey({ path: { name: '' } })),
+  /** `GET /api/workflows/{name}/source`, for every name: the viewer. */
+  source: (): QueryKey =>
+    withoutPath(getSourceApiWorkflowsNameSourceGetQueryKey({ path: { name: '' } })),
+  /** `GET /api/plugins` — the pane cycle, the cards, the palette's rows. */
+  manifest: (): QueryKey => manifestApiPluginsGetQueryKey(),
 } as const
 
 /** What one event name makes stale. */
@@ -94,8 +128,8 @@ export type Invalidation = (event: AthanoreEvent) => QueryKey[]
 /**
  * 10 §Realtime's table, transcribed.
  *
- * Two readings of that section are worth naming, because neither is
- * visible in the row alone:
+ * Four readings of that section are worth naming, because none of them
+ * is visible in the row alone:
  *
  * - `task.stream`'s key is here so that the matcher can be *asked* about
  *   it and answer with the transcript rather than with `task.*`'s three
@@ -114,6 +148,17 @@ export type Invalidation = (event: AthanoreEvent) => QueryKey[]
  *   never parks the task — so no `task.*` follows it, and a list
  *   refetched only on the other two shows nothing waiting on the
  *   operator until something unrelated moves (D208).
+ * - `workflow.*` is 22 §SPA's row: a registration, a reload or a
+ *   removal makes the workflow list, the single-workflow and source
+ *   queries and the manifest stale, and that one refetch is what moves
+ *   the library, the new-run chips, the palette's plugin rows and the
+ *   pane cycle. `runs` is in it for D208's reason one more time:
+ *   `GET /api/runs` answers `unregistered` per request from the live
+ *   registry (08 §Runs), and a removal writes no run or task status and
+ *   emits no `run.*`/`task.*` (22 §Remove), so a list refetched only on
+ *   those would draw the row's `⊘` only when something unrelated moved
+ *   (D253). The name-keyed prefixes reach every workflow at once; the
+ *   event names one, but the list and the chips are about all of them.
  */
 export const invalidations: Record<string, Invalidation> = {
   'task.stream': (e) => (e.task_id == null ? [] : [queryKeys.stream(e.task_id)]),
@@ -135,6 +180,13 @@ export const invalidations: Record<string, Invalidation> = {
     queryKeys.inbox(),
   ],
   'agent.stats': (e) => (e.run_id == null ? [] : [queryKeys.run(e.run_id)]),
+  'workflow.*': () => [
+    queryKeys.workflows(),
+    queryKeys.workflow(),
+    queryKeys.source(),
+    queryKeys.manifest(),
+    queryKeys.runs(),
+  ],
   'plugin.*': (e) => panelsRefreshingOn(e.name),
 }
 

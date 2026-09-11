@@ -8,7 +8,14 @@
  */
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import { ASSET_ATTRIBUTE, assetLoaded, injectAssets, injectedAssets } from '../assets'
+import {
+  ASSET_ATTRIBUTE,
+  assetLoaded,
+  assetPath,
+  injectAssets,
+  injectedAssets,
+  staleAssets,
+} from '../assets'
 
 const PLAYFIELD = '/plugins/gamedev/static/playfield.js'
 const HELPER = '/plugins/gamedev/static/vendor/helper.js'
@@ -63,5 +70,58 @@ describe('an asset that will not load', () => {
     expect(reported).toHaveBeenCalledWith(
       expect.stringContaining('a plugin asset failed to load'),
     )
+  })
+})
+
+describe('a path the document already ran at another version', () => {
+  const V1 = `${PLAYFIELD}?v=aaaaaaaaaaaa`
+  const V2 = `${PLAYFIELD}?v=bbbbbbbbbbbb`
+
+  it('splits a manifest url into its path and nothing else', () => {
+    expect(assetPath(V1)).toBe(PLAYFIELD)
+    expect(assetPath(PLAYFIELD)).toBe(PLAYFIELD)
+    expect(assetPath('/plugins/gamedev/static/a.js?v=1&x=?')).toBe(
+      '/plugins/gamedev/static/a.js',
+    )
+  })
+
+  it('is not stale on a first injection', () => {
+    expect(staleAssets([V1, HELPER])).toEqual([])
+  })
+
+  it('is not stale when the manifest lists what is loaded', () => {
+    injectAssets([V1, HELPER])
+
+    expect(staleAssets([V1, HELPER])).toEqual([])
+  })
+
+  it('is not stale when a workflow is removed and lists nothing', () => {
+    injectAssets([V1])
+
+    expect(staleAssets([])).toEqual([])
+  })
+
+  it('names the url whose path is loaded under a different ?v=', () => {
+    injectAssets([V1, HELPER])
+
+    // The reload changed one file: the helper's bytes, and so its
+    // version, are what they were.
+    expect(staleAssets([V2, HELPER])).toEqual([V2])
+  })
+
+  it('never injects the second version of one path', () => {
+    injectAssets([V1])
+    injectAssets([V2])
+
+    // One script, and it is the one that ran: a second would run the
+    // plugin's `customElements.define` again and throw (D225).
+    expect(injectedAssets()).toEqual([V1])
+  })
+
+  it('still injects a path that is new beside one that is stale', () => {
+    injectAssets([V1])
+    injectAssets([V2, HELPER])
+
+    expect(injectedAssets()).toEqual([V1, HELPER])
   })
 })

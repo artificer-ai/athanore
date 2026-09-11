@@ -31,6 +31,9 @@
  *
  * `ServerDownBanner` sits directly under the header and renders nothing
  * while the event feed is up (10 §Realtime and caching).
+ * `PluginAssetsBanner` sits under it and renders nothing until a
+ * workflow's JavaScript has changed under this page — the one change of
+ * a live registration the tab cannot follow without a reload (22 §SPA).
  *
  * `useAttention` is read here for a third form of the same reason: the
  * tab title and the desktop notifications are one fact about the whole
@@ -63,6 +66,7 @@ import { useEffect } from 'react'
 import { Detail } from './components/Detail'
 import { Footer } from './components/Footer'
 import { Header } from './components/Header'
+import { PluginAssetsBanner } from './components/PluginAssetsBanner'
 import { RunList, useRunListModel, useRuns } from './components/RunList'
 import { ServerDownBanner } from './components/ServerDownBanner'
 import { Splitter } from './components/Splitter'
@@ -428,6 +432,7 @@ export default function App({
         }}
       />
       <ServerDownBanner />
+      <PluginAssetsBanner />
 
       <Splitter
         count={runs.rows.length}

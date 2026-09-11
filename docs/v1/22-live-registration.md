@@ -464,10 +464,14 @@ no target reloads what `serve` loaded.
 
 Three rows join the invalidation table (10 §Realtime and caching):
 `workflow.*` invalidates the workflow list, the single-workflow and
-source queries, and the manifest. That refetch is what refreshes the
-library overlay, the new-run chip group, the palette's plugin rows, and
-the selected run's pane cycle — whose index 10 §Panes already clamps
-when the count changes.
+source queries, the manifest, and the run list — whose `unregistered`
+flag is computed per request (08 §Runs), so a removal that emits no
+`run.*` would otherwise leave the row's marker for something unrelated
+to draw (D253). That refetch is what refreshes the library overlay, the
+new-run chip group, the palette's plugin rows, the selected run's pane
+cycle — whose index 10 §Panes already clamps when the count changes —
+and the `⊘` a run of a removed workflow carries on its row (10
+§Attention).
 
 A newly registered workflow's assets are injected as any workflow's are
 at manifest load. A **replaced** workflow's assets are the one case the

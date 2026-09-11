@@ -7,7 +7,14 @@
  * element gets three capabilities and nothing else — and the three
  * modules behind this file are one of those each.
  */
-export { ASSET_ATTRIBUTE, assetLoaded, injectAssets, injectedAssets } from './assets'
+export {
+  ASSET_ATTRIBUTE,
+  assetLoaded,
+  assetPath,
+  injectAssets,
+  injectedAssets,
+  staleAssets,
+} from './assets'
 export {
   bindPluginBridge,
   pluginBridge,

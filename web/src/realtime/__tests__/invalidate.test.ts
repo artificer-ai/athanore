@@ -2,6 +2,10 @@ import type { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 
 import { createAppQueryClient } from '../../api/client'
+import {
+  getSourceApiWorkflowsNameSourceGetQueryKey,
+  getWorkflowApiWorkflowsNameGetQueryKey,
+} from '../../api/gen/@tanstack/react-query.gen'
 import type { StreamOut } from '../../api/gen/types.gen'
 import {
   COALESCE_WINDOW_MS,
@@ -103,6 +107,69 @@ describe('the invalidation table', () => {
       const keys = names(keysFor(event('agent.stats', { run_id: 'r1', task_id: 7 })))
 
       expect(keys).toEqual(names([queryKeys.run('r1')]))
+    })
+
+    describe('workflow.*', () => {
+      /** 22 §SPA's four, and the run list (D253). */
+      const registrationKeys = () =>
+        names([
+          queryKeys.workflows(),
+          queryKeys.workflow(),
+          queryKeys.source(),
+          queryKeys.manifest(),
+          queryKeys.runs(),
+        ])
+
+      it.each(['workflow.registered', 'workflow.replaced', 'workflow.unregistered'])(
+        'refetches the library, the manifest and the run list on %s',
+        (name) => {
+          // The three carry no `run_id` (22 §Wire), and the row asks for
+          // none: a registration is about every workflow's list.
+          const keys = names(keysFor(event(name)))
+
+          expect(keys).toEqual(registrationKeys())
+          expect(keys).not.toContain(JSON.stringify(queryKeys.run('r1')))
+          expect(keys).not.toContain(JSON.stringify(queryKeys.task(7)))
+          expect(keys).not.toContain(JSON.stringify(queryKeys.stream(7)))
+        },
+      )
+
+      it('names the single-workflow and source queries of every name at once', async () => {
+        // The generated keys carry `path: { name }`; the row's prefix is
+        // the same object with `path` taken off, which TanStack's deep
+        // partial matching reaches for any name (D155, D253).
+        const queryClient = createAppQueryClient()
+        const tempo = getWorkflowApiWorkflowsNameGetQueryKey({ path: { name: 'tempo' } })
+        const tempoSource = getSourceApiWorkflowsNameSourceGetQueryKey({
+          path: { name: 'tempo' },
+        })
+        const probeSource = getSourceApiWorkflowsNameSourceGetQueryKey({
+          path: { name: 'probe' },
+        })
+        queryClient.setQueryData(tempo, { name: 'tempo' })
+        queryClient.setQueryData(tempoSource, { source: 'v1' })
+        queryClient.setQueryData(probeSource, { source: 'v1' })
+
+        const [prefix] = queryKeys.workflow() as [Record<string, unknown>]
+        expect(prefix).not.toHaveProperty('path')
+        expect(prefix._id).toBe((tempo[0] as Record<string, unknown>)._id)
+        expect(prefix.baseUrl).toBe((tempo[0] as Record<string, unknown>).baseUrl)
+        expect(
+          queryClient.getQueryCache().findAll({ queryKey: queryKeys.workflow() }),
+        ).toHaveLength(1)
+        expect(
+          queryClient
+            .getQueryCache()
+            .findAll({ queryKey: queryKeys.source() })
+            .map((query) => query.queryKey),
+        ).toEqual([tempoSource, probeSource])
+
+        await queryClient.invalidateQueries({ queryKey: queryKeys.source() })
+
+        expect(queryClient.getQueryState(tempoSource)?.isInvalidated).toBe(true)
+        expect(queryClient.getQueryState(probeSource)?.isInvalidated).toBe(true)
+        expect(queryClient.getQueryState(tempo)?.isInvalidated).toBe(false)
+      })
     })
 
     it('answers with nothing for a name no row matches', () => {
@@ -239,6 +306,28 @@ describe('the coalescer', () => {
       [queryKeys.runs(), queryKeys.run('r1'), queryKeys.graph('r1')].map((key) =>
         JSON.stringify(key),
       ),
+    )
+  })
+
+  it('coalesces the three registration names into one refetch each', () => {
+    const invalidator = new Invalidator(queryClient)
+
+    // A reload is `workflow.replaced`; a `rm` then an `add` of one name
+    // inside a window is two more. Five keys, once each.
+    invalidator.handle(event('workflow.replaced'))
+    invalidator.handle(event('workflow.unregistered'))
+    invalidator.handle(event('workflow.registered'))
+
+    vi.advanceTimersByTime(COALESCE_WINDOW_MS)
+
+    expect(invalidated()).toEqual(
+      [
+        queryKeys.workflows(),
+        queryKeys.workflow(),
+        queryKeys.source(),
+        queryKeys.manifest(),
+        queryKeys.runs(),
+      ].map((key) => JSON.stringify(key)),
     )
   })
 

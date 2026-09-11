@@ -4211,6 +4211,10 @@ removal. Playwright: the spec above.
 **Done.** The SPA follows registrations without a reload except where
 a plugin's JavaScript changed, and says so; the end-to-end flow of 22
 §Testing passes in CI; gate green; snapshot unchanged.
+**Status.** Done. The `workflow.*` row over five generated keys, the
+path-less prefixes, `staleAssets` at manifest load into `useUi`, the
+`PluginAssetsBanner`, the host keyed on asset paths, the row's `⊘`,
+`web/e2e/registration.spec.ts`; D253.
 
 ## Traceability
 

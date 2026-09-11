@@ -13,6 +13,10 @@
  * than nine, and a spec reads as the operator's story rather than as
  * CSS.
  */
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+
 import { test as base, expect, type Locator, type Page } from '@playwright/test'
 
 import { AthanoreServer } from './server'
@@ -30,7 +34,14 @@ export const RUN_TIMEOUT = 30_000
  */
 export const NARROW_VIEWPORT = { width: 390, height: 844 }
 
-/** The workflows `support/server.ts` registers (`../workflows.py`). */
+/**
+ * The workflows `support/server.ts` registers (`../workflows.py`).
+ *
+ * What a spec may name without registering anything first. A spec that
+ * registers a workflow of its own over the API (`../registration.spec.ts`)
+ * submits it by name, so the gestures below take a `string`; the union
+ * stays for what it documents.
+ */
 export type FixtureWorkflow =
   | 'probe'
   | 'spread'
@@ -111,11 +122,7 @@ export class Dashboard {
    * asked for — an on-screen keyboard into a focused input is how a
    * phone types, and 21 §Touch operation says so in as many words.
    */
-  async submit(
-    workflow: FixtureWorkflow,
-    title: string,
-    by: Gesture = 'click',
-  ): Promise<void> {
+  async submit(workflow: string, title: string, by: Gesture = 'click'): Promise<void> {
     const act = async (target: Locator) => {
       if (by === 'tap') await target.tap()
       else await target.click()
@@ -137,7 +144,7 @@ export class Dashboard {
    * that make a queue for `reorder` to move something in. The gesture
    * under test is always the browser's; this is the fixture.
    */
-  async submitOverApi(workflow: FixtureWorkflow, title: string): Promise<string> {
+  async submitOverApi(workflow: string, title: string): Promise<string> {
     const response = await fetch(`${this.server.url}/api/workflows/${workflow}/runs`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -150,7 +157,20 @@ export class Dashboard {
     return created.run_id
   }
 
+  /**
+   * The `⊘` on a run's row: this server has no workflow of that name
+   * (22 §Remove, 10 §Attention).
+   */
+  unregistered(title: string): Locator {
+    return this.row(title).getByTestId('run-unregistered')
+  }
+
   // -- the detail region -----------------------------------------------
+
+  /** One dot of the pane bar, by the pane's name. */
+  paneDot(name: string): Locator {
+    return this.page.locator(`[data-pane="${name}"][role="radio"]`)
+  }
 
   /** Show a builtin pane by name: the bar's dots are a radio group. */
   async pane(name: string): Promise<void> {
@@ -213,6 +233,61 @@ export class Dashboard {
     await expect(palette).toBeVisible()
     await palette.locator(`[cmdk-item][data-value="${name}"]`).click()
     await expect(palette).toBeHidden()
+  }
+
+  /** Open the workflow library from the header's `workflows` button. */
+  async openLibrary(): Promise<Locator> {
+    await this.page.getByRole('button', { name: 'workflows', exact: true }).click()
+    const library = this.page.getByTestId('library')
+    await expect(library).toBeVisible()
+    return library
+  }
+
+  /** The library's row for a workflow, by name (10 §Overlays). */
+  libraryRow(name: string): Locator {
+    return this.page.locator(`[data-testid="library-list"] [data-workflow="${name}"]`)
+  }
+
+  /** The library's source viewer: the selected workflow's Python. */
+  librarySource(): Locator {
+    return this.page.getByTestId('library-source')
+  }
+
+  /** Open the New Run overlay without submitting anything. */
+  async openNewRun(): Promise<Locator> {
+    await this.page.getByRole('button', { name: 'new run', exact: true }).click()
+    const panel = this.page.getByTestId('new-run')
+    await expect(panel).toBeVisible()
+    return panel
+  }
+
+  /** The New Run overlay's chip for a workflow, by name. */
+  newRunChip(name: string): Locator {
+    return this.page.getByTestId('new-run').getByRole('radio', { name, exact: true })
+  }
+
+  /** `esc`: whichever overlay is up goes down (10 §Overlays). */
+  async closeOverlay(): Promise<void> {
+    await this.page.keyboard.press('Escape')
+    await expect(this.page.getByTestId('library')).toHaveCount(0)
+    await expect(this.page.getByTestId('new-run')).toHaveCount(0)
+  }
+
+  // -- the banners -----------------------------------------------------
+
+  /**
+   * The strip that says a plugin's JavaScript changed under this page
+   * and only a reload can follow it (22 §SPA).
+   */
+  pluginAssetsBanner(): Locator {
+    return this.page.getByTestId('plugin-assets-banner')
+  }
+
+  /** Press the banner's `reload`, and wait for the shell as `open` does. */
+  async reloadFromBanner(): Promise<void> {
+    await this.pluginAssetsBanner().getByRole('button', { name: 'reload' }).click()
+    await expect(this.page.getByRole('heading', { name: 'ATHANORE' })).toBeVisible()
+    await expect(this.page.getByTestId('rows-shown')).toBeVisible()
   }
 
   // -- requests --------------------------------------------------------
@@ -394,7 +469,11 @@ export class Dashboard {
   }
 }
 
-export const test = base.extend<{ server: AthanoreServer; dashboard: Dashboard }>({
+export const test = base.extend<{
+  server: AthanoreServer
+  dashboard: Dashboard
+  scratch: string
+}>({
   server: async ({}, use) => {
     const server = new AthanoreServer()
     await server.start()
@@ -402,6 +481,20 @@ export const test = base.extend<{ server: AthanoreServer; dashboard: Dashboard }
       await use(server)
     } finally {
       await server.stop()
+    }
+  },
+
+  /**
+   * A directory of the test's own, outside the server's root, for the
+   * workflow files a spec writes and registers (`../registration.spec.ts`).
+   * Gone when the test is.
+   */
+  scratch: async ({}, use) => {
+    const directory = mkdtempSync(join(tmpdir(), 'athanore-e2e-scratch-'))
+    try {
+      await use(directory)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
     }
   },
 

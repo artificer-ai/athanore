@@ -22,12 +22,13 @@
  * is everything the host does before the plugin's first line runs.
  */
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 
 import { manifestApiPluginsGetQueryKey } from '../../api/gen/@tanstack/react-query.gen'
 import { ASSET_ATTRIBUTE, injectedAssets } from '../../plugins'
 import { CustomElementHost } from '../CustomElementHost'
+import { useManifestEntries } from '../manifest'
 import { GAMEDEV_ENTRY, MANIFEST } from './fixtures'
 
 const RUN = '01JD5XELEMENTHOST0000000'
@@ -97,6 +98,75 @@ describe('the assets', () => {
     draw({ workflow: 'feature_build', tag: 'fb-diff' })
 
     expect(injectedAssets()).toEqual([])
+  })
+
+  describe('after the workflow is reloaded', () => {
+    const PATH = '/plugins/gamedev/static/playfield.js'
+    const V1 = `${PATH}?v=aaaaaaaaaaaa`
+    const V2 = `${PATH}?v=bbbbbbbbbbbb`
+    const HELPER = '/plugins/gamedev/static/helper.js?v=cccccccccccc'
+
+    /** What the host reads of the manifest, beside it, for a test to wait on. */
+    function Assets() {
+      const { manifest } = useManifestEntries()
+      return (
+        <span data-testid="assets">
+          {manifest.flatMap((entry) => entry.assets ?? []).join(' ')}
+        </span>
+      )
+    }
+
+    function drawWith(assets: string[]) {
+      queryClient.setQueryData(manifestApiPluginsGetQueryKey(), [
+        { ...GAMEDEV_ENTRY, assets },
+      ])
+      return render(
+        <QueryClientProvider client={queryClient}>
+          <CustomElementHost tag="gd-playfield" workflow="gamedev" scope={{ runId: RUN }} />
+          <Assets />
+        </QueryClientProvider>,
+      )
+    }
+
+    /**
+     * Replace the cached manifest, as a `workflow.*` refetch does, and
+     * wait for the host's render to have seen it — the cache notifies
+     * on a timer.
+     */
+    async function refetch(assets: string[]) {
+      act(() => {
+        queryClient.setQueryData(manifestApiPluginsGetQueryKey(), [
+          { ...GAMEDEV_ENTRY, assets },
+        ])
+      })
+      await waitFor(() => {
+        expect(screen.getByTestId('assets')).toHaveTextContent(assets.join(' '), {
+          normalizeWhitespace: true,
+        })
+      })
+    }
+
+    it('neither re-injects nor rebuilds on a new ?v= of the same path', async () => {
+      drawWith([V1])
+      const first = screen.getByTestId('plugin-element')
+
+      await refetch([V2])
+
+      // The module this document ran is the one that stays: a second
+      // script would throw inside the plugin (D225), and a rebuilt
+      // element would throw away what the plugin had drawn. The shell's
+      // notice is what says the code moved (`manifest.ts`).
+      expect(injectedAssets()).toEqual([V1])
+      expect(screen.getByTestId('plugin-element')).toBe(first)
+    })
+
+    it('injects a path the manifest adds', async () => {
+      drawWith([V1])
+
+      await refetch([V1, HELPER])
+
+      expect(injectedAssets()).toEqual([V1, HELPER])
+    })
   })
 })
 

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -286,6 +286,36 @@ describe('usePanes', () => {
 
     expect(screen.getByTestId('run-workflow')).toHaveTextContent('gamedev')
     expect(screen.getByTestId('run-id')).toHaveTextContent(RUN.id)
+  })
+
+  it('follows the manifest when a workflow leaves it, and clamps the index', async () => {
+    // A `workflow.*` event refetches the manifest (22 §SPA); the cycle
+    // is derived from it, so the removed workflow's panes leave and the
+    // index that was on one of them lands on the last pane there is.
+    const queryClient = seeded()
+    const onChange = vi.fn()
+    render(
+      <QueryClientProvider client={queryClient}>
+        <Probe runId={RUN.id} index={6} onChange={onChange} />
+      </QueryClientProvider>,
+    )
+    expect(screen.getByTestId('current')).toHaveTextContent('sessions')
+
+    act(() => {
+      queryClient.setQueryData(manifestApiPluginsGetQueryKey(), [
+        BUILTIN_ENTRY,
+        OTHER_ENTRY,
+      ])
+    })
+
+    // The cache notifies on a timer; the cycle is what it drew after.
+    await waitFor(() => {
+      expect(screen.getByTestId('names')).toHaveTextContent(
+        /^overview,log,agent,requests,graph$/,
+      )
+    })
+    expect(screen.getByTestId('index')).toHaveTextContent('4')
+    expect(screen.getByTestId('current')).toHaveTextContent('graph')
   })
 
   it('does not stop existing because a workflow declares no panes', () => {
