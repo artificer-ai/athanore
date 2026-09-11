@@ -35,11 +35,14 @@
  * The stacked middle has a third value, **`global`**: the narrow global
  * screen, which is the same `detail` slot — the shell hands it a
  * `Detail` over the global cycle, exactly what the desktop draws with
- * nothing selected — marked `data-stacked="global"` (D216). It is
- * entered by a swipe right on the stacked middle and left by a swipe
- * left, and that gesture is read here, on the stacked `<main>` alone:
- * the swipe is a property of the stacked middle, and the desktop split
- * is never listened to (`../lib/useSwipe.ts`).
+ * nothing selected — marked `data-stacked="global"` (D216). The three
+ * are one line — list, detail, global — and a horizontal swipe walks
+ * it: left is one screen towards the list, right is one away from it
+ * (D217). The gesture is read here, on the stacked `<main>` at every
+ * narrow screen and nowhere else — the swipe is a property of the
+ * stacked middle, and the desktop split is never listened to
+ * (`../lib/useSwipe.ts`) — and what a direction means on the screen it
+ * lands on is the shell's to decide.
  */
 import { useRef, type ReactNode } from 'react'
 import { Group, Panel, Separator } from 'react-resizable-panels'
@@ -68,14 +71,15 @@ export function Splitter({
   /**
    * The one region to draw, below the breakpoint, or nothing at or
    * above it. `App` decides: `?run=` says list or detail (D194), and
-   * `?global=` says the global screen over either (D216), which is the
-   * `detail` slot drawn again.
+   * `?global=` beside it says the global screen over that run (D216,
+   * D217), which is the `detail` slot drawn again.
    */
   stacked?: 'list' | 'detail' | 'global' | undefined
   /**
-   * A horizontal swipe on the stacked middle: `right` opens the global
-   * screen, `left` puts it away. Read only while stacked; the desktop
-   * split has no gesture.
+   * A horizontal swipe on the stacked middle: `left` is one screen
+   * towards the list, `right` is one away from it, and the shell drops
+   * a direction that has no meaning on the screen it is on (D217). Read
+   * only while stacked; the desktop split has no gesture.
    */
   onSwipe?: ((direction: SwipeDirection) => void) | undefined
 }) {

@@ -18,15 +18,17 @@
  * Beside it, below the breakpoint, sits **`global panes`**: the button
  * that opens and closes the narrow global screen (21 §Regions, narrow,
  * D216). It is in the footer because the footer is the one chrome on
- * every narrow screen — the list, the detail and the global screen
- * itself — and `palette` is the precedent for a full-height touch
- * target there. It is a toggle, `aria-pressed` while the screen is up,
- * and the discoverable route: the swipe that does the same is not one a
- * screen reader has, and 21 §Touch operation lets nothing be reachable
- * only via a gesture. The shell passes `global` only when narrow and
- * the class hides the button above the breakpoint regardless, so a
- * desktop render is what it was. It carries no request count — the tab
- * title and the inbox's own header already do.
+ * every narrow screen and `palette` is the precedent for a full-height
+ * touch target there. It is a toggle, `aria-pressed` while the screen
+ * is up, and the discoverable route: the swipe that does the same is
+ * not one a screen reader has, and 21 §Touch operation lets nothing be
+ * reachable only via a gesture. It is drawn on the detail and the
+ * global screen — the two narrow screens the swipe joins — and not on
+ * the list, which has no gesture to twin (D217 (4)); the shell decides
+ * when to pass `global` (D201 (2)), and the class hides the button
+ * above the breakpoint regardless, so a desktop render is what it was.
+ * It carries no request count — the tab title and the inbox's own
+ * header already do.
  */
 import type { ReactNode } from 'react'
 
@@ -50,7 +52,8 @@ export function Footer({
   /**
    * The narrow global screen's button: whether the screen is up, and
    * what flips it. Absent above the breakpoint, where there is no such
-   * screen (D216).
+   * screen (D216), and on the narrow list, which has no swipe to it
+   * (D217).
    */
   global?: { pressed: boolean; onToggle: () => void } | undefined
 }) {

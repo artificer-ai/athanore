@@ -25,8 +25,7 @@ export function AppRoute() {
         // carrying it to the next run would filter that run's log to a
         // node it may not have. `?global=` goes too: selecting a run is
         // how the detail stops showing the global panes and starts
-        // showing the run's, and below the breakpoint that is the same
-        // one navigation off the global screen (21 §Narrow layout, D216).
+        // showing the run's (21 §Narrow layout, D216).
         void navigate({
           search: (prev) => ({ ...prev, run: runId, node: undefined, global: undefined }),
         })
@@ -127,18 +126,25 @@ export function AppRoute() {
         void navigate({ search: (prev) => ({ ...prev, global: index }) })
       }}
       onClearRun={() => {
-        // Nothing is selected any more. Two callers say that: the
+        // Nothing is selected any more. Three callers say that: the
         // delete confirm, once the run is gone — a selection that no
         // longer exists would point the detail pane at a 404 — and the
-        // pane bar's narrow back control, for which "back to the list"
-        // *is* "nothing is selected" (21 §Narrow layout). Either way
-        // `?node=` and `?task=` were about that run too.
+        // pane bar's narrow back control and the swipe left that shares
+        // its write, for which "back to the list" *is* "nothing is
+        // selected" (21 §Narrow layout). Either way `?node=` and
+        // `?task=` were about that run too, and so is `?global=`: the
+        // narrow global screen is always over a run (D217), so the
+        // screen goes with the thing under it — a run deleted from the
+        // palette while it is up lands on the list, and the `←` and the
+        // swipe leave nothing behind. At `md` and above the key is
+        // inert and clearing it is harmless.
         void navigate({
           search: (prev) => ({
             ...prev,
             run: undefined,
             node: undefined,
             task: undefined,
+            global: undefined,
           }),
         })
       }}
