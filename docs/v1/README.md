@@ -56,6 +56,7 @@ afterwards; cross-references use the document number.
 | 19 | [Agent prompt text](19-agent-prompts.md) | The verbatim kickoff, ask, submission, and repair blocks agents receive |
 | 20 | [Carried findings](20-carried-findings.md) | The MVP's ACP findings and permission decisions the other documents cite, folded in so the set is self-contained |
 | 21 | [Design refresh: re-import, narrow viewports, type scale](21-design-refresh.md) | The first post-1.0 phase: the refreshed design import and its diff discipline, the narrow-viewport layout and touch operation, the font-size chooser and the base-relative type ramp |
+| 22 | [Live registration](22-live-registration.md) | The second post-1.0 phase: workflows added, replaced and removed on a serving process — the server verbs, what happens to runs in flight, module reloading, the three routes, verbs and events, and how the SPA follows |
 | — | [design/](design/README.md) | The imported Claude Design mock and Nocturne tokens |
 | — | [../plans/](../plans/) | One implementation plan per task of 17: the fenced scope, the file-by-file steps, and the verification a reviewer and QA ask for. Written before the task is built and read by whoever builds it |
 

@@ -121,6 +121,21 @@ ticket here may change
 | A7.2 | Base-relative type ramp and the font-size chooser: `gen-theme.mjs` emits the `calc(<px>rem / 12)` ramp and the `data-font-size` steps, `usePrefs.fontSize`, header popover + palette rows, applied before first paint; axe at `xlarge` | M | 21 §Type scale, D195, D196 | A7.1 |
 | A7.3 | Mobile support: the `md` breakpoint, stacked list↔detail on `?run=`, back control in the pane bar, two-line run-list rows, wrapped header with scrollable chip strip, footer's mobile treatment, splitter unmounted; every overlay fits 390 px (library and task drawer as sheets, stacked library columns); mobile Playwright spec driving the five flows by `tap()` at 390×844, axe at the mobile viewport | L | 21 §Narrow layout, §Touch operation, §Gates, D194, D197 | A7.1, A7.2 |
 
+## Epic 8 — Post-1.0: live registration
+
+The second post-1.0 phase, specified by 22 and appended to the serial
+plan as Phase 8 (T083–T087), one task per ticket. The wire contract
+changes in A8.3 (the event union) and A8.4 (the routes); every other
+ticket leaves `tests/snapshots/openapi.json` byte-identical.
+
+| Id | Ticket | Size | Spec | Depends |
+|---|---|---|---|---|
+| A8.1 | Engine: replace a graph by name, unregister a name (cancel its attempts shutdown-style, unbind, keep the pool), recovery by name excluding nothing in flight; pool rebinding refused with attempts in flight | M | 22 §Effects, §Pools, D221 | |
+| A8.2 | Live plugin mounting: a mutable collection on `app.state.plugins` that includes/removes a workflow's router, assets mount and manifest entry on the running application, swaps its `on` handlers under one subscription, drops the OpenAPI cache; `?v=<sha256[:12]>` on manifest asset URLs | M | 22 §Live mounting, D225 | |
+| A8.3 | Loader and server verbs: `load_target` to `plugins.discovery` with reload (subtree purge, `linecache`); `Server.add`/`replace`/`remove`, recorded targets, `register` raising after start; `[workflows.<name>].target` rows read at boot by `serve` and `register_configured()`, written/removed on `persist` with `tomlkit`; `workflow.registered`/`replaced`/`unregistered` events and payloads; `serve` and discovery record targets | L | 22 §Server surface, §Reloading a module, §Persistence, §Events, D220, D224, D226, D228 | A8.1, A8.2 |
+| A8.4 | Wire: `POST /api/workflows`, `PUT /api/workflows/{name}`, `DELETE /api/workflows/{name}` with `persist`, the registrar port, `workflow_load_failed` / `unknown_pool` / `registration_unavailable` / `persist_failed`, `WorkflowOut.target`; `athanore workflows add|reload|rm [--persist]`; snapshot and TypeScript client regenerated | M | 22 §Wire, §CLI, §Persistence, D223, D227 | A8.3 |
+| A8.5 | SPA and end to end: `workflow.*` invalidation rows, the changed-assets notice, the Playwright add→run→reload→remove→add flow on the fake | M | 22 §SPA, §Testing, D225 | A8.4 |
+
 ## Cross-cutting decisions still open (15 §Open questions)
 
 Resolve before the ticket that needs them: open question 4 (git-ignored

@@ -4002,6 +4002,191 @@ content in 362 px without dropping or shrinking something 21 says stays
 
 ---
 
+## Phase 8 — Post-1.0: live registration
+
+The second post-1.0 phase, specified by 22 and cut as Epic 8 in 16. The
+wire contract changes in T085 (the event union) and T086 (the routes);
+`tests/snapshots/openapi.json` and `web/src/api/gen/` are byte-identical
+after every other task here.
+`docs/plans/<id>-*.md` exists for each task and fences its scope.
+
+### T083 — Engine: replace, unregister, recovery by name (A8.1)
+
+**Do.** `Engine.replace(graph, pool=None)`: swap the graph under its
+name; keep the binding unless a pool is given, refuse a different pool
+with attempts of the workflow in flight (`ValueError`, which the API
+maps to 409), rebind otherwise. `await Engine.unregister(name) ->
+list[int]`: cancel every attempt of the workflow this process holds
+(in progress or waiting), the way `stop()` cancels — asyncio cancel,
+terminate/kill under `KILL_AFTER`, transcript flushed, the façade's
+cancellation stats entry, **no task status written** — then
+drop the graph and unbind the name; the pool stays. `PoolRegistry.
+unbind(name)` and `rebind(name, pool)`. `recover(engine, workflows=
+[name])`: the existing reset for one name, callable after start, same
+`engine.recovered` event, nothing emitted when nothing was reset.
+`Ops` and the scheduler read the graph by name as today — assert it,
+change nothing. Fold 22 §Effects and §Pools into 04 (§Pools, a new
+§Live registration paragraph under §Recovery on startup pointing at
+22).
+**Tests.** Engine-level, on `MockAgent`: replace swaps what the next
+claim dispatches while the attempt in flight completes on the old body
+(assert by the old body's side effect); a task whose node the new graph
+lacks dead-letters with `GraphError`; unregister kills the agent
+subprocess (`FakeACPAgent`, `returncode` set), records a stats entry,
+leaves the row `in_progress`, unbinds the name and
+keeps the pool; a following register + `recover([name])` resets the row
+and emits `engine.recovered`; rebinding refused with an attempt in
+flight and accepted without; `workflows_of(pool)` no longer lists the
+name.
+**Done.** The engine can swap and drop a workflow live with the
+semantics 22 §Effects names; gate green; snapshot unchanged.
+
+### T084 — Live plugin mounting (A8.2)
+
+**Do.** `plugins.mount.MountedPlugins`: owns the ordered specs
+(builtins first, then registration order), the application it mounts
+into, and the `HandlerDispatch`. `add(spec)` includes the router,
+appends the assets mount (`mount_plugin_assets`), records the manifest
+entry, hands the handlers to the dispatcher; `remove(workflow)`
+reverses each — routes by name prefix `plugin:{workflow}:`, the mount
+by path — and `replace(spec)` is remove then add at the same position.
+Every mutation sets `app.openapi_schema = None`. `HandlerDispatch`
+keeps one subscription and a mutable spec map; `set(workflow, spec |
+None)` swaps under it without closing. `app.state.plugins` becomes the
+collection; the manifest route, the actions endpoint, the static
+mount and `routers/workflows._plugin` read `.specs` per request.
+Manifest asset URLs carry `?v=<sha256 of the file, first 12 hex>`,
+computed where `_asset_urls` lists the files. `create_app(plugins=...)` still accepts a sequence
+and wraps it. Fold 22 §Live mounting into 09 §Mounting.
+**Tests.** Plugin-level on a built application: a spec added after
+`create_app` answers on its route, appears in the manifest after the
+existing entries with `?v=` on its assets, serves the asset, and its
+`on` handler receives the next published event; removed, the route is
+404 `not_found`, the entry and the asset are gone, the handler receives
+nothing further, and the subscription object is the same one
+throughout; `openapi.json` gains and loses the route; replace keeps
+the position; builtins first at every step; a manifest built from the
+same directory twice carries the same `?v=`, and a changed file a
+different one.
+**Done.** Plugin surface follows registration on a running
+application; gate green; snapshot unchanged (the dump application
+registers nothing).
+
+### T085 — Loader, server verbs, events (A8.3)
+
+**Do.** Move `load_target` (and `_load_module`, `_load_file`,
+`_prepend_sys_path`) to `plugins.discovery`, raising
+`discovery.LoadError(stage, target, detail)` with `stage` per 22 §Wire;
+`cli.serve` maps it to `typer.BadParameter` as before. `load_target(
+target, *, reload=False)`: with `reload`, a module target purges
+`sys.modules` of `where` and `where.*` first, a file target replaces
+its stem entry; `linecache.checkcache()` on the files involved.
+`Server.add`, `replace`, `remove` and `targets` per 22 §Server surface
+and §Effects (engine step, mount step, recovery step, event step,
+`notify()`); `register(..., target=None)` records the target and
+raises `RuntimeError` after `start()`. `RemovedWorkflow(workflow,
+task_ids)`. **Persistence** (22 §Persistence): `[workflows.<name>].
+target` becomes a known key; `serve` loads the rows after the
+positionals and before discovery through the same loader (exit 2 on a
+failure or a key that is not the workflow's name; a positional of the
+same name wins with a warning; a row shadows a discovered workflow);
+`Server.register_configured()` does the same for a host;
+`plugins.persist` writes and removes rows with `tomlkit` (D228),
+preserving the rest of the file; `add`/`replace`/`remove` take
+`persist=False`, write between validation and mutation, and never
+touch a `.py`. `EventName.workflow_registered/replaced/unregistered`,
+payload models `WorkflowRegistered {workflow, pool, target?}`,
+`WorkflowReplaced`, `WorkflowUnregistered {workflow, task_ids}` and
+their envelopes in the union; `run_id` absent. `athanore serve` and
+`discover()` record targets (the positional as given; the entry
+point's `module:attr`). Fold 22 §Reloading a module into 11 §Server,
+§Events into 03 §Event vocabulary and 18 (§Envelope's exception list,
+a §Workflows table).
+**Tests.** Discovery: a file target reloaded picks up the edited file;
+a module target's subtree is purged and a sibling module's object
+identity is unchanged; a failing reload raises `LoadError` with the
+right `stage` for each of the six; `inspect.getsource` of the reloaded
+workflow shows the new text. Server (started, `MockAgent`): `add`
+mounts, recovers the name's orphaned rows and emits `workflow.
+registered` then `engine.recovered` with no `run_id`; `replace` emits
+`workflow.replaced` and leaves the running attempt alone; `remove`
+returns the interrupted ids and emits `workflow.unregistered` naming
+them; `register` after `start()` raises; before `start()` the three
+coroutines mutate the registries and emit nothing; `persist=True`
+writes one row and leaves the rest of the file byte-identical, a
+failing validation writes nothing, a failing write mutates nothing,
+`remove(persist=True)` removes the row and only the row, and the `.py`
+is untouched throughout; every new `EventName` has a payload model and
+validates (the existing contract test picks them up). `serve` records
+targets and loads rows with the precedence above (existing serve tests
+extended); `register_configured()` on a host.
+**Done.** A started `Server` adds, replaces and removes workflows with
+22's effects and events; gate green; `tests/snapshots/openapi.json` and
+`web/src/api/gen` regenerated for the three new envelopes in the event
+union (the SPA's discriminated union is what T087 switches on).
+
+### T086 — Wire: routes, registrar port, CLI verbs (A8.4)
+
+**Do.** `api.registrar.WorkflowRegistrar` protocol (`add_target`,
+`reload_target`, `remove`, `targets`); `Server` implements it over
+`load_target` and its own verbs and passes itself to `create_app(
+registrar=...)`. Routes per 22 §Wire: `POST /api/workflows`, `PUT
+/api/workflows/{name}`, `DELETE /api/workflows/{name}?persist=`,
+request models `RegisterWorkflow {target, pool?, persist=false}` and
+`ReloadWorkflow {target?, pool?, persist=false}`, response
+`RemovedWorkflowOut {workflow, task_ids}`; `WorkflowOut.target?`;
+`ErrorCode.workflow_load_failed` (422, body `{error, code, target,
+stage, detail}`), `unknown_pool` (422), `registration_unavailable`
+(503, no registrar), `persist_failed` (500, `{path, detail}`); 409 `conflict` on a
+registered name at `POST`, a differently named target or a pool move
+with attempts in flight at `PUT`. `LoadError` and the engine's
+`ValueError`s map in one place. CLI: `athanore workflows add|reload|
+rm` as a typer group with `invoke_without_command` keeping the bare
+table, each with `--persist`; exit 2 on `workflow_load_failed`
+printing `stage` and `detail`; `rm` prints the ids; a persisting verb
+prints the path it wrote. Regenerate `tests/snapshots/openapi.json` and
+`web/src/api/gen`. Fold 22 §Wire into 08 §Workflows and §Conventions
+(the three codes), the security sentence into 12 §Plugins, §CLI into
+11 §Verbs.
+**Tests.** API on the started server: every status of the three
+routes; the exact `workflow_load_failed` body for each `stage`;
+`target` present on a loaded workflow and absent on a programmatic
+one; the three events on `GET /api/events` with no `run_id`;
+`/source` shows the reloaded text after `PUT`; `persist: true` on
+each verb changes exactly its row in the fixture's `athanore.toml` and
+a read-only file is 500 `persist_failed` with nothing registered; a
+task token is refused on all three; the no-registrar application's
+503; OpenAPI snapshot test. CLI: the three verbs against a served
+fixture, `--pool`, `--persist` (the row and the printed path), exit
+codes, the printed ids.
+**Done.** The three routes and verbs work end to end against a served
+process; snapshot and client regenerated and committed; gate green.
+
+### T087 — SPA follows; end to end (A8.5)
+
+**Do.** `realtime/invalidate.ts`: a `workflow.*` row invalidating the
+workflow list, single-workflow, source and manifest keys (generated
+keys, D49). `plugins/assets.ts`: per-workflow record of injected URLs;
+when a manifest lists, for a workflow, a URL whose path is injected
+under a different `?v=`, set a `staleAssets` flag the shell renders as
+a persistent notice `plugin code changed — reload the page` with a
+reload button (10 §Attention's notice surface); no re-injection ever.
+A newly listed workflow's assets inject as today. Playwright
+`web/e2e/registration.spec.ts` on `FakeACPAgent`: write a workflow
+file into the test's tmp dir, `POST` it, see it in the library and the
+new-run chips, run it to completion; edit the file to rename its node,
+`PUT`, run again and watch the new node in the graph pane; `DELETE`
+while a run is mid-node, see the run's `unregistered` badge and the
+attempt stop; `POST` it back, see the run finish. Fold 22 §SPA into 10
+§Realtime and caching and §Overlays (the library reflects
+registrations).
+**Tests.** Vitest: the invalidation rows; the notice for a changed
+`?v=`, and none for a first injection, an identical manifest, or a
+removal. Playwright: the spec above.
+**Done.** The SPA follows registrations without a reload except where
+a plugin's JavaScript changed, and says so; the end-to-end flow of 22
+§Testing passes in CI; gate green; snapshot unchanged.
+
 ## Traceability
 
 | Doc 16 ticket | Tasks here |
@@ -4016,6 +4201,7 @@ content in 362 px without dropping or shrinking something 21 says stays
 | A5.1–A5.4 | T070–T073 |
 | A6.1–A6.4 | T074–T079 |
 | A7.1–A7.3 | T080–T082 |
+| A8.1–A8.5 | T083–T087 |
 
 Sequencing changes relative to 16, all recorded in 15 when executed:
 the TUI is not deleted at all in this repository — it never lived here
