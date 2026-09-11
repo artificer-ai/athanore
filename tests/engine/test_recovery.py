@@ -14,17 +14,26 @@ other way:
 
 The last one is asserted twice over: the row is unchanged, and the engine
 is then run for long enough to claim it if it were going to.
+
+The same sweep runs for one name after start — ``recover(engine,
+[name])``, what a workflow added to a running server gets (22 §Add step
+3, T083). What is new there is that this process may already be running
+attempts of the name: those rows are excluded, and the sweep runs
+between ticks so the exclusion is exact.
 """
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
+
+import pytest
 
 from athanore.engine import Engine
 from athanore.engine.pools import Pool
 from athanore.engine.recovery import recover
 from athanore.events.names import EventName
-from athanore.store.rows import EventRow, TaskStatus
+from athanore.store.rows import EventRow, TaskRow, TaskStatus
 from athanore.store.tables import tasks
 from athanore.store.uow import Store
 from athanore.workflow import Workflow
@@ -240,3 +249,122 @@ async def test_start_recovers_before_it_claims(
 
 async def _is_done(store: Store, task_id: int) -> bool:
     return await status_of(store, task_id) is TaskStatus.done
+
+
+# --------------------------------------------------------------------------
+# Recovery for one name, after start (T083, 22 §Add step 3)
+# --------------------------------------------------------------------------
+
+
+class Sleeper:
+    """A body that announces itself and parks until it is cancelled."""
+
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+
+    def workflow(self, name: str) -> Workflow:
+        wf = Workflow(name)
+
+        @wf.node(start=True)
+        async def only() -> str:
+            self.started.set()
+            await asyncio.sleep(3600)
+            return "landed"  # pragma: no cover - cancelled first
+
+        return wf
+
+
+async def test_a_name_added_back_after_an_unregister_recovers_its_rows(
+    start_engine, store: Store, wait_for
+) -> None:
+    """The round trip 22 §Remove and §Add describe, at the engine.
+
+    ``unregister`` leaves the row ``in_progress``; ``register`` and
+    ``recover(engine, [name])`` reset exactly that workflow's rows and
+    announce them — while the sibling's row, held by a live attempt of
+    this engine, is left alone.
+    """
+
+    doomed, sibling = Sleeper(), Sleeper()
+    engine: Engine = await start_engine(
+        (doomed.workflow("doomed"), Pool("test", 2)),
+        (sibling.workflow("sibling"), Pool("test", 2)),
+    )
+    interrupted = await engine.ops.submit("doomed", "interrupted")
+    held = await engine.ops.submit("sibling", "held")
+    await wait_for(doomed.started)
+    await wait_for(sibling.started)
+    (interrupted_task,) = await tasks_of(store, interrupted.id)
+    (held_task,) = await tasks_of(store, held.id)
+
+    assert await engine.unregister("doomed") == [interrupted_task.id]
+    assert await status_of(store, interrupted_task.id) is TaskStatus.in_progress
+
+    engine.register(doomed.workflow("doomed").finalize(), Pool("test", 2))
+    assert await recover(engine, ["doomed"]) == [interrupted_task.id]
+
+    assert await status_of(store, interrupted_task.id) is TaskStatus.ready
+    assert await token_hash_of(store, interrupted_task.id) is None
+    assert await status_of(store, held_task.id) is TaskStatus.in_progress
+    (event,) = await engine_events(store, EventName.engine_recovered)
+    assert event.data == {"task_ids": [interrupted_task.id]}
+    assert event.run_id is None
+
+
+async def test_recovery_for_a_name_with_nothing_to_reset_announces_nothing(
+    start_engine, store: Store
+) -> None:
+    engine: Engine = await start_engine(workflow("quiet"))
+    await engine.ops.submit("quiet", "a run")
+
+    assert await recover(engine, ["quiet"]) == []
+    assert await engine_events(store, EventName.engine_recovered) == []
+
+
+async def test_a_row_held_by_a_live_attempt_is_not_reset_under_it(
+    start_engine, store: Store, wait_for
+) -> None:
+    """The one difference from boot: this process may already be running some.
+
+    The name is bound before recovery is asked for (22 §Add's order), so
+    a tick in between can have claimed a row of it; that row is held by
+    an attempt of this engine and is excluded, while a row a dead process
+    left is reset beside it.
+    """
+
+    sleeper = Sleeper()
+    engine: Engine = await start_engine((sleeper.workflow("mixed"), Pool("test", 1)))
+    live = await engine.ops.submit("mixed", "live")
+    await wait_for(sleeper.started)
+    (live_task,) = await tasks_of(store, live.id)
+    dead = await submit(store, "mixed")
+    await force(store, dead, status=TaskStatus.in_progress.value, token_hash="d" * 64)
+    assert engine.attempts_of("mixed") == [live_task.id]
+
+    assert await recover(engine, ["mixed"]) == [dead]
+
+    assert await status_of(store, live_task.id) is TaskStatus.in_progress
+    assert await status_of(store, dead) is TaskStatus.ready
+    assert engine.scheduler.in_flight == (live_task.id,)
+    (event,) = await engine_events(store, EventName.engine_recovered)
+    assert event.data == {"task_ids": [dead]}
+
+
+async def test_recovery_refuses_an_unregistered_name_and_writes_nothing(
+    engines, store: Store
+) -> None:
+    engine: Engine = engines()
+    engine.register(workflow("registered").finalize(), Pool("test", 1))
+    orphan = await submit(store, "gone_away")
+    await force(store, orphan, status=TaskStatus.in_progress.value)
+
+    with pytest.raises(KeyError, match=r"unregistered workflows \['gone_away'\]"):
+        await recover(engine, ["registered", "gone_away"])
+
+    assert await status_of(store, orphan) is TaskStatus.in_progress
+    assert await engine_events(store, EventName.engine_recovered) == []
+
+
+async def tasks_of(store: Store, run_id: str) -> list[TaskRow]:
+    async with store.reader() as reader:
+        return await reader.tasks.list_for_run(run_id)

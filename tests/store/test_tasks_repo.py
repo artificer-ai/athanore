@@ -536,6 +536,37 @@ async def test_reset_for_recovery_clears_the_hash_of_a_dead_attempts_token(
     assert (await raw(store, task.id))["token_hash"] is None
 
 
+async def test_reset_for_recovery_leaves_the_excluded_rows_alone(
+    store: Store,
+) -> None:
+    """``exclude`` is the runtime case: a row an attempt of this process holds.
+
+    A recovery run for one workflow after start (22 §Add step 3) can
+    find a row already claimed by a tick that ran between the bind and
+    the sweep; resetting it would put two attempts on one task (D229).
+    """
+
+    run_id = await make_run(store)
+    held = await enqueue(store, run_id, "held")
+    orphan = await enqueue(store, run_id, "orphan")
+    for task in (held, orphan):
+        await force(
+            store,
+            task.id,
+            status=TaskStatus.in_progress.value,
+            started=OLD,
+            token_hash=token_hash(f"token-{task.id}"),
+        )
+
+    async with store.uow() as uow:
+        recovered = await uow.tasks.reset_for_recovery(["demo"], exclude=[held.id])
+
+    assert recovered == [orphan.id]
+    assert (await raw(store, held.id))["status"] == TaskStatus.in_progress.value
+    assert (await raw(store, held.id))["token_hash"] == token_hash(f"token-{held.id}")
+    assert (await raw(store, orphan.id))["status"] == TaskStatus.ready.value
+
+
 async def test_reset_for_recovery_spans_every_run_and_reports_nothing_when_idle(
     store: Store,
 ) -> None:

@@ -488,7 +488,8 @@ Per 13 §Pyramid, at the lowest layer that expresses each behaviour:
   while the attempt in flight completes on the old body; a task whose
   node the replacement lacks dead-letters with `GraphError`; `remove`
   cancels the in-flight attempt (agent subprocess gone, stats row
-  `failed/unregistered`), writes no task status, unbinds the pool and
+  `failed/shutdown` — the façade's ordinary cancellation entry, §Remove
+  step 1), writes no task status, unbinds the pool and
   leaves the pool; a later `add` of the name resets those rows and
   emits `engine.recovered`; pool rebinding refused with attempts in
   flight, accepted without.

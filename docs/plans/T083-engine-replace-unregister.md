@@ -315,3 +315,35 @@ git diff --exit-code tests/snapshots web/src/api/gen
   above; runner and ops untouched and asserted; 04 folded, 22's bullet
   corrected, decisions logged, T083 marked done; gate green; snapshot
   unchanged.
+
+## As built
+
+Landed as planned; the notes below are what an implementer of T085
+should know beyond the text above.
+
+- `ClaimedTask.workflow` is filled by one `select(runs.c.id,
+  runs.c.workflow)` over the claimed run ids (`TaskRepo._workflows_of`),
+  after `_start_runs`, inside the claiming transaction.
+- `Scheduler.quiescent()` is an `asyncio.Lock` (`_ticking`) held around
+  `_dispatch_all()`; `_wake.clear()` stays *before* the acquire, so a
+  `notify()` that lands while the loop waits for the lock is honoured
+  by the tick that follows (one extra tick at most, never a lost wake).
+- `Engine.replace(graph)` with `pool=None` swaps the dict entry without
+  taking the lock: a swap is atomic with respect to the loop, and only
+  the pool move needs the in-flight set to be exact. With a pool it
+  takes the lock, and the same pool is not a move.
+- `Engine.unregister` logs `unregistered with attempts in flight` at
+  INFO when it interrupted anything, beside the ids it returns.
+- Tests: `tests/engine/test_replace.py` (8), `tests/engine/test_unregister.py`
+  (7), `tests/engine/test_scheduler.py` (+6), `tests/engine/test_recovery.py`
+  (+4), `tests/engine/test_pools.py` (+4), `tests/engine/test_runner.py` and
+  `test_ops_basic.py` (+1 each), `tests/store/test_claim.py` (+1),
+  `tests/store/test_tasks_repo.py` (+1). The raced-claim test in
+  `test_unregister.py` holds the loop inside its claim with a store
+  wrapper whose *next* `uow()` blocks at a gate, armed after `submit`
+  returns (the submit's own transaction would otherwise be the one
+  gated). The `waiting` attempt is a real `human_input` in
+  `test_unregister.py` (the `requests_service` fixture) and a direct
+  `lease.released()` in `test_replace.py`, which is the layer the wait
+  lives at.
+- Decisions D229–D234.

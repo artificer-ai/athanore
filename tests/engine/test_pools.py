@@ -384,3 +384,68 @@ def test_pools_do_not_lend_capacity_to_each_other():
     assert sandbox.try_acquire(3) is not None
     assert pools.snapshot()["local"]["in_flight"] == 1
     assert pools.snapshot()["sandbox"]["in_flight"] == 1
+
+
+# --- live registration: unbind and rebind (22 §Pools, T083) ----------------
+
+
+def test_unbind_drops_the_binding_and_keeps_the_pool():
+    pools = PoolRegistry()
+    local = pools.add(Pool("local", capacity=1))
+    pools.bind("build", "local")
+    pools.bind("gamedev", "local")
+
+    pools.unbind("build")
+
+    assert pools.workflows_of("local") == ("gamedev",)
+    assert "local" in pools and pools.get("local") is local
+    with pytest.raises(KeyError, match="not bound to a pool"):
+        pools.for_workflow("build")
+    # The name is free again: a pool may now take it, and a bind may.
+    assert pools.bind("build", "local") is local
+
+
+def test_rebind_moves_the_binding_and_both_pools_follow():
+    pools = PoolRegistry()
+    pools.add(Pool("local", capacity=1))
+    sandbox = pools.add(Pool("sandbox", capacity=1))
+    pools.bind("build", "local")
+    pools.bind("gamedev", "local")
+
+    assert pools.rebind("build", "sandbox") is sandbox
+
+    assert pools.for_workflow("build") is sandbox
+    assert pools.workflows_of("local") == ("gamedev",)
+    assert pools.workflows_of("sandbox") == ("build",)
+
+
+def test_rebind_to_the_same_pool_is_a_no_op():
+    pools = PoolRegistry()
+    local = pools.add(Pool("local", capacity=1))
+    pools.bind("build", "local")
+
+    assert pools.rebind("build", "local") is local
+    assert pools.workflows_of("local") == ("build",)
+
+
+def test_unbind_and_rebind_are_lookups_and_fail_as_lookups():
+    """``KeyError`` throughout: an unbound name, an unknown pool.
+
+    ``bind``'s ``ValueError`` is for a registration that is wrong; the
+    engine's ``ValueError`` is for a move with attempts in flight. The
+    server has to tell "no such pool" from that refusal by type.
+    """
+
+    pools = PoolRegistry()
+    pools.add(Pool("local", capacity=1))
+    pools.bind("build", "local")
+
+    with pytest.raises(KeyError, match="'release' is not bound"):
+        pools.unbind("release")
+    with pytest.raises(KeyError, match="'release' is not bound"):
+        pools.rebind("release", "local")
+    with pytest.raises(KeyError, match="no pool named 'sandbox'"):
+        pools.rebind("build", "sandbox")
+    # A refusal changes nothing.
+    assert pools.workflows_of("local") == ("build",)
+    assert "sandbox" not in pools
