@@ -7,9 +7,10 @@
  * documents: the dashboard an operator opens — an empty list and the
  * global inbox — the dashboard they work in, with a run selected, a
  * graph drawn and a request waiting to be answered, that same dashboard
- * at the largest step of the type ramp, that same dashboard on a phone,
- * and the run list with a `failed` run picked up by `⏎`. Everything the
- * mock puts on screen is in the second one.
+ * at the largest step of the type ramp, that same dashboard on a phone —
+ * all three of its narrow screens — and the run list with a `failed` run
+ * picked up by `⏎`. Everything the mock puts on screen is in the second
+ * one.
  *
  * The third and the fourth are D197's, which is one floor over three
  * documents: `xlarge` is a 25 % larger base under a layout specified in
@@ -127,5 +128,15 @@ test.describe('on a phone', () => {
     const detail = await new AxeBuilder({ page: dashboard.page }).analyze()
     expect(blocking(detail), violationReport(detail)).toEqual([])
     expect(axeScore(detail), violationReport(detail)).toBeGreaterThanOrEqual(A11Y_SCORE)
+
+    // ...and the third narrow screen: the global panes over that run,
+    // with the same request waiting in the inbox (D216).
+    await dashboard.globalPanes().tap()
+    await expect(dashboard.page.locator('main[data-stacked="global"]')).toBeVisible()
+    await expect(dashboard.openRequest('permission')).toBeVisible()
+
+    const global = await new AxeBuilder({ page: dashboard.page }).analyze()
+    expect(blocking(global), violationReport(global)).toEqual([])
+    expect(axeScore(global), violationReport(global)).toBeGreaterThanOrEqual(A11Y_SCORE)
   })
 })

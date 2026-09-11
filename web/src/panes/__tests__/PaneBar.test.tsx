@@ -227,5 +227,60 @@ describe('PaneBar', () => {
       await userEvent.click(dots()[2]!)
       expect(panes.jump).toHaveBeenCalledWith(2)
     })
+
+    describe('over the global screen', () => {
+      /** The global cycle: no run under it, and `leave` given (D216). */
+      const GLOBAL: Pane[] = [pane('inbox', true), pane('crontab', false)]
+
+      function global() {
+        return model({ panes: GLOBAL, runId: undefined, run: undefined })
+      }
+
+      it('draws `←` back to the run, and it clears the screen', async () => {
+        const onLeave = vi.fn()
+        render(
+          <PaneBar panes={global()} onBack={vi.fn()} leave={{ to: 'run', onLeave }} />,
+        )
+
+        const back = screen.getByRole('button', { name: 'back to the run' })
+        expect(back).toHaveClass('max-md:min-h-[24px]')
+        await userEvent.click(back)
+        expect(onLeave).toHaveBeenCalledOnce()
+      })
+
+      it('draws `←` back to runs when nothing was selected under it', () => {
+        render(<PaneBar panes={global()} leave={{ to: 'list', onLeave: vi.fn() }} />)
+
+        expect(screen.getByRole('button', { name: 'back to runs' })).toBeInTheDocument()
+        expect(
+          screen.queryByRole('button', { name: 'back to the run' }),
+        ).toBeNull()
+      })
+
+      it('draws one control in the left slot, and nothing about a run on the right', () => {
+        // Neither the selection's back control nor the collapse toggle;
+        // the right slot is gated on `runId`, as the desktop's global
+        // view is.
+        render(
+          <PaneBar
+            panes={global()}
+            onBack={vi.fn()}
+            leave={{ to: 'run', onLeave: vi.fn() }}
+          />,
+        )
+
+        expect(screen.getAllByRole('button', { name: /back|clear|hide/ })).toHaveLength(1)
+        expect(screen.queryByRole('button', { name: 'hide run list' })).toBeNull()
+        expect(
+          screen.queryByRole('button', { name: 'clear the selected run' }),
+        ).toBeNull()
+        expect(screen.queryByTestId('selected-run')).toBeNull()
+        expect(screen.queryByText('run')).toBeNull()
+        // The same mapping as everywhere: the inbox is a builtin, the
+        // plugin's global pane is a plugin's (D216 (2)).
+        expect(dots()[0]).toHaveAttribute('data-builtin', 'true')
+        expect(dots()[1]).toHaveClass('bg-[var(--color-accent-800)]')
+      })
+    })
   })
 })

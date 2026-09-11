@@ -166,11 +166,32 @@ but shows **one** middle region at a time:
 
 - `?run=` unset → the run list, full width.
 - `?run=` set → the detail pane, full width.
+- `?global=` set → the **global screen**, full width, over whichever of
+  the other two is under it (D216).
 
 Opening a run from the list writes `?run=` exactly as it does today;
 "back" clears it. No new state: the stacked navigation rides the search
 param that already is the selection (D152, D179), so a narrow view stays
 linkable and a deep link to `?run=…&pane=…` opens on the detail.
+
+The global screen is the detail drawn over the `global` cycle — the
+inbox and every `slot="global"` pane a plugin declares (09 §Slots) —
+exactly as the desktop draws the detail with nothing selected. Below the
+breakpoint that is a screen of its own, because the two states above
+never show it: `?run=` unset is the list, not the empty detail, and
+`?run=` set is the run's panes. `?global=<index>` is that cycle's own
+pane index, present exactly while the screen is up; it is not `?pane=`
+reused, so `?run=` and `?pane=` are untouched by a visit and leaving
+lands on the pane of the run the operator was on. Reopening starts at
+`0`. At `md` and above `?global=` is inert — kept, not cleared, as
+`listCollapsed` is below — because the detail is the global panes there
+whenever nothing is selected, and a phone's link opened on a desktop
+shows the run it names. Selecting a run (a row tap, `↑`/`↓`/`j`/`k`) and
+the two handovers that name a run pane by index (a graph row's jump to
+the log, the task drawer's `focus stream`) clear it in the same
+navigation; clearing the selection leaves it, so a run deleted from the
+palette while the screen is up leaves the operator on the global screen
+over the list.
 
 The splitter is not mounted below the breakpoint. `listWidth` and
 `listCollapsed` are inert there — kept, not cleared, so a phone visit
@@ -212,13 +233,23 @@ fluid, not a second fixed design. Strips that manage their own overflow
   route (D209). Only its label and its placement are this section's.
   The `◀`/`▶` pane buttons and the dots remain and are the touch route
   for cycling panes. The docked request panel and every pane render
-  full-width; panes scroll vertically as they do today.
+  full-width; panes scroll vertically as they do today. On the global
+  screen the left slot's `←` is the screen's own: labelled `back to the
+  run` while `?run=` is set under it and `back to runs` otherwise, it
+  clears `?global=` and nothing else (D216). The right slot draws
+  nothing there, as the desktop's global view draws nothing.
 - **Footer**: the key-hint chips are hidden below the breakpoint —
   keycaps are noise on a touchscreen — and the footer keeps the
   `^p palette` button, relabelled `palette`, as a full-height touch
   target. The palette is the touch route to every operator action
   (D176: the keyboard map dispatches on the palette's rows, so the
-  palette's catalogue is complete by construction).
+  palette's catalogue is complete by construction). Beside it, below the
+  breakpoint only, the footer gains **`global panes`**: an
+  `aria-pressed` toggle that opens the global screen on its first pane
+  and closes it, the same size as `palette`. It is drawn on every narrow
+  screen, so a run's detail says the global panes exist; it carries no
+  request count, because the tab title (10 §Attention) and the inbox's
+  own header already do (D216).
 
 ### Overlays, narrow
 
@@ -246,20 +277,43 @@ affordance as a real button. `esc` keeps working everywhere.
 
 By touch alone, on a 390 px viewport, an operator MUST be able to:
 view the run list; open a run's detail; cycle its panes; answer an open
-request (options, text and form kinds); and start a new run. Nothing in
-those flows may be reachable only via a keyboard shortcut. Typing uses
-the on-screen keyboard through ordinary focused inputs — that is not a
-"keyboard shortcut".
+request (options, text and form kinds); start a new run; and open the
+global panes from a run's detail, answer what is waiting there, and
+return to the pane of the run they left. Nothing in those flows may be
+reachable only via a keyboard shortcut, and nothing in them may be
+reachable only via a gesture: a gesture is undiscoverable and a screen
+reader has none, so every swipe has a button that does the same. Typing
+uses the on-screen keyboard through ordinary focused inputs — that is
+not a "keyboard shortcut".
+
+The one gesture is the global screen's (D216). A **swipe right** on the
+middle region opens it; a **swipe left** closes it. It is read on the
+region's body by native passive touch listeners, and not within 24 px
+of either side of the viewport — the edges are the browser's own
+back/forward gesture, and an edge swipe would fire both. A touch that
+starts over an element that scrolls horizontally (a wide table in its
+`overflow-x: auto` wrapper) or inside a text field is that element's
+and is never read as a swipe; the check walks `composedPath()`, so a
+field inside a plugin pane's shadow root counts (D210). A swipe is 60 px
+of horizontal travel at a ratio of at least 2:1 to the vertical, with
+no time cap and no velocity: the ratio separates it from a vertical
+scroll that wandered. Nothing else swipes — a swipe left on the detail
+does not go back to the list, and nothing swipes the pane cycle. The
+overlays portal out of the region, so a finger on a sheet moves nothing
+under it, and a global plugin action opened from the palette runs as an
+ordinary `?overlay=action` over the global screen, which stays up.
 
 ## Gates (normative)
 
-- **Playwright**: a mobile spec drives the five touch flows above at
+- **Playwright**: a mobile spec drives the six touch flows above at
   390×844 with `hasTouch` and `isMobile`, using `tap()` — not `click()`
-  — for every activation (D197). One viewport is pinned; 360 px is
-  covered by the fluid rule, not by a matrix.
+  — for every activation (D197), and CDP `Input.dispatchTouchEvent` for
+  the swipe, for the same reason (D216). One viewport is pinned; 360 px
+  is covered by the fluid rule, not by a matrix.
 - **axe**: the a11y gate of 10 §Accessibility and quality (no `serious`
   or `critical` violation, score ≥ 95) holds at the desktop viewport,
-  at 390×844, and at the desktop viewport with `xlarge` selected.
+  at 390×844 — the list, the detail and the global screen — and at the
+  desktop viewport with `xlarge` selected.
 - **The full gate** (`./scripts/test.sh`) is green after every task, and
   `tests/snapshots/openapi.json` is unchanged throughout the phase.
 - The vitest layer covers what it can express below e2e (13 §Pyramid):

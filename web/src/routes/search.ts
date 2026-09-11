@@ -55,6 +55,12 @@ export type Overlay = (typeof OVERLAYS)[number]
  *   overlay is about. Opaque here for the same reason `run` and `node`
  *   are: which actions exist is the installed workflows' business, and
  *   the overlay says so when the manifest carries none by that name.
+ * - `global` — the narrow global screen's pane index: the zero-based
+ *   index into the `global` cycle, present exactly while that screen is
+ *   up and inert at `md` and above, where the detail is the global
+ *   panes whenever nothing is selected (21 §Narrow layout, D216). It is
+ *   not `pane` reused, so a visit to the global panes leaves the run's
+ *   own pane where it was.
  */
 export type AppSearch = {
   run?: string
@@ -63,6 +69,7 @@ export type AppSearch = {
   task?: number
   node?: string
   action?: string
+  global?: number
 }
 
 const OVERLAY_SET: ReadonlySet<string> = new Set(OVERLAYS)
@@ -104,6 +111,7 @@ export function validateAppSearch(search: Record<string, unknown>): AppSearch {
   // run's graph has, and the log pane draws no rows for one it has not.
   const node = asId(search['node'])
   const action = asId(search['action'])
+  const global = asInteger(search['global'], 0)
 
   return {
     ...(run === undefined ? {} : { run }),
@@ -112,5 +120,6 @@ export function validateAppSearch(search: Record<string, unknown>): AppSearch {
     ...(task === undefined ? {} : { task }),
     ...(node === undefined ? {} : { node }),
     ...(action === undefined ? {} : { action }),
+    ...(global === undefined ? {} : { global }),
   }
 }

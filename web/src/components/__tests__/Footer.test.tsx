@@ -56,4 +56,39 @@ describe('Footer', () => {
     await userEvent.click(screen.getByRole('button', { name: /palette/ }))
     expect(onOpenPalette).toHaveBeenCalledOnce()
   })
+
+  describe('the global panes button', () => {
+    it('is not drawn without the prop: the desktop footer is what it was', () => {
+      render(<Footer onOpenPalette={() => {}} />)
+
+      expect(screen.queryByRole('button', { name: 'global panes' })).toBeNull()
+      expect(screen.getAllByRole('button')).toHaveLength(1)
+    })
+
+    it('is a pressed toggle that flips the narrow global screen', async () => {
+      // The discoverable route to the global panes (21 §Touch operation:
+      // nothing reachable only via a gesture), beside `palette` for the
+      // same reason `palette` is there (D216).
+      const onToggle = vi.fn()
+      const { rerender } = render(
+        <Footer onOpenPalette={() => {}} global={{ pressed: false, onToggle }} />,
+      )
+
+      const button = screen.getByRole('button', { name: 'global panes' })
+      expect(button).toHaveAttribute('aria-pressed', 'false')
+      // Narrow-only by class as well as by prop: the shell passes the
+      // prop only below the breakpoint, and the class says so again.
+      expect(button).toHaveClass('md:hidden')
+      await userEvent.click(button)
+      expect(onToggle).toHaveBeenCalledOnce()
+
+      rerender(<Footer onOpenPalette={() => {}} global={{ pressed: true, onToggle }} />)
+      expect(screen.getByRole('button', { name: 'global panes' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+      // The palette button is still there, still found by its role.
+      expect(screen.getByRole('button', { name: /palette/ })).toBeInTheDocument()
+    })
+  })
 })

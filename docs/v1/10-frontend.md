@@ -106,13 +106,15 @@ That layout is the one at Tailwind's `md` (768 px) and above. Below it —
 "narrow" — the SPA keeps the same four regions and shows **one** middle
 region at a time: the run list while `?run=` is unset, the detail pane
 while it is set, with the pane bar's left slot carrying a back control
-(`aria-label="back to runs"`) that clears it. The splitter is not
-mounted there and `listWidth` / `listCollapsed` are inert, kept rather
-than cleared; the run list's rows become two lines; the header wraps,
-with the chips and the `/` filter as a strip that scrolls horizontally
-within itself; the footer drops the keycaps and keeps the palette
-button; interactive chrome carries a 24×24 px hit area (WCAG 2.5.8). The
-keyboard map stays fully bound at every width. 21 §Narrow layout is
+(`aria-label="back to runs"`) that clears it, and a third screen, the
+global panes over either, while `?global=` is set (21 §Narrow layout,
+D216). The splitter is not mounted there and `listWidth` /
+`listCollapsed` are inert, kept rather than cleared; the run list's rows
+become two lines; the header wraps, with the chips and the `/` filter as
+a strip that scrolls horizontally within itself; the footer drops the
+keycaps and keeps the palette button, with a `global panes` toggle
+beside it; interactive chrome carries a 24×24 px hit area (WCAG 2.5.8).
+The keyboard map stays fully bound at every width. 21 §Narrow layout is
 normative for all of it, D194 for the breakpoint, and the shell reads
 the width through one `matchMedia` hook (`lib/useIsNarrow.ts`) so the
 CSS's breakpoint and JavaScript's cannot drift.
@@ -126,7 +128,12 @@ it is dropped or shrunk to make one line of it (D201).
 
 Builtins first, then the selected run's plugin panes (09). `←`/`→` cycle
 with wrap; `1`–`9` jump; the index persists across selection changes
-(it is a property of the operator's attention, not the run).
+(it is a property of the operator's attention, not the run). Below the
+breakpoint the `global` panes are a screen of their own with an index of
+their own (`?global=`, 21 §Narrow layout, D216), so leaving it lands on
+the pane of the run the operator was on; the keys above cycle whatever
+the middle shows. At `md` and above they are what the detail shows with
+nothing selected, as before.
 
 The order is the **manifest's** and is not hard-coded here: the builtins
 are declared like any other plugin (09 §Builtins are plugins) and the
@@ -338,13 +345,14 @@ focus instead, and `tab` is the only way attention reaches the detail
 pane (D176, D179, D204 (1)).
 
 `esc` unwinds one rung at a time, nearest outwards: an open overlay, then
-a run held by `⏎`, then the selection itself. That last rung is what
-makes the `global` panes reachable again — they are shown when no run is
+the narrow global screen (D216), then a run held by `⏎`, then the
+selection itself. That last rung is what makes the `global` panes
+reachable again above the breakpoint — they are shown when no run is
 selected, and until it existed the only things that cleared `?run=` were
-the delete confirm and the narrow back control, so above the breakpoint
-selecting a run was a dead end (D209). With nothing to unwind `esc` does
-nothing, rather than rewriting the same search and spending a history
-entry per keystroke.
+the delete confirm and the narrow back control, so selecting a run was a
+dead end there (D209). With nothing to unwind `esc` does nothing, rather
+than rewriting the same search and spending a history entry per
+keystroke.
 
 `⏎` **focuses a run**: it picks the highlighted run up so that `↑`/`↓`
 — and `j`/`k`, which are the same binding — move it in the dispatch
@@ -454,17 +462,19 @@ attributes.
   `critical`** whatever that share says (D178, D179). The floor holds in
   five states of that page, because they are five documents: the empty
   dashboard, the loaded one, the loaded one at `xlarge`, the loaded one
-  at 390×844 — both of its narrow regions (D197) — and the run list with
-  a `failed` run picked up by `⏎`, which is the only state that draws a
-  focused row and so the only one that measures what a status pill sits
-  on inside that mode (D204 (5)). The pointer is moved off the row
-  before axe walks it: `hover:bg-*` outranks a row's own tint, so a row
-  still under the cursor that a click selected is measured on its hover
-  colour rather than on the tint the assertion is about.
+  at 390×844 — all three of its narrow screens (D197, D216) — and the
+  run list with a `failed` run picked up by `⏎`, which is the only state
+  that draws a focused row and so the only one that measures what a
+  status pill sits on inside that mode (D204 (5)). The pointer is moved
+  off the row before axe walks it: `hover:bg-*` outranks a row's own
+  tint, so a row still under the cursor that a click selected is
+  measured on its hover colour rather than on the tint the assertion is
+  about.
 - Touch targets in the narrow chrome are at least 24×24 CSS px (WCAG
   2.5.8); the visual size stays the mock's. `web/e2e/mobile.spec.ts`
-  drives the five flows of 21 §Touch operation with `tap()` alone and
-  asserts no horizontal page scroll in any of them.
+  drives the six flows of 21 §Touch operation with `tap()` alone — and
+  a CDP touch sequence for the one swipe — and asserts no horizontal
+  page scroll in any of them.
 
 ## Auth in the browser
 

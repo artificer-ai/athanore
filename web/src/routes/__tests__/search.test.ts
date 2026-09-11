@@ -52,6 +52,23 @@ describe('validateAppSearch', () => {
     expect(validateAppSearch({ task: -3 })).toEqual({})
   })
 
+  it('keeps the narrow global screen’s index, and drops what is not one', () => {
+    // `?global=` is the global cycle's own index, present while that
+    // screen is up (21 §Narrow layout, D216): parsed exactly as `pane`
+    // is, and a string from a hand-typed URL is fine.
+    expect(validateAppSearch({ global: 0 })).toEqual({ global: 0 })
+    expect(validateAppSearch({ global: '2' })).toEqual({ global: 2 })
+    expect(validateAppSearch({ run: 'a4c8', pane: 1, global: 0 })).toEqual({
+      run: 'a4c8',
+      pane: 1,
+      global: 0,
+    })
+    expect(validateAppSearch({ global: -1 })).toEqual({})
+    expect(validateAppSearch({ global: 0.5 })).toEqual({})
+    expect(validateAppSearch({ global: 'inbox' })).toEqual({})
+    expect(validateAppSearch({ global: '' })).toEqual({})
+  })
+
   it('drops a run id that is not a non-empty string', () => {
     expect(validateAppSearch({ run: '' })).toEqual({})
     expect(validateAppSearch({ run: '   ' })).toEqual({})

@@ -10,7 +10,12 @@
  * D194). Selection is already a search parameter, so the stacked
  * navigation is a render decision and not new state, and `onClearRun` —
  * which the delete confirm already had — is what the pane bar's back
- * control writes.
+ * control writes. A third narrow screen, the **global screen**, rides
+ * `?global=` over either of those: it is the same `Detail` over the
+ * global cycle — what the desktop draws with nothing selected — entered
+ * by a swipe right or the footer's `global panes` button and left by a
+ * swipe left, the bar's `←`, the button or `esc`, with `?run=` and
+ * `?pane=` untouched underneath (D216).
  *
  * Everything that makes this view *this view* comes in on `search`: the
  * shell owns no selection state of its own, and `onSelectRun` hands a
@@ -103,6 +108,7 @@ export default function App({
   onCloseOverlay,
   onFocusStream,
   onClearRun,
+  onShowGlobal,
 }: {
   search: AppSearch
   onSelectRun: (runId: string) => void
@@ -146,6 +152,15 @@ export default function App({
    * deleted id would point the detail pane at a 404.
    */
   onClearRun?: (() => void) | undefined
+  /**
+   * The narrow global screen: `?global=` to this index, or away.
+   *
+   * `0` opens it on its first pane, a larger index is `◀ ▶`, a dot or a
+   * jump key moving inside it, and `undefined` is every way off it (21
+   * §Narrow layout, D216). Nothing else in the search is touched, which
+   * is what puts a swipe back on the pane of the run it left.
+   */
+  onShowGlobal?: ((index: number | undefined) => void) | undefined
 }) {
   const runs = useRunListModel()
   useAttention()
@@ -153,7 +168,25 @@ export default function App({
   // two regions are two subtrees, and below the breakpoint exactly one
   // of them is mounted (D194).
   const narrow = useIsNarrow()
-  const panes = usePanes(search.run, { index: search.pane, onChange: onSelectPane })
+  // The narrow global screen: `?global=` set, below the breakpoint. At
+  // `md` and above the parameter is inert — kept, not cleared, as
+  // `listCollapsed` is below (D194) — because the detail is the global
+  // panes there whenever nothing is selected, and a phone's link opened
+  // on a desktop should show the run it names.
+  const showingGlobal = narrow && search.global !== undefined
+  const showGlobal = onShowGlobal ?? NOTHING
+  // One pane model, keyed off the screen, not two: what the middle shows
+  // is what the keyboard cycles, what the palette's `append log` looks
+  // the log pane up in, and what `Detail` draws, and on the global
+  // screen all three are the global cycle. `logPane` and `agentPane`
+  // come out `-1` there, so `append log` asks for nothing — which is
+  // already what it does with no log pane.
+  const panes = usePanes(
+    showingGlobal ? undefined : search.run,
+    showingGlobal
+      ? { index: search.global, onChange: showGlobal }
+      : { index: search.pane, onChange: onSelectPane },
+  )
   const queryClient = useQueryClient()
   const toggleListCollapsed = usePrefs((state) => state.toggleListCollapsed)
   const listCollapsed = usePrefs((state) => state.listCollapsed)
@@ -208,6 +241,9 @@ export default function App({
   // the pane host read it a moment ago — so this costs no request, and
   // reading it here is what keeps the palette's catalogue in one place.
   const { manifest } = useManifest()
+  // The run a plugin's action is scoped to: none on the global screen,
+  // as on the desktop's global view (`panes/actions.ts`, ownership).
+  const pluginScopeRun = showingGlobal ? undefined : search.run
 
   // The palette's rows are the app's own actions, so they are built here
   // rather than inside it: `refresh` is this tab's whole cache,
@@ -257,9 +293,18 @@ export default function App({
     // rows exist so the choice is reachable without a pointer (D196).
     setFontSize,
   }).concat(
+    // On the narrow global screen the plugin rows are the global view's
+    // — every workflow's, resolved against no run — which is the
+    // catalogue the desktop's global view has, and the one that lists a
+    // plugin's global action beside its global pane (D216). The run
+    // operations above keep `?run=`: the selection is still the run,
+    // only the screen over it is not.
     pluginPaletteActions(
-      actionsOf(manifest, { runId: search.run, workflow: selected?.workflow }),
-      { runId: search.run, taskId: search.task },
+      actionsOf(manifest, {
+        runId: pluginScopeRun,
+        workflow: showingGlobal ? undefined : selected?.workflow,
+      }),
+      { runId: pluginScopeRun, taskId: search.task },
       onOpenAction ?? NOTHING,
     ),
   )
@@ -321,9 +366,18 @@ export default function App({
     // end and the crontab and drop-box panes could not be got back to
     // (D209). The guard matters: a navigation that rewrote the same
     // search would be one history entry per keystroke.
+    //
+    // The narrow global screen is a rung between the overlay and the
+    // held run (D216): a held run is never narrow, so the order between
+    // those two is never exercised, but the rung sits where it reads
+    // right — the screen is nearer than the selection under it.
     close: () => {
       if (search.overlay !== undefined) {
         onCloseOverlay?.()
+        return
+      }
+      if (showingGlobal) {
+        showGlobal(undefined)
         return
       }
       if (runFocused) {
@@ -349,10 +403,29 @@ export default function App({
 
       <Splitter
         count={runs.rows.length}
-        // The stacked middle of 21 §Narrow layout: `?run=` unset is the
-        // list, `?run=` set is the detail, and at `md` and above there
-        // is no stack — the splitter draws both.
-        stacked={narrow ? (search.run === undefined ? 'list' : 'detail') : undefined}
+        // The stacked middle of 21 §Narrow layout: `?global=` set is the
+        // global screen over whichever of the other two is under it,
+        // `?run=` unset is the list, `?run=` set is the detail, and at
+        // `md` and above there is no stack — the splitter draws both.
+        stacked={
+          narrow
+            ? showingGlobal
+              ? 'global'
+              : search.run === undefined
+                ? 'list'
+                : 'detail'
+            : undefined
+        }
+        // Swipe right opens the global screen on its first pane, swipe
+        // left puts it away. Each is guarded on the screen's state, so a
+        // swipe right *on* the global screen does not write `0` over
+        // the pane it is on and a swipe left off it does not spend a
+        // history entry rewriting the same search — the guard 10
+        // §Keyboard gives `esc`.
+        onSwipe={(direction) => {
+          if (direction === 'right' && !showingGlobal) showGlobal(0)
+          else if (direction === 'left' && showingGlobal) showGlobal(undefined)
+        }}
         list={
           <RunList
             model={runs}
@@ -389,11 +462,40 @@ export default function App({
             // layout's back arrow, above it, it is the only pointer
             // route to the `global` panes.
             onBack={onClearRun}
+            // The global screen's own way back: `?global=` away, with
+            // `?run=` left as it is, so `back to the run` is literal —
+            // and `back to runs` when nothing was selected under it.
+            leave={
+              showingGlobal
+                ? {
+                    to: search.run === undefined ? 'list' : 'run',
+                    onLeave: () => {
+                      showGlobal(undefined)
+                    },
+                  }
+                : undefined
+            }
           />
         }
       />
 
-      <Footer onOpenPalette={onOpenPalette} />
+      {/* `global` only when narrow: `App` is one of D201 (2)'s three
+          `useIsNarrow()` components already, so the width is decided
+          here and the footer stays a `max-md:` class away from knowing.
+          Above the breakpoint the button is not in the document at all. */}
+      <Footer
+        onOpenPalette={onOpenPalette}
+        global={
+          narrow
+            ? {
+                pressed: showingGlobal,
+                onToggle: () => {
+                  showGlobal(showingGlobal ? undefined : 0)
+                },
+              }
+            : undefined
+        }
+      />
 
       <Palette
         open={search.overlay === 'palette'}
@@ -452,7 +554,7 @@ export default function App({
       <PluginAction
         open={search.overlay === 'action'}
         action={search.action}
-        runId={search.run}
+        runId={pluginScopeRun}
         taskId={search.task}
         onClose={onCloseOverlay ?? NOTHING}
       />

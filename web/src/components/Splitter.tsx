@@ -31,10 +31,20 @@
  * desktop geometry exactly as the operator left it — and the group is
  * not mounted at all, because 260 px of list and 340 px of detail do not
  * both fit in a phone.
+ *
+ * The stacked middle has a third value, **`global`**: the narrow global
+ * screen, which is the same `detail` slot — the shell hands it a
+ * `Detail` over the global cycle, exactly what the desktop draws with
+ * nothing selected — marked `data-stacked="global"` (D216). It is
+ * entered by a swipe right on the stacked middle and left by a swipe
+ * left, and that gesture is read here, on the stacked `<main>` alone:
+ * the swipe is a property of the stacked middle, and the desktop split
+ * is never listened to (`../lib/useSwipe.ts`).
  */
 import { useRef, type ReactNode } from 'react'
 import { Group, Panel, Separator } from 'react-resizable-panels'
 
+import { useSwipe, type SwipeDirection } from '../lib/useSwipe'
 import { MIN_DETAIL_WIDTH, MIN_LIST_WIDTH, usePrefs } from '../store/prefs'
 
 /**
@@ -49,6 +59,7 @@ export function Splitter({
   list,
   detail,
   stacked,
+  onSwipe,
 }: {
   /** Run rows on screen: what the collapsed rail reports. */
   count: number
@@ -56,9 +67,17 @@ export function Splitter({
   detail: ReactNode
   /**
    * The one region to draw, below the breakpoint, or nothing at or
-   * above it. `App` decides: it is `?run=` that says which (D194).
+   * above it. `App` decides: `?run=` says list or detail (D194), and
+   * `?global=` says the global screen over either (D216), which is the
+   * `detail` slot drawn again.
    */
-  stacked?: 'list' | 'detail' | undefined
+  stacked?: 'list' | 'detail' | 'global' | undefined
+  /**
+   * A horizontal swipe on the stacked middle: `right` opens the global
+   * screen, `left` puts it away. Read only while stacked; the desktop
+   * split has no gesture.
+   */
+  onSwipe?: ((direction: SwipeDirection) => void) | undefined
 }) {
   const listWidth = usePrefs((s) => s.listWidth)
   const listCollapsed = usePrefs((s) => s.listCollapsed)
@@ -66,6 +85,10 @@ export function Splitter({
   const setListCollapsed = usePrefs((s) => s.setListCollapsed)
   const listElement = useRef<HTMLDivElement | null>(null)
   const detailElement = useRef<HTMLDivElement | null>(null)
+  // Attached to the stacked `<main>` below and to nothing else: the ref
+  // is only ever set on that branch, so the split layouts, which never
+  // render it, listen to nothing.
+  const swipeRef = useSwipe(stacked === undefined ? undefined : onSwipe)
 
   // Narrow first: a `listCollapsed` the operator set on a desktop says
   // nothing about a viewport that has no list *and* detail to choose
@@ -73,7 +96,11 @@ export function Splitter({
   // drawn here.
   if (stacked !== undefined) {
     return (
-      <main data-stacked={stacked} className="flex min-h-0 min-w-0 flex-1 items-stretch">
+      <main
+        ref={swipeRef}
+        data-stacked={stacked}
+        className="flex min-h-0 min-w-0 flex-1 items-stretch"
+      >
         {stacked === 'list' ? list : detail}
       </main>
     )

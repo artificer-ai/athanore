@@ -23,8 +23,13 @@ export function AppRoute() {
         // its own, so a click and a pasted link end in the same state.
         // `?node=` goes with it: a node filter is one run's graph, and
         // carrying it to the next run would filter that run's log to a
-        // node it may not have.
-        void navigate({ search: (prev) => ({ ...prev, run: runId, node: undefined }) })
+        // node it may not have. `?global=` goes too: selecting a run is
+        // how the detail stops showing the global panes and starts
+        // showing the run's, and below the breakpoint that is the same
+        // one navigation off the global screen (21 §Narrow layout, D216).
+        void navigate({
+          search: (prev) => ({ ...prev, run: runId, node: undefined, global: undefined }),
+        })
       }}
       onSelectPane={(index) => {
         // The pane index is a search parameter like the selection (10
@@ -48,11 +53,15 @@ export function AppRoute() {
         // One navigation and not two: 10 §Graph pane's "jumps to the log
         // pane filtered to that node" is `?node=` and `?pane=` together,
         // and writing them in two calls would leave the second updating
-        // a search the first had already replaced.
+        // a search the first had already replaced. It names a run pane
+        // by index, so the narrow global screen comes down with it
+        // (D216) — a pane index means nothing on a screen that shows a
+        // different cycle.
         void navigate({
           search: (prev) => ({
             ...prev,
             node,
+            global: undefined,
             ...(pane === undefined ? {} : { pane }),
           }),
         })
@@ -96,15 +105,26 @@ export function AppRoute() {
         // One navigation and not three: the drawer closes, `?task=`
         // stays — it is the agent pane's focused attempt (T063c) — and
         // the cycle moves to that pane. Written separately, the last
-        // write would be updating a search the first had replaced.
+        // write would be updating a search the first had replaced. Like
+        // `onOpenNode` it names a run pane, so `?global=` goes (D216).
         void navigate({
           search: (prev) => ({
             ...prev,
             overlay: undefined,
             task: taskId,
+            global: undefined,
             ...(pane === undefined ? {} : { pane }),
           }),
         })
+      }}
+      onShowGlobal={(index) => {
+        // The narrow global screen (21 §Narrow layout, D216): `?global=`
+        // is the global cycle's own index, present while the screen is
+        // up. `undefined` is how it is left — the router drops the key,
+        // as it does for `overlay` — and `?run=` and `?pane=` are not
+        // touched either way, which is what lands a swipe back on the
+        // pane of the run the operator was on.
+        void navigate({ search: (prev) => ({ ...prev, global: index }) })
       }}
       onClearRun={() => {
         // Nothing is selected any more. Two callers say that: the
