@@ -1,11 +1,19 @@
 /**
  * <athanore-chat> — the conversation, and a box to add to it.
  *
- * One route for the state (`turns`), one for the send (`say`), and the
- * tab's event feed to know when either changed. The element never
- * decides anything: whether it is your turn is `pending` from the
- * server, and a send is an answer to that request — the same answer the
- * request pane or `athanore` on the command line would give.
+ * One route for the state (`turns`), one for the send (`say`), one for
+ * the reply as it is typed (`draft`), and the tab's event feed to know
+ * when any of them changed. The element never decides anything: whether
+ * it is your turn is `pending` from the server, and a send is an answer
+ * to that request — the same answer the request pane or `athanore` on
+ * the command line would give.
+ *
+ * The draft follows `task.stream`, the ephemeral event the transcript
+ * writer publishes per flushed batch (08 §Tasks). Each one is a pull of
+ * `draft?after=<last seq seen>`; the text chunks that come back are
+ * appended to a draft bubble under the conversation, which goes away
+ * when the turn's reply lands in the work log and the next turn's
+ * request opens.
  */
 
 const REFRESH_ON = [
@@ -17,6 +25,9 @@ const REFRESH_ON = [
   'run.cancelled',
   'task.started',
 ]
+
+//: The one event that means "the draft grew" rather than "reload".
+const STREAM = 'task.stream'
 
 class AthanoreChat extends HTMLElement {
   connectedCallback() {
@@ -51,6 +62,9 @@ class AthanoreChat extends HTMLElement {
                    border-bottom-right-radius: 4px; }
         .msg.them { align-self: flex-start; background: var(--surface);
                     border-bottom-left-radius: 4px; }
+        .msg.draft { opacity: 0.8; border: 1px dashed var(--divider); }
+        .msg.draft::after { content: '▍'; color: var(--accent); animation: blink 1s steps(2) infinite; }
+        @keyframes blink { to { visibility: hidden; } }
         .who { display: block; font-size: 0.75em; letter-spacing: 0.02em;
                color: var(--muted); margin-bottom: 2px; }
         .msg.you .who { text-align: right; }
@@ -86,14 +100,20 @@ class AthanoreChat extends HTMLElement {
         this.form.requestSubmit()
       }
     })
+    this.turns = []
+    this.draft = { taskId: null, seq: 0, text: '' }
+    this.pulls = Promise.resolve()
     try {
-      this.unsubscribe = window.athanore.subscribe(REFRESH_ON, (event) => {
-        if (!event.run_id || event.run_id === this.runId) this.load()
+      this.unsubscribe = window.athanore.subscribe([...REFRESH_ON, STREAM], (event) => {
+        if (event.run_id && event.run_id !== this.runId) return
+        if (event.name === STREAM) this.pull()
+        else this.load()
       })
     } catch (err) {
       this.fail(`live updates off: ${err.message}`)
     }
     this.load()
+    this.pull()
   }
 
   disconnectedCallback() {
@@ -105,8 +125,9 @@ class AthanoreChat extends HTMLElement {
     this.state.classList.toggle('bad', Boolean(message))
   }
 
-  async call(path, init) {
-    const r = await window.athanore.fetch(`${path}?run_id=${encodeURIComponent(this.runId)}`, init)
+  async call(path, init, params = {}) {
+    const query = new URLSearchParams({ run_id: this.runId, ...params })
+    const r = await window.athanore.fetch(`${path}?${query}`, init)
     if (!r.ok) {
       let detail = `${r.status}`
       try { detail = (await r.json()).error ?? detail } catch { /* not JSON */ }
@@ -123,23 +144,48 @@ class AthanoreChat extends HTMLElement {
     }
   }
 
+  /**
+   * Pull the draft's next page. Pulls are chained so two `task.stream`
+   * events in flight cannot append the same chunks twice, and a pull
+   * that lands on a different task than the last one starts the draft
+   * over — a new turn, a new reply.
+   */
+  pull() {
+    this.pulls = this.pulls.then(async () => {
+      const after = this.draft.seq
+      let page
+      try {
+        page = await this.call('draft', undefined, { after: String(after) })
+        if (page.task_id !== null && page.task_id !== this.draft.taskId) {
+          // Another turn's task: its cursor starts at 0, so the page
+          // that came back with the old task's cursor is not its start.
+          this.draft = { taskId: page.task_id, seq: 0, text: '' }
+          if (after !== 0) page = await this.call('draft', undefined, { after: '0' })
+        }
+      } catch (err) {
+        this.fail(err.message)
+        return
+      }
+      if (page.task_id === null) {
+        this.draft = { taskId: null, seq: 0, text: '' }
+      } else {
+        this.draft.text += page.chunks.map((chunk) => chunk.text).join('')
+        this.draft.seq = page.last_seq
+      }
+      this.paint()
+    })
+    return this.pulls
+  }
+
   render(view) {
-    const stuck = this.log.scrollTop + this.log.clientHeight >= this.log.scrollHeight - 8
-    this.log.replaceChildren(
-      ...view.turns.map((turn) => {
-        const div = document.createElement('div')
-        div.className = `msg ${turn.who === 'you' ? 'you' : 'them'}`
-        const who = document.createElement('span')
-        who.className = 'who'
-        who.textContent = turn.who
-        div.append(who, turn.text)
-        return div
-      }),
-    )
-    if (stuck) this.log.scrollTop = this.log.scrollHeight
+    this.view = view
+    this.turns = view.turns
+    const yours = view.pending !== null
+    // The reply landed: it is in `turns` now, so the draft of it goes.
+    if (yours) this.draft = { taskId: null, seq: 0, text: '' }
+    this.paint()
 
     const over = view.run.status !== 'running' && view.run.status !== 'queued'
-    const yours = view.pending !== null
     this.box.disabled = over || !yours
     this.button.disabled = over || !yours
     this.state.classList.remove('bad')
@@ -147,6 +193,27 @@ class AthanoreChat extends HTMLElement {
     else if (yours) this.state.textContent = ''
     else this.state.textContent = `${view.agent} is answering…`
     if (yours && !over) this.box.focus()
+  }
+
+  bubble(who, text, draft = false) {
+    const div = document.createElement('div')
+    div.className = `msg ${who === 'you' ? 'you' : 'them'}${draft ? ' draft' : ''}`
+    const label = document.createElement('span')
+    label.className = 'who'
+    label.textContent = who
+    div.append(label, text)
+    return div
+  }
+
+  /** The conversation, then the draft if there is one. */
+  paint() {
+    const stuck = this.log.scrollTop + this.log.clientHeight >= this.log.scrollHeight - 8
+    const bubbles = this.turns.map((turn) => this.bubble(turn.who, turn.text))
+    if (this.draft.text) {
+      bubbles.push(this.bubble(this.view?.agent ?? 'agent', this.draft.text, true))
+    }
+    this.log.replaceChildren(...bubbles)
+    if (stuck) this.log.scrollTop = this.log.scrollHeight
   }
 
   async send(e) {

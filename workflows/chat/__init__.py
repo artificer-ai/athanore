@@ -25,8 +25,17 @@ in `static/chat.js`, draws the conversation from the work log and puts a
 composer under it. Sending answers the turn's open request, which is all
 a message ever is here — so the request pane, the CLI and this pane are
 three views of one channel, and nothing is lost by using any of them.
-The plugin's two routes are the pane's data and its send; both are
-run-scoped (`?run_id=`), so the pane shows this run's chat and no other.
+The plugin's three routes are the pane's data, its send, and the
+reply in progress; all are run-scoped (`?run_id=`), so the pane shows
+this run's chat and no other.
+
+**The reply streams.** While the agent is answering, the pane follows
+the ephemeral `task.stream` event (08 §Tasks) and pulls the turn's
+`text` chunks through `draft`, so what the model is typing shows up as
+a draft bubble before the turn's `reply` lands in the work log. The
+bridge binds a pane's `fetch` to the plugin's own prefix (09 §Escape
+hatch), which is why `draft` exists rather than the pane reading
+`/api/tasks/{id}/stream` itself.
 
 Talk to it::
 
@@ -51,6 +60,7 @@ from athanore import (
     current_task,
     human_input,
 )
+from athanore.store.rows import ChunkKind, TaskStatus
 from workflows.feature.sandbox import AGENT_SH, CHECKOUT
 
 __all__ = ["AGENT", "MEMORY", "STOP_WORDS", "ChatAgent", "Reply", "Say", "wf"]
@@ -252,6 +262,54 @@ async def turns(ctx: PluginContext, request: Request) -> dict[str, Any]:
     """The conversation so far, and whether it is the operator's turn."""
 
     return await _view(ctx, request)
+
+
+async def _answering(request: Request, run_id: str) -> Any:
+    """The run's ``in_progress`` task, or ``None`` when nothing is running.
+
+    Every turn is its own task, and it is ``waiting`` while the question
+    is open and ``in_progress`` while the agent answers it, so the one
+    live task is the turn being answered and its transcript is that
+    reply as it is typed. Read through the store for the same reason
+    :func:`_pending` is.
+    """
+
+    store = request.app.state.store
+    if store is None:
+        return None
+    async with store.reader() as reader:
+        tasks = await reader.tasks.list_for_run(run_id)
+    live = [task for task in tasks if task.status == TaskStatus.in_progress]
+    return max(live, key=lambda task: task.id) if live else None
+
+
+@wf.route("/draft")
+async def draft(ctx: PluginContext, request: Request, after: int = 0) -> dict[str, Any]:
+    """The reply being typed: the live turn's ``text`` chunks after ``after``.
+
+    ``task_id`` is ``None`` when no turn is being answered. The pane
+    passes the ``last_seq`` it saw and appends what comes back, the same
+    cursor ``/api/tasks/{id}/stream`` pages by; ``last_seq`` counts every
+    chunk kind, so a page of only tool calls still moves the cursor.
+    """
+
+    assert ctx.run_id is not None
+    task = await _answering(request, ctx.run_id)
+    if task is None:
+        return {"task_id": None, "chunks": [], "last_seq": 0}
+    store = request.app.state.store
+    async with store.reader() as reader:
+        chunks = await reader.stream.list_after(task.id, after)
+        last_seq = await reader.stream.last_seq(task.id)
+    return {
+        "task_id": task.id,
+        "chunks": [
+            {"seq": chunk.seq, "text": chunk.text}
+            for chunk in chunks
+            if chunk.kind == ChunkKind.text
+        ],
+        "last_seq": last_seq,
+    }
 
 
 @wf.route("/say", methods="POST")
