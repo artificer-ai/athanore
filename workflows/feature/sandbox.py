@@ -18,6 +18,18 @@ Two facts about where this runs shape the rest:
   a `cwd` means the same thing on both sides of the boundary and an agent
   edits the same files this module then reads with git.
 
+**Every run builds in a git worktree of its own** (D263):
+``.worktrees/<branch>`` under the checkout, cut from ``origin/main``.
+The operator's checkout is never checked out, dirtied or merged into by
+a run, so it is free to be worked in while runs are in flight, and two
+runs can be in flight at once. A worktree is under the checkout so the
+bind mount carries it — the same path on both sides of the boundary,
+as above — and `scripts/_lib.sh` gives it a uv environment of its own
+in the container, so two trees never rewrite each other's venv. Every
+function here that touches a tree takes it as ``cwd``; :data:`CHECKOUT`
+is for the things that belong to the repository rather than to a tree —
+the worktree list, the branches, `.athanore/`.
+
 A change lands the way AGENTS.md §Landing a change says every change
 does (D260): the branch is pushed, a pull request is opened, CI on it is
 the gate that counts, and `gh pr merge` makes the merge commit. `gh` is
@@ -37,12 +49,15 @@ __all__ = [
     "CHECKOUT",
     "GATE_COMMAND",
     "GATE_TAIL",
+    "WORKTREES",
+    "add_worktree",
     "branch_name",
     "gh",
     "gh_try",
     "git",
     "git_try",
     "plan_docs",
+    "remove_worktree",
     "run_gate",
     "unique_branch",
     "watch_checks",
@@ -54,16 +69,21 @@ __all__ = [
 #: workflow is on the host, and a host has a shell that may be anywhere.
 CHECKOUT = Path(__file__).resolve().parents[2]
 
+#: Where a run's worktree goes: `.worktrees/<branch>`, git-ignored. Under
+#: the checkout, not beside it, because the container mounts the checkout
+#: and nothing else.
+WORKTREES = CHECKOUT / ".worktrees"
+
 #: The one way into the sandbox, absolute. `command` is spawned in the
 #: agent's `cwd`, and it works from either side of the container boundary
 #: (AGENTS.md §Dispatching agents into the container).
 AGENT_SH = CHECKOUT / "scripts" / "agent.sh"
 
-#: The gate, which is the definition of green (D74). Not `pytest`: the
+#: The gate, which is the definition of green (D74), as a tree-relative
+#: command: :func:`run_gate` runs the tree's own copy. Not `pytest`: the
 #: gate is ruff, pyright, import-linter, both test suites, the SPA build,
 #: Playwright and the packaging check, and a workflow that ran less than
 #: a human runs would be merging on a weaker promise.
-GATE_SCRIPT = CHECKOUT / "scripts" / "test.sh"
 GATE_COMMAND = "./scripts/test.sh"
 
 #: How long the gate may take, and how much of its tail is quoted back to
@@ -85,11 +105,11 @@ CHECKS_INTERVAL = 30
 #: step 5).
 
 
-async def _run(program: str, *args: str) -> tuple[int, str]:
+async def _run(program: str, *args: str, cwd: Path = CHECKOUT) -> tuple[int, str]:
     proc = await asyncio.create_subprocess_exec(
         program,
         *args,
-        cwd=CHECKOUT,
+        cwd=cwd,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
         env={**os.environ, "GH_PROMPT_DISABLED": "1", "GH_NO_UPDATE_NOTIFIER": "1"},
@@ -98,44 +118,46 @@ async def _run(program: str, *args: str) -> tuple[int, str]:
     return proc.returncode or 0, out.decode(errors="replace").strip()
 
 
-async def git_try(*args: str) -> tuple[int, str]:
-    """One git command in the checkout: its exit code and its output.
+async def git_try(*args: str, cwd: Path = CHECKOUT) -> tuple[int, str]:
+    """One git command in ``cwd``: its exit code and its output.
 
     For the callers that have something to do with a failure. Everything
-    else wants :func:`git`.
+    else wants :func:`git`. ``cwd`` is the run's worktree for anything
+    about its files or its HEAD, and the checkout for the repository's
+    own things — the worktree list, the branches.
     """
 
-    return await _run("git", *args)
+    return await _run("git", *args, cwd=cwd)
 
 
-async def git(*args: str) -> str:
+async def git(*args: str, cwd: Path = CHECKOUT) -> str:
     """Same, but a non-zero exit ends the attempt (rule 3).
 
     A git command that fails here is not something a node body can route
-    around: the checkout is not in the state the next step assumes, so
-    the exception is the honest answer.
+    around: the tree is not in the state the next step assumes, so the
+    exception is the honest answer.
     """
 
-    code, out = await git_try(*args)
+    code, out = await git_try(*args, cwd=cwd)
     if code:
         raise RuntimeError(f"git {' '.join(args)} failed ({code}):\n{out}")
     return out
 
 
-async def gh_try(*args: str) -> tuple[int, str]:
-    """One `gh` command in the checkout, the same shape as :func:`git_try`.
+async def gh_try(*args: str, cwd: Path = CHECKOUT) -> tuple[int, str]:
+    """One `gh` command in ``cwd``, the same shape as :func:`git_try`.
 
-    Run in the checkout so `gh` resolves the repository from `origin`
-    and never needs `--repo`.
+    Run in a tree of the repository so `gh` resolves it from `origin`
+    and never needs `--repo`; a worktree shares the checkout's remotes.
     """
 
-    return await _run("gh", *args)
+    return await _run("gh", *args, cwd=cwd)
 
 
-async def gh(*args: str) -> str:
+async def gh(*args: str, cwd: Path = CHECKOUT) -> str:
     """Same, failing the attempt on a non-zero exit, like :func:`git`."""
 
-    code, out = await gh_try(*args)
+    code, out = await gh_try(*args, cwd=cwd)
     if code:
         raise RuntimeError(f"gh {' '.join(args)} failed ({code}):\n{out}")
     return out
@@ -152,16 +174,24 @@ def branch_name(title: str) -> str:
 
 
 async def branch_exists(name: str) -> bool:
-    code, _ = await git_try("rev-parse", "--verify", "--quiet", f"refs/heads/{name}")
-    return code == 0
+    """Whether ``name`` is a local branch, a branch on `origin`, or a
+    worktree directory — any of which a new run must not reuse."""
+
+    for ref in (f"refs/heads/{name}", f"refs/remotes/origin/{name}"):
+        code, _ = await git_try("rev-parse", "--verify", "--quiet", ref)
+        if code == 0:
+            return True
+    return worktree_path(name).exists()
 
 
 async def unique_branch(name: str) -> str:
     """`name`, or the next free `name-N`.
 
-    A failed run leaves its branch behind to be read; a second run of the
-    same feature takes the next number rather than clobbering the
-    evidence.
+    A failed run leaves its branch and worktree behind to be read; a
+    second run of the same feature takes the next number rather than
+    clobbering the evidence. Checked against `origin` too, after the
+    fetch `prepare` does, so a branch pushed by a run that died before
+    its worktree was cleaned up is not pushed over.
     """
 
     if not await branch_exists(name):
@@ -172,29 +202,73 @@ async def unique_branch(name: str) -> str:
     return f"{name}-{n}"
 
 
-def plan_docs(title: str) -> list[str]:
-    """`docs/plans/<title>*.md`, checkout-relative.
+def worktree_path(branch: str) -> Path:
+    """`.worktrees/<branch>`, with the branch's slashes folded.
+
+    `feat/T003` becomes `.worktrees/feat-T003`: git allows a slash in a
+    branch and a worktree is a directory, and one level is easier to
+    list, remove and reason about than a tree of them.
+    """
+
+    return WORKTREES / branch.replace("/", "-")
+
+
+async def add_worktree(branch: str, start: str = "origin/main") -> Path:
+    """Cut ``branch`` from ``start`` in a worktree of its own; return it.
+
+    The checkout's own HEAD is not touched: the branch is created by
+    `worktree add -b`, straight from the ref, so what the operator has
+    checked out and whatever they have uncommitted is neither read nor
+    disturbed. The tree starts empty of everything git ignores — no
+    `.env`, no `web/node_modules` — and the wrappers in `scripts/` know
+    to reach the main checkout's stack and to install what a gate needs
+    (`scripts/_lib.sh`).
+    """
+
+    path = worktree_path(branch)
+    WORKTREES.mkdir(exist_ok=True)
+    await git("worktree", "add", "--quiet", str(path), "-b", branch, start)
+    return path
+
+
+async def remove_worktree(path: Path) -> None:
+    """Drop the worktree at ``path``, whatever state it is in.
+
+    `--force` because a merged run's tree may hold ignored files the
+    gate produced (`web/dist`, `node_modules`) and git otherwise refuses
+    to remove a tree with anything in it that is not in the index. The
+    directory is gone afterwards; the branch is the caller's to delete.
+    """
+
+    await git("worktree", "remove", "--force", str(path))
+
+
+def plan_docs(tree: Path, title: str) -> list[str]:
+    """`docs/plans/<title>*.md` in ``tree``, tree-relative.
 
     Looked up when the node runs rather than when the run was submitted,
     which is what lets `planner` write the plan for this very run and
     `implement`, the node after it, find it.
     """
 
-    plans = sorted((CHECKOUT / "docs" / "plans").glob(f"{title}*.md"))
-    return [str(p.relative_to(CHECKOUT)) for p in plans]
+    plans = sorted((tree / "docs" / "plans").glob(f"{title}*.md"))
+    return [str(p.relative_to(tree)) for p in plans]
 
 
-async def run_gate() -> tuple[int, str]:
-    """Run the gate. Returns its exit code and the tail of its output.
+async def run_gate(tree: Path) -> tuple[int, str]:
+    """Run the gate on ``tree``. Returns its exit code and an output tail.
 
-    A timeout is a failure with a code of its own rather than an
-    exception: a gate that hung is something the implementer can be told
-    about and can act on, and the node routes on it like any other red.
+    The tree's own copy of the script, so the tree under test and the
+    scripts testing it are the same commit; `scripts/_lib.sh` finds the
+    checkout's stack from there. A timeout is a failure with a code of
+    its own rather than an exception: a gate that hung is something the
+    implementer can be told about and can act on, and the node routes on
+    it like any other red.
     """
 
     proc = await asyncio.create_subprocess_exec(
-        str(GATE_SCRIPT),
-        cwd=CHECKOUT,
+        str(tree / "scripts" / "test.sh"),
+        cwd=tree,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
     )
@@ -208,7 +282,7 @@ async def run_gate() -> tuple[int, str]:
     return proc.returncode or 0, tail
 
 
-async def watch_checks(branch: str) -> tuple[int, str]:
+async def watch_checks(branch: str, cwd: Path = CHECKOUT) -> tuple[int, str]:
     """Wait for the pull request's CI. Returns its exit code and a tail.
 
     `gh pr checks --watch` blocks until every check has finished and
@@ -234,7 +308,7 @@ async def watch_checks(branch: str) -> tuple[int, str]:
             "--watch",
             "--interval",
             str(CHECKS_INTERVAL),
-            cwd=CHECKOUT,
+            cwd=cwd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
             env={**os.environ, "GH_PROMPT_DISABLED": "1", "GH_NO_UPDATE_NOTIFIER": "1"},
@@ -272,9 +346,10 @@ async def watch_checks(branch: str) -> tuple[int, str]:
         "databaseId",
         "--jq",
         ".[0].databaseId",
+        cwd=cwd,
     )
     log = ""
     if run_id.strip().isdigit():
-        _, log = await gh_try("run", "view", run_id.strip(), "--log-failed")
+        _, log = await gh_try("run", "view", run_id.strip(), "--log-failed", cwd=cwd)
     tail = (f"{table}\n\n{log}" if log else table).rstrip()[-GATE_TAIL:]
     return code, tail

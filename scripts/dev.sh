@@ -15,7 +15,9 @@ if in_container; then
 fi
 
 ensure_image
+flags=()
+mapfile -t flags < <(tree_flags)
 if [ $# -eq 0 ]; then
-  compose_exec run --rm --entrypoint bash dev -l
+  compose_exec run --rm ${flags[@]+"${flags[@]}"} --entrypoint bash dev -l
 fi
-compose_exec run --rm dev "$*"
+compose_exec run --rm ${flags[@]+"${flags[@]}"} dev "$*"

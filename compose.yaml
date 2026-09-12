@@ -72,6 +72,10 @@ x-volumes: &volumes
   # web/node_modules deliberately stays inside the bind mount: a named
   # volume there would create a root-owned directory on the host.
   - athanore-venv:/home/agent/venv
+  # One uv environment per git worktree, `/home/agent/venvs/<name>`:
+  # `scripts/_lib.sh` points UV_PROJECT_ENVIRONMENT there when the work
+  # is in a worktree, so trees never rewrite each other's venv.
+  - athanore-venvs:/home/agent/venvs
   - athanore-uv-cache:/home/agent/.cache/uv
   - athanore-pnpm-store:/home/agent/.local/share/pnpm/store
   - athanore-ms-playwright:/home/agent/ms-playwright
@@ -100,6 +104,7 @@ services:
     volumes:
       - ${WORKSPACE}:${WORKSPACE}
       - athanore-venv:/home/agent/venv
+      - athanore-venvs:/home/agent/venvs
       - athanore-uv-cache:/home/agent/.cache/uv
       - athanore-pnpm-store:/home/agent/.local/share/pnpm/store
       - athanore-ms-playwright:/home/agent/ms-playwright
@@ -209,6 +214,8 @@ services:
 volumes:
   athanore-venv:
     name: athanore-venv
+  athanore-venvs:
+    name: athanore-venvs
   athanore-uv-cache:
     name: athanore-uv-cache
   athanore-pnpm-store:

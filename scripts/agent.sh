@@ -34,5 +34,10 @@ if in_container; then
 fi
 
 ensure_image
+# The agent works where it was spawned: `ACPAgent.cwd` is where the
+# engine starts this script, and a worktree there puts the container's
+# working directory and uv environment in that tree (see `_lib.sh`).
+flags=()
+mapfile -t flags < <(tree_flags)
 # -T: no TTY on the JSON wire.
-compose_exec run --rm -T "$service" "$@"
+compose_exec run --rm -T ${flags[@]+"${flags[@]}"} "$service" "$@"

@@ -8,10 +8,14 @@ source "$(dirname "$0")/_lib.sh"
 
 if ! in_container; then
   ensure_image
-  compose_exec run --rm dev "./scripts/test.sh $*"
+  flags=()
+  mapfile -t flags < <(tree_flags)
+  compose_exec run --rm ${flags[@]+"${flags[@]}"} dev "./scripts/test.sh $*"
 fi
 
-cd "$ROOT"
+# The tree under test, which in a worktree is not the checkout that owns
+# the stack (see `_lib.sh`).
+cd "$TREE"
 
 # A local `scripts/gate.sh` wins if you drop one in; the plan does not
 # create one (D74).

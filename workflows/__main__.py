@@ -26,20 +26,24 @@ from athanore import Pool, Server
 from workflows.chat import wf as chat
 from workflows.feature import wf as feature
 from workflows.feature.cron import start_ticker
+from workflows.quick import wf as quick
 
 
 def build() -> Server:
-    """The server: `feature` on the checkout, `chat` on `talk`.
+    """The server: `feature` and `quick` on `checkout`, `chat` on `talk`.
 
     Two pools because they cap two different things. `checkout` is the
-    working tree — one of it, so one run at a time. `talk` holds a slot
-    only while an agent is answering and gives it back while it waits on
-    a person, and a conversation has no business holding the slot the
-    build needs.
+    builds: each runs in a worktree of its own (D263), so the cap is no
+    longer the one working tree but how many builds may be in flight —
+    one, until a run can resolve a merge conflict with `main` on its
+    own. `talk` holds a slot only while an agent is answering and gives
+    it back while it waits on a person, and a conversation has no
+    business holding the slot the build needs.
     """
 
     server = Server()
     server.register(feature, Pool("checkout", capacity=1))
+    server.register(quick, Pool("checkout", capacity=1))
     server.register(chat, Pool("talk", capacity=2))
     return server
 

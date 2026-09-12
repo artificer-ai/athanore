@@ -45,6 +45,12 @@ gone — this is v1 maintaining v1 — so the workflow runs in the checkout's
 own venv and reaches the sandbox one way, through `scripts/agent.sh`
 (:mod:`workflows.feature.agents`).
 
+**Every run builds in a worktree of its own** (`.worktrees/<branch>`,
+D263), cut from `origin/main`, and the operator's checkout is never
+checked out, dirtied or merged into. The deterministic nodes are thin:
+what they do is in :mod:`workflows.feature.steps`, shared with `quick`,
+and the node here holds the edges and routes on the step's answer.
+
 **The rules do the bookkeeping.** Rule 1: the signature is the graph, so
 every loop-back edge is a parameter. Rule 2: the return value is the
 routing. Rule 3: the exception is the failure policy — blowing a loop cap
@@ -72,10 +78,10 @@ still in the graph and still routes, it just does not stop. Set
 from __future__ import annotations
 
 import os
-from typing import Any
 
-from athanore import Workflow, current_task, human_input
+from athanore import Workflow, human_input
 
+from . import steps
 from .agents import (
     ImplementerAgent,
     PlannerAgent,
@@ -85,19 +91,13 @@ from .agents import (
 )
 from .cron import declare as declare_cron
 from .files import declare as declare_files
-from .models import Brief, PlanDoc, QAVerdict, ReviewVerdict, TaskReport
-from .sandbox import (
-    GATE_COMMAND,
-    branch_name,
-    gh,
-    gh_try,
-    git,
-    git_try,
-    plan_docs,
-    run_gate,
-    unique_branch,
-    watch_checks,
-)
+from .models import Brief, PlanDoc, QAVerdict, ReviewVerdict
+from .sandbox import GATE_COMMAND, git, plan_docs
+from .steps import MAX_ATTEMPTS, MAX_LOOPS
+from .steps import bounce as _bounce
+from .steps import log as _log
+from .steps import title_of as _title
+from .steps import tree_of as _tree
 
 __all__ = ["MAX_ATTEMPTS", "MAX_LOOPS", "wf"]
 
@@ -107,13 +107,6 @@ __all__ = ["MAX_ATTEMPTS", "MAX_LOOPS", "wf"]
 wf = Workflow("feature", assets="./static")
 declare_files(wf)
 declare_cron(wf)
-
-#: Loop-backs to `implement` per lane, and in total, before rule 3 ends
-#: the run. Three and six are v0's numbers, kept because they were tuned
-#: on a real build: a lane that has bounced three times is not converging,
-#: and the branch is more useful read than retried.
-MAX_LOOPS = int(os.environ.get("FEATURE_MAX_LOOPS", "3"))
-MAX_ATTEMPTS = int(os.environ.get("FEATURE_MAX_ATTEMPTS", "6"))
 
 #: Whether a person is asked before anything reaches `main`. **Off by
 #: default**, which is a change: the node stays in the graph and still
@@ -129,76 +122,17 @@ MAX_ATTEMPTS = int(os.environ.get("FEATURE_MAX_ATTEMPTS", "6"))
 ATTENDED = os.environ.get("FEATURE_ATTENDED", "0") == "1"
 
 
-async def _log(text: str) -> None:
-    """Append to the run's work log, which is what the next stage reads."""
-
-    await current_task().services.log.append(text)
-
-
-def _title(payload: dict[str, Any]) -> str:
-    title = str(payload.get("title", "")).strip()
-    if not title:
-        raise RuntimeError("a run needs a title: the feature or task id")
-    return title
-
-
-async def _refuse_dirty() -> None:
-    """Stop if the checkout has uncommitted work of somebody else's.
-
-    Checked twice — before the first token is spent, and again
-    immediately before branching — because the two are minutes apart and
-    the tree is shared with whatever else is using this checkout.
-    """
-
-    dirty = await git("status", "--porcelain")
-    if dirty:
-        raise RuntimeError(
-            f"the checkout has uncommitted changes; refusing to work over "
-            f"them:\n{dirty}"
-        )
-
-
-def _bounce(payload: dict[str, Any], lane: str, feedback: str) -> dict[str, Any]:
-    """The payload for a loop-back to `implement`, with the caps applied.
-
-    Counting lives here rather than in each lane because the cap is one
-    policy, and a lane that counted for itself would drift from the
-    others. Blowing either cap raises: rule 3 decides what a run that is
-    not converging does, and what it does is stop with its branch intact.
-    """
-
-    loops = {**payload.get("loops", {})}
-    loops[lane] = loops.get(lane, 0) + 1
-    attempts = int(payload.get("attempts", 1)) + 1
-
-    if loops[lane] > MAX_LOOPS:
-        raise RuntimeError(
-            f"{_title(payload)}: {lane} has sent the work back {loops[lane]} "
-            f"times (cap {MAX_LOOPS}). Stopping with the branch intact.\n\n"
-            f"{feedback}"
-        )
-    if attempts > MAX_ATTEMPTS:
-        raise RuntimeError(
-            f"{_title(payload)}: {attempts} implement attempts (cap "
-            f"{MAX_ATTEMPTS}). Stopping with the branch intact.\n\n{feedback}"
-        )
-    return {**payload, "loops": loops, "attempts": attempts, "feedback": feedback}
-
-
 @wf.node(start=True, retries=1, timeout=None)
 async def prompt(prepare, *, payload):
     """Rewrite what the operator typed into what the architect will read.
 
-    First, and before anything is branched, because a dirty checkout
-    stops this run either way and finding that out here costs nothing.
-    `timeout=None` because the node's own budget is the agent's
-    (`AGENT_TIMEOUT`), and two caps on one wait means the tighter one
-    fires and the other is decoration.
+    Before anything is branched: it only reads, so it runs against the
+    checkout as it stands. `timeout=None` because the node's own budget
+    is the agent's (`AGENT_TIMEOUT`), and two caps on one wait means the
+    tighter one fires and the other is decoration.
     """
 
     title = _title(payload)
-    await _refuse_dirty()
-
     description = str(payload.get("description", "")).strip()
     result = await PromptAgent().run(
         f"An operator asked for: {title}\n\n"
@@ -224,28 +158,14 @@ async def prompt(prepare, *, payload):
 
 @wf.node(retries=0, timeout=600)
 async def prepare(planner, *, payload):
-    """Branch from `main`. No agent decides where work goes.
+    """Branch and worktree from `origin/main`. No agent decides where
+    work goes.
 
-    A dirty checkout is a hard stop rather than something to tidy: the
-    uncommitted work is somebody's, and it is not this run's to discard.
-    `retries=0` because branching is not improved by doing it twice.
+    `retries=0` because cutting a worktree is not improved by doing it
+    twice; a half-made one is evidence to read.
     """
 
-    title = _title(payload)
-    await _refuse_dirty()
-
-    # `main` is what `origin` says it is: a PR merged from anywhere else
-    # since the last run is on the remote and not yet here.
-    await git("checkout", "main")
-    await git("pull", "--ff-only", "origin", "main")
-    base = await git("rev-parse", "HEAD")
-    branch = await unique_branch(branch_name(title))
-    await git("switch", "-c", branch)
-    await _log(f"prepare: {branch} from main at {base[:12]}")
-
-    return planner(
-        {**payload, "branch": branch, "base": base, "attempts": 1, "loops": {}}
-    )
+    return planner(await steps.prepare(payload))
 
 
 @wf.node(retries=1, timeout=None)
@@ -292,195 +212,55 @@ async def planner(implement, *, payload):
             "plan that you made it."
         )
 
-    result = await PlannerAgent().run(prompt_text)
+    tree = _tree(payload)
+    result = await PlannerAgent(cwd=str(tree)).run(prompt_text)
     if not result.ok:
         raise RuntimeError(
             f"the architect did not finish: {result.error or result.stop_reason}"
         )
     plan: PlanDoc = result.output
 
-    found = plan_docs(title)
+    found = plan_docs(tree, title)
     if not found:
         raise RuntimeError(
             f"{title}: the architect reported `{plan.plan}`, but no file "
             f"matches `docs/plans/{title}*.md`. The implementer resolves the "
             "plan by that prefix and would find nothing."
         )
-    uncommitted = await git("status", "--porcelain", "--", "docs/plans")
+    uncommitted = await git("status", "--porcelain", "--", "docs/plans", cwd=tree)
     if uncommitted:
         raise RuntimeError(
             f"{title}: the plan is not committed on `{branch}`:\n{uncommitted}"
         )
 
-    plan_base = await git("rev-parse", "HEAD")
+    plan_base = await git("rev-parse", "HEAD", cwd=tree)
     await _log(f"planner: {', '.join(found)}\n{plan.summary}")
     return implement({**payload, "plan": plan.model_dump(), "plan_base": plan_base})
 
 
 @wf.node(retries=1, timeout=None)
 async def implement(gate, *, payload):
-    """The agent takes the feature.
+    """The agent takes the feature, in the worktree.
 
     `timeout=None` because the node's own budget is the agent's
     (`AGENT_TIMEOUT`), and two caps on one wait means the tighter one
     fires and the other is decoration.
     """
 
-    title = _title(payload)
-    description = str(payload.get("description", "")).strip()
-    feedback = str(payload.get("feedback", "")).strip()
-    branch = payload["branch"]
-
-    prompt = f"Implement {title} on branch `{branch}`."
-    if description:
-        prompt += f"\n\n{description}"
-    if plans := plan_docs(title):
-        prompt += (
-            "\n\nThe implementation plan is "
-            + ", ".join(f"`{p}`" for p in plans)
-            + ". Follow it: it fences the scope and says what done means."
-        )
-    if feedback:
-        prompt += (
-            f"\n\nA previous attempt did not pass. Fix this, and only this:\n{feedback}"
-        )
-
-    result = await ImplementerAgent().run(prompt)
-    if not result.ok:
-        raise RuntimeError(
-            f"the implementer did not finish: {result.error or result.stop_reason}"
-        )
-    report: TaskReport = result.output
-    await _log(f"implement: {report.headline}")
-    # The first attempt names the feature; later attempts name the fix,
-    # and the merge commit wants the former.
-    headline = str(payload.get("headline") or report.headline)
-    return gate({**payload, "report": report.model_dump(), "headline": headline})
+    return gate(await steps.implement(payload, ImplementerAgent))
 
 
 @wf.node(retries=0, timeout=None)
 async def gate(review, implement, *, payload):
-    """Deterministic, in two halves.
+    """Deterministic: git, the gate in the worktree, then CI on the PR.
 
-    git says whether there is anything to review; then the gate says
-    whether it passes. The agent's account of either is not consulted.
-    `retries=0`: a red gate is not a transient failure, it is an answer.
+    The agent's account of any of it is not consulted. `retries=0`: a
+    red gate is not a transient failure, it is an answer, and the answer
+    goes back to `implement` with the tail that explains it.
     """
 
-    branch, base = payload["branch"], payload["base"]
-    # The plan is already a commit on this branch (see `planner`), so
-    # "did the implementer commit anything" is counted from there. From
-    # `base` it would always be yes, and the check would stop working.
-    since = str(payload.get("plan_base") or base)
-
-    on = await git("rev-parse", "--abbrev-ref", "HEAD")
-    if on != branch:
-        raise RuntimeError(
-            f"the checkout is on {on!r}, not {branch!r}: the agent moved off "
-            "its branch, so `main` may have been written to. Stopping."
-        )
-
-    dirty = await git("status", "--porcelain", "--untracked-files=no")
-    commits = (await git("rev-list", f"{since}..HEAD")).split()
-    if dirty or not commits:
-        problem = (
-            "You left tracked changes uncommitted; everything the feature "
-            f"needs must be committed on `{branch}`:\n{dirty}"
-            if dirty
-            else f"You made no commit on `{branch}`. There is nothing to review."
-        )
-        await _log(f"gate: rejected before running\n{problem}")
-        return implement(_bounce(payload, "gate", problem))
-
-    code, tail = await run_gate()
-    await _log(f"gate: {'PASS' if code == 0 else f'FAIL ({code})'}\n{tail}")
-    if code:
-        return implement(
-            _bounce(
-                payload,
-                "gate",
-                f"`{GATE_COMMAND}` failed with exit code {code}. Its last "
-                f"lines:\n{tail}",
-            )
-        )
-
-    # Green here: publish the branch and let CI say so on a runner. A
-    # loop-back pushes the same branch again and the PR opened for it
-    # follows the branch, so one PR carries every attempt.
-    pr = await _publish(payload)
-    code, ci = await watch_checks(branch)
-    await _log(f"gate: CI {'PASS' if code == 0 else f'FAIL ({code})'} on {pr}\n{ci}")
-    if code:
-        return implement(
-            _bounce(
-                payload,
-                "gate",
-                f"`{GATE_COMMAND}` passed here but CI on the pull request ({pr}) "
-                f"failed with exit code {code}. Its last lines:\n{ci}",
-            )
-        )
-
-    return review(
-        {**payload, "head": commits[0], "commits": commits, "gate": tail, "pr": pr}
-    )
-
-
-def _subject(payload: dict[str, Any]) -> str:
-    """`T083: <headline>` — the PR title, and so the merge commit's."""
-
-    report = payload.get("report") or {}
-    headline = str(payload.get("headline") or report.get("headline") or "").strip()
-    title = _title(payload)
-    return f"{title}: {headline}" if headline else title
-
-
-async def _publish(payload: dict[str, Any]) -> str:
-    """Push the branch; open its pull request, or bring the open one up
-    to date. Returns the PR's URL.
-
-    The title and body are the implementer's headline and summary, which
-    can change between attempts, so an existing PR is edited rather
-    than left with the first attempt's words: the merge commit is made
-    from them (AGENTS.md §Landing a change).
-    """
-
-    branch = payload["branch"]
-    report = payload.get("report") or {}
-    subject = _subject(payload)
-    body = str(report.get("summary", "")).strip()
-
-    await git("push", "-u", "origin", branch)
-    url = await gh(
-        "pr",
-        "list",
-        "--head",
-        branch,
-        "--state",
-        "open",
-        "--json",
-        "url",
-        "--jq",
-        ".[0].url // empty",
-    )
-    if url:
-        await gh("pr", "edit", branch, "--title", subject, "--body", body)
-        await _log(f"gate: pushed {branch}; updated {url}")
-        return url
-    url = await gh(
-        "pr",
-        "create",
-        "--head",
-        branch,
-        "--base",
-        "main",
-        "--title",
-        subject,
-        "--body",
-        body,
-    )
-    url = url.splitlines()[-1].strip()
-    await _log(f"gate: pushed {branch}; opened {url}")
-    return url
+    passed, out = await steps.gate(payload)
+    return review(out) if passed else implement(out)
 
 
 @wf.node(retries=1, timeout=None)
@@ -492,10 +272,11 @@ async def review(qa, implement, *, payload):
     """
 
     title, branch, base = _title(payload), payload["branch"], payload["base"]
-    log = await git("log", "--format=%h %s", f"{base}..HEAD")
-    stat = await git("diff", "--stat", f"{base}..HEAD")
+    tree = _tree(payload)
+    log = await git("log", "--format=%h %s", f"{base}..HEAD", cwd=tree)
+    stat = await git("diff", "--stat", f"{base}..HEAD", cwd=tree)
 
-    result = await ReviewerAgent().run(
+    result = await ReviewerAgent(cwd=str(tree)).run(
         f"Review branch `{branch}` against {title}.\n\n"
         f"{str(payload.get('description', '')).strip()}\n\n"
         f"The diff is `git diff {base}..HEAD` — read all of it.\n\n"
@@ -531,7 +312,7 @@ async def qa(approve, implement, *, payload):
     title, branch = _title(payload), payload["branch"]
     report = payload.get("report") or {}
 
-    result = await QAAgent().run(
+    result = await QAAgent(cwd=str(_tree(payload))).run(
         f"QA {title} on branch `{branch}`.\n\n"
         f"{str(payload.get('description', '')).strip()}\n\n"
         f"What was built: {report.get('summary', '')}\n\n"
@@ -581,74 +362,17 @@ async def approve(merge, halted, *, payload):
 
 @wf.node(retries=0, timeout=900)
 async def merge(*, payload):
-    """Merge the pull request, then pull `main` back; the branch is gone.
+    """Merge the pull request; the worktree and the branch are gone.
 
-    One merge commit per feature with its work underneath, so reverting a
-    feature is reverting one commit. GitHub makes it (`--merge`, never
-    squash or rebase) with the PR's title and body as its message, which
-    is why `_publish` keeps those current. `retries=0`: a merge that
-    half happened is not improved by doing it again.
+    `retries=0`: a merge that half happened is not improved by doing it
+    again.
     """
 
-    title, branch, base = _title(payload), payload["branch"], payload["base"]
-    report = payload.get("report") or {}
-    subject = _subject(payload)
-    pr = str(payload.get("pr", "")).strip()
-
-    # QA ran after the gate and may have scribbled on tracked files while
-    # exercising the feature. Everything real was committed before the
-    # gate, so this is scratch — but say what is being dropped first.
-    scratch = await git("diff", "--stat")
-    if scratch:
-        await _log(f"merge: discarding post-gate scratch in the tree:\n{scratch}")
-        await git("checkout", "--", ".")
-
-    # Off the branch before gh deletes it, so the checkout is never left
-    # on a ref that no longer exists.
-    await git("checkout", "main")
-    code, out = await gh_try(
-        "pr",
-        "merge",
-        branch,
-        "--merge",
-        "--delete-branch",
-        "--subject",
-        subject,
-        "--body",
-        str(report.get("summary", "")),
-    )
-    if code:
-        await git_try("switch", branch)
-        raise RuntimeError(f"{title}: merge of {pr or branch} failed:\n{out}")
-
-    await git("pull", "--ff-only", "origin", "main")
-    await git_try("branch", "-D", branch)  # gh usually has; make sure
-    merge_commit = await git("rev-parse", "HEAD")
-    await _log(
-        f"merge: {subject}\n{merge_commit[:12]} on main via {pr}; {branch} deleted"
-    )
-
-    return {
-        "title": title,
-        "merged": True,
-        "merge_commit": merge_commit,
-        "pr": pr,
-        "base": base,
-        "commits": payload.get("commits", []),
-        "report": report,
-        "review": payload.get("review"),
-        "qa": payload.get("qa"),
-    }
+    return await steps.merge(payload)
 
 
 @wf.node(retries=0, timeout=60)
 async def halted(*, payload):
-    """Terminal: the operator said stop. The branch and its PR stay open."""
+    """Terminal: the operator said stop. The worktree, branch and PR stay."""
 
-    return {
-        "title": _title(payload),
-        "merged": False,
-        "branch": payload["branch"],
-        "pr": payload.get("pr"),
-        "report": payload.get("report"),
-    }
+    return steps.halt(payload)

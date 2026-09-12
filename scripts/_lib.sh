@@ -8,9 +8,41 @@
 
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Two directories, usually the same one. `ROOT` is the checkout that owns
+# the dev stack: `.env`, the compose project, the named volumes. `TREE`
+# is the tree the work happens in. They differ inside a git worktree
+# (`git worktree add .worktrees/<name>`): a second tree of the same
+# repository, on its own branch, that shares the main checkout's `.git`
+# — and, through it, the stack. A worktree therefore never gets a second
+# `.env` or a second compose project; it gets its own working directory
+# in the container (the checkout is mounted at its own path, so a path
+# under it is the same path on both sides) and its own uv environment,
+# so two trees can run the gate at once without rewriting each other's
+# venv. `TREE` is the tree the caller is standing in when that is a
+# worktree of this repository, else the tree these scripts live in.
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+_common_dir() { git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true; }
+_common="$(_common_dir "$SCRIPT_ROOT")"
+ROOT="${_common:+$(dirname "$_common")}"
+ROOT="${ROOT:-$SCRIPT_ROOT}"
+TREE="$SCRIPT_ROOT"
+if _top="$(git rev-parse --show-toplevel 2>/dev/null)" \
+   && [ -n "$_common" ] && [ "$(_common_dir "$_top")" = "$_common" ]; then
+  TREE="$_top"
+fi
+unset _common _top
 
 in_container() { [ "${ATHANORE_IN_CONTAINER:-0}" = "1" ]; }
+
+# `docker compose run` flags that put the work in `$TREE`: the working
+# directory, and a uv environment of the worktree's own under the
+# `athanore-venvs` volume. Empty in the main checkout, whose environment
+# is `/home/agent/venv` as the image says. Read with `mapfile -t`.
+tree_flags() {
+  [ "$TREE" = "$ROOT" ] && return 0
+  printf -- '-w\n%s\n-e\nUV_PROJECT_ENVIRONMENT=/home/agent/venvs/%s\n' \
+    "$TREE" "$(basename "$TREE")"
+}
 
 die() { printf '%s\n' "$*" >&2; exit 1; }
 note() { printf '\033[2m%s\033[0m\n' "$*" >&2; }
@@ -67,10 +99,12 @@ ensure_image() {
   compose build dev
 }
 
-# Run one shell command in the dev container.
+# Run one shell command in the dev container, in `$TREE`.
 dev_run() {
+  local flags=()
+  mapfile -t flags < <(tree_flags)
   ensure_image
-  compose run --rm dev "$*"
+  compose run --rm ${flags[@]+"${flags[@]}"} dev "$*"
 }
 
 # Bring the project environment up to the lockfile. uv logs to stderr, so

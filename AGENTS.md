@@ -243,6 +243,19 @@ Three things about the container are load-bearing:
   uid/gid, so a commit made by an agent in the container is a normal
   file on the host.
 
+And one about git worktrees. The wrappers tell the checkout that owns
+the stack (`ROOT`: `.env`, the compose project, the volumes) from the
+tree the work is in (`TREE`), and they differ inside a worktree of this
+repository: `git worktree add .worktrees/<name>` gives you a second
+tree on its own branch, and `./scripts/test.sh` run from it tests
+*that* tree, in the container, in a uv environment of the worktree's
+own (`/home/agent/venvs/<name>`, on the `athanore-venvs` volume). A
+worktree must be under the checkout — `.worktrees/` is git-ignored for
+it — because that is what the container mounts. The build workflows
+work this way (D263): every run gets a worktree, so your checkout is
+never checked out, dirtied or merged into by a run, and you can keep
+working in it while one is in flight.
+
 ### Dispatching agents into the container
 
 `./scripts/agent.sh <pi|claude>` speaks ACP (JSON-RPC over stdio) with an
@@ -280,6 +293,26 @@ Authenticating them, once each:
   volume — the host `~/.claude` is deliberately *not* mounted. Run
   `./scripts/dev.sh "claude setup-token"` once, or export
   `ANTHROPIC_API_KEY` / `CLAUDE_CODE_OAUTH_TOKEN` before starting compose.
+
+### The build workflows
+
+`python -m workflows` serves two seats that maintain this repository
+(`workflows/feature/`, `workflows/quick/`), each in a worktree of its
+own, each landing through a pull request as §Landing a change says:
+
+```sh
+athanore submit feature "T090" "..."     # rewrite, plan, implement, gate, review, QA, merge
+athanore submit quick "MIT license" "..."  # implement (sonnet), gate, merge
+```
+
+`feature` is for a change worth judging three times before `main`;
+`quick` is for one that is not — a file, a badge, a config line — and
+its only verdicts are the gate and CI. Which one a change is, is the
+operator's call at submission; a `quick` run that turns out to need a
+plan or a review stops with its worktree and branch intact, to be
+resubmitted as a `feature`. Both share their deterministic steps
+(`workflows/feature/steps.py`). A finished run removes its worktree and
+branch; a failed or halted one leaves both, and its PR, to be read.
 
 Verify the wire without a workflow:
 
