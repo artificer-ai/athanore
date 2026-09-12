@@ -259,7 +259,7 @@ def methods(cls: type, *, title: str) -> list[str]:
     """A heading and one bullet per public method of ``cls``."""
 
     where = relative(cls)
-    lines = [f"{title}" + (f" — `{where}`" if where else ""), ""]
+    lines = [f"{title}" + (f" (`{where}`)" if where else ""), ""]
     for name, member in sorted(vars(cls).items()):
         if name.startswith("_") or not inspect.isroutine(member):
             continue
@@ -299,7 +299,7 @@ def public_api() -> list[str]:
         else:
             kind = type(value).__name__
         where = relative(value) or "athanore/__init__.py"
-        lines.append(f"- **`{name}`** — {kind}, `{where}`")
+        lines.append(f"- **`{name}`**: {kind}, `{where}`")
         rendered = signature(value)
         if rendered is not None:
             lines.append(f"  - `{name}{rendered}`")
@@ -348,7 +348,7 @@ def agents() -> list[str]:
     lines += ["", "## `AgentResult`", ""]
     for name, annotation, value in dataclass_fields(AgentResult):
         lines.append(declaration(name, annotation, value))
-    lines.append(f"- `ok` — property: {first_line(AgentResult.ok.__doc__)}")
+    lines.append(f"- `ok`: property. {first_line(AgentResult.ok.__doc__)}")
     return lines
 
 
@@ -395,7 +395,7 @@ def events() -> list[str]:
     for title, group in event_groups():
         lines += [f"## {title}", ""]
         for member in group:
-            lines.append(f"- `{member.value}` — {payload_fields(PAYLOADS[member])}")
+            lines.append(f"- `{member.value}`: {payload_fields(PAYLOADS[member])}")
         lines.append("")
     lines += [
         "## Published but never stored",
@@ -592,7 +592,7 @@ def parameter(param: Any) -> str | None:
         head += f" (default: `{param.default!r}`)"
     help_text = first_line(getattr(param, "help", None))
     if help_text:
-        head += f" — {help_text}"
+        head += f": {help_text}"
     return head
 
 

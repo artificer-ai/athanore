@@ -3,11 +3,11 @@
 # Runs, retries and capacity
 
 A run is one execution of one workflow. Submitting one creates the run
-and a task at the start node; from there the engine dispatches tasks
+and a task at the start node. From there the engine dispatches tasks
 against explicit capacity, retries what fails, and gives you verbs for
 everything it cannot decide by itself.
 
-## Submitting
+## Submitting a run
 
 ```sh
 athanore submit feature_build "Add the export button" "Notes for the run"
@@ -15,7 +15,7 @@ athanore submit feature_build "Add the export button" "Notes for the run"
 
 The same thing over HTTP is a `POST` to the workflow's runs collection,
 and from a plugin action it is `ctx.ops.submit(...)`. A new run is
-`queued`, not `running`: waiting for a slot is a state you can see, and
+`queued`, not `running`. Waiting for a slot is a state you can see, and
 the first claim of one of its tasks is what flips it.
 
 ## Pools and capacity
@@ -49,9 +49,9 @@ feature_build = { pool = "local" }
 gamedev = { pool = "cloud" }
 ```
 
-There is no lending between pools: capacity reserved for `local` stays
+There is no lending between pools. Capacity reserved for `local` stays
 reserved even when `local` is idle. A pool with a capacity of zero parks
-its workflows — they queue and never dispatch, which is a way to hold
+its workflows: they queue and never dispatch, which is a way to hold
 work without cancelling it. A workflow nothing binds runs on the default
 pool, sized by `workers`.
 
@@ -61,7 +61,7 @@ A task's pool follows its run's workflow and never changes.
 
 Within a pool, the order is:
 
-1. the run's position in the list — which is what `athanore position`
+1. the run's position in the list, which is what `athanore position`
    changes, so promoting a run promotes all of its work;
 2. inside a run, nodes given an explicit `priority` first, in that
    order;
@@ -76,17 +76,17 @@ cannot keep jumping the queue.
 
 When a body raises, the attempt is marked failed and the failure is
 appended to the work log. If the exception is retryable and the node has
-attempts left, another one is queued with the same payload; when they run
+attempts left, another one is queued with the same payload. When they run
 out, the task is dead-lettered and the run is marked failed.
 
 `retries` is per node, defaulting to the server's `max_retries`.
-`GraphError` and `NonRetryable` skip retrying entirely — see
+`GraphError` and `NonRetryable` skip retrying entirely; see
 [Writing a workflow](guide-workflows.md#rule-3-the-exception-is-the-failure-policy).
 
 Two branches of one fan-out can fail together. The first verdict is the
 run's; the second records its own task events without overwriting it.
 
-## Steering a run
+## Operator verbs
 
 Every one of these is transactional and emits an event, and each has a
 command-line verb, an HTTP endpoint and a plugin operation:
@@ -109,31 +109,31 @@ command-line verb, an HTTP endpoint and a plugin operation:
 Moving or retrying keeps the payload, which under a fan-out is the
 branch's identity.
 
-## After a restart
+## Recovery after a restart
 
 There is no separate recovery mode to run. On start, every task that was
-in progress or waiting is reset to ready and an event lists them; runs
-whose workflow is not registered on this server are left alone and marked
+in progress or waiting is reset to ready and an event lists them. Runs
+whose workflow is not registered on this server are left alone, marked
 so, and never dispatch.
 
 An attempt that was interrupted re-executes from the beginning, so agent
-work wants to be roughly idempotent — and a body parked on a question
+work should be roughly idempotent. A body parked on a question
 re-attaches to the request it already opened rather than asking again.
 
-A graceful stop leaves the store in exactly the same state as a crash:
-interrupted rows are not written to, because `cancelled` is reserved for
+A graceful stop leaves the store in the same state as a crash.
+Interrupted rows are not written to, because `cancelled` is reserved for
 what an operator meant.
 
-## Draining
+## Draining before a shutdown
 
-There is no drain mode: agent attempts run for hours, and waiting for
+There is no drain mode. Agent attempts run for hours, and waiting for
 them is not a shutdown. The operator's drain is to pause every run and
 wait for the in-flight task count on the health endpoint to reach zero.
-That count is literally in-progress tasks — a waiting task holds no slot
-and needs a person rather than time, so counting it would mean a drain
-that never finished while one question sat unanswered.
+That count is in-progress tasks only. A waiting task holds no slot and
+needs a person rather than time, so counting it would mean a drain that
+never finished while one question sat unanswered.
 
-## Watching
+## Following runs live
 
 ```sh
 athanore ls --watch          # the run table, live
@@ -144,12 +144,12 @@ athanore stream <task> -f    # one task's agent transcript
 All three follow the server-sent event stream and remember the last
 event they saw, so a dropped connection resumes rather than replaying
 from zero. The same stream is what the browser interface uses, and
-Driving the API (see the athanore-api skill) is how to read it from a client of your
-own.
+Using the HTTP API (see the athanore-api skill) is how to read it from a client of
+your own.
 
 ## Next
 
-- Writing a plugin (see the athanore-plugins skill) — your own panes and buttons on these
+- Writing a plugin (see the athanore-plugins skill): your own panes and buttons on these
   runs.
-- [Events](events.md) — every event name and what it
+- [Events](events.md): every event name and what it
   carries.

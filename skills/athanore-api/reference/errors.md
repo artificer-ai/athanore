@@ -5,7 +5,7 @@
 The stable `code` an error body carries. It is what a client
 branches on, so it outlives any wording change to the human
 `error` message beside it. The shape both live in is in
-[Driving the API](guide-http-api.md).
+[Using the HTTP API](guide-http-api.md).
 
 - `not_found`
 - `conflict`

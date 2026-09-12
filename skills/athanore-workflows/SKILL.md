@@ -47,7 +47,7 @@ athanore serve hello.py:wf          # http://127.0.0.1:4002, SPA and API
 
 <!-- from: README.md -->
 ```sh
-athanore submit hello "first run"   # → run id
+athanore submit hello "first run"   # prints the run id
 athanore ls                         # runs, with the node each is on
 athanore requests                   # what is waiting for you
 athanore answer 1 world             # the request id, and the text typed

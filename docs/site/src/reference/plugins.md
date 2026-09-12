@@ -107,7 +107,7 @@ and a workflow-scoped one has neither.
 
 - The operator operations of 04, unscoped by design.
 
-#### `Ops` — `athanore/engine/ops.py`
+#### `Ops` (`athanore/engine/ops.py`)
 
 - `await append_log(run_id: str, text: str) -> LogEntryRow`
   - Add an operator note to a run's work log.
@@ -152,12 +152,12 @@ is reached for.
 - `ctx.services.events` → `EventPort`
   - Publishing ``plugin.<workflow>.<name>``, and nothing else.
 
-#### `LogService` — `athanore/engine/services.py`
+#### `LogService` (`athanore/engine/services.py`)
 
 - `await append(text: str, *, author: LogAuthor | str = LogAuthor.agent, kind: LogKind | str | None = None) -> LogEntryRow`
   - Add one entry to the run's work log and announce it.
 
-#### `StreamService` — `athanore/engine/services.py`
+#### `StreamService` (`athanore/engine/services.py`)
 
 - `await append(kind: ChunkKind | str, text: str) -> int`
   - Buffer one chunk and return the ``seq`` it was given.
@@ -166,7 +166,7 @@ is reached for.
 - `await flush() -> None`
   - Write what has accumulated, now, without ending the transcript.
 
-#### `SubmissionService` — `athanore/engine/services.py`
+#### `SubmissionService` (`athanore/engine/services.py`)
 
 - `await accept(payload: Any) -> SubmissionRow`
   - Record a payload that passed the declared model.
@@ -177,7 +177,7 @@ is reached for.
 - `await repair(turn: int, reason: Literal['nothing_submitted', 'rejected']) -> Event`
   - Announce a repair turn: the façade is asking again.
 
-#### `RequestsPort` — `athanore/engine/services.py`
+#### `RequestsPort` (`athanore/engine/services.py`)
 
 - `await answer_as_engine(request_id: int, option_id: str | None = None) -> AnswerRow`
 - `await create_agent_request(prompt: str, *, mode: RequestMode | str, kind: RequestKind | str, options: list[dict[str, Any]] | None = None, schema: dict[str, Any] | None = None, tool_call: dict[str, Any] | None = None) -> RequestRow`
@@ -192,7 +192,7 @@ is reached for.
   - Forget this request's validator. Not having one is not an error.
 - `await wait(request_id: int, timeout: float | None = None) -> AnswerRow`
 
-#### `PluginRuns` — `athanore/plugins/context.py`
+#### `PluginRuns` (`athanore/plugins/context.py`)
 
 - `await detail() -> RunDetailRows`
   - The run in scope, its attempts, and their summed stats.
@@ -205,7 +205,7 @@ is reached for.
 - `await log_entries(after: int = 0, limit: int | None = None) -> list[LogEntryRow]`
   - The work log of the run in scope, oldest first.
 
-#### `EventPort` — `athanore/engine/services.py`
+#### `EventPort` (`athanore/engine/services.py`)
 
 - `await publish(name: str, data: Mapping[str, Any]) -> Event`
   - Store and publish ``plugin.<workflow>.<name>``.
