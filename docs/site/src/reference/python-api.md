@@ -7,7 +7,7 @@ Generated from `athanore.__all__`, with the file each name is
 defined in, its signature, and the first line of its docstring.
 
 - **`ACPAgent`**: class, `athanore/agents/acp.py`
-  - `ACPAgent(command: Sequence[str] | None = None, cwd: str | None = None, timeout: float | None = None, env: Mapping[str, str] | None = None)`
+  - `ACPAgent(command: Sequence[str] | None = None, cwd: str | None = None, timeout: float | None = None, env: Mapping[str, str] | None = None, session_id: str | None = None)`
   - An agent façade backed by an ACP subprocess.
 - **`Agent`**: class, `athanore/agents/base.py`
   - `Agent()`

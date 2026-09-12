@@ -659,10 +659,22 @@ async def test_health_reports_the_pools_and_the_work_in_flight(
     assert body["version"]
     assert body["runs_running"] == 0
     assert body["tasks_in_progress"] == 0
-    assert body["pools"] == {
-        "default": {"capacity": 2, "in_flight": 0},
-        "wide": {"capacity": 4, "in_flight": 0},
+    assert {name: pool["capacity"] for name, pool in body["pools"].items()} == {
+        "default": 2,
+        "wide": 4,
     }
+
+    # `in_flight` is polled rather than read once. The loop takes a
+    # pool's free slots *before* it claims and gives the surplus back
+    # after (D107), so a probe that lands inside the claim's await sees
+    # a reservation about to be returned — the whole `wide` pool, on a
+    # cold runner's first tick. The assertion is that the server is
+    # idle, which is what the poll says (D112).
+    async def pools_idle() -> bool:
+        pools = (await http.get("/api/health")).json()["pools"]
+        return all(pool["in_flight"] == 0 for pool in pools.values())
+
+    await until(pools_idle, what="every pool to read nothing in flight")
 
     # A run that finished leaves nothing in flight, which is what makes
     # this endpoint a drain check (04 §Shutdown).

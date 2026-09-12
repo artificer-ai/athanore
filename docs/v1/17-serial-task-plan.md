@@ -4319,6 +4319,25 @@ result's `session_id` back, on both ACP methods, with the transcript,
 the counters and the stats entry telling the truth about the attempt;
 05 and 13 say so; gate green; snapshot and client unchanged.
 
+**Status.** Done. `session_id=` on `ACPAgent.__init__`; `_exchange`'s
+session opening split into `_open_session` (fresh: `session/new`) and
+`_continue` (`session/resume` when `sessionCapabilities.resume` is
+present, else `session/load` under `client.replaying`, else `AgentError`
+before any prompt; `RequestError` translated to `the agent could not
+continue session <id>: <message>`; `session.session_id` set on success;
+the `continuing session <id>` notice before configuration);
+`ACPClient.replaying` / `replayed` with `session_update` dropping and
+counting under the flag and the count logged once at DEBUG;
+`_configure` / `_resolve_config_id` taking the options and the id;
+`_entry` not consulting the provider's `stats()` on a continued run;
+the "Continuing a session (23)" section of
+`tests/agents/test_acp_lifecycle.py` on the fake's `sessions` key and
+the signature test in `test_agent_classes.py` widened; 05 §Agent
+classes, §The ACP client, §Session lifecycle (+ §Continuing a session)
+and §Stats entry folded, 13's façade row, the site guide's
+"Continuing a session" section and the workflows skill's bullet, the
+reference and skill copies regenerated; D265.
+
 ### T090 — `ACPAgent.open()`: a session held open (A9.3)
 
 **Do.** `athanore/agents/acp.py`: split `run()` along 23 §Lifecycle of

@@ -26,7 +26,8 @@ class ACPAgent(Agent):
     tooling: Literal["auto", "mcp", "native", "http"] = "auto"   # how the agent reaches its task (§Tooling tiers)
     client_class = ACPClient
     stats_provider: SessionStatsProvider | None = None
-    def __init__(self, command=None, cwd=None, timeout=None, env=None): ...
+    def __init__(self, command=None, cwd=None, timeout=None, env=None,
+                 session_id: str | None = None): ...
 ```
 
 Decisions carried from the MVP: an agent is a class carrying its config;
@@ -47,6 +48,23 @@ agents by accident.
 
 `template=` (prompt from a file) is dropped. It was superseded by inlined
 prompts and only survives in tests.
+
+`session_id=` continues a session an earlier run opened (23 §Surface,
+D254). It is an argument of construction, beside `cwd`, `timeout` and
+`env`, because it is per-instance configuration of the same kind —
+*where* and *how* this run happens — and `AgentResult.session_id` is
+where it comes from:
+
+```python
+first = await Reviewer(cwd=checkout).run(assignment)
+again = await Reviewer(cwd=checkout, session_id=first.session_id).run(follow_up)
+assert again.session_id == first.session_id
+```
+
+The `cwd` MUST be the one the session was opened with; the agent
+enforces it, and the façade reports the refusal. A run constructed with
+`session_id=` either continues that session or raises `AgentError` —
+never a `session/new` in its place — per §Continuing a session below.
 
 ### AgentResult
 
@@ -141,7 +159,14 @@ callbacks:
   starts/updates go to the transcript (`StreamChunk`, kinds `text` /
   `thought` / `tool_call` / `tool_result`; façade notices are `notice`)
   via `ctx.services.stream`; a flusher persists in batches every
-  `stream_flush_interval` and publishes `task.stream`.
+  `stream_flush_interval` and publishes `task.stream`. While the client
+  is `replaying` — the façade sets it around a `session/load` and
+  nowhere else — an update writes no chunk, adds no text and counts no
+  tool call; every update received under the flag is counted, whatever
+  its kind, and the count is logged once at DEBUG (`replay discarded`,
+  `count=`) when the flag clears. `request_permission` and
+  `create_elicitation` do not read the flag and are answered as ever
+  (§Continuing a session).
 - `request_permission` → `agent.resolve_permission()` (policies below).
 - `create_elicitation` → `agent.resolve_elicitation()`.
 - `fs/*` and `terminal/*` return `method_not_found` (verified harmless;
@@ -168,7 +193,10 @@ callbacks:
      — routinely exceeds asyncio's 64 KiB default, which fails the read
      rather than the tool call (D124).
 2. `initialize` (client info carries the real `athanore.__version__`),
-   `new_session(cwd)`, set `model` / `thinking` by category.
+   then `new_session(cwd, mcp_servers)` — or, on an agent constructed
+   with `session_id=`, the re-open of §Continuing a session — and set
+   `model` / `thinking` by category from the response's `configOptions`,
+   whichever method answered.
 3. Declare `output_model` and `ask_policy` on the `TaskContext` for the
    duration (restored afterwards, so a body can run agents in sequence).
 4. `prompt(full_prompt)` under `timeout`.
@@ -197,6 +225,81 @@ callbacks:
    much as on the clean one. Five seconds is a shutdown budget, not a
    turn's: the agent has already been told to stop, and an adapter that
    is still writing after it is one this process cannot wait for.
+
+### Continuing a session
+
+The lifecycle above with step 2 replaced, for a run on an `ACPAgent`
+constructed with `session_id=`. 23 §Lifecycle of a continued run is
+where the reasoning lives; this is the fold.
+
+1. Spawn is unchanged: the same command, the same scrubbed environment,
+   and the task's `ATHANORE_TASK_URL` / `ATHANORE_TASK_TOKEN` — **this**
+   task's, not the one the session was opened under. Tokens are per
+   task (12 §Task tokens); a continued session is not a continued token.
+2. After `initialize`, the façade chooses from what the agent
+   advertised, in this order: `session/resume` when
+   `agentCapabilities.sessionCapabilities.resume` is present; else
+   `session/load` when `agentCapabilities.loadSession` is true; else it
+   raises `AgentError` — `<Agent> cannot continue a session: the agent
+   advertises neither session/resume nor session/load` — before any
+   prompt, with the child stopped. Both calls take `session_id`, `cwd`
+   (`self.cwd or os.getcwd()`) and the same `mcp_servers` a
+   `session/new` would carry for this run's tier (§Tooling tiers), so
+   the `mcp` tier's server carries this task's token, and `mcpServers`
+   is `[]` outside it on both methods as it is on `new`. `resume` comes
+   first because it is the cheaper of the two on the wire and produces
+   nothing to discard; `load` is the one every adapter that persists
+   sessions has (D255). The response's `configOptions` is configured
+   exactly as a `session/new` response is — `model` and `thinking`
+   resolved by category and set, a rejected option logged and written
+   as a `notice`, never swallowed — because the class is the
+   configuration and a session that drifted from it is not the one the
+   workflow author declared. `session.session_id` is set to the
+   requested id only when the call **succeeds**: a run that failed to
+   join a session did not have one, and its stats entry MUST NOT name
+   it.
+3. Between sending `session/load` and receiving its answer the client is
+   **replaying**: `session_update` writes no chunk, appends no text and
+   counts no `ToolCallStart`; a `request_permission` or
+   `create_elicitation` is answered as it would be outside a replay,
+   because a request dropped on the floor would hang the adapter. The
+   flag is set immediately before the one `load_session` call and
+   cleared on every path out of it — an error, a dropped connection, a
+   cancellation, a timeout — and `session/resume` never sets it. The
+   number of updates dropped is logged once at DEBUG (`replay
+   discarded`, `count=`) so a transcript that looks too short has a line
+   saying why. The replay is discarded rather than recorded because the
+   replayed turns already have a transcript, on the attempt that ran
+   them: a `StreamChunk` belongs to the task that produced it (03
+   §StreamChunk), and a replay produced nothing.
+4. Once the session is open, and before configuration, the façade writes
+   one `notice` chunk, `continuing session <session_id>`, through the
+   client's `append`. It is the first chunk of the continued attempt's
+   transcript on both paths — before any configuration notice, and
+   whichever method the agent had (D258, D265) — and the one line that
+   tells a reader why this transcript starts in the middle of a
+   conversation.
+5. Prompt, repair and outcome are unchanged (steps 4–6 above); the repair
+   loop runs on the continued session. Cleanup and accounting are
+   unchanged in mechanism (step 7); what the entry carries on a continued
+   run is §Stats entry.
+
+**Refusal.** A continued run raises `AgentError` and returns nothing
+when the agent advertises neither method (the message in step 2, after
+`initialize` and before any prompt, the child stopped); when the agent
+answers `session/load` or `session/resume` with a JSON-RPC error — an
+unknown id, a `cwd` that is not the session's, a session it can no
+longer read — with the message `the agent could not continue session
+<id>: <the agent's message>`; and for anything a fresh run would already
+raise for, which includes a connection dropped during the re-open (the
+`transport` failure a fresh run reports for the same thing at
+`session/new`). All of them record one stats entry with `status=failed`
+and `reason=transport`, no new reason, and no `session_id`, because none
+was joined. There is deliberately **no fallback** to `session/new`: a
+body that asked for a session it cannot have is misconfigured, and a run
+that quietly started over would answer with no memory of the
+conversation and report success — the precedent is §Policies, where
+`auto_allow` raises rather than picking another option (D254).
 
 ### Truncation detection is a provider concern
 
@@ -276,6 +379,19 @@ determined are omitted. Never raises. The text form is
 `format_stats_line` from the MVP, unchanged:
 `[stats] node=qa attempt=2 ok — model=…, tokens=12,406 in / 1,204 out /
 13,610 total, tools=23 calls, repairs=1, cost=$0.0000, 142s, session=01a01646`.
+
+On a continued run (§Continuing a session) the provider's `stats()` is
+not consulted: a `SessionStatsProvider` reports a *session*, and a
+continued run is a fraction of one whose size the provider cannot know,
+so attributing the whole session's tokens and cost to the tenth turn
+would be the estimate 01 §Design principles forbids. `input_tokens`,
+`output_tokens`, `total_tokens` and `cost` are therefore ACP's per-turn
+`usage` or omitted; `model` is the class's, as on any run without a
+provider; `final_stop_reason()` is still consulted, because this run's
+final turn is the session's final turn and truncation is decided the
+same way on both paths; and `session_id` is the continued session's, so
+every run on one session carries one id and no `resumed` field is added
+(23 §Stats, D256).
 
 ## Testing doubles (`athanore.testing`)
 

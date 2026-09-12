@@ -114,6 +114,37 @@ return a different edge if you would rather route around it.
 Timeouts, transport failures and a missing or invalid submission raise
 `AgentError`. Both paths record a statistics entry.
 
+## Continuing a session
+
+A run is one conversation, and the agent forgets it when its process
+stops. The next run remembers it if you hand it the last result's
+`session_id`:
+
+```python
+first = await Reviewer(cwd=checkout).run("Review the branch.")
+again = await Reviewer(cwd=checkout, session_id=first.session_id).run(
+    "Now look at the tests you skipped."
+)
+assert again.session_id == first.session_id
+```
+
+Use the same `cwd`; a session belongs to the directory it was opened in.
+The agent re-opens the session by whichever of the two methods it
+supports — a resume, or a load that replays the history first — and both
+pi and Claude Code persist sessions, so either works with the adapters
+in `examples/`.
+
+The earlier turns are not written into the new attempt's transcript
+again. It opens with a `continuing session` line and then carries only
+what this run said and did, and its statistics are this run's turn, not
+the whole conversation's. The earlier attempt already has its own.
+
+An agent that cannot re-open the session — it does not support it, the
+id is unknown, the `cwd` moved — raises `AgentError` rather than
+starting a fresh conversation. A reply from an agent that quietly forgot
+everything would look exactly like success, and that is the one outcome
+this argument exists to rule out.
+
 ## Permissions and elicitations
 
 When an agent asks to run a tool, `permission_policy` decides what
@@ -144,6 +175,12 @@ turns and denied permissions.
 Fields that cannot be determined are left out. Nothing is estimated and
 nothing is zero-filled. An absent token count means the provider did not
 report one, which is a different fact from zero.
+
+On a continued run the token counts and the cost are the run's own turn
+as the agent reports them, never the whole session's: a provider reads a
+whole session file, and attributing all of it to the tenth turn would be
+an estimate. The session id is the same on every run of one
+conversation, which is how you read its cost across the `[stats]` lines.
 
 ## Testing without a model
 
