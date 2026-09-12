@@ -23,21 +23,24 @@ one distribution, so there is no second environment to keep it out of
 from __future__ import annotations
 
 from athanore import Pool, Server
+from workflows.chat import wf as chat
 from workflows.feature import wf as feature
 from workflows.feature.cron import start_ticker
 
 
 def build() -> Server:
-    """The server: `feature` on the checkout, and nothing else.
+    """The server: `feature` on the checkout, `chat` on `talk`.
 
-    `checkout` is the working tree — one of it, so one run at a time. A
-    workflow that touches no file does not belong on it; give one its own
-    pool here rather than sharing this one (T085's `add` binds to a pool
-    that already exists).
+    Two pools because they cap two different things. `checkout` is the
+    working tree — one of it, so one run at a time. `talk` holds a slot
+    only while an agent is answering and gives it back while it waits on
+    a person, and a conversation has no business holding the slot the
+    build needs.
     """
 
     server = Server()
     server.register(feature, Pool("checkout", capacity=1))
+    server.register(chat, Pool("talk", capacity=2))
     return server
 
 

@@ -39,12 +39,15 @@ import uuid
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any
 
+from fastapi import Request
+
 from athanore import PluginContext, PluginError, Workflow
 
 from .sandbox import CHECKOUT
 
 if TYPE_CHECKING:
     from athanore import Server
+    from athanore.engine import Engine
 
 __all__ = ["FIELDS", "SCHEDULES", "declare", "matches", "next_fire", "start_ticker"]
 
@@ -78,11 +81,16 @@ _TERM = re.compile(r"^(?:\*|(\d+)(?:-(\d+))?)(?:/(\d+))?$")
 #: the whole of the concurrency story.
 _lock = asyncio.Lock()
 
-#: Set by :func:`start_ticker`, read by the route that lists workflows.
+#: Set by :func:`start_ticker`, and the ticker's handle on its host.
 #: Dev machinery reaching into its own host, deliberately: there is no
 #: seam on `PluginContext` that names the workflows a server runs, and
 #: inventing one to avoid a module global would be a change to `athanore`
-#: for the benefit of a pane.
+#: for the benefit of a pane. **A route never reads it**: a live reload
+#: (22 §Reloading a module) re-imports this module with the global back
+#: at ``None`` while the host — and the ticker task the old module
+#: started — carry on, so the routes take the engine off the application
+#: they were mounted on instead (:func:`_engine`), which is the same
+#: object either way and outlives every reload.
 _server: Server | None = None
 
 
@@ -219,7 +227,22 @@ def _view(row: dict[str, Any], now: datetime) -> dict[str, Any]:
     return {**row, "next": upcoming}
 
 
-async def _fire(name: str, title: str, description: str) -> str:
+def _engine(request: Request | None = None) -> Engine:
+    """The engine to submit to and to ask what runs: the request's
+    application's when a route is asking, the ticker's host's otherwise."""
+
+    if request is not None:
+        engine: Engine | None = request.app.state.engine
+        if engine is not None:
+            return engine
+    if _server is None:
+        raise PluginError(503, "the scheduler is not attached to a server yet")
+    return _server.engine
+
+
+async def _fire(
+    name: str, title: str, description: str, request: Request | None = None
+) -> str:
     """Submit one run and return its id.
 
     Through ``ops`` rather than over HTTP: the ticker holds the server,
@@ -228,9 +251,7 @@ async def _fire(name: str, title: str, description: str) -> str:
     no ``ops`` by design (04 §TaskContext); the host does.
     """
 
-    if _server is None:  # pragma: no cover - the ticker sets it before any tick
-        raise PluginError(503, "the scheduler is not attached to a server yet")
-    run = await _server.engine.ops.submit(name, title, description)
+    run = await _engine(request).ops.submit(name, title, description)
     return run.id
 
 
@@ -321,18 +342,18 @@ def declare(wf: Workflow) -> None:
     """
 
     @wf.route("/schedules")
-    async def schedules_list(ctx: PluginContext) -> dict[str, Any]:
+    async def schedules_list(ctx: PluginContext, request: Request) -> dict[str, Any]:
         """Every schedule, and the workflows one may be pointed at."""
 
         now = datetime.now()
         async with _lock:
             rows = [_view(row, now) for row in _read()]
-        known = sorted(_server.workflows) if _server is not None else []
+        known = sorted(_engine(request).graphs)
         return {"schedules": rows, "workflows": known, "fields": [f[0] for f in FIELDS]}
 
     @wf.route("/schedules", methods="POST")
     async def schedules_add(
-        ctx: PluginContext, input: dict[str, Any]
+        ctx: PluginContext, request: Request, input: dict[str, Any]
     ) -> dict[str, Any]:
         """Add one schedule. The expression is parsed before it is saved."""
 
@@ -342,7 +363,7 @@ def declare(wf: Workflow) -> None:
         prompt = str(input.get("prompt", ""))
         if not name:
             raise PluginError(400, "a schedule needs a workflow to run")
-        if _server is not None and name not in _server.workflows:
+        if name not in _engine(request).graphs:
             raise PluginError(400, f"{name!r} is not a workflow this server runs")
         if not title:
             raise PluginError(400, "a schedule needs a title: it becomes the run's")
@@ -388,7 +409,9 @@ def declare(wf: Workflow) -> None:
         raise PluginError(404, f"no schedule {schedule_id!r}")
 
     @wf.route("/schedules/{schedule_id}/run", methods="POST")
-    async def schedules_run(ctx: PluginContext, schedule_id: str) -> dict[str, Any]:
+    async def schedules_run(
+        ctx: PluginContext, request: Request, schedule_id: str
+    ) -> dict[str, Any]:
         """Submit one schedule's run now, without waiting for its minute.
 
         It does **not** mark the minute as fired: running it by hand is
@@ -404,6 +427,7 @@ def declare(wf: Workflow) -> None:
                         row["workflow"],
                         row.get("title") or row["cron"],
                         row.get("prompt", ""),
+                        request,
                     )
                     row["last_run"] = run_id
                     row["last_fired"] = int(time.time())

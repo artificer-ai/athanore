@@ -12,10 +12,29 @@
  * the browser runs as-is has no toolchain to keep in step with `web/`'s.
  */
 
-const TOKENS = [
-  '--ath-bg', '--ath-surface', '--ath-border', '--ath-text',
-  '--ath-muted', '--ath-accent', '--ath-status-ok', '--ath-status-bad',
-]
+// The pane's own names for the theme's tokens (D183). The values are
+// `tokens.gen.ts`'s — `--color-*` and `--ath-status-*` — read as the
+// document resolves them; the fallbacks are Nocturne's, for a document
+// that resolves nothing. `--ath-bg` and friends are this file's aliases,
+// not names any theme defines.
+const TOKENS = {
+  '--ath-bg': ['--color-bg', '#161826'],
+  '--ath-surface': ['--color-surface', '#232532'],
+  '--ath-border': ['--color-divider', 'rgba(233, 233, 237, 0.16)'],
+  '--ath-text': ['--color-text', '#e9e9ed'],
+  '--ath-muted': ['--color-neutral-500', '#9397ab'],
+  '--ath-accent': ['--color-accent', '#9184d9'],
+  '--ath-status-ok': ['--ath-status-ok', '#8fbfa4'],
+  '--ath-status-bad': ['--ath-status-fail', '#d9868f'],
+}
+
+/** `:host` declarations binding every alias above to the live theme. */
+function themeVars() {
+  const theme = (window.athanore?.theme?.tokens) ?? {}
+  return Object.entries(TOKENS)
+    .map(([alias, [token, fallback]]) => `${alias}: ${theme[token] || fallback}`)
+    .join(';')
+}
 
 /** Bytes as something a person reads at a glance. */
 function size(n) {
@@ -81,8 +100,7 @@ class AthanoreFiles extends HTMLElement {
     // Pierce the shadow boundary with the host's own tokens, so this
     // pane follows the theme and the font-size chooser (T081) rather
     // than pinning its own sizes.
-    const theme = (window.athanore?.theme?.tokens) ?? {}
-    const vars = TOKENS.map((t) => `${t}: ${theme[t] ?? 'inherit'}`).join(';')
+    const vars = themeVars()
     this.shadowRoot.innerHTML = `
       <style>
         :host { ${vars}; display: block; font: inherit; color: var(--ath-text); }
