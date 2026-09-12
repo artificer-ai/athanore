@@ -311,7 +311,7 @@ async def _publish(payload: dict[str, Any]) -> str:
         "--json",
         "number,url",
         "--jq",
-        '.[0] | "\\(.number) \\(.url)"',
+        '.[0] // empty | "\\(.number) \\(.url)"',
         cwd=tree,
     )
     if found.strip():
