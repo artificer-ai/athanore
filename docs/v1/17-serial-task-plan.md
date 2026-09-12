@@ -4258,6 +4258,15 @@ and on `session/load` without the key; `mcpServers` handed on
 `session/load` is what `mcp_calls` connects to.
 **Done.** The fake persists a session across two processes and speaks
 both re-open methods per 23 §The fake; gate green; snapshot unchanged.
+**Status.** Done. The `sessions` key, validated beside `session_file`;
+`initialize` advertising from it; `session/new` split into the shared
+`_open` and `_start_recording`; `update()` recording each update object
+to `<dir>/<sessionId>.json` by atomic rewrite and `prompt()` recording
+the `user_message_chunk`; `load_session` for both re-open methods
+(`-32601` unadvertised, `-32602 no such session: <id>`, replay through
+`send()` on `load` only, `{configOptions}`); the "Sessions across
+processes" section of `tests/testing/test_fake_acp.py` driving two raw
+clients over one file; 13 §Fakes and the module docstring folded; D259.
 
 ### T089 — `ACPAgent(session_id=)`: one session across runs (A9.2)
 

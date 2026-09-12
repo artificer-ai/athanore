@@ -78,11 +78,23 @@ configured to do. Two things follow, both enforced rather than asked for
   `mcp_calls: [{tool, args}]` (connect to the received MCP server with
   the `mcp` client and call each tool in order, emitting the results as
   tool-call updates carrying content — the transcript's `tool_result`;
-  exercises the `mcp` tier end to end). Unknown keys are an error.
+  exercises the `mcp` tier end to end), `sessions: {dir, resume?: bool}`
+  (advertises `loadSession` on `initialize`, and
+  `sessionCapabilities.resume` when `resume`; `session/new` writes
+  `<dir>/<sessionId>.json`, the ordered list of every `session/update`
+  sent plus one `user_message_chunk` per prompt received; `session/load`
+  re-sends it verbatim before answering `{configOptions}`,
+  `session/resume` answers without a replay and only when advertised;
+  both record `mcpServers` as `session/new` does; an unknown id is
+  `-32602` `no such session: <id>`, an unadvertised method `-32601`; this
+  is how the fake persists a session across two processes, 23 §The fake,
+  D257). Unknown keys are an error.
 - A scenario scripts **one run**: every content block above is emitted on
   the first prompt turn, and the repair turns that follow it submit
   `repair_submit` and nothing else. `sleep_s`, `stop_reason` and `usage`
-  belong to a turn and apply to every one (D122).
+  belong to a turn and apply to every one (D122). The second process of a
+  continued session runs the first-turn script again on its first prompt
+  (23 §The fake).
 
 ### Running examples on the fake
 

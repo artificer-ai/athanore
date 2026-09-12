@@ -38,6 +38,22 @@ is emitted on the **first** prompt turn and not repeated on the repair
 turns that follow it (D122). ``sleep_s``, ``stop_reason`` and ``usage``
 belong to a turn rather than to the run, so they apply to every one; and
 a repair turn is what submits ``repair_submit``.
+
+**Sessions that survive the process** (23 §The fake, D257). A continued
+run is a second process, so ``sessions: {dir, resume?: bool}`` puts the
+session on disk. With it, ``initialize`` advertises ``loadSession: true``
+(and ``sessionCapabilities.resume: {}`` when ``resume`` is true), and
+``session/new`` creates ``<dir>/<sessionId>.json``: a JSON list of update
+objects, one ``user_message_chunk`` recorded per ``session/prompt`` (its
+text blocks concatenated) and every update the session sends, in the
+order they happen. ``session/load`` re-sends that list verbatim before
+answering ``{configOptions}``; ``session/resume`` answers without a
+replay, and only when advertised. Both adopt the id, record
+``mcpServers`` as ``session/new`` does, and keep appending to the same
+file. An unknown id is ``-32602`` ``no such session: <id>``; an
+unadvertised method is ``-32601``, as any unknown method. The scenario
+still scripts one run, so the second process's first prompt runs the
+first-turn script again (D122).
 """
 
 from __future__ import annotations
@@ -76,6 +92,7 @@ SCENARIO_KEYS = frozenset(
         "env_echo",
         "advertise_mcp",
         "mcp_calls",
+        "sessions",
     }
 )
 
@@ -179,6 +196,7 @@ def validate_scenario(scenario: Any, *, where: str = "scenario") -> dict[str, An
     _validate_usage(scenario.get("usage"), where)
     _validate_session_file(scenario.get("session_file"), where)
     _validate_mcp_calls(scenario.get("mcp_calls"), where)
+    _validate_sessions(scenario.get("sessions"), where)
     return scenario
 
 
@@ -264,6 +282,17 @@ def _validate_session_file(value: Any, where: str) -> None:
         raise ScenarioError(f"{at}.dir: expected a string")
     if "cost" in value and not _is_number(value["cost"]):
         raise ScenarioError(f"{at}.cost: expected a number")
+
+
+def _validate_sessions(value: Any, where: str) -> None:
+    if value is None:
+        return
+    at = f"{where}.sessions"
+    _fields(value, {"dir", "resume"}, {"dir"}, at)
+    if not isinstance(value["dir"], str):
+        raise ScenarioError(f"{at}.dir: expected a string")
+    if "resume" in value and not isinstance(value["resume"], bool):
+        raise ScenarioError(f"{at}.resume: expected true or false")
 
 
 def _validate_mcp_calls(value: Any, where: str) -> None:
@@ -440,6 +469,11 @@ class FakeACPAgent:
         self.session_file_written = False
         self.mcp_servers: list[dict[str, Any]] = []
         self.config: list[dict[str, Any]] = []
+        # The session's file and its content (23 §The fake). Held here and
+        # not in `self.scenario`, which select_scenario() replaces on the
+        # first prompt in directory mode: a swap must not stop a recording.
+        self.session_path: str | None = None
+        self.history: list[dict[str, Any]] = []
         self._next_id = 1000
 
     # -- framing ---------------------------------------------------------
@@ -469,6 +503,39 @@ class FakeACPAgent:
                 "params": {"sessionId": self.session_id, "update": dict(update)},
             }
         )
+        if self.session_path is not None:
+            self._record(update)
+
+    # -- the session file (23 §The fake, D257) ------------------------------
+
+    def _record(self, update: Mapping[str, Any]) -> None:
+        """Append one update object to the session's file."""
+
+        self.history.append(dict(update))
+        self._flush()
+
+    def _flush(self) -> None:
+        """Rewrite the file from `history`, atomically.
+
+        The in-memory list is the truth and a session in CI is a few dozen
+        entries, so a full rewrite is simpler than patching a JSON list in
+        place; the rename is what keeps a reader in another process from
+        ever seeing half of one.
+        """
+
+        assert self.session_path is not None
+        tmp = f"{self.session_path}.tmp"
+        with open(tmp, "w", encoding="utf-8") as handle:
+            json.dump(self.history, handle)
+        os.replace(tmp, self.session_path)
+
+    def _start_recording(self, sessions: Mapping[str, Any]) -> None:
+        """`session/new` under `sessions`: the file exists, empty, from here."""
+
+        os.makedirs(sessions["dir"], exist_ok=True)
+        self.session_path = os.path.join(sessions["dir"], f"{self.session_id}.json")
+        self.history = []
+        self._flush()
 
     def chunk(self, kind: str, text: str) -> None:
         self.update({"sessionUpdate": kind, "content": {"type": "text", "text": text}})
@@ -553,29 +620,101 @@ class FakeACPAgent:
             self.set_config_option(request_id, params)
         elif method == "session/prompt":
             self.prompt(request_id, params)
+        elif method in ("session/load", "session/resume"):
+            self.load_session(request_id, method, params)
         else:
             self.fail(request_id, -32601, f"method not found: {method}")
 
     def initialize(self) -> dict[str, Any]:
         advertised = bool(self.scenario.get("advertise_mcp"))
+        sessions = self.scenario.get("sessions")
+        capabilities: dict[str, Any] = {
+            "loadSession": sessions is not None,
+            "promptCapabilities": {},
+            "mcpCapabilities": {"http": advertised, "sse": False},
+        }
+        if sessions is not None and sessions.get("resume"):
+            # `SessionResumeCapabilities` is an empty object in the SDK.
+            capabilities["sessionCapabilities"] = {"resume": {}}
         return {
             "protocolVersion": 1,
-            "agentCapabilities": {
-                "loadSession": False,
-                "promptCapabilities": {},
-                "mcpCapabilities": {"http": advertised, "sse": False},
-            },
+            "agentCapabilities": capabilities,
             "agentInfo": {"name": "fake-acp", "version": "1"},
         }
 
-    def new_session(self, params: Mapping[str, Any]) -> dict[str, Any]:
+    def _open(self, params: Mapping[str, Any]) -> None:
+        """What `session/new`, `session/load` and `session/resume` share.
+
+        The `mcpServers` carried are what `mcp_calls` connects to, and the
+        config options are the scenario's, whichever method opened the
+        session (23 §The fake).
+        """
+
         servers = params.get("mcpServers") or []
         self.mcp_servers = [server for server in servers if isinstance(server, dict)]
         self.config = [
             _config_option(spec)
             for spec in self.scenario.get("config_options", DEFAULT_CONFIG_OPTIONS)
         ]
+
+    def new_session(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        self._open(params)
+        sessions = self.scenario.get("sessions")
+        if sessions is not None:
+            self._start_recording(sessions)
         return {"sessionId": self.session_id, "configOptions": self.config}
+
+    def load_session(
+        self, request_id: Any, method: str, params: Mapping[str, Any]
+    ) -> None:
+        """`session/load` and `session/resume` (23 §The fake, D257).
+
+        Both adopt the id and open the session as `session/new` would;
+        only `load` re-sends the file first. The replay goes through
+        :meth:`send` and never :meth:`update`, or it would append itself
+        to the file it is replaying.
+        """
+
+        replay = method == "session/load"
+        sessions = self.scenario.get("sessions")
+        if sessions is None or (not replay and not sessions.get("resume")):
+            # Unadvertised is not found: the same fact, the same message.
+            self.fail(request_id, -32601, f"method not found: {method}")
+            return
+        session_id = params.get("sessionId")
+        if not isinstance(session_id, str):
+            self.fail(request_id, -32602, "sessionId: expected a string")
+            return
+        path = os.path.join(sessions["dir"], f"{session_id}.json")
+        if not os.path.isfile(path):
+            self.fail(request_id, -32602, f"no such session: {session_id}")
+            return
+        try:
+            with open(path, encoding="utf-8") as handle:
+                history = json.load(handle)
+        except (OSError, json.JSONDecodeError) as exc:
+            self.fail(request_id, -32603, f"session {path}: {exc}")
+            return
+        if not isinstance(history, list) or not all(
+            isinstance(entry, dict) for entry in history
+        ):
+            self.fail(request_id, -32603, f"session {path}: not a list of updates")
+            return
+        # Adopted before any replay, so the re-sent updates carry this id.
+        self.session_id = session_id
+        self.session_path = path
+        self.history = list(history)
+        self._open(params)
+        if replay:
+            for entry in self.history:
+                self.send(
+                    {
+                        "jsonrpc": "2.0",
+                        "method": "session/update",
+                        "params": {"sessionId": self.session_id, "update": entry},
+                    }
+                )
+        self.reply(request_id, {"configOptions": self.config})
 
     def set_config_option(self, request_id: Any, params: Mapping[str, Any]) -> None:
         config_id = params.get("configId")
@@ -599,6 +738,15 @@ class FakeACPAgent:
             for block in params.get("prompt") or []
             if isinstance(block, dict)
         )
+        if self.session_path is not None:
+            # Recorded, not sent: a live turn does not echo the user's
+            # message, but a replay carries it, as pi's and Claude's do.
+            self._record(
+                {
+                    "sessionUpdate": "user_message_chunk",
+                    "content": {"type": "text", "text": text},
+                }
+            )
         if self.scenarios_dir is not None:
             try:
                 self.scenario = self.select_scenario(text)

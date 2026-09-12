@@ -8,9 +8,10 @@ fake's contract is the *wire*, and a fake asserted against the façade
 that consumes it could agree with it about something the protocol does
 not say.
 
-One test per scenario key, plus the handshake and the two failure modes
-that matter: an unknown key, and a scenario that names a shape the
-vocabulary does not have.
+One test per scenario key, plus the handshake, the sessions that survive
+the process (23 §The fake: a second ``RawACPClient`` is the second
+process), and the two failure modes that matter: an unknown key, and a
+scenario that names a shape the vocabulary does not have.
 """
 
 from __future__ import annotations
@@ -147,18 +148,39 @@ class RawACPClient:
             raise AssertionError(f"unexpected agent request {message['method']}")
         self._send({"jsonrpc": "2.0", "id": message["id"], "result": result})
 
-    # -- the three methods a session needs --------------------------------
+    # -- the methods a session needs ---------------------------------------
+
+    async def initialize(self) -> dict[str, Any]:
+        return await self.call(
+            "initialize", {"protocolVersion": 1, "clientCapabilities": {}}
+        )
 
     async def handshake(self, **new_session: Any) -> dict[str, Any]:
         """``initialize`` then ``session/new``; returns both results."""
 
-        initialize = await self.call(
-            "initialize", {"protocolVersion": 1, "clientCapabilities": {}}
-        )
+        initialize = await self.initialize()
         params = {"cwd": os.getcwd(), "mcpServers": [], **new_session}
         session = await self.call("session/new", params)
         self.session_id = session["sessionId"]
         return {"initialize": initialize, "session": session}
+
+    async def load(self, session_id: str, **params: Any) -> dict[str, Any]:
+        """``session/load``: a second process opening without ``session/new``."""
+
+        return await self._reopen("session/load", session_id, params)
+
+    async def resume(self, session_id: str, **params: Any) -> dict[str, Any]:
+        return await self._reopen("session/resume", session_id, params)
+
+    async def _reopen(
+        self, method: str, session_id: str, params: dict[str, Any]
+    ) -> dict[str, Any]:
+        result = await self.call(
+            method,
+            {"sessionId": session_id, "cwd": os.getcwd(), "mcpServers": [], **params},
+        )
+        self.session_id = session_id
+        return result
 
     async def prompt(self, text: str = "do the work") -> dict[str, Any]:
         return await self.call(
@@ -339,6 +361,25 @@ def read_lines(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
 
+def read_session(directory: Path, session_id: str) -> list[dict[str, Any]]:
+    """The fake's session file: ``<dir>/<sessionId>.json`` (23 §The fake)."""
+
+    return json.loads((directory / f"{session_id}.json").read_text())
+
+
+def sent(client: RawACPClient) -> list[dict[str, Any]]:
+    """The update objects the client received, in arrival order."""
+
+    return [update["params"]["update"] for update in client.updates]
+
+
+def user_chunk(text: str) -> dict[str, Any]:
+    return {
+        "sessionUpdate": "user_message_chunk",
+        "content": {"type": "text", "text": text},
+    }
+
+
 # --------------------------------------------------------------------------
 # The handshake.
 # --------------------------------------------------------------------------
@@ -356,7 +397,7 @@ async def test_the_fake_speaks_initialize_new_session_and_prompt() -> None:
 async def test_an_unknown_method_is_a_json_rpc_error() -> None:
     async with RawACPClient(scenario()) as client:
         await client.handshake()
-        message = await client.send("session/load", {"sessionId": client.session_id})
+        message = await client.send("session/fork", {"sessionId": client.session_id})
     assert message["error"]["code"] == -32601
 
 
@@ -746,6 +787,203 @@ async def test_mcp_calls_without_a_server_fail_the_turn_loudly() -> None:
 
 
 # --------------------------------------------------------------------------
+# Sessions across processes (23 §The fake, D257).
+# --------------------------------------------------------------------------
+
+
+async def test_sessions_advertises_load_session_and_resume_on_request(
+    tmp_path: Path,
+) -> None:
+    sessions = {"dir": str(tmp_path / "sessions")}
+    async with RawACPClient(scenario(sessions=sessions)) as client:
+        capabilities = (await client.initialize())["agentCapabilities"]
+    assert capabilities["loadSession"] is True
+    assert "sessionCapabilities" not in capabilities
+
+    async with RawACPClient(scenario(sessions={**sessions, "resume": True})) as client:
+        capabilities = (await client.initialize())["agentCapabilities"]
+    assert capabilities["loadSession"] is True
+    assert capabilities["sessionCapabilities"] == {"resume": {}}
+
+    async with RawACPClient(scenario()) as client:
+        capabilities = (await client.initialize())["agentCapabilities"]
+    assert capabilities["loadSession"] is False
+    assert "sessionCapabilities" not in capabilities
+
+
+async def test_session_new_creates_the_file_and_a_turn_fills_it_in_order(
+    tmp_path: Path,
+) -> None:
+    directory = tmp_path / "sessions"
+    command = scenario(
+        sessions={"dir": str(directory)},
+        thoughts=["hmm"],
+        text=["one", "two"],
+        tool_calls=1,
+    )
+    async with RawACPClient(command) as client:
+        await client.handshake()
+        assert read_session(directory, client.session_id) == []
+        await client.prompt("first ask")
+        recorded = read_session(directory, client.session_id)
+    assert recorded == [user_chunk("first ask"), *sent(client)]
+    assert [entry["sessionUpdate"] for entry in recorded] == [
+        "user_message_chunk",
+        "agent_thought_chunk",
+        "agent_message_chunk",
+        "agent_message_chunk",
+        "tool_call",
+        "tool_call_update",
+    ]
+    assert client.chunks("user_message_chunk") == []
+
+
+async def test_a_second_process_loads_the_session_and_replays_the_file(
+    tmp_path: Path,
+) -> None:
+    directory = tmp_path / "sessions"
+    command = scenario(sessions={"dir": str(directory)}, text=["one", "two"])
+    async with RawACPClient(command) as first:
+        await first.handshake()
+        await first.prompt("first ask")
+        session_id = first.session_id
+    before = read_session(directory, session_id)
+    assert before == [user_chunk("first ask"), *sent(first)]
+
+    async with RawACPClient(command) as second:
+        await second.initialize()
+        result = await second.load(session_id)
+        replayed = list(second.updates)
+        await second.prompt("second ask")
+        live = second.updates[len(replayed) :]
+    assert [update["params"]["update"] for update in replayed] == before
+    assert {update["params"]["sessionId"] for update in replayed} == {session_id}
+    assert [o["category"] for o in result["configOptions"]] == [
+        "model",
+        "thought_level",
+    ]
+    assert "sessionId" not in result
+    # The first-turn script ran again (D122), and the file grew by it.
+    after = read_session(directory, session_id)
+    assert after == [
+        *before,
+        user_chunk("second ask"),
+        *[update["params"]["update"] for update in live],
+    ]
+    assert [update["params"]["update"]["content"]["text"] for update in live] == [
+        "one",
+        "two",
+    ]
+
+
+async def test_session_resume_answers_without_replaying(tmp_path: Path) -> None:
+    directory = tmp_path / "sessions"
+    command = scenario(sessions={"dir": str(directory), "resume": True}, text=["hi"])
+    async with RawACPClient(command) as first:
+        await first.handshake()
+        await first.prompt("first ask")
+        session_id = first.session_id
+    before = read_session(directory, session_id)
+
+    async with RawACPClient(command) as second:
+        await second.initialize()
+        result = await second.resume(session_id)
+        assert second.updates == []
+        await second.prompt("second ask")
+    assert [o["id"] for o in result["configOptions"]] == ["model", "thought_level"]
+    assert second.texts() == ["hi"]
+    assert read_session(directory, session_id) == [
+        *before,
+        user_chunk("second ask"),
+        *sent(second),
+    ]
+
+
+async def test_loading_an_unknown_session_is_invalid_params(tmp_path: Path) -> None:
+    command = scenario(sessions={"dir": str(tmp_path / "sessions"), "resume": True})
+    async with RawACPClient(command) as client:
+        await client.initialize()
+        load = await client.send(
+            "session/load",
+            {"sessionId": "nope", "cwd": os.getcwd(), "mcpServers": []},
+        )
+        resume = await client.send(
+            "session/resume",
+            {"sessionId": "nope", "cwd": os.getcwd(), "mcpServers": []},
+        )
+    assert load["error"] == {"code": -32602, "message": "no such session: nope"}
+    assert resume["error"] == {"code": -32602, "message": "no such session: nope"}
+
+
+async def test_resume_unadvertised_and_load_without_the_key_are_method_not_found(
+    tmp_path: Path,
+) -> None:
+    directory = tmp_path / "sessions"
+    params = {"cwd": os.getcwd(), "mcpServers": []}
+    async with RawACPClient(scenario(sessions={"dir": str(directory)})) as client:
+        await client.handshake()
+        message = await client.send(
+            "session/resume", {"sessionId": client.session_id, **params}
+        )
+    assert message["error"]["code"] == -32601
+    assert message["error"]["message"] == "method not found: session/resume"
+    assert read_session(directory, client.session_id) == []
+
+    async with RawACPClient(scenario()) as client:
+        await client.handshake()
+        load = await client.send(
+            "session/load", {"sessionId": client.session_id, **params}
+        )
+        resume = await client.send(
+            "session/resume", {"sessionId": client.session_id, **params}
+        )
+    assert load["error"]["code"] == -32601
+    assert resume["error"]["code"] == -32601
+    assert not (directory / f"{client.session_id}.json").exists()
+
+
+async def test_mcp_servers_on_load_are_what_mcp_calls_connects_to(
+    mcp_server: dict[str, Any], tmp_path: Path, logs: tuple[Path, Path]
+) -> None:
+    """`session/load` records `mcpServers` as `session/new` does."""
+
+    directory = tmp_path / "sessions"
+    requests, _responses = logs
+    server = {key: mcp_server[key] for key in ("type", "name", "url", "headers")}
+    command = scenario(
+        sessions={"dir": str(directory)},
+        advertise_mcp=True,
+        mcp_calls=[{"tool": "append_log", "args": {"text": "later"}}],
+        request_log=str(requests),
+    )
+    async with RawACPClient(command) as first:
+        await first.handshake()
+        session_id = first.session_id
+
+    async with RawACPClient(command) as second:
+        await second.initialize()
+        await second.load(session_id, mcpServers=[server])
+        await second.prompt()
+    update = second.chunks("tool_call_update")[0]
+    assert update["content"][0]["content"]["text"] == "logged: later"
+    assert TOKEN in mcp_server["tokens"]
+    received = read_lines(requests)
+    assert [entry["method"] for entry in received] == [
+        "initialize",
+        "session/new",
+        "initialize",
+        "session/load",
+        "session/prompt",
+    ]
+    assert received[3]["params"]["sessionId"] == session_id
+    assert received[3]["params"]["mcpServers"] == [server]
+    assert read_session(directory, session_id) == [
+        user_chunk("do the work"),
+        *sent(second),
+    ]
+
+
+# --------------------------------------------------------------------------
 # Per-node selection, and the errors.
 # --------------------------------------------------------------------------
 
@@ -820,6 +1058,12 @@ def test_a_misshapen_value_is_an_error_too() -> None:
         scenario(permissions=[{"options": [{"name": "Allow"}]}])
     with pytest.raises(ScenarioError, match="stop_reason"):
         scenario(stop_reason="finished")
+    with pytest.raises(ScenarioError, match="sessions.dir"):
+        scenario(sessions={"dir": 1})
+    with pytest.raises(ScenarioError, match="sessions.resume"):
+        scenario(sessions={"dir": "/tmp/x", "resume": "yes"})
+    with pytest.raises(ScenarioError, match="sessions.*replay"):
+        scenario(sessions={"dir": "/tmp/x", "replay": True})
 
 
 async def test_an_unknown_key_in_a_scenario_file_kills_the_fake(
