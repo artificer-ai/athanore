@@ -1,5 +1,10 @@
 # Athanore
 
+[![CI](https://github.com/artificer-ai/athanore/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/artificer-ai/athanore/actions/workflows/ci.yml)
+[![Docs](https://github.com/artificer-ai/athanore/actions/workflows/pages.yml/badge.svg?branch=main)](https://artificer-ai.github.io/athanore/)
+[![PyPI](https://img.shields.io/pypi/v/athanore)](https://pypi.org/project/athanore/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](#install)
+
 Code-defined AI agent workflows over the
 [Agent Client Protocol](https://agentclientprotocol.com) (ACP).
 
