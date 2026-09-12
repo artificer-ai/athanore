@@ -22,7 +22,7 @@ decisions. An agent never moves a task. It submits a validated value and
 the node body routes on it, so every edge a run traverses is code you can
 read, test, and blame.
 
-![The Athanore SPA: a list of runs on the left; on the right, the overview of a completed `feature` run with its token count, duration and queue position, a bar per node of tokens spent, and the task description it was given](https://raw.githubusercontent.com/artificer-ai/athanore/main/docs/images/run-overview.png)
+![The Athanore SPA: a list of runs on the left, four `feature` runs queued behind one another; on the right, the overview of the running one with its token count, duration and queue position, a bar per node of tokens spent, and the task description it was given](https://raw.githubusercontent.com/artificer-ai/athanore/main/docs/images/run-overview.gif)
 
 ## Install
 
