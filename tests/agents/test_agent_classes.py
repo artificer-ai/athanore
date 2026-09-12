@@ -121,24 +121,27 @@ def test_a_subclass_narrows_without_touching_its_base() -> None:
     assert ACPAgent.permission_policy == "ask"
 
 
-def test_only_the_four_run_time_arguments_are_constructor_arguments() -> None:
+def test_only_the_five_run_time_arguments_are_constructor_arguments() -> None:
     """What differs per *run* is an argument; what differs per seat is not.
 
-    ``command``, ``cwd``, ``timeout`` and ``env`` are the four a body may
-    vary between two runs of the same class — a different worktree, a
-    shorter budget — and everything else is the class, so a body cannot
+    ``command``, ``cwd``, ``timeout``, ``env`` and ``session_id`` are the
+    five a body may vary between two runs of the same class — a different
+    worktree, a shorter budget, the session the last run left behind (23
+    §Surface, D254) — and everything else is the class, so a body cannot
     quietly hand an agent a different permission policy than the one its
     class was reviewed with (D10).
     """
 
     parameters = list(inspect.signature(ACPAgent.__init__).parameters)
-    assert parameters == ["self", "command", "cwd", "timeout", "env"]
+    assert parameters == ["self", "command", "cwd", "timeout", "env", "session_id"]
 
     agent = ACPAgent(command=["fake"], cwd="/tmp", timeout=5.0, env={"A": "1"})
     assert agent.command == ["fake"]
     assert agent.cwd == "/tmp"
     assert agent.timeout == 5.0
     assert agent.env == {"A": "1"}
+    assert agent.session_id is None, "a fresh run unless a session is named"
+    assert ACPAgent(session_id="01a0").session_id == "01a0"
     # ...and the class it was built from is untouched by any of it.
     assert ACPAgent.command == ["npx", "pi-acp"]
 

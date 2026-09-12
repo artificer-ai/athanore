@@ -41,6 +41,13 @@ the handshake, the prompt, the repair turns, and the cleanup.
   exception.** The tokens were spent whether or not the turn worked, and
   the failure path is where a number is most worth having (05 §Stats
   entry, T039a).
+- **A replay is history, not this attempt's transcript.** While the
+  client is ``replaying`` — the façade sets it around a ``session/load``
+  and nowhere else — the updates an agent re-sends write no chunk, add
+  no text and count no tool call: they were recorded by the attempt
+  that ran them, and a tenth turn's transcript that carried the first
+  nine would count tool calls it did not make (23 §The replay is not
+  this attempt's transcript, D255).
 - **A refusal is an answer.** ``refusal``, ``cancelled`` and a truncated
   final turn come back as a *failed result* the node body routes on; a
   timeout, a transport failure and a missing submission raise
@@ -74,11 +81,12 @@ from acp.schema import (
     HttpMcpServer,
     Implementation,
     InitializeResponse,
+    LoadSessionResponse,
     McpServerStdio,
-    NewSessionResponse,
     PermissionOption,
     PromptResponse,
     RequestPermissionResponse,
+    ResumeSessionResponse,
     SseMcpServer,
     ToolCallUpdate,
 )
@@ -226,7 +234,11 @@ class ACPClient(Client):
     ``ctx.services.stream``; it **counts** — tool calls and denied
     permissions, for the stats entry; and it **delegates** — a permission
     request and an elicitation go to :mod:`athanore.agents.policies`,
-    which is the only thing that decides either.
+    which is the only thing that decides either. While it is
+    :attr:`replaying` it does the first two of those to nothing: a
+    ``session/load``'s re-sent history is dropped and counted, and only
+    the delegating goes on (23 §The replay is not this attempt's
+    transcript).
 
     Module-level and referenced by :attr:`ACPAgent.client_class` so a
     façade can substitute one (20 §Finding 3). A subclass takes the same
@@ -267,6 +279,11 @@ class ACPClient(Client):
         self.failure: AgentError | None = None
         #: The connection this client was bound to, from ``on_connect``.
         self.connection: Any = None
+        #: Whether ``session/update`` is a replay to be dropped. Set by the
+        #: façade around a ``session/load`` and nowhere else (23, D255).
+        self.replaying: bool = False
+        #: How many updates arrived while :attr:`replaying` was set.
+        self.replayed: int = 0
 
     # -- the transcript --------------------------------------------------
 
@@ -292,8 +309,16 @@ class ACPClient(Client):
         The four kinds of 05, and nothing else: a plan update, an
         available-commands list or a mode change describes the agent's
         own UI and is not part of the transcript an operator reads.
+
+        Under :attr:`replaying` every update is dropped and counted,
+        whatever its kind, before anything is awaited: the replay is what
+        the agent sent between ``session/load`` and its answer (23
+        §Terms), and the count a reader of the DEBUG line gets is that.
         """
 
+        if self.replaying:
+            self.replayed += 1
+            return
         kind = _CHUNKS.get(str(getattr(update, "session_update", "")))
         if kind is None:
             return
@@ -638,11 +663,17 @@ class ACPAgent(Agent):
         cwd: str | None = None,
         timeout: float | None = None,
         env: Mapping[str, str] | None = None,
+        session_id: str | None = None,
     ) -> None:
         if command is not None:
             self.command = list(command)
         #: The agent's workspace. The engine never writes there (12).
         self.cwd = cwd
+        #: A session an earlier run left behind, to be continued rather
+        #: than a new one opened (23 §Surface, D254). ``AgentResult.
+        #: session_id`` is where it comes from, and ``cwd`` has to be the
+        #: one the session was opened with — the agent enforces it.
+        self.session_id = session_id
         #: This agent's own timeout, or ``settings.agent_timeout``.
         self.timeout = timeout
         #: Environment merged last, so a class may state a variable the
@@ -718,7 +749,8 @@ class ACPAgent(Agent):
 
         The lifecycle of 05, in order: declare this agent's
         ``output_model`` and ``ask_policy`` on the task for the duration,
-        spawn, handshake, configure the session by category, prompt,
+        spawn, handshake, open a session — a new one, or the one
+        ``session_id`` names — configure it by category, prompt,
         repair while it is worth repairing, map the outcome, and then —
         on every path, including a cancelled one — flush the transcript,
         close the connection, stop the child, and record exactly one
@@ -842,11 +874,9 @@ class ACPAgent(Agent):
                 theirs=initialized.protocol_version,
             )
         tier = self._tier(initialized, ctx)
-        started = await conn.new_session(
-            cwd=self.cwd or os.getcwd(), mcp_servers=self._mcp_servers(tier, ctx)
-        )
-        session.session_id = started.session_id
-        await self._configure(conn, client, started)
+        options = await self._open_session(session, client, initialized, tier, ctx)
+        assert session.session_id is not None
+        await self._configure(conn, client, session.session_id, options)
 
         text = await self.render_prompt(prompt, ctx, tier=tier)
         response = await self._prompt(session, client, text)
@@ -873,6 +903,106 @@ class ACPAgent(Agent):
         if client.failure is not None:
             raise client.failure
         return response
+
+    # -- opening the session, one way or the other ------------------------
+
+    async def _open_session(
+        self,
+        session: _Session,
+        client: ACPClient,
+        initialized: InitializeResponse,
+        tier: Tier,
+        ctx: TaskContext | None,
+    ) -> Sequence[Any] | None:
+        """Open the session this run is on, and hand back its config options.
+
+        A fresh run is ``session/new`` (05 §Session lifecycle, step 2). A
+        run constructed with ``session_id`` continues that session
+        instead (:meth:`_continue`). Either way ``session.session_id`` is
+        set only once the agent has answered: a run that never joined a
+        session has none to name in its stats entry.
+        """
+
+        if self.session_id is not None:
+            return await self._continue(session, client, initialized, tier, ctx)
+        conn = session.connection
+        assert conn is not None
+        started = await conn.new_session(
+            cwd=self.cwd or os.getcwd(), mcp_servers=self._mcp_servers(tier, ctx)
+        )
+        session.session_id = started.session_id
+        return started.config_options
+
+    async def _continue(
+        self,
+        session: _Session,
+        client: ACPClient,
+        initialized: InitializeResponse,
+        tier: Tier,
+        ctx: TaskContext | None,
+    ) -> Sequence[Any] | None:
+        """Re-open ``session_id`` by whichever method the agent advertised.
+
+        ``session/resume`` when ``sessionCapabilities.resume`` is present,
+        else ``session/load`` when ``loadSession`` is, else
+        :exc:`AgentError` before anything is prompted (23 §Lifecycle of a
+        continued run, step 2; D255). ``resume`` first because it is the
+        cheaper of the two and produces nothing to discard; ``load``
+        because it is the one every adapter that persists sessions has.
+        Both carry the ``cwd`` and the tier's ``mcp_servers`` a
+        ``session/new`` would — this task's token, not the one the
+        session was opened under (12 §Task tokens).
+
+        The replay a ``load`` produces is dropped by the client under
+        :attr:`ACPClient.replaying`, set immediately before the call and
+        cleared on every path out of it, with the count logged once at
+        DEBUG. There is deliberately **no fallback** to ``session/new``:
+        a run that quietly started over would answer with no memory of
+        the conversation and report success (23 §Refusal, D254).
+        """
+
+        session_id = self.session_id
+        assert session_id is not None
+        conn = session.connection
+        assert conn is not None
+        capabilities = initialized.agent_capabilities
+        sessions = capabilities.session_capabilities if capabilities else None
+        resume = sessions is not None and sessions.resume is not None
+        load = capabilities is not None and bool(capabilities.load_session)
+        if not resume and not load:
+            raise AgentError(
+                f"{type(self).__name__} cannot continue a session: the agent "
+                "advertises neither session/resume nor session/load"
+            )
+        cwd = self.cwd or os.getcwd()
+        servers = self._mcp_servers(tier, ctx) or []
+        try:
+            if resume:
+                opened: LoadSessionResponse | ResumeSessionResponse
+                opened = await conn.resume_session(
+                    session_id=session_id, cwd=cwd, mcp_servers=servers
+                )
+            else:
+                client.replaying = True
+                try:
+                    opened = await conn.load_session(
+                        cwd=cwd, session_id=session_id, mcp_servers=servers
+                    )
+                finally:
+                    client.replaying = False
+                    _log.debug(
+                        "replay discarded",
+                        agent=type(self).__name__,
+                        session_id=session_id,
+                        count=client.replayed,
+                    )
+        except RequestError as exc:
+            raise AgentError(
+                f"the agent could not continue session {session_id}: {exc}"
+            ) from exc
+        session.session_id = session_id
+        await client.append("notice", f"continuing session {session_id}")
+        return opened.config_options
 
     # -- the session's configuration -------------------------------------
 
@@ -926,7 +1056,7 @@ class ACPAgent(Agent):
         ]
 
     def _resolve_config_id(
-        self, session: NewSessionResponse, category: str
+        self, options: Sequence[Any] | None, category: str
     ) -> str | None:
         """The advertised config option id for ``category`` (20 §Finding 2).
 
@@ -942,11 +1072,10 @@ class ACPAgent(Agent):
         a model.
         """
 
-        options = session.config_options or []
-        for option in options:
+        for option in options or []:
             if option.category == category:
                 return option.id
-        for option in options:
+        for option in options or []:
             if option.id == category:
                 return option.id
         return None
@@ -955,7 +1084,8 @@ class ACPAgent(Agent):
         self,
         conn: ClientSideConnection,
         client: ACPClient,
-        started: NewSessionResponse,
+        session_id: str,
+        options: Sequence[Any] | None,
     ) -> None:
         """Set ``model`` and ``thinking`` on the session, loudly (D11).
 
@@ -964,13 +1094,19 @@ class ACPAgent(Agent):
         ``notice``**. Neither fails the run — the agent will answer on its
         own default — and neither is silent, because a whole build
         running on the wrong model is what silence bought last time.
+
+        ``options`` is the ``configOptions`` of whichever response opened
+        the session — ``session/new``, ``load`` or ``resume`` — and a
+        continued session is re-told the class's choices exactly as a new
+        one is: the class is the configuration, and a session that
+        drifted from it is not the one the author declared (23).
         """
 
         for category, attribute in CONFIG_CATEGORIES.items():
             value = getattr(self, attribute)
             if not value:
                 continue
-            config_id = self._resolve_config_id(started, category)
+            config_id = self._resolve_config_id(options, category)
             if config_id is None:
                 await self._rejected(
                     client,
@@ -981,7 +1117,7 @@ class ACPAgent(Agent):
                 continue
             try:
                 await conn.set_config_option(
-                    config_id=config_id, session_id=started.session_id, value=value
+                    config_id=config_id, session_id=session_id, value=value
                 )
             except Exception as exc:
                 await self._rejected(client, category, value, str(exc))
@@ -1159,7 +1295,11 @@ class ACPAgent(Agent):
         here is the second source. ACP's ``usage`` — summed over the
         turns of this run, repair turns included — wins for tokens, and
         the provider supplies cost and the model that actually answered
-        (:func:`~athanore.agents.stats.merge_usage`).
+        (:func:`~athanore.agents.stats.merge_usage`). Not on a continued
+        run: a provider reports a whole *session*, and a continued run is
+        a fraction of one whose size it cannot know, so there the tokens
+        are ACP's or omitted and the model is the class's (23 §Stats,
+        D256).
 
         Kept on the session, so the ``finally`` that records it and the
         result that carries it hold the same object and it can only be
@@ -1170,7 +1310,11 @@ class ACPAgent(Agent):
             return session.entry
         provider_stats = None
         provider = self.stats_provider
-        if provider is not None and session.session_id is not None:
+        if (
+            provider is not None
+            and session.session_id is not None
+            and self.session_id is None
+        ):
             try:
                 provider_stats = await provider.stats(session.session_id, self.cwd)
             except Exception:
