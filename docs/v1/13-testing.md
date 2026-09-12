@@ -12,7 +12,7 @@ tests of the same behaviours.
 | Unit | pytest, hypothesis | `graph` (signature parsing, finalization errors, generations — property-tested with random DAGs and cycles), `routing.interpret`, validators, stats builders, formatters |
 | Store | pytest-asyncio, SQLite tmp file, Postgres in nightly | Repositories, claim ordering, cascade delete, outbox ordering, migrations up/down, v0 import on the MVP's fixture databases |
 | Engine | in-process `Server` on a free port, `MockAgent` / `StatsMockAgent` | Fan-out completion, fan-in (join receives branches in index order; nested fan-out/join; dead-lettered branch → `failed`, retry → join fires → `completed`; branch terminating instead of joining → `join_incomplete`; late arrival recorded, not re-fired; recovery mid-fan-out; `output` shape by terminal count), loop-backs, retries/dead-letter, recovery, pools (dedicated/shared/zero), pause/resume, cancel kills, waiting releases the slot, priorities |
-| Agent façade | `FakeACPAgent` subprocess | Session lifecycle, config by category, streaming, permissions by kind, elicitation bridge, HTTP ask, repair turns, truncation via a fake stats provider, env scrubbing, timeout/cancel/refusal exit paths, stats on every path, tooling tier selection (`auto` → `mcp` when advertised, else `http`; the `mcp` tier through `mcp_calls`; the athanore tool server auto-allowed under `ask`); continued sessions (`session_id=` on the fake's `sessions` key: `session/resume` when advertised else `session/load`, the replay discarded from the transcript and the counters, the `continuing session` notice, config options re-set, the refusal before any prompt, the provider's `stats()` not consulted, 23 §Testing) |
+| Agent façade | `FakeACPAgent` subprocess | Session lifecycle, config by category, streaming, permissions by kind, elicitation bridge, HTTP ask, repair turns, truncation via a fake stats provider, env scrubbing, timeout/cancel/refusal exit paths, stats on every path, tooling tier selection (`auto` → `mcp` when advertised, else `http`; the `mcp` tier through `mcp_calls`; the athanore tool server auto-allowed under `ask`); continued sessions (`session_id=` on the fake's `sessions` key: `session/resume` when advertised else `session/load`, the replay discarded from the transcript and the counters, the `continuing session` notice, config options re-set, the refusal before any prompt, the provider's `stats()` not consulted, 23 §Testing); held sessions (`open()` on the fake's `prompts` key: one process for two prompts, one entry per prompt with one `session_id`, exit on exception and on cancellation, a dead session refusing later prompts, a refusal leaving it open, the concurrent `RuntimeError`, `open()` with `session_id=`, the provider's `stats()` only on `run()`, entry failure never entering the block, 23 §A session held open §Testing) |
 | API | httpx against the live app | Every endpoint, auth matrix (loopback plain / network bind with and without token / task token / expired task token), error shapes, 413, SSE replay and live, OpenAPI snapshot |
 | Plugins | a test workflow with one of each declaration | Manifest, scoping (404 on foreign run), action validation, node liveness, assets served, `on` handlers |
 | SPA unit | Vitest + Testing Library | Renderers per kind, ActionForm round-trips nested schemas and arrays, invalidation table precedence and coalescing, SSE wrapper reconnect and `resync`, keymap scoping |
@@ -88,13 +88,25 @@ configured to do. Two things follow, both enforced rather than asked for
   both record `mcpServers` as `session/new` does; an unknown id is
   `-32602` `no such session: <id>`, an unadvertised method `-32601`; this
   is how the fake persists a session across two processes, 23 §The fake,
-  D257). Unknown keys are an error.
+  D257), `prompts: [scenario, ...]` (a list of scenarios, the n-th
+  scripting the n-th body prompt of the session, the last repeating for
+  every prompt past the end; each a scenario less `sessions`,
+  `advertise_mcp`, `config_options`, `reject_config`, `session_file`,
+  `request_log`, `response_log` and `prompts`, which belong to the
+  process and are refused rather than ignored; a `session/prompt` whose
+  text opens with 19 §Repair turn's first words is a repair turn of the
+  prompt before it and posts that prompt's `repair_submit`, anything
+  else is the next prompt; this is how the fake scripts a session held
+  open across several prompts, 23 §A session held open §The fake).
+  Unknown keys are an error.
 - A scenario scripts **one run**: every content block above is emitted on
   the first prompt turn, and the repair turns that follow it submit
   `repair_submit` and nothing else. `sleep_s`, `stop_reason` and `usage`
   belong to a turn and apply to every one (D122). The second process of a
   continued session runs the first-turn script again on its first prompt
-  (23 §The fake).
+  (23 §The fake). With `prompts` the n-th body prompt runs the n-th
+  script's first turn; without it a held session's second prompt is the
+  repair script, as `run()`'s tests rely on.
 
 ### Running examples on the fake
 

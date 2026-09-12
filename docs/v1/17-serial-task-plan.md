@@ -4396,6 +4396,29 @@ exported.
 likes, with one process for the block, one stats entry per prompt and
 the same cleanup on every exit; `run()` is that with one prompt; 05
 and 13 say so; gate green; snapshot and client unchanged.
+**Status.** Done. `ACPAgent.open()` returning the private
+`_session(whole=False)` context manager that `run()` enters with
+`whole=True` and one `prompt()`; `_Session` split into the process half
+(`process`, `connection`, `client`, `stderr`, `session_id`, `tier`,
+`whole`, `busy`, `closed`) and a per-prompt `_Turn` (counter offsets
+into the client's whole-process counters, `repair_turns`, `status`,
+`reason`, `usage`, `entry`); `_enter` (spawn, `initialize`, the session
+opened or continued, `_configure`) and `_turn` (render, `_prompt`,
+`_repair`, `_outcome`, then flush and `_record`) both under `_bounded`,
+the one failure mapping; a `transport` or `timeout` prompt setting
+`closed` and stopping the child at once, a cancelled one setting it for
+the exit to stop, later prompts refused with `the session is closed:
+<reason>`, a concurrent one `RuntimeError` before the wire, neither
+recording; `_cleanup` idempotent, `_flush` on its own; `AgentSession`
+(`session_id`, `prompt()`) exported from `athanore` and
+`athanore.agents.acp`; the fake's `prompts` key with `PROMPT_KEYS`,
+`REPAIR_MARKER` and `self.script`; the "Holding a session (23)" section
+of `tests/agents/test_acp_lifecycle.py`, the `prompts` section of
+`tests/testing/test_fake_acp.py`, the export test; 05 §Agent classes,
+§AgentResult, §Holding a session and §Stats entry, 13 §Fakes and the
+façade row, 02's layout and public API block, 23's two cancelled
+phrases, the site guide's "Holding a session open", the skill's bullet,
+the reference regenerated; D266.
 
 ### T091 — `chat` as one held session (A9.4)
 

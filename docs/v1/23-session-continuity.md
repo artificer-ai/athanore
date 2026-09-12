@@ -355,8 +355,9 @@ entry, to each prompt, and to the block's exit.
    guarded on their own, as 05 says, and run on every path — the
    `finally` of the block, so a body's exception, a node timeout and a
    cancellation all reach them. A prompt in flight when the body is
-   cancelled records its entry `failed/cancelled` (or `shutdown`, on an
-   engine stop) as it does today, and then the exit runs.
+   cancelled records its entry `failed/shutdown`, as any cancelled run
+   does today (04 §Shutdown), and the session is closed by it; then the
+   exit runs.
 6. **After a crash**, the attempt re-executes from its first line
    (D6): the block is entered again, and the `human_input`s already
    answered replay their answers by ordinal (06 §Restart durability),
@@ -441,7 +442,7 @@ Per 13 §Pyramid:
   `duration_s`; `run()` still records exactly one entry and stops the
   child, and the existing lifecycle tests are unchanged. Exit on an
   exception inside the block stops the child and records no extra
-  entry. A prompt cancelled mid-turn records `failed/cancelled` and
+  entry. A prompt cancelled mid-turn records `failed/shutdown` and
   the exit stops the child. A transport failure on the first prompt:
   `AgentError`, the child stopped, the second `prompt()` raising `the
   session is closed`. A refusal on the first prompt: the second

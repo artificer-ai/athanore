@@ -28,6 +28,11 @@ class ACPAgent(Agent):
     stats_provider: SessionStatsProvider | None = None
     def __init__(self, command=None, cwd=None, timeout=None, env=None,
                  session_id: str | None = None): ...
+    def open(self) -> AbstractAsyncContextManager[AgentSession]: ...
+
+class AgentSession:                # what open() yields
+    session_id: str                # once open
+    async def prompt(self, prompt: str = "") -> AgentResult: ...
 ```
 
 Decisions carried from the MVP: an agent is a class carrying its config;
@@ -66,6 +71,43 @@ enforces it, and the façade reports the refusal. A run constructed with
 `session_id=` either continues that session or raises `AgentError` —
 never a `session/new` in its place — per §Continuing a session below.
 
+`open()` holds one session open for a block (23 §A session held open,
+D264). `run()` pays for a process per prompt — spawn, `initialize`,
+open the session, one prompt, stop — which is the cost of doing
+business for a pipeline stage and a cold process on every message for
+a body that talks to the same agent turn after turn. `open()` is
+`run()` split in two: the body says when the conversation starts and
+when it ends, and prompts in between.
+
+```python
+async with ChatAgent(cwd=checkout).open() as agent:
+    while True:
+        said = await human_input(ask)                # parks; slot given back
+        if said in STOP_WORDS:
+            return said
+        reply = await agent.prompt(said)             # same process, same session
+```
+
+- `open()` is an async context manager and nothing else: there is no
+  `close()` to forget, and the exit of the block is the end of the
+  session on every path — return, exception, cancellation.
+- `run(prompt)` **is** `async with self.open() as s: return await
+  s.prompt(prompt)`. One code path; the one-shot form is the held form
+  with one prompt, and §Session lifecycle is unchanged for it.
+- `prompt()` takes the assignment text and returns an `AgentResult`,
+  exactly as `run()` does. The assembly of 19 applies to every prompt:
+  `system_prompt` is sent by the adapter per session, and the
+  assignment, task block and tier block are the prompt's. A body that
+  wants a shorter second prompt writes a shorter assignment; the façade
+  does not edit what it is given.
+- On an agent constructed with `session_id=`, `open()` continues that
+  session (§Continuing a session) and holds it.
+- `AgentSession.session_id` is the id the agent gave, or the one
+  continued, available from the moment the block is entered. It is the
+  one thing a body should write down — to the work log, or into what it
+  returns — because it is what a re-executed attempt hands back as
+  `session_id=` (§Holding a session, step 6).
+
 ### AgentResult
 
 ```python
@@ -81,7 +123,8 @@ class AgentResult:
     ok: bool               # property
 ```
 
-A `failed` result is returned (not raised) for refusal/cancel/truncation
+What one `run()`, or one `prompt()` on a held session, produced. A
+`failed` result is returned (not raised) for refusal/cancel/truncation
 so bodies can decide; `AgentError` is raised for timeouts, transport
 failures, missing or invalid submissions. Both paths record stats.
 
@@ -301,6 +344,89 @@ that quietly started over would answer with no memory of the
 conversation and report success — the precedent is §Policies, where
 `auto_allow` raises rather than picking another option (D254).
 
+### Holding a session
+
+`open()` is the seven steps above split at the block's edges: steps 1–3
+at entry, steps 4–6 per `prompt()`, step 7 at exit. 23 §A session held
+open is where the reasoning lives; this is the fold.
+
+1. **Entry**: spawn (step 1), `initialize`, `session/new` — or
+   `session/resume` / `session/load` when constructed with
+   `session_id=` (§Continuing a session, step 2) — and the config
+   options set by category (step 2). `output_model` and `ask_policy`
+   are declared on the `TaskContext` for the length of the block (step
+   3): the class is the configuration, and one class holds one session.
+   The whole of entry, spawn included, runs under `timeout` (step 4),
+   because a handshake that never answers must not hang the body; on
+   any failure the child is stopped, one stats entry is recorded
+   `failed/transport` (or `timeout`, or `shutdown` on a cancellation),
+   naming the session only if one was actually joined, and `AgentError`
+   leaves `open()` — the block is never entered.
+2. **Each `prompt()`**: the render, the prompt under `timeout`, the
+   repair loop, the outcome (steps 4–6), all as `run()` does them; the
+   repair turns are on the held session, as they are on any. `timeout`
+   bounds *one prompt and its repairs*, as it bounds one run; nothing in
+   the façade bounds the block, and nothing should — a chat idles for
+   hours by design. The node's own `timeout` is the bound on the whole
+   session, and 04 §Timeouts already pauses it while the task is
+   `waiting`, which is exactly the time a chat spends parked on a
+   person.
+3. **After each `prompt()`**: the transcript is flushed and **one stats
+   entry is recorded** for that prompt (§Stats entry). The result
+   returned is the prompt's, and it carries `session_id`. Submissions
+   stay the attempt's (§Submissions): a second prompt on a class with an
+   `output_model` attaches the attempt's latest valid submission, as two
+   `run()`s in one body do.
+4. **A prompt that fails ends the session's usefulness, not the
+   block.** `AgentError` (a transport failure, a timeout, a missing
+   submission) and the failed `AgentResult`s (refusal, cancellation,
+   truncation) are raised or returned from `prompt()` exactly as from
+   `run()`. After a **transport failure or a timeout** the child is
+   stopped at once — inside the block — and every later `prompt()`
+   raises `AgentError`, `the session is closed: <the reason>`, until
+   the block exits; a refusal, a cancelled stop reason, a truncated
+   turn or a missing submission leaves the session open, because the
+   process is fine and the body may have something to say about it. A
+   body that wants to carry on after a dead session opens a new block;
+   it does not get a new process behind its back.
+5. **Exit**: flush the transcript, close the connection, stop the
+   child under `KILL_AFTER` (step 7). **No stats entry** is recorded
+   at exit: every prompt already recorded its own, and an exit after
+   zero prompts recorded none, because nothing was asked. The steps are
+   guarded on their own, as step 7 says, and run on every path — the
+   `finally` of the block, so a body's exception, a node timeout and a
+   cancellation all reach them; each resource is dealt with once, so
+   the stop a dead session did at once and the exit compose. A prompt
+   in flight when the body is cancelled records its entry
+   `failed/shutdown`, as any cancelled run does (04 §Shutdown), the
+   session is closed by it — the agent was mid-turn and its state is
+   unknown — and then the exit runs and stops the child.
+6. **After a crash**, the attempt re-executes from its first line
+   (D6): the block is entered again, and the `human_input`s already
+   answered replay their answers by ordinal (06 §Restart durability),
+   so the body reaches the first unanswered question at once. The
+   session is a fresh one unless the body constructs the agent with
+   the `session_id` it wrote down (§Agent classes) — which is the
+   composition 23 exists for, and the reason `session_id` is written to
+   the work log by any body that holds a session for long.
+7. **One prompt at a time.** A second `prompt()` while one is in
+   flight is a programming error and raises `RuntimeError` before
+   touching the wire; it records nothing, because nothing was sent and
+   nothing was spent, and neither does a prompt refused on a dead
+   session. A session is not shared between tasks: it is opened inside
+   one attempt and dies with it, and the `TaskContext` it declared on
+   is that attempt's.
+
+While a held session is parked on a `human_input`, the body holds no
+slot (04 §Waiting) and the agent process is alive and idle. The pool
+therefore caps agents *answering*, not agents *alive* — a `talk` pool
+of 2 is two replies being generated at once, over any number of open
+chats (D264). An idle adapter costs memory and a container, and a
+conversation that had to give its process up on every question would
+be a cold process and a re-pasted history on every message. An
+operator who wants to cap live processes caps runs, which is what
+`position` and the run list are for.
+
 ### Truncation detection is a provider concern
 
 The MVP reads pi's session JSONL from `~/.pi/agent/sessions` to detect a
@@ -363,7 +489,8 @@ unattended pipeline cannot be stalled by a chatty model.
 
 ## Stats entry
 
-Recorded once per `run()` on every exit path, as a `[stats]` work-log line
+Recorded once per `run()` — once per `prompt()` on a held session
+(§Holding a session) — on every exit path, as a `[stats]` work-log line
 (author `engine`) and an `agent.stats` event:
 
 `node`, `attempt`, `status` (`ok` / `failed` + reason), `model`
@@ -393,6 +520,27 @@ same way on both paths; and `session_id` is the continued session's, so
 every run on one session carries one id and no `resumed` field is added
 (23 §Stats, D256).
 
+On a held session (§Holding a session) there is one entry per
+`prompt()`, with `session_id` the held session's on every one — so the
+entries of one conversation carry one id, as the entries of a
+continued session do. Per entry: `duration_s` is the prompt's, from its
+send to its outcome (on every entry, `run()`'s included, so a one-shot
+run's entry does not count its spawn and handshake); `input_tokens`,
+`output_tokens`, `total_tokens` and `cost` are ACP's per-turn `usage`,
+summed over the prompt and its repair turns, or omitted; `tool_calls`,
+`repair_turns` and `denied_permissions` are the prompt's; `status` and
+`reason` are the prompt's outcome. **The provider's `stats()` is not
+consulted on a held session's prompts**, by the same rule as a
+continued run: a `SessionStatsProvider` reports a *session*, and an
+entry that describes less than the whole session may not carry the
+whole session's numbers (D256). A one-shot `run()` is the whole session,
+and is the only entry that consults the provider. `final_stop_reason()`
+is consulted on every prompt, because every prompt has a final turn.
+**No entry is recorded at exit.** The one-line form is unchanged:
+`[stats] node=talk attempt=1 ok — …, session=01a01646`, one line per
+reply, which is what a reader of a chat's work log expects to see
+under each answer.
+
 ## Testing doubles (`athanore.testing`)
 
 - `MockAgent(output=… | submit=… | log=… | stream=… | fail=…)` — no
@@ -406,7 +554,8 @@ every run on one session carries one id and no `resumed` field is added
   façade; `stats=` takes a value or a zero-argument callable, and `fail=`
   is `True` for a transport failure or one of §Stats entry's reasons.
 - `FakeACPAgent` — a real subprocess speaking ACP over stdio, scriptable
-  (text chunks, tool calls, permission requests, elicitations, usage), so
+  (text chunks, tool calls, permission requests, elicitations, usage, and
+  `prompts` for a session held across several of them, 13 §Fakes), so
   the façade is tested end to end without pi or Claude.
 
 ## User-land adapters (examples, not shipped)

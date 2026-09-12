@@ -10,8 +10,10 @@ not say.
 
 One test per scenario key, plus the handshake, the sessions that survive
 the process (23 §The fake: a second ``RawACPClient`` is the second
-process), and the two failure modes that matter: an unknown key, and a
-scenario that names a shape the vocabulary does not have.
+process), the ``prompts`` that script a session held across several of
+them (23 §A session held open §The fake), and the two failure modes that
+matter: an unknown key, and a scenario that names a shape the vocabulary
+does not have.
 """
 
 from __future__ import annotations
@@ -30,7 +32,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from athanore.testing import FAKE_ACP, ScenarioError, scenario, scenario_file
-from athanore.testing.fake_acp import ENV_MARKER, REJECT_FIRST
+from athanore.testing.fake_acp import ENV_MARKER, REJECT_FIRST, REPAIR_MARKER
 
 TOKEN = "task-token-abc"
 
@@ -981,6 +983,126 @@ async def test_mcp_servers_on_load_are_what_mcp_calls_connects_to(
         user_chunk("do the work"),
         *sent(second),
     ]
+
+
+# --------------------------------------------------------------------------
+# The `prompts` key (23 §A session held open §The fake).
+# --------------------------------------------------------------------------
+
+
+async def test_prompts_script_successive_prompts_in_order_and_repeat_the_last() -> None:
+    """The n-th body prompt runs the n-th script; past the end, the last one."""
+
+    command = scenario(
+        prompts=[{"text": ["one"]}, {"text": ["two"], "tool_calls": 1}],
+    )
+    async with RawACPClient(command) as client:
+        await client.handshake()
+        await client.prompt("first")
+        await client.prompt("second")
+        await client.prompt("third")
+    assert client.texts() == ["one", "two", "two"]
+    assert len(client.chunks("tool_call")) == 2, "one per 'two' turn, none for 'one'"
+
+
+async def test_a_repair_turn_under_prompts_submits_the_prompt_it_follows(
+    task_api: TaskAPI, task_env: dict[str, str]
+) -> None:
+    """19's first words say "repair": the list does not advance, the script
+    the prompt was on posts its `repair_submit`."""
+
+    command = scenario(
+        prompts=[
+            {"text": ["one"]},
+            {"text": ["two"], "repair_submit": {"ok": True}},
+        ]
+    )
+    async with RawACPClient(command, env=task_env) as client:
+        await client.handshake()
+        await client.prompt("first")
+        await client.prompt("second")
+        await client.prompt(f"{REPAIR_MARKER} was received for this task…")
+        assert task_api.submissions == [{"ok": True}]
+        assert client.texts() == ["one", "two"], "a repair turn emits no content"
+        await client.prompt("fourth")
+    assert client.texts() == ["one", "two", "two"], "the repair did not advance"
+    assert task_api.submissions == [{"ok": True}]
+
+
+async def test_without_prompts_the_second_prompt_is_the_repair_script(
+    task_api: TaskAPI, task_env: dict[str, str]
+) -> None:
+    """D122 unchanged: no key, and every prompt after the first is a repair,
+    whatever its text says."""
+
+    command = scenario(text=["one"], repair_submit={"ok": True})
+    async with RawACPClient(command, env=task_env) as client:
+        await client.handshake()
+        await client.prompt("first")
+        await client.prompt("an ordinary second prompt, not the repair text")
+    assert client.texts() == ["one"]
+    assert task_api.submissions == [{"ok": True}]
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [
+        ("sessions", {"dir": "/tmp/x"}),
+        ("advertise_mcp", True),
+        ("config_options", [{"id": "m", "category": "model", "values": ["a"]}]),
+        ("reject_config", ["model"]),
+        ("session_file", {"dir": "/tmp/x"}),
+        ("request_log", "/tmp/x"),
+        ("response_log", "/tmp/x"),
+        ("prompts", [{"text": ["nested"]}]),
+    ],
+)
+def test_a_prompts_element_may_not_carry_a_session_level_key(
+    key: str, value: Any
+) -> None:
+    """A key the process reads before or outside any prompt would do nothing
+    under `prompts`, and a key that does nothing is refused (13 §Fakes)."""
+
+    with pytest.raises(ScenarioError) as caught:
+        scenario(prompts=[{key: value}])
+    assert "prompts[0]" in str(caught.value)
+    assert key in str(caught.value)
+
+
+def test_prompts_may_not_be_empty() -> None:
+    with pytest.raises(ScenarioError, match="at least one"):
+        scenario(prompts=[])
+    with pytest.raises(ScenarioError, match="prompts: expected a list"):
+        scenario(prompts={"text": ["one"]})
+
+
+async def test_prompts_on_a_loaded_session_start_from_the_first_script(
+    tmp_path: Path,
+) -> None:
+    """A second process is a new count: its first prompt runs `prompts[0]`,
+    the rule D257 gives the outer scenario, after the load's replay."""
+
+    directory = tmp_path / "sessions"
+    command = scenario(
+        sessions={"dir": str(directory)},
+        prompts=[{"text": ["one"]}, {"text": ["two"]}],
+    )
+    async with RawACPClient(command) as first:
+        await first.handshake()
+        await first.prompt("first ask")
+        await first.prompt("second ask")
+        session_id = first.session_id
+    assert first.texts() == ["one", "two"]
+    before = read_session(directory, session_id)
+
+    async with RawACPClient(command) as second:
+        await second.initialize()
+        await second.load(session_id)
+        replayed = list(second.updates)
+        await second.prompt("third ask")
+        live = second.updates[len(replayed) :]
+    assert [update["params"]["update"] for update in replayed] == before
+    assert [update["params"]["update"]["content"]["text"] for update in live] == ["one"]
 
 
 # --------------------------------------------------------------------------

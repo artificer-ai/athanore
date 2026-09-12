@@ -39,6 +39,20 @@ turns that follow it (D122). ``sleep_s``, ``stop_reason`` and ``usage``
 belong to a turn rather than to the run, so they apply to every one; and
 a repair turn is what submits ``repair_submit``.
 
+**A session held across several prompts** (23 §The fake, T090). A held
+session's prompts are not repair turns, so ``prompts: [scenario, ...]``
+scripts them: the n-th element scripts the n-th *body* prompt of the
+session and the last one repeats for every prompt past the end of the
+list. Each element is a scenario less the keys the process consumes
+before or outside any prompt (:data:`PROMPT_KEYS`), which stay on the
+outer scenario. On the wire a repair turn and the next prompt are both
+``session/prompt``, so the fake tells them apart by the text: a prompt
+opening with 19 §Repair turn's first words (:data:`REPAIR_MARKER`) is a
+repair of the prompt before it and posts that script's ``repair_submit``;
+anything else is the next prompt and runs the next script's first turn.
+Without the key nothing changes: the second ``session/prompt`` is the
+run's repair turn, as above.
+
 **Sessions that survive the process** (23 §The fake, D257). A continued
 run is a second process, so ``sessions: {dir, resume?: bool}`` puts the
 session on disk. With it, ``initialize`` advertises ``loadSession: true``
@@ -93,8 +107,32 @@ SCENARIO_KEYS = frozenset(
         "advertise_mcp",
         "mcp_calls",
         "sessions",
+        "prompts",
     }
 )
+
+#: What a per-prompt scenario under ``prompts`` may say: a turn's script.
+#: The keys the process consumes before or outside any prompt — the
+#: session's capabilities and options, what is read at
+#: ``session/set_config_option``, what is written at start, the two logs
+#: — belong to the outer scenario and are refused here rather than
+#: silently ignored (13 §Fakes: a key that does nothing is a green test
+#: that asserted nothing).
+PROMPT_KEYS = SCENARIO_KEYS - {
+    "prompts",
+    "sessions",
+    "advertise_mcp",
+    "config_options",
+    "reject_config",
+    "session_file",
+    "request_log",
+    "response_log",
+}
+
+#: The first words of 19 §Repair turn, both texts. Under ``prompts`` a
+#: ``session/prompt`` opening with them is a repair turn of the prompt
+#: before it, not the next prompt of the session.
+REPAIR_MARKER = "Your turn ended, but no valid structured result"
 
 #: The stop reasons a scenario may name (ACP ``StopReason``, the subset 13
 #: fixes). ``end_turn`` is what a turn ends with when nothing says
@@ -153,22 +191,26 @@ class ScenarioError(ValueError):
 # --------------------------------------------------------------------------
 
 
-def validate_scenario(scenario: Any, *, where: str = "scenario") -> dict[str, Any]:
+def validate_scenario(
+    scenario: Any, *, where: str = "scenario", keys: frozenset[str] = SCENARIO_KEYS
+) -> dict[str, Any]:
     """Check ``scenario`` against 13 §Fakes, or raise :exc:`ScenarioError`.
 
     Every key is checked, and so is the shape under it: the elements of
     ``permissions``, the fields of ``usage``, the keys of a
     ``session_file``. A misspelling anywhere in a scenario is a failure
     at the point it is written rather than a run that quietly did less.
+    ``keys`` is the vocabulary allowed here — the whole of it for a
+    scenario, :data:`PROMPT_KEYS` for an element of ``prompts``.
     """
 
     if not isinstance(scenario, dict):
         raise ScenarioError(f"{where}: expected a JSON object, got {_kind(scenario)}")
-    unknown = sorted(key for key in scenario if key not in SCENARIO_KEYS)
+    unknown = sorted(key for key in scenario if key not in keys)
     if unknown:
         raise ScenarioError(
             f"{where}: unknown key(s) {', '.join(unknown)}; "
-            f"the vocabulary is {', '.join(sorted(SCENARIO_KEYS))}"
+            f"the vocabulary is {', '.join(sorted(keys))}"
         )
 
     for key in ("text", "thoughts"):
@@ -197,6 +239,7 @@ def validate_scenario(scenario: Any, *, where: str = "scenario") -> dict[str, An
     _validate_session_file(scenario.get("session_file"), where)
     _validate_mcp_calls(scenario.get("mcp_calls"), where)
     _validate_sessions(scenario.get("sessions"), where)
+    _validate_prompts(scenario.get("prompts"), where)
     return scenario
 
 
@@ -293,6 +336,19 @@ def _validate_sessions(value: Any, where: str) -> None:
         raise ScenarioError(f"{at}.dir: expected a string")
     if "resume" in value and not isinstance(value["resume"], bool):
         raise ScenarioError(f"{at}.resume: expected true or false")
+
+
+def _validate_prompts(value: Any, where: str) -> None:
+    """``prompts`` is a non-empty list of per-prompt scenarios (23 §The fake)."""
+
+    if value is None:
+        return
+    if not isinstance(value, list):
+        raise ScenarioError(f"{where}.prompts: expected a list")
+    if not value:
+        raise ScenarioError(f"{where}.prompts: expected at least one scenario")
+    for index, item in enumerate(value):
+        validate_scenario(item, where=f"{where}.prompts[{index}]", keys=PROMPT_KEYS)
 
 
 def _validate_mcp_calls(value: Any, where: str) -> None:
@@ -465,7 +521,13 @@ class FakeACPAgent:
         self.scenario: dict[str, Any] = dict(scenario)
         self.scenarios_dir = scenarios_dir
         self.session_id = str(uuid.uuid4())
+        #: ``session/prompt``s received, repair turns included.
         self.turn = 0
+        #: Body prompts answered under ``prompts`` — the index into it.
+        self.prompted = 0
+        #: The scenario the current turn is scripted by: the outer one,
+        #: or the ``prompts`` element this prompt (or its repair) is on.
+        self.script: dict[str, Any] = self.scenario
         self.session_file_written = False
         self.mcp_servers: list[dict[str, Any]] = []
         self.config: list[dict[str, Any]] = []
@@ -755,24 +817,37 @@ class FakeACPAgent:
                 return
         turn = self.turn
         self.turn += 1
+        prompts = self.scenario.get("prompts")
+        if prompts is None:
+            # One run, one script: the first turn is content, every later
+            # one a repair (D122).
+            self.script, first = self.scenario, turn == 0
+        elif text.startswith(REPAIR_MARKER) and self.prompted:
+            # A repair of the prompt `self.script` is on; the list stands.
+            first = False
+        else:
+            # The next body prompt: the next script, the last repeating.
+            self.script = prompts[min(self.prompted, len(prompts) - 1)]
+            self.prompted += 1
+            first = True
 
-        sleep_s = self.scenario.get("sleep_s")
+        sleep_s = self.script.get("sleep_s")
         if sleep_s:
             time.sleep(float(sleep_s))
 
         try:
-            if turn == 0:
+            if first:
                 self.first_turn()
-            elif "repair_submit" in self.scenario:
-                self.post("submit", self.scenario["repair_submit"])
+            elif "repair_submit" in self.script:
+                self.post("submit", self.script["repair_submit"])
         except Exception as exc:  # noqa: BLE001 - reported, never swallowed
             self.fail(request_id, -32603, f"{type(exc).__name__}: {exc}")
             return
 
         result: dict[str, Any] = {
-            "stopReason": self.scenario.get("stop_reason", "end_turn")
+            "stopReason": self.script.get("stop_reason", "end_turn")
         }
-        usage = self.scenario.get("usage")
+        usage = self.script.get("usage")
         if usage is not None:
             result["usage"] = _usage(usage)
         self.reply(request_id, result)
@@ -794,29 +869,29 @@ class FakeACPAgent:
         return scenario
 
     def first_turn(self) -> None:
-        """Everything a scenario scripts for the run, once (D122)."""
+        """Everything a script says for one prompt, once (D122, 23 §The fake)."""
 
-        if "log" in self.scenario:
-            self.post("log", {"text": self.scenario["log"]})
-        if "submit" in self.scenario:
-            submissions = self.scenario["submit"]
+        if "log" in self.script:
+            self.post("log", {"text": self.script["log"]})
+        if "submit" in self.script:
+            submissions = self.script["submit"]
             if not isinstance(submissions, list):
                 submissions = [submissions]
             for payload in submissions:
                 self.post("submit", payload)
         self.ask_permissions()
         self.ask_elicitations()
-        for thought in self.scenario.get("thoughts", []):
+        for thought in self.script.get("thoughts", []):
             self.chunk("agent_thought_chunk", thought)
-        for text in self.scenario.get("text", []):
+        for text in self.script.get("text", []):
             self.chunk("agent_message_chunk", text)
-        if self.scenario.get("env_echo"):
+        if self.script.get("env_echo"):
             self.echo_env()
         self.emit_tool_calls()
         self.call_mcp_tools()
 
     def ask_permissions(self) -> None:
-        for index, spec in enumerate(self.scenario.get("permissions", [])):
+        for index, spec in enumerate(self.script.get("permissions", [])):
             if spec == "reject_first":
                 title, options = f"fake tool {index + 1}", list(REJECT_FIRST)
             else:
@@ -837,7 +912,7 @@ class FakeACPAgent:
             )
 
     def ask_elicitations(self) -> None:
-        for index, spec in enumerate(self.scenario.get("elicitations", [])):
+        for index, spec in enumerate(self.script.get("elicitations", [])):
             message = f"fake question {index + 1}"
             if spec.get("mode", "form") == "url":
                 self.request(
@@ -870,7 +945,7 @@ class FakeACPAgent:
         self.chunk("agent_message_chunk", f"{ENV_MARKER}\n{listing}")
 
     def emit_tool_calls(self) -> None:
-        for index, call in enumerate(_tool_calls(self.scenario.get("tool_calls"))):
+        for index, call in enumerate(_tool_calls(self.script.get("tool_calls"))):
             call_id = f"call_{index}"
             start: dict[str, Any] = {
                 "sessionUpdate": "tool_call",
@@ -899,7 +974,7 @@ class FakeACPAgent:
         as tool-call updates, which is the transcript's ``tool_result``.
         """
 
-        calls = self.scenario.get("mcp_calls")
+        calls = self.script.get("mcp_calls")
         if not calls:
             return
         server = next(

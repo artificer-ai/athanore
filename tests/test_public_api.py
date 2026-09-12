@@ -117,6 +117,20 @@ def test_every_name_is_the_object_its_module_defines(name: str) -> None:
     assert getattr(athanore, name) is getattr(import_module(module), attribute)
 
 
+def test_agent_session_is_exported_beside_agent_result() -> None:
+    """What `open()` yields is public (05 §Agent classes, 23 §Surface, T090).
+
+    A body writes `async with Agent().open() as held:` and annotates what
+    it was handed; the name has to be importable from the front door and
+    documented in 02 like every other one, and it has to be the class the
+    façade module defines rather than a copy.
+    """
+
+    assert "AgentSession" in athanore.__all__
+    assert "AgentSession" in documented_surface()
+    assert athanore.AgentSession is import_module("athanore.agents.acp").AgentSession
+
+
 def test_the_version_is_the_distribution_metadata() -> None:
     """It goes on the ACP wire (05 §Session lifecycle), so it is real."""
 
