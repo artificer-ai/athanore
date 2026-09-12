@@ -4319,6 +4319,96 @@ result's `session_id` back, on both ACP methods, with the transcript,
 the counters and the stats entry telling the truth about the attempt;
 05 and 13 say so; gate green; snapshot and client unchanged.
 
+### T090 — `ACPAgent.open()`: a session held open (A9.3)
+
+**Do.** `athanore/agents/acp.py`: split `run()` along 23 §Lifecycle of
+a held session. `open()` returns an async context manager; its entry is
+`_spawn`, `initialize`, `new_session` or the T089 continuation, and
+`_configure`, under `timeout`, with `declare(ctx)` entered for the
+block; on entry failure the child is stopped, one `failed/transport`
+(or `timeout`) entry recorded, `AgentError` raised. It yields an
+`AgentSession` (`session_id`, `prompt()`); `prompt()` is `_prompt`, the
+repair loop and `_outcome` under `timeout`, then a transcript flush and
+`_record` for that prompt — `_entry` built from per-prompt counters
+(`_Session` grows per-prompt fields, or a per-prompt record is opened
+on each call; the whole-session counters `run()` reads today become
+the sum). After a transport failure or a timeout the child is stopped
+and a `closed` reason kept; every later `prompt()` raises `AgentError`
+(`the session is closed: <reason>`); a refusal or truncation leaves it
+open. A concurrent `prompt()` is `RuntimeError`. Exit is `_cleanup`
+with no `_record`. `run()` becomes `async with self.open() as s: return
+await s.prompt(prompt)` and its behaviour is unchanged, including the
+provider's `stats()` on its one entry; a held prompt's entry skips the
+provider as a continued run's does (T089) and consults
+`final_stop_reason` as every entry does. `AgentSession` is exported
+from `athanore.agents` and `athanore` beside `AgentResult`.
+`athanore/testing/fake_acp.py`: the `prompts` key of 23 §The fake (a
+list of per-prompt scenarios, the last repeating; validated like the
+outer scenario less the session-level keys). Fold 23 §A session held
+open into 05 (§Agent classes gains `open()` and `AgentSession`;
+§Session lifecycle gains a §Holding a session subsection assigning
+its seven steps; §Stats entry gains the per-prompt rule) and 13
+(§Fakes gains `prompts`); `docs/site/src/guide/agents.md` gains a
+section with the `async with … open()` loop; the workflows skill and
+the generated reference follow. D264 is already recorded.
+**Tests.** `tests/testing/test_fake_acp.py`: `prompts` scripts
+successive prompts in order and repeats the last; a repair turn after
+the second prompt submits `repair_submit`; without the key the second
+prompt runs the repair script. `tests/agents/test_acp_lifecycle.py`
+(on the fake), the list of 23 §A session held open §Testing: two
+prompts on one `open()` — one `session/new`, two `session/prompt`, one
+child (`returncode` unset between, set after), both replies in the
+transcript in order, two entries with one `session_id` and their own
+`tool_calls`/`duration_s`; `run()` unchanged (one entry, child
+stopped, every existing lifecycle test green); an exception inside the
+block stops the child and records nothing more; a cancelled prompt
+records `failed/cancelled` then the exit stops the child; a transport
+failure on the first prompt raises, stops the child, and the second
+`prompt()` raises `the session is closed`; a refusal on the first
+prompt leaves the second answering; a concurrent `prompt()` is
+`RuntimeError` with one `session/prompt` on the wire; `open()` with
+`session_id=` does `session/load` (or `resume`) once then prompts;
+`FakeStatsProvider.stats()` not called on held prompts and called on
+`run()`, `final_stop_reason` called on every prompt; an `initialize`
+failure raises from `open()` with one `failed/transport` entry and
+the block never entered. `tests/test_public_api.py`: `AgentSession`
+exported.
+**Done.** A body opens an agent once and prompts it as often as it
+likes, with one process for the block, one stats entry per prompt and
+the same cleanup on every exit; `run()` is that with one prompt; 05
+and 13 say so; gate green; snapshot and client unchanged.
+
+### T091 — `chat` as one held session (A9.4)
+
+**Do.** `workflows/chat/__init__.py`: one node, `talk` (start, the
+only node, `retries=0`, `timeout=None`), whose body opens the agent
+once — `ChatAgent(cwd=CHECKOUT, session_id=<the id the work log
+carries, if any>).open()` — writes `session <id>` to the work log
+(author `engine` line, so a re-executed attempt finds it: the last
+such line in the run's log), then loops: `human_input` with the
+opener as the first message, `prompt()`, `reply` line to the work log;
+a stop word returns the transcript as the run's output. `kickoff`,
+`turn`, `wrap`, `MEMORY` and `_assignment`'s pasted history are
+deleted; `ChatAgent.system_prompt` no longer says the conversation is
+in the prompt. The pane (`static/chat.js`) and the three routes are
+unchanged: a message still answers the open request on the run, the
+draft still follows `task.stream`, and the transcript is still the
+work log; `_pending` and `_answering` now find one task in `waiting`
+or `in_progress` rather than the newest of many. The module docstring
+is rewritten to say what the seat now is: the proof 23 §Why names.
+`workflows/__main__.py` unchanged (`talk`, capacity 2 — two replies at
+once, any number of chats, 23 §What the pool slot means).
+**Tests.** None in the gate (`workflows/` is dev machinery; the gate
+lints it). Exercised by hand: a chat of several turns has one task,
+one `[stats]` line per reply, one `session=` on all of them, a reply
+that starts without a container spawn; `/quit` completes the run with
+the transcript; a server restart mid-chat re-executes the attempt,
+replays the answered turns, and the next reply continues the same
+agent session (`continuing session` notice in the new transcript).
+**Done.** Chatting is one active node for the whole conversation, the
+agent is one process for its length, and nothing about the pane, the
+wire or the request channel changed.
+
 ## Traceability
 
 | Doc 16 ticket | Tasks here |
@@ -4334,7 +4424,7 @@ the counters and the stats entry telling the truth about the attempt;
 | A6.1–A6.4 | T074–T079 |
 | A7.1–A7.3 | T080–T082 |
 | A8.1–A8.5 | T083–T087 |
-| A9.1–A9.2 | T088–T089 |
+| A9.1–A9.4 | T088–T091 |
 
 Sequencing changes relative to 16, all recorded in 15 when executed:
 the TUI is not deleted at all in this repository — it never lived here

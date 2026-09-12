@@ -24,14 +24,22 @@ both. The SDK (`agent-client-protocol` 0.12.1) carries both methods on
 `ClientSideConnection`. Nothing here needs an unstable protocol
 feature.
 
-This document gives the façade one argument, `session_id=`, and says
-exactly what a run does with it. [`05-agents.md`](05-agents.md) and
-[`13-testing.md`](13-testing.md) remain the specs for the façade and
-the fake; this document is normative for the behaviour it adds, and
-the tasks that build it (T088, T089) fold the deltas back into those
-documents' affected sections, each pointing here. Where this document
-and one of them disagree afterwards, that is a bug in the fold, not a
-choice.
+This document gives the façade two things. One argument,
+`session_id=`, with which a run continues a session an earlier run
+left behind (§Surface, §Lifecycle of a continued run). And one method,
+`open()`, with which a body holds a session open and prompts it as
+many times as it likes before letting it go (§A session held open).
+The first is memory across runs; the second is one process for the
+length of a conversation. They compose — `open()` on an agent
+constructed with `session_id=` re-opens the old session and holds it —
+and each is useful without the other.
+
+[`05-agents.md`](05-agents.md) and [`13-testing.md`](13-testing.md)
+remain the specs for the façade and the fake; this document is
+normative for the behaviour it adds, and the tasks that build it
+(T088–T090) fold the deltas back into those documents' affected
+sections, each pointing here. Where this document and one of them
+disagree afterwards, that is a bug in the fold, not a choice.
 
 ## Why
 
@@ -59,15 +67,23 @@ and the counters; the stats entry told the truth on a continued
 session; the fake persisting sessions across processes so the whole of
 it is testable in CI.
 
+Also in scope, since 2026-09-12: `open()` on `ACPAgent`, a session held
+open by a body across several prompts (§A session held open, D264).
+T089 delivers `session_id=`; T090 delivers `open()`; T091 rewrites
+the `chat` seat on it, which is the proof §Why asks for.
+
 Out of scope, explicitly:
 
-- **Keeping the subprocess alive between runs.** A run still spawns
-  the adapter and stops it (05 §Session lifecycle step 7). The session
-  persists because the *agent* persists it — pi to its session files,
-  Claude Code to its project directory — and the next run re-opens it.
-  A long-lived adapter process held across `run()` calls would change
-  what a `TaskContext` owns, what cancellation kills and what a pool
-  slot means, and none of that is asked for here (D254).
+- **Keeping the subprocess alive between *runs*.** A `run()` still
+  spawns the adapter and stops it (05 §Session lifecycle step 7). The
+  session persists because the *agent* persists it — pi to its session
+  files, Claude Code to its project directory — and the next run
+  re-opens it. What §A session held open adds is a process held open
+  *within one attempt*, for as long as the body holds it, and D264
+  answers the three questions D254 raised against that: the body owns
+  the process, cancellation kills it, and the pool slot counts an agent
+  *answering*, not an agent alive. A process held across attempts, or
+  across runs, is still out of scope.
 - **Forking, listing, deleting or closing sessions.** ACP has
   `session/fork` (unstable), `session/list`, `session/delete` and
   `session/close`; none is a seam a body has asked for. `session_id`
@@ -232,6 +248,216 @@ the conversation and report success. That is the failure mode this
 whole document exists to remove, and the precedent is 05 §Policies:
 `auto_allow` raises when neither allow kind is offered rather than
 picking something else (D254).
+
+## A session held open
+
+### Why a second seam
+
+`session_id=` gives a body memory across runs, but every run still
+pays for a process: spawn the adapter, `initialize`, open or re-open
+the session, one prompt, stop the adapter. For a pipeline stage that is
+the cost of doing business. For a body that talks to the same agent
+turn after turn it is a few seconds and a cold process on every
+message, in a conversation whose natural unit is *the conversation*.
+
+A body can already hold a conversation open on its own side: it can
+call `human_input` as many times as it likes inside one attempt (06
+§Restart durability numbers the questions), and park on each one with
+its pool slot given back (04 §Waiting). What it cannot do is keep the
+*agent* open between those questions, because `run()` owns the whole
+of 05 §Session lifecycle, its `finally` included. `open()` is that one
+method split in two: the body says when the conversation starts and
+when it ends, and prompts in between.
+
+### Surface
+
+```python
+class ACPAgent(Agent):
+    def open(self) -> AbstractAsyncContextManager[AgentSession]: ...
+
+class AgentSession:
+    session_id: str                                  # once open
+    async def prompt(self, prompt: str = "") -> AgentResult: ...
+```
+
+```python
+async with ChatAgent(cwd=checkout).open() as agent:
+    while True:
+        said = await human_input(ask)                # parks; slot given back
+        if said in STOP_WORDS:
+            return said
+        reply = await agent.prompt(said)             # same process, same session
+```
+
+- `open()` is an async context manager and nothing else: there is no
+  `close()` to forget, and the exit of the block is the end of the
+  session on every path — return, exception, cancellation.
+- `run(prompt)` **is** `async with self.open() as s: return await
+  s.prompt(prompt)`. One code path; the one-shot form is the held form
+  with one prompt, and 05 §Session lifecycle is unchanged for it.
+- `prompt()` takes the assignment text and returns an `AgentResult`,
+  exactly as `run()` does. The assembly of 19 applies to every prompt:
+  `system_prompt` is sent by the adapter per session, and the
+  assignment, task block and tier block are the prompt's. A body that
+  wants a shorter second prompt writes a shorter assignment; the façade
+  does not edit what it is given.
+- On an agent constructed with `session_id=`, `open()` continues that
+  session (§Lifecycle of a continued run, step 2) and holds it.
+- `AgentSession.session_id` is the id the agent gave, or the one
+  continued, available from the moment the block is entered. It is the
+  one thing a body should write down — to the work log, or into what it
+  returns — because it is what a re-executed attempt hands back as
+  `session_id=` (§Lifecycle of a held session, step 6).
+
+### Lifecycle of a held session
+
+05 §Session lifecycle, with the seven steps assigned to the block's
+entry, to each prompt, and to the block's exit.
+
+1. **Entry**: spawn (05 step 1), `initialize`, `session/new` — or
+   `session/resume` / `session/load` when constructed with
+   `session_id=` (§Lifecycle of a continued run, step 2) — and the
+   config options set by category (05 step 2). `output_model` and
+   `ask_policy` are declared on the `TaskContext` for the length of the
+   block (05 step 3): the class is the configuration, and one class
+   holds one session. The whole of entry runs under `timeout` (05
+   step 4), because a handshake that never answers must not hang the
+   body; on any failure the child is stopped, one stats entry is
+   recorded `failed/transport` (or `timeout`), and `AgentError` leaves
+   `open()` — the block is never entered.
+2. **Each `prompt()`**: prompt under `timeout`, the repair loop, the
+   outcome (05 steps 4–6), all as `run()` does them today; the repair
+   turns are on the held session, as they are on any. `timeout` bounds
+   *one prompt and its repairs*, as it bounds one run today; nothing in
+   the façade bounds the block, and nothing should — a chat idles for
+   hours by design. The node's own `timeout` is the bound on the whole
+   session, and 04 §Timeouts already pauses it while the task is
+   `waiting`, which is exactly the time a chat spends parked on a
+   person.
+3. **After each `prompt()`**: the transcript is flushed and **one stats
+   entry is recorded** for that prompt (§Stats of a held session). The
+   result returned is the prompt's, and it carries `session_id`.
+4. **A prompt that fails ends the session's usefulness, not the
+   block.** `AgentError` (a transport failure, a timeout) and the failed
+   `AgentResult`s (refusal, cancellation, truncation) are raised or
+   returned from `prompt()` exactly as from `run()`. After a transport
+   failure or a timeout the child is stopped at once and every later
+   `prompt()` raises `AgentError` — `the session is closed: <the
+   reason>` — until the block exits; a refusal or a truncated turn
+   leaves the session open, because the process is fine and the body
+   may have something to say about it. A body that wants to carry on
+   after a dead session opens a new block; it does not get a new
+   process behind its back.
+5. **Exit**: flush the transcript, close the connection, stop the
+   child under `KILL_AFTER` (05 step 7). **No stats entry** is recorded
+   at exit: every prompt already recorded its own, and an exit after
+   zero prompts recorded none, because nothing was asked. The steps are
+   guarded on their own, as 05 says, and run on every path — the
+   `finally` of the block, so a body's exception, a node timeout and a
+   cancellation all reach them. A prompt in flight when the body is
+   cancelled records its entry `failed/cancelled` (or `shutdown`, on an
+   engine stop) as it does today, and then the exit runs.
+6. **After a crash**, the attempt re-executes from its first line
+   (D6): the block is entered again, and the `human_input`s already
+   answered replay their answers by ordinal (06 §Restart durability),
+   so the body reaches the first unanswered question at once. The
+   session is a fresh one unless the body constructs the agent with
+   the `session_id` it wrote down (§Surface) — which is the composition
+   this document exists for, and the reason `session_id` is written to
+   the work log by any body that holds a session for long.
+
+One prompt at a time: a second `prompt()` while one is in flight is a
+programming error and raises `RuntimeError` before touching the wire.
+A session is not shared between tasks: it is opened inside one attempt
+and dies with it, and the `TaskContext` it declared on is that
+attempt's.
+
+### What the pool slot means
+
+While a held session is parked on a `human_input`, the body holds no
+slot (04 §Waiting) and the agent process is alive and idle. The pool
+therefore caps agents *answering*, not agents *alive* — a `talk` pool
+of 2 is two replies being generated at once, over any number of open
+chats. That is the change D254 named and this document accepts
+(D264): an idle adapter costs memory and a container, and a
+conversation that had to give its process up on every question would
+be the thing §Why describes. An operator who wants to cap live
+processes caps runs, which is what `position` and the run list are
+for.
+
+### Stats of a held session
+
+One entry per `prompt()`, the entry of 05 §Stats entry, with
+`session_id` the held session's on every one — so the entries of one
+conversation carry one id, as the entries of a continued session do
+(§Stats). Per entry: `duration_s` is the prompt's, from its send to
+its outcome; `input_tokens`, `output_tokens`, `total_tokens` and
+`cost` are ACP's per-turn `usage`, or omitted; `tool_calls` and
+`repair_turns` are the prompt's; `status` and `reason` are the
+prompt's outcome.
+
+**The provider's `stats()` is not consulted on a held session's
+prompts.** The rule is the one §Stats gives: a `SessionStatsProvider`
+reports a *session*, and an entry that describes less than the whole
+session may not carry the whole session's numbers (01 §Design
+principles, D256). A one-shot `run()` is the whole session, and is the
+only entry that consults the provider. `final_stop_reason()` is
+consulted on every prompt, because every prompt has a final turn.
+
+The one-line form is unchanged: `[stats] node=talk attempt=1 ok — …,
+session=01a01646`, one line per reply, which is what a reader of a
+chat's work log expects to see under each answer.
+
+### The fake
+
+A scenario scripts one run (13 §Fakes, D122): content on the first
+prompt, `repair_submit` on the prompts after it. A held session's
+prompts are not repair turns, so the fake gains one key:
+
+- `prompts: [scenario, ...]` — a list of scenarios, the **n-th of which
+  scripts the n-th `session/prompt`** of the session, with the last one
+  repeating for every prompt past the end of the list. Each is a
+  scenario as 13 describes, less `sessions`, `advertise_mcp` and
+  `config_options` (which belong to the session, and are read from the
+  outer scenario). Repair turns still submit `repair_submit` and
+  nothing else, whichever prompt they follow. Without the key, a held
+  session's second prompt runs the run's repair script, which is what
+  today's rule says and what a test of `run()` still relies on.
+
+### Testing
+
+Per 13 §Pyramid:
+
+- **Fake** (`tests/testing/test_fake_acp.py`): `prompts` scripts
+  successive prompts of one session in order and repeats the last;
+  a repair turn after the second prompt submits `repair_submit`;
+  without the key the second prompt is the repair script.
+- **Façade** (`tests/agents/test_acp_lifecycle.py`, on the fake):
+  `open()` then two `prompt()`s — one `session/new` and two
+  `session/prompt` in the fake's `request_log`, one child spawned
+  (`returncode` unset between the prompts, set after the block), the
+  transcript carrying both replies in order, two stats entries with
+  one `session_id` and each prompt's own `tool_calls` and
+  `duration_s`; `run()` still records exactly one entry and stops the
+  child, and the existing lifecycle tests are unchanged. Exit on an
+  exception inside the block stops the child and records no extra
+  entry. A prompt cancelled mid-turn records `failed/cancelled` and
+  the exit stops the child. A transport failure on the first prompt:
+  `AgentError`, the child stopped, the second `prompt()` raising `the
+  session is closed`. A refusal on the first prompt: the second
+  `prompt()` still answers. A second `prompt()` while one is in
+  flight: `RuntimeError`, one `session/prompt` on the wire. `open()`
+  on an agent with `session_id=`: `session/load` (or `resume`) once,
+  then the prompts. The provider's `stats()` not called on any held
+  prompt, called on a one-shot `run()`; `final_stop_reason` called on
+  every prompt. Entry failure — an agent whose `initialize` fails —
+  raises from `open()` with one `failed/transport` entry and the
+  block never entered.
+- **The seat** (`workflows/chat`, T091): not tested by the gate
+  (workflows are dev machinery), but the pane's own tests, if any,
+  keep passing: nothing on the wire changes.
+
+`tests/snapshots/openapi.json` and `web/src/api/gen/` are unchanged.
 
 ## Stats
 

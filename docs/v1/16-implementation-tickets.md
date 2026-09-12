@@ -139,14 +139,17 @@ ticket leaves `tests/snapshots/openapi.json` byte-identical.
 ## Epic 9 — Post-1.0: session continuity
 
 The third post-1.0 phase, specified by 23 and appended to the serial
-plan as Phase 9 (T088–T089), one task per ticket. Façade and fake only:
-no ticket here may change the engine, the store or the wire contract,
-and `tests/snapshots/openapi.json` stays byte-identical throughout.
+plan as Phase 9 (T088–T091), one task per ticket. Façade, fake and the
+`chat` seat only: no ticket here may change the engine, the store or
+the wire contract, and `tests/snapshots/openapi.json` stays
+byte-identical throughout.
 
 | Id | Ticket | Size | Spec | Depends |
 |---|---|---|---|---|
 | A9.1 | `FakeACPAgent` persists sessions across processes: the `sessions: {dir, resume?}` scenario key, `loadSession` and `sessionCapabilities.resume` advertised from it, the session file as the verbatim list of updates sent plus one `user_message_chunk` per prompt, `session/load` replaying it, `session/resume` not, `-32602` on an unknown id, `-32601` on an unadvertised method | S | 23 §The fake, §Testing, D257 | |
 | A9.2 | `ACPAgent(session_id=)`: `session/resume` when advertised, else `session/load` with the replay discarded from the transcript and the counters, else `AgentError` before any prompt; the `continuing session` notice; config options set on the continued session; the provider's `stats()` not consulted on a continued run; 05 and 13 folded, the site guide and the workflows skill told | M | 23 §Surface, §Lifecycle of a continued run, §Stats, D254–D256, D258 | A9.1 |
+| A9.3 | `ACPAgent.open()`: a session held open across several `prompt()`s inside one attempt — `run()` becomes `open()` + one prompt; entry, per-prompt and exit steps of 05's lifecycle assigned per 23 §Lifecycle of a held session; one stats entry per prompt, none at exit, the provider's `stats()` not consulted on a held prompt; a dead session's later prompts refused; the fake's `prompts` key; 05 and 13 folded, the site guide told | M | 23 §A session held open, D264 | A9.2 |
+| A9.4 | `workflows/chat` as one held session: a single `talk` node that loops `human_input` and `prompt()` on one open agent and returns on a stop word; `session_id` written to the work log and handed back on re-execution; `MEMORY` and the pasted history gone; the pane unchanged | S | 23 §A session held open, §Why, D264 | A9.3 |
 
 ## Cross-cutting decisions still open (15 §Open questions)
 
