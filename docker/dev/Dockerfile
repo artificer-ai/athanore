@@ -106,6 +106,7 @@ RUN if [ "$WITH_BROWSERS" = "1" ]; then \
     fi
 
 RUN mkdir -p /home/agent/venv \
+             /home/agent/venvs \
              /home/agent/.cache/uv \
              /home/agent/.local/share/pnpm/store \
              /home/agent/.claude \

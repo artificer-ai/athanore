@@ -68,3 +68,8 @@ docs/site/build/
 # refuses a dirty checkout with `git status --porcelain`, which counts
 # untracked files but never ignored ones.
 TODO.md
+
+# Git worktrees the `feature` and `quick` workflows build in, one per run
+# (`workflows/feature/sandbox.py`). Inside the checkout so the container's
+# bind mount carries them; a merged run removes its own.
+/.worktrees/
