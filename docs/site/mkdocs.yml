@@ -101,8 +101,8 @@ nav:
       - Asking a human: guide/human-in-the-loop.md
       - Runs, retries and capacity: guide/runs.md
       - Writing a plugin: guide/plugins.md
-      - The command line: guide/cli.md
-      - Driving the API: guide/http-api.md
+      - Using the command line: guide/cli.md
+      - Using the HTTP API: guide/http-api.md
       - Deployment: guide/deployment.md
   - Reference:
       - Python API: reference/python-api.md

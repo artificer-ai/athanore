@@ -5,7 +5,7 @@ asking a question, an agent asking permission to run a tool, and an agent
 asking for structured input are all the same row, answerable from the
 same places, and durable across a restart.
 
-## From a node body
+## Asking from a node body
 
 ```python
 from athanore import Workflow, human_input
@@ -50,23 +50,23 @@ Three shapes, and the argument you pass decides which:
 then decides what that means. Without one, the request waits
 indefinitely, which is usually what you want.
 
-## Waiting gives the slot back
+## Waiting releases the worker slot
 
 This is the part that matters for throughput. While a node is parked on
 `human_input` the task is marked as waiting and its worker slot goes back
 to the pool, so other runs keep moving. When you answer, the task joins
-the front of that pool's queue — it is mid-execution and holding state,
-and it already queued once — and the body resumes where it stopped.
+the front of that pool's queue, because it is mid-execution, holding
+state, and already queued once. The body resumes where it stopped.
 
 The node's own timeout clock is paused for the duration. A person taking
 a day does not fail an attempt budgeted for ten minutes of agent work. To
 bound the wait itself, pass `timeout=` to `human_input`.
 
-Agent-side waits are different: a permission prompt or an elicitation
-keeps the slot, because the agent process is alive and holding
-inference-adjacent resources.
+Agent-side waits are different. A permission prompt or an elicitation
+keeps the slot, because the agent process is alive and holding an open
+model session.
 
-## From an agent
+## Requests an agent opens
 
 Two of the three producers are the agent's, and neither needs anything in
 your body:
@@ -86,7 +86,7 @@ Whichever the producer, the answer is a *value*. A node's answer feeds
 deterministic Python that routes; an agent's answer feeds a
 probabilistic process mid-turn. Neither can move the graph.
 
-## Answering
+## Answering a request
 
 From the browser, open requests appear in an inbox, and the run that owns
 one is marked. A request on the task you are watching gets a panel under
@@ -104,9 +104,9 @@ athanore deny 13             # ...or refuse
 ```
 
 `answer` reads its argument against the request's mode, which is the one
-fact that is not a guess: a form request takes JSON that parses as an
+fact that is not a guess. A form request takes JSON that parses as an
 object, an options request takes an option, and a text request takes the
-characters you typed — so an answer that happens to look like JSON still
+characters you typed, so an answer that happens to look like JSON still
 reaches a text question as the string it is.
 
 Request ids are unique across runs, so the run id is never needed to
@@ -119,7 +119,7 @@ waiter that opened it. There is no queue of untargeted answers and no
 first-come ordering to reason about.
 
 If the server restarts while a run is parked, the task is reset to ready
-and the body re-executes; when it reaches the same `human_input` call it
+and the body re-executes. When it reaches the same `human_input` call it
 finds the request it opened last time and takes the stored answer, or
 parks again. It does not ask twice.
 
@@ -128,6 +128,6 @@ the run to be resumed, as they would anyway.
 
 ## Next
 
-- [Runs, retries and capacity](runs.md) — what the pool is doing with
+- [Runs, retries and capacity](runs.md): what the pool is doing with
   that slot.
-- [The command line](cli.md) — the answering verbs in full.
+- [Using the command line](cli.md): the answering verbs in full.

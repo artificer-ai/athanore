@@ -39,4 +39,4 @@ Adds to `Agent`, and inherits the three above.
 - `stop_reason: str | None = None`
 - `error: str | None = None`
 - `stats: dict[str, Any] = dict()`
-- `ok` — property: Whether the run completed. ``status="failed"`` is not an error.
+- `ok`: property. Whether the run completed. ``status="failed"`` is not an error.

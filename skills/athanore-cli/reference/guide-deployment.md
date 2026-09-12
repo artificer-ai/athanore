@@ -34,14 +34,14 @@ chat = { target = "workflows/chat.py:wf" }
 ```
 
 A `[workflows.<name>]` row with a `pool` binds a workflow that arrives
-some other way; one with a `target` is a registration in its own right —
+some other way. One with a `target` is a registration in its own right:
 `athanore serve` loads it after the targets on its command line and
 before the installed packages' entry points, and a registration made
 while serving with `persist` is written here as exactly such a row, the
 rest of the file kept as it was.
 
 An unknown top-level key is an error at startup rather than a default
-quietly taken — a typo in a capacity setting is worth stopping for. Two
+quietly taken. A typo in a capacity setting is worth stopping for. Two
 settings are refused in the file entirely: the operator token, because it
 is a secret, and the agent command override, because it is a test hook.
 
@@ -63,9 +63,9 @@ that never binds a network never sees a login screen.
 ## Behind a reverse proxy
 
 There is no built-in TLS. Terminate it in a proxy, keep the application
-bound to loopback, and set `require_token` — because "loopback means
-trusted" would otherwise expose the API through the proxy with no
-credential at all.
+bound to loopback, and set `require_token`. Without it, "loopback means
+trusted" would expose the API through the proxy with no credential at
+all.
 
 Two more settings make that work: `public_url`, which is what agents and
 plugins are told to call back on, and `forwarded_allow_ips`, which is
@@ -113,15 +113,15 @@ there, and a destination that already exists.
 ## Retention
 
 A background job prunes on an hourly tick. Agent transcript chunks for
-finished tasks are dropped after `stream_days` — the work log keeps the
-deliverables, and the transcript is diagnostic — and events after
-`events_days`, except run-level lifecycle events, which are kept for as
-long as the run is. Deleting a run deletes everything under it.
+finished tasks are dropped after `stream_days`, since the work log keeps
+the deliverables and the transcript is diagnostic. Events are dropped
+after `events_days`, except run-level lifecycle events, which are kept
+for as long as the run is. Deleting a run deletes everything under it.
 
 ## Running agents in containers
 
-Containerising anything that executes code is the recommended posture,
-and it needs nothing from Athanore: an agent's `command` is a command
+Containerising anything that executes code is the recommended practice,
+and it needs nothing from Athanore. An agent's `command` is a command
 line, so it can be `docker run` as easily as `npx`.
 
 ```python
@@ -143,7 +143,7 @@ is spawned; `env` adds what you want, and `env_allowlist` switches to
 allowing nothing by default. Its working directory is yours to choose,
 and the engine never writes there.
 
-## Hygiene
+## Secrets and logging
 
 - The database file and the token file are owner-only. `athanore token
   show` prints the effective token and where it came from.
@@ -154,14 +154,15 @@ and the engine never writes there.
 - Pin agent adapter versions rather than floating them. An agent command
   is code you chose to run.
 
-## What is not built
+## Not in this version
 
 Built-in TLS, rate limiting and multi-user authentication are not in this
-version. The first two are a proxy's job for now; the third is a single
-seam — the dependency that resolves who is calling — when it is wanted.
+version. The first two are a proxy's job for now. The third would be one
+change, to the dependency that resolves who is calling, when it is
+wanted.
 
 ## Next
 
-- [Settings](settings.md) — every setting, generated from
+- [Settings](settings.md): every setting, generated from
   the model.
-- [The command line](guide-cli.md) — the database and token verbs.
+- [Using the command line](guide-cli.md): the database and token verbs.

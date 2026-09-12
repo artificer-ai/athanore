@@ -176,7 +176,7 @@ def _python_api() -> str:
     return _page(
         "# Python API",
         [
-            "Every name `athanore` exports — what a workflow module imports.",
+            "Every name `athanore` exports, which is what a workflow module imports.",
             "Generated from `athanore.__all__`, with the file each name is",
             "defined in, its signature, and the first line of its docstring.",
         ],
@@ -219,7 +219,7 @@ def _events() -> str:
             "groups them, with the fields of the payload each one carries. A",
             "`?` marks a field that is absent rather than null when it has no",
             "value. These are the `event:` names on the SSE stream described in",
-            "[Driving the API](../guide/http-api.md).",
+            "[Using the HTTP API](../guide/http-api.md).",
         ],
         reference.events(),
     )
@@ -259,7 +259,7 @@ def _cli() -> str:
         [
             "Every `athanore` command, its arguments and its options, walked",
             "off the command tree itself. What the verbs are for, and how one",
-            "reaches a server, is in [The command line](../guide/cli.md).",
+            "reaches a server, is in [Using the command line](../guide/cli.md).",
         ],
         reference.commands(),
     )
@@ -272,7 +272,7 @@ def _errors() -> str:
             "The stable `code` an error body carries. It is what a client",
             "branches on, so it outlives any wording change to the human",
             "`error` message beside it. The shape both live in is in",
-            "[Driving the API](../guide/http-api.md).",
+            "[Using the HTTP API](../guide/http-api.md).",
         ],
         reference.error_codes(),
     )
@@ -355,7 +355,7 @@ def _body(operation: dict[str, Any]) -> list[str]:
     for media, entry in sorted(body.get("content", {}).items()):
         required = " (required)" if body.get("required") else ""
         lines.append(
-            f"**Request body**{required} — `{media}`, {_type_of(entry.get('schema'))}"
+            f"**Request body**{required}: `{media}`, {_type_of(entry.get('schema'))}"
         )
         lines.append("")
     return lines
@@ -469,7 +469,7 @@ def _http_api() -> str:
             "requires: `operator` is the operator token (or nothing at all on a",
             "loopback bind), `task` is the per-task token an agent is given.",
             "How to authenticate, read the event stream and generate a client",
-            "is in [Driving the API](../guide/http-api.md).",
+            "is in [Using the HTTP API](../guide/http-api.md).",
         ],
         [
             *reference.route_table(),
@@ -525,7 +525,7 @@ def _settings_rows(model: type[Any], *, prefix: str) -> list[str]:
         "|---|---|---|---|---|---|",
     ]
     for name, field in model.model_fields.items():
-        env = f"`{prefix}{name.upper()}`" if prefix else "—"
+        env = f"`{prefix}{name.upper()}`" if prefix else "*none*"
         key = "*refused*" if name in _REFUSED else f"`{name}`"
         lines.append(
             f"| `{name}` | {env} | {key} | {_annotation(field)} "

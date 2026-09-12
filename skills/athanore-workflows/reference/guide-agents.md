@@ -45,24 +45,25 @@ async def rework():
     ...
 ```
 
-Everything a subclass can set — on `Agent`, on `ACPAgent`, and the fields
-of the result a run returns — is in [Agents](agents.md).
+Everything a subclass can set, on `Agent` and on `ACPAgent`, and the
+fields of the result a run returns, are in
+[Agents](agents.md).
 
 ## The engine never sees the agent
 
 A node body awaits an agent the way it would await anything else. The
 engine treats the body as an opaque coroutine; it does not know agents
-exist. That is what keeps the failure story simple: an agent that goes
-wrong is an exception or a result your body inspects, and the engine's
-retry policy applies to the attempt, not to the agent.
+exist. That keeps the failure story simple. An agent that goes wrong is
+an exception or a result your body inspects, and the engine's retry
+policy applies to the attempt, not to the agent.
 
 ## Prompts are inlined text
 
 `system_prompt` is a Python string on the class. There is no template
-language and no prompt directory. What the agent actually receives is
-that string, then your `run()` argument as the assignment, then a task
-block the façade adds: which task this is, which node of which workflow,
-which run — and how to reach its own task.
+language and no prompt directory. What the agent receives is that
+string, then your `run()` argument as the assignment, then a task block
+the façade adds: which task this is, which node of which workflow, which
+run, and how to reach its own task.
 
 Sections with nothing to say are left out, so an agent with no
 `system_prompt` opens on its assignment.
@@ -70,7 +71,7 @@ Sections with nothing to say are left out, so an agent with no
 ## Structured submissions
 
 `output_model` is the contract. Declare a pydantic model and the agent is
-told to submit an object of that shape; the API validates what arrives
+told to submit an object of that shape. The API validates what arrives
 and refuses anything else with the errors and the schema, which the agent
 can read and fix inside the same turn. Only valid payloads are stored,
 the latest valid one wins, and the history is kept.
@@ -84,10 +85,10 @@ node, or reopen a run. It answers; your body routes.
 
 ## How an agent reaches its task
 
-An agent needs four things: read its task, append to the work log, submit
-a result, and — if you turned it on — ask you a question. Those are one
-HTTP surface, reached through whichever of three adapters the agent can
-use:
+An agent needs four things: to read its task, append to the work log,
+submit a result, and, if you turned it on, ask you a question. Those are
+one set of HTTP endpoints, reached through whichever of three adapters
+the agent can use:
 
 - **MCP**, when the agent advertises an HTTP MCP client. The façade hands
   it an in-process MCP server, and `submit_result`'s input schema *is*
@@ -103,14 +104,14 @@ use:
 the first two the token never appears in prompt text, and so never
 reaches the model provider.
 
-## Results, and what raises
+## Results and exceptions
 
 `run()` returns a result rather than raising for outcomes your body might
 reasonably route around. A refusal, a cancellation or a truncated turn
 come back as a failed result with `error` set, so a body can decide;
-`result.ok` is the short form of asking. The common shape is exactly the
-one above: convert it to `NonRetryable` if you know a retry is pointless,
-or return a different edge if you would rather route around it.
+`result.ok` is the short form of asking. The common shape is the one
+above: convert it to `NonRetryable` if you know a retry is pointless, or
+return a different edge if you would rather route around it.
 
 Timeouts, transport failures and a missing or invalid submission raise
 `AgentError`. Both paths record a statistics entry.
@@ -131,7 +132,7 @@ These waits do *not* release the worker slot: the agent process is alive
 and holding resources. Only a node's own `human_input` does that.
 
 `ask_policy="http"` is off by default and lets an agent ask you a
-question directly. Leave it off for anything unattended — a chatty model
+question directly. Leave it off for anything unattended. A chatty model
 can stall a pipeline that had nobody watching it.
 
 ## Statistics
@@ -139,11 +140,11 @@ can stall a pipeline that had nobody watching it.
 One entry is recorded per run, on every exit path, as a `[stats]` line in
 the work log and an event on the stream: the node and attempt, the
 outcome, the model the provider reported, input and output tokens, tool
-calls, cost, duration, session id, and — when they happened — repair
+calls, cost, duration, session id, and, when they happened, repair
 turns and denied permissions.
 
 Fields that cannot be determined are left out. Nothing is estimated and
-nothing is zero-filled: an absent token count means the provider did not
+nothing is zero-filled. An absent token count means the provider did not
 report one, which is a different fact from zero.
 
 ## Testing without a model
@@ -190,7 +191,7 @@ scripted by closing over a counter. `StatsMockAgent` records a
 statistics entry the way the real façade does.
 
 For the tests that *are* about the wire, `scenario()` scripts
-`fake_acp.py` — a real subprocess speaking the protocol over stdio — and
+`fake_acp.py`, a real subprocess speaking the protocol over stdio, and
 returns the `command` an `ACPAgent` runs, down to text chunks, tool
 calls, permission requests, elicitations and usage. Setting
 `agent_command` (the `ATHANORE_AGENT_COMMAND` environment variable)
@@ -218,12 +219,12 @@ class SandboxedAgent(ACPAgent):
     permission_policy = "auto_allow"
 ```
 
-Pin the adapter version rather than floating it: an agent command is code
+Pin the adapter version rather than floating it. An agent command is code
 you are choosing to run.
 
 ## Next
 
-- [Asking a human](guide-human-in-the-loop.md) — the request object these
+- [Asking a human](guide-human-in-the-loop.md): the request object these
   policies open.
-- [Agents](agents.md) — every attribute and every field,
+- [Agents](agents.md): every attribute and every field,
   generated from the code.

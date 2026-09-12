@@ -3,7 +3,7 @@
 A two-node workflow, end to end: written, served, submitted, answered
 and read back. It uses no agent, so it runs with nothing configured.
 
-## Write it
+## Write the workflow
 
 Save this as `hello.py`:
 
@@ -27,7 +27,7 @@ async def shout(*, name):
 Two things are happening, and they are rules 1 and 2.
 
 `greet` takes one positional parameter, `shout`, so `shout` is the one
-node `greet` can hand work to — that is the edge. What arrives in the
+node `greet` can hand work to. That is the edge. What arrives in the
 body is an edge reference, and calling it (`shout(name)`) returns a
 transition that carries `name` as the next node's payload.
 
@@ -39,18 +39,18 @@ dictionary it returns becomes the run's output.
 gives its worker slot back, so a run stopped on a question does not hold
 the server.
 
-## Serve it
+## Serve the workflow
 
 ```sh
 athanore serve hello.py:wf
 ```
 
-That prints a URL — `http://127.0.0.1:4002` by default. The browser
+That prints a URL, `http://127.0.0.1:4002` by default. The browser
 interface and the HTTP API are both there, the database is
 `athanore.db` in the current directory, and the bind is loopback, so
 there is no token and no login.
 
-## Drive it from a terminal
+## Drive the run from a terminal
 
 In a second shell:
 
@@ -66,23 +66,24 @@ athanore show <run>                 # output: {'greeting': 'HELLO WORLD'}
 requests` shows the question. Answering it wakes the body, `greet`
 returns `shout("world")`, `shout` runs and the run completes.
 
-`--json` is a global flag — it goes before the verb, like `--url` and
-`--token` — and every read verb honours it, so this composes with `jq`:
+`--json` is a global flag. It goes before the verb, like `--url` and
+`--token`, and every read verb honours it, so the command line composes
+with `jq`:
 
 ```sh
 athanore --json ls | jq '.[] | {id, status, node}'
 ```
 
-## ...or from the browser
+## Drive the run from the browser
 
 Open `http://127.0.0.1:4002`. Press `Ctrl-P` (or `⌘P`) for the command
-palette and submit a run from there; the question appears in the inbox and can be
-answered in place. The run's graph, its work log, its events and any
-agent transcript are all on the run's page.
+palette and submit a run from there. The question appears in the inbox
+and can be answered in place. The run's graph, its work log, its events
+and any agent transcript are all on the run's page.
 
 ## Add an agent
 
-A node that dispatches an agent is the same shape. An agent is a class
+A node that dispatches an agent has the same shape. An agent is a class
 that carries its own configuration and its own prompt as inlined text,
 and `output_model` is what turns its answer into a validated Python
 object:
@@ -130,9 +131,9 @@ it. The agent cannot move the task, and the branch that gets taken is the
 
 ## Next
 
-- [Writing a workflow](guide/workflows.md) — routing in full, fan-out,
+- [Writing a workflow](guide/workflows.md): routing in full, fan-out,
   joins and loop-backs.
-- [Dispatching agents](guide/agents.md) — prompts, submissions, repair
+- [Dispatching agents](guide/agents.md): prompts, submissions, repair
   turns, policies and stats.
-- [The command line](guide/cli.md) — every verb, and how one finds a
-  server.
+- [Using the command line](guide/cli.md): every verb, and how one finds
+  a server.

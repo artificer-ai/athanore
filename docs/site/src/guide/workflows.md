@@ -36,13 +36,13 @@ A node's positional parameters name the nodes it can hand work to. There
 is no separate edge declaration, and there is no way for the graph and
 the code to disagree, because they are the same text.
 
-The payload slot is the exception. A keyword-only parameter — the first
-one after `*` — receives whatever the previous node sent, rather than
-being an edge. (If the signature uses a `/`, the first parameter after
-it is the payload instead.) `*args` and `**kwargs` are rejected.
+The payload slot is the exception. A keyword-only parameter, the first
+one after `*`, receives whatever the previous node sent, rather than
+being an edge. If the signature uses a `/`, the first parameter after
+it is the payload instead. `*args` and `**kwargs` are rejected.
 
 Exactly one node is `start=True`. The graph is checked once, when the
-workflow is registered: a missing or duplicated start node, an edge
+workflow is registered. A missing or duplicated start node, an edge
 naming a node that does not exist, a duplicate node name, a node nothing
 can reach from the start, or a workflow name that is not a Python
 identifier all raise `GraphError` there rather than mid-run.
@@ -81,7 +81,7 @@ The forms, in short:
   each;
 - an empty list or tuple ends this branch, whatever edges the node
   declares;
-- anything else, from a node with no edges, ends the branch — and when it
+- anything else, from a node with no edges, ends the branch, and when it
   is the last branch, that value is the run's output;
 - anything else, from a node with exactly one edge, goes along it as the
   next node's payload;
@@ -96,9 +96,9 @@ model or a dataclass arrives as a dictionary.
 Raising is how a body says the attempt failed. The exception *type*
 picks between the two policies the engine has:
 
-- `GraphError` — routing to an edge that was never declared, or an
-  ambiguous plain return — dead-letters immediately. Retrying reproduces
-  a code defect.
+- `GraphError`, raised for routing to an edge that was never declared or
+  for an ambiguous plain return, dead-letters immediately. Retrying
+  would reproduce a code defect.
 - `NonRetryable`, which your body raises deliberately, dead-letters
   immediately too. Use it when you already know a second attempt cannot
   help: a refusal, a hard validation failure.
@@ -118,12 +118,12 @@ and description the graph view shows. The exact names, types and
 defaults are in [Node options](../reference/node-options.md).
 
 `timeout` is a cap on one attempt of the *body*, and its clock stops
-while the task is waiting on a person — a human taking a day should not
+while the task is waiting on a person. A human taking a day should not
 fail an attempt budgeted for ten minutes of agent time. An agent has a
 timeout of its own, which does count the wait, because the agent process
 is alive throughout.
 
-## Fanning out, and joining back
+## Fan-out and join
 
 Returning a list of transitions splits the work:
 
@@ -151,13 +151,13 @@ async def release(*, results):
 
 A node declared `join=True` closes a fan-out. It dispatches once, after
 every branch has transitioned into it, and its payload slot receives one
-entry per branch in fan-out order — each with the branch's index, the
-payload that identified it, the value that arrived and the task it came
-from. A join node has to declare a payload slot; one that does not is
-rejected when the graph is checked.
+entry per branch in fan-out order. Each entry carries the branch's
+index, the payload that identified it, the value that arrived and the
+task it came from. A join node has to declare a payload slot; one that
+does not is rejected when the graph is checked.
 
 A join waits for every branch. There is no timeout on one and no
-"first N of M": a branch that is stuck is an operator problem, and retry,
+"first N of M". A branch that is stuck is an operator problem, and retry,
 move and cancel are the tools for it. If a run ends up with nothing to
 do and a join that only partly arrived, that is reported as a failure
 naming the join and the count, not as a completion.
@@ -165,16 +165,16 @@ naming the join and the count, not as a completion.
 Branches nest. A branch that fans out again pushes another frame, and an
 inner join closes the inner fan-out first.
 
-## Output
+## Run output
 
 A run completes when its last branch lands. If exactly one task was
-terminal — a linear workflow, or a fan-out closed by a join — that task's
-value is the run's output. If several branches ended independently, the
-output is the list of their values in branch order. Closing a fan-out
-with a join is the recommended shape, because then there is one answer
-rather than a list.
+terminal, as in a linear workflow or a fan-out closed by a join, that
+task's value is the run's output. If several branches ended
+independently, the output is the list of their values in branch order.
+Closing a fan-out with a join is the recommended shape, because then
+there is one answer rather than a list.
 
-## Registering and serving it
+## Registering and serving workflows
 
 The shortest form runs one workflow:
 
@@ -210,11 +210,11 @@ def main() -> None:
 
 Both are the same thing the command line does. The `athanore serve`
 form, which also reads pools from a configuration file and finds
-installed workflows, is in [The command line](cli.md).
+installed workflows, is in [Using the command line](cli.md).
 
 Registration does not stop when serving starts. `register` is for
-before `start()`; on a serving server the same host awaits three verbs
-— `add`, `replace` and `remove` — which register a workflow, swap its
+before `start()`. On a serving server the same host awaits three verbs,
+`add`, `replace` and `remove`, which register a workflow, swap its
 graph and plugins under the same name, or drop it, without a restart
 and without touching the other workflows' runs:
 
@@ -229,29 +229,29 @@ removed.task_ids                    # the attempts that were interrupted
 `athanore.toml` (see [Deployment](deployment.md)), and
 `server.register_configured()` before `start()` is how a programmatic
 host loads such rows back. An attempt already running finishes on the
-body it started with; a removed workflow's runs stay listed, flagged
+body it started with. A removed workflow's runs stay listed, flagged
 `unregistered`, and resume when it is added back. The dashboard follows
-all three without a page reload — the library, the new-run chips, the
-pane bar and the run rows move as the registration does — and when a
-plugin's JavaScript has changed under it, it says so with a reload
-notice rather than pretending: a module a page has already run cannot
-be run again.
+all three without a page reload: the library, the new-run chips, the
+pane bar and the run rows move as the registration does. When a
+plugin's JavaScript has changed under it, the dashboard shows a reload
+notice rather than pretending, because a module a page has already run
+cannot be run again.
 
 The same three verbs are on the wire and on the command line, so an
-agent or a script can do what the host does: `POST /api/workflows`
-with a target, `PUT /api/workflows/{name}` to reload one, `DELETE
-/api/workflows/{name}` to drop it — or `athanore workflows add`,
-`reload` and `rm` (see [The command line](cli.md)). A target that does
-not load is answered `422 workflow_load_failed`, and the thing to read
-in that body is `stage`: `target` (the string is not `where:attr`),
-`import` (the file would not load), `attribute` (no such attribute, or
-not a workflow), `finalize` (the graph does not close), `plugins` (a
-declaration does not validate) or `register` (the name is a verb or a
-pool). `detail` is the underlying error, in full.
+agent or a script can do what the host does. `POST /api/workflows`
+with a target registers one, `PUT /api/workflows/{name}` reloads one,
+and `DELETE /api/workflows/{name}` drops it; `athanore workflows add`,
+`reload` and `rm` do the same (see [Using the command line](cli.md)). A
+target that does not load is answered `422 workflow_load_failed`, and
+the field to read in that body is `stage`: `target` (the string is not
+`where:attr`), `import` (the file would not load), `attribute` (no such
+attribute, or not a workflow), `finalize` (the graph does not close),
+`plugins` (a declaration does not validate) or `register` (the name is
+a verb or a pool). `detail` is the underlying error, in full.
 
 ## Next
 
-- [Dispatching agents](agents.md) — the object most bodies await.
-- [Asking a human](human-in-the-loop.md) — the other one.
-- [Runs, retries and capacity](runs.md) — what happens to a node once
+- [Dispatching agents](agents.md): the object most bodies await.
+- [Asking a human](human-in-the-loop.md): the other one.
+- [Runs, retries and capacity](runs.md): what happens to a node once
   the graph is written.

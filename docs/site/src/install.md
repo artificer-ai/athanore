@@ -2,7 +2,7 @@
 
 Athanore needs Python 3.11 or newer and nothing else. There is no
 service to stand up, no account to create, and no API key until a
-workflow of yours dispatches an agent that wants one: runs are kept in a
+workflow of yours dispatches an agent that wants one. Runs are kept in a
 SQLite file in the directory you start the server in.
 
 ## With uv
@@ -36,18 +36,18 @@ uv run athanore --help
 That gives you the command line, the server and the browser interface
 from the working tree.
 
-## What the extras are for
+## The postgres extra
 
 `postgres` swaps the default SQLite store for PostgreSQL over `asyncpg`.
-Everything else — the engine, the agents, the API, the interface — is in
+Everything else, the engine, the agents, the API and the interface, is in
 the base install. Nothing in the package depends on any particular agent
-vendor or on Docker; adapters for those are ordinary Python you write or
+vendor or on Docker. Adapters for those are ordinary Python you write or
 copy, in your own project.
 
 Which database is used, and everything else that can be configured, is in
 [Settings](reference/settings.md).
 
-## Check it
+## Verify the install
 
 ```sh
 athanore --help

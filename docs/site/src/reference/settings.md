@@ -41,8 +41,8 @@ table of `athanore.toml`, or together as JSON in
 
 | Setting | Environment variable | `athanore.toml` | Type | Default | Description |
 |---|---|---|---|---|---|
-| `events_days` | — | `events_days` | `int` | `30` | How many days an event is kept before the retention job prunes it. |
-| `stream_days` | — | `stream_days` | `int` | `14` | How many days a stream chunk is kept before the retention job prunes it. |
+| `events_days` | *none* | `events_days` | `int` | `30` | How many days an event is kept before the retention job prunes it. |
+| `stream_days` | *none* | `stream_days` | `int` | `14` | How many days a stream chunk is kept before the retention job prunes it. |
 
 ## `athanore.toml`
 

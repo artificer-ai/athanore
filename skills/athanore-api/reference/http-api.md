@@ -7,7 +7,7 @@ document it produces. The credential column is what the operation
 requires: `operator` is the operator token (or nothing at all on a
 loopback bind), `task` is the per-task token an agent is given.
 How to authenticate, read the event stream and generate a client
-is in [Driving the API](guide-http-api.md).
+is in [Using the HTTP API](guide-http-api.md).
 
 | Method | Path | Tag | Operation | Credential | Summary |
 |---|---|---|---|---|---|
@@ -97,7 +97,7 @@ case nothing was registered; 503 `registration_unavailable` from an
 application built without a registrar. A response that wrote the row
 carries `X-Athanore-Persisted: <path>`.
 
-**Request body** (required) — `application/json`, [`RegisterWorkflow`](#schema-RegisterWorkflow)
+**Request body** (required): `application/json`, [`RegisterWorkflow`](#schema-RegisterWorkflow)
 
 **Responses**
 
@@ -187,7 +187,7 @@ recorded one; 422 `unknown_pool`; 500 `persist_failed`; 503
 |---|---|---|---|---|
 | `name` | path | `string` | yes | The registered workflow's name. |
 
-**Request body** (required) — `application/json`, [`ReloadWorkflow`](#schema-ReloadWorkflow)
+**Request body** (required): `application/json`, [`ReloadWorkflow`](#schema-ReloadWorkflow)
 
 **Responses**
 
@@ -215,7 +215,7 @@ what flips it.
 |---|---|---|---|---|
 | `name` | path | `string` | yes | The registered workflow's name. |
 
-**Request body** (required) — `application/json`, [`NewRun`](#schema-NewRun)
+**Request body** (required): `application/json`, [`NewRun`](#schema-NewRun)
 
 **Responses**
 
@@ -364,7 +364,7 @@ attempts back would be a round trip for nothing.
 |---|---|---|---|---|
 | `run_id` | path | `string` | yes | The run id, a ULID. |
 
-**Request body** (required) — `application/json`, [`EditRun`](#schema-EditRun)
+**Request body** (required): `application/json`, [`EditRun`](#schema-EditRun)
 
 **Responses**
 
@@ -503,7 +503,7 @@ fan-out would claim a context it does not have (``Ops.append_log``).
 |---|---|---|---|---|
 | `run_id` | path | `string` | yes | The run id, a ULID. |
 
-**Request body** (required) — `application/json`, [`LogText`](#schema-LogText)
+**Request body** (required): `application/json`, [`LogText`](#schema-LogText)
 
 **Responses**
 
@@ -559,7 +559,7 @@ the two fields.
 |---|---|---|---|---|
 | `run_id` | path | `string` | yes | The run id, a ULID. |
 
-**Request body** (required) — `application/json`, [`Position`](#schema-Position)
+**Request body** (required): `application/json`, [`Position`](#schema-Position)
 
 **Responses**
 
@@ -612,7 +612,7 @@ branch that arrived late.
 |---|---|---|---|---|
 | `run_id` | path | `string` | yes | The run id, a ULID. |
 
-**Request body** (required) — `application/json`, [`Rerun`](#schema-Rerun)
+**Request body** (required): `application/json`, [`Rerun`](#schema-Rerun)
 
 **Responses**
 
@@ -698,7 +698,7 @@ branches that already landed.
 |---|---|---|---|---|
 | `task_id` | path | `integer` | yes | The task id, unique across runs. |
 
-**Request body** (required) — `application/json`, [`Move`](#schema-Move)
+**Request body** (required): `application/json`, [`Move`](#schema-Move)
 
 **Responses**
 
@@ -755,7 +755,7 @@ operator's to declare, which is why the body's field is a
 |---|---|---|---|---|
 | `task_id` | path | `integer` | yes | The task id, unique across runs. |
 
-**Request body** (required) — `application/json`, [`SetStatus`](#schema-SetStatus)
+**Request body** (required): `application/json`, [`SetStatus`](#schema-SetStatus)
 
 **Responses**
 
@@ -879,7 +879,7 @@ record an answer without a person.
 |---|---|---|---|---|
 | `request_id` | path | `integer` | yes | The request id, unique across runs. |
 
-**Request body** (required) — `application/json`, [`Answer`](#schema-Answer)
+**Request body** (required): `application/json`, [`Answer`](#schema-Answer)
 
 **Responses**
 
@@ -963,7 +963,7 @@ rather than holding this connection open.
 | `task_id` | path | `integer` | yes | The task the token was minted for. |
 | `x-athanore-token` | header | `string` | yes | The task token, from the claimed attempt. |
 
-**Request body** (required) — `application/json`, [`Ask`](#schema-Ask)
+**Request body** (required): `application/json`, [`Ask`](#schema-Ask)
 
 **Responses**
 
@@ -994,7 +994,7 @@ on — the same call a node body makes, reached over HTTP.
 | `task_id` | path | `integer` | yes | The task the token was minted for. |
 | `x-athanore-token` | header | `string` | yes | The task token, from the claimed attempt. |
 
-**Request body** (required) — `application/json`, [`LogText`](#schema-LogText)
+**Request body** (required): `application/json`, [`LogText`](#schema-LogText)
 
 **Responses**
 
@@ -1070,7 +1070,7 @@ move its own task.
 | `task_id` | path | `integer` | yes | The task the token was minted for. |
 | `x-athanore-token` | header | `string` | yes | The task token, from the claimed attempt. |
 
-**Request body** (required) — `application/json`, `any`
+**Request body** (required): `application/json`, `any`
 
 **Responses**
 
@@ -1094,7 +1094,7 @@ The agent surface as MCP tools: `get_task`, `append_log`, `submit_result`, and �
 |---|---|---|---|---|
 | `X-Athanore-Token` | header | `string` | yes | The task token, from the claimed attempt. |
 
-**Request body** (required) — `application/json`, `any`
+**Request body** (required): `application/json`, `any`
 
 **Responses**
 
@@ -1146,7 +1146,7 @@ with whatever the handler returned, as JSON.
 | `wf` | path | `string` | yes | The workflow that declared the action. |
 | `name` | path | `string` | yes | The action's name. |
 
-**Request body** (required) — `application/json`, [`ActionCall`](#schema-ActionCall)
+**Request body** (required): `application/json`, [`ActionCall`](#schema-ActionCall)
 
 **Responses**
 
