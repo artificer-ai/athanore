@@ -21,6 +21,8 @@ decisions. An agent never moves a task. It submits a validated value and
 the node body routes on it, so every edge a run traverses is code you can
 read, test, and blame.
 
+![The Athanore SPA: a list of runs on the left; on the right, the overview of a completed `feature` run with its token count, duration and queue position, a bar per node of tokens spent, and the task description it was given](https://raw.githubusercontent.com/artificer-ai/athanore/main/docs/images/run-overview.png)
+
 ## Install
 
 Python 3.11 or newer, with [uv](https://docs.astral.sh/uv/).
