@@ -301,7 +301,7 @@ async def _publish(payload: dict[str, Any]) -> str:
     body = str(report.get("summary", "")).strip()
 
     await git("push", "--quiet", "-u", "origin", branch, cwd=tree)
-    url = await gh(
+    found = await gh(
         "pr",
         "list",
         "--head",
@@ -309,15 +309,30 @@ async def _publish(payload: dict[str, Any]) -> str:
         "--state",
         "open",
         "--json",
-        "url",
+        "number,url",
         "--jq",
-        ".[0].url // empty",
+        '.[0] | "\\(.number) \\(.url)"',
         cwd=tree,
     )
-    if url:
-        await gh("pr", "edit", branch, "--title", title, "--body", body, cwd=tree)
-        await log(f"gate: pushed {branch}; updated {url}")
-        return url
+    if found.strip():
+        number, url = found.split(None, 1)
+        # Through the REST API, not `gh pr edit`: that verb still asks
+        # GraphQL for the PR's classic project cards, which GitHub now
+        # refuses, and the whole edit fails with it (gh 2.45).
+        await gh(
+            "api",
+            "--method",
+            "PATCH",
+            f"repos/{{owner}}/{{repo}}/pulls/{number}",
+            "-f",
+            f"title={title}",
+            "-f",
+            f"body={body}",
+            "--silent",
+            cwd=tree,
+        )
+        await log(f"gate: pushed {branch}; updated {url.strip()}")
+        return url.strip()
     url = await gh(
         "pr",
         "create",
