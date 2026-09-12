@@ -43,11 +43,11 @@ disagree afterwards, that is a bug in the fold, not a choice.
 
 ## Why
 
-The `chat` seat under `workflows/` is the proof. Its docstring says
-what it does today: every turn is a fresh ACP session, and the agent's
-memory is the last twenty turns of the transcript pasted into the
-assignment. That is honest and it works, and it is slow and it gets
-worse with every turn — the prompt grows, the model re-reads it, and
+The `chat` seat under `workflows/` is the proof. Its docstring said
+what it did before T091: every turn was a fresh ACP session, and the
+agent's memory was the last twenty turns of the transcript pasted into
+the assignment. That was honest and it worked, and it was slow and it
+got worse with every turn — the prompt grows, the model re-reads it, and
 the agent re-discovers the checkout each time. With a session held
 across turns the prompt is the message, the agent's context is the
 agent's own, and a turn costs a turn.

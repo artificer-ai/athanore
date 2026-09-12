@@ -4450,6 +4450,38 @@ agent session (`continuing session` notice in the new transcript).
 **Done.** Chatting is one active node for the whole conversation, the
 agent is one process for its length, and nothing about the pane, the
 wire or the request channel changed.
+**Status.** Done. `workflows/chat/__init__.py` is one node, `talk`
+(start, `retries=0`, `timeout=None`), on one `ChatAgent(cwd=CHECKOUT,
+timeout=TURN_TIMEOUT, session_id=...).open()` block: `_recorded()`
+reads the run's work log over `GET /api/agent/tasks/{id}` with the task
+token — the last `session <id>` engine line is the session to continue,
+this task's `you:`/reply lines are the turns already answered — the
+block's entry writes `session <id>` (author `engine`) before any
+prompt, and the loop is `human_input` (the title as message one), the
+replay reconciliation (the first `len(replies)` messages skipped, a
+`you:` without its reply prompted without a second line), a `you:
+<message>` `notice` chunk flushed to the transcript, `prompt()`, the
+reply line; a stop word returns `{agent, session_id, turns, history}`.
+`kickoff`, `turn`, `wrap`, `MEMORY` and `_assignment` deleted; `cwd`
+and `timeout` passed at construction, the dead class attributes
+dropped; the system prompt and the module docstring say the session is
+the agent's memory; `_pending` is the oldest open request and
+`_answering` the one `in_progress` task (500 on more); `draft` pages
+from the last `you:` marker in the page, so the draft bubble is the
+reply being typed and not the conversation before it; `static/chat.js`,
+`workflows/__main__.py`, the routes' shapes, the snapshot and the
+client byte-identical; 23 §Why in the past tense; D267. Exercised by
+hand on the fake and on `pi`: one task throughout, one `[stats]` line
+per reply with one `session=` on all of them, one `pi-acp` process
+across the replies, `draft?after=0` mid-reply carrying only the current
+reply's text, a SIGINT restart mid-chat re-executing the same task with
+a second identical `session` line, `continuing session <id>` in the
+transcript, the answered turns neither re-asked nor re-answered and the
+open request still the same one, `/quit` completing the run with the
+transcript; on `pi` the continued session answered "what was my second
+message?" correctly after the restart with nothing pasted into the
+prompt. The `replay discarded` line is DEBUG and the root logger is
+fixed at INFO, so it is not observable in a server log; the notice is.
 
 ## Traceability
 
