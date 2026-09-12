@@ -4,6 +4,7 @@
 [![Docs](https://github.com/artificer-ai/athanore/actions/workflows/pages.yml/badge.svg?branch=main)](https://artificer-ai.github.io/athanore/)
 [![PyPI](https://img.shields.io/pypi/v/athanore)](https://pypi.org/project/athanore/)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](#install)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](https://github.com/artificer-ai/athanore/blob/main/LICENSE)
 
 Code-defined AI agent workflows over the
 [Agent Client Protocol](https://agentclientprotocol.com) (ACP).
@@ -258,3 +259,5 @@ a workspace member and registers them as entry points.
 - [`AGENTS.md`](AGENTS.md) explains how to work in this repository. Read it
   before changing anything, human or agent.
 - [`DESIGN.md`](DESIGN.md) says where the MVP's design document went.
+- [`LICENSE`](LICENSE) is the MIT license. Athanore is copyright Scott
+  Russell and free to use, copy, modify and redistribute under its terms.

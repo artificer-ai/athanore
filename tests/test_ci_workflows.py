@@ -496,6 +496,24 @@ def test_the_wheel_is_configured_to_carry_the_spa() -> None:
     assert "athanore/web/dist/**" in pyproject["tool"]["hatch"]["build"]["artifacts"]
 
 
+def test_the_package_declares_its_license() -> None:
+    """MIT, declared where each reader looks for it.
+
+    `LICENSE` at the root is what GitHub and hatchling's default
+    license-files glob read; `[project] license` is the PEP 639 SPDX
+    expression hatchling writes as `License-Expression`; the classifier
+    is what PyPI's sidebar reads. `scripts/check_wheel.py` proves the
+    built wheel carries the file; this names the three lines that make
+    it so.
+    """
+    text = (ROOT / "LICENSE").read_text(encoding="utf-8")
+    assert text.startswith("MIT License\n\nCopyright (c) 2026 Scott Russell\n")
+    pyproject = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    assert pyproject["project"]["license"] == "MIT"
+    classifiers = pyproject["project"]["classifiers"]
+    assert "License :: OSI Approved :: MIT License" in classifiers
+
+
 #: The audits of 13 §CI, turned on in T079: one per job, each the last
 #: step of the job it is in.
 AUDITS = {

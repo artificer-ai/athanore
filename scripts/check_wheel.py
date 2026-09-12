@@ -25,7 +25,10 @@ What this script does, in order:
 3. **Reads the wheel.** `index.html` is in it, under
    `athanore/web/dist/`, and so is every `/assets/…` file that document
    references. A build that shipped an index without its bundle is a
-   white page with a 404 in the console.
+   white page with a 404 in the console. The license file is in it too,
+   byte for byte the checkout's `LICENSE`: hatchling ships it by default
+   (PEP 639), and a default is a thing that can change under a version
+   bump.
 4. **Installs it into a clean venv and serves it.** `python -m venv`,
    then `pip install <the wheel>` — a real install of a real wheel, with
    no source checkout on `sys.path`: the server runs from a temporary
@@ -70,6 +73,11 @@ PACKAGE_DATA: Final[str] = "athanore/web/dist"
 INDEX: Final[str] = f"{PACKAGE_DATA}/index.html"
 #: Where `pnpm -C web build` writes it in the checkout.
 BUILT_INDEX: Final[Path] = ROOT / "athanore" / "web" / "dist" / "index.html"
+
+#: Where hatchling puts the root `LICENSE` in the wheel (PEP 639): the
+#: `licenses/` directory of the `.dist-info`, whose name carries the
+#: version, so it is matched by suffix rather than spelled out.
+LICENSE_IN_WHEEL: Final[str] = ".dist-info/licenses/LICENSE"
 
 #: `src="/assets/index-….js"` and `href="/assets/index-….css"`: every
 #: file the built document asks the server for by absolute path.
@@ -175,6 +183,31 @@ def check_wheel_carries_spa(wheel: Path) -> bytes:
             )
     note(f"the wheel carries {INDEX} and its {len(referenced)} assets")
     return document
+
+
+def check_wheel_carries_license(wheel: Path) -> None:
+    """Step 3, continued: the wheel holds the checkout's `LICENSE`, byte for byte.
+
+    hatchling puts the root license file under `<dist-info>/licenses/`
+    by its default `license-files` glob; `pyproject.toml` declares no
+    glob of its own, so this is the check that the default still does.
+    """
+
+    expected = (ROOT / "LICENSE").read_bytes()
+    with zipfile.ZipFile(wheel) as archive:
+        carried = [n for n in archive.namelist() if n.endswith(LICENSE_IN_WHEEL)]
+        if len(carried) != 1:
+            raise CheckFailed(
+                f"{wheel.name} carries {carried or 'no'} …{LICENSE_IN_WHEEL}. "
+                f"hatchling ships the root LICENSE by its default license-files "
+                f"glob; check that the file is still named LICENSE and that "
+                f"pyproject.toml's [project] license is still the SPDX string."
+            )
+        if archive.read(carried[0]) != expected:
+            raise CheckFailed(
+                f"{carried[0]} in {wheel.name} is not the LICENSE in the checkout."
+            )
+    note("the wheel carries LICENSE")
 
 
 @contextmanager
@@ -337,6 +370,7 @@ def main() -> int:
         require_built_spa()
         wheel = build_distribution()
         document = check_wheel_carries_spa(wheel)
+        check_wheel_carries_license(wheel)
         with clean_install(wheel) as (athanore, cwd):
             with serving(athanore, cwd) as url:
                 check_it_serves_the_spa(url, document)
