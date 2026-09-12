@@ -55,10 +55,15 @@ starting. Everything that matters is specified in `docs/v1/`:
 - The package layout and the per-module responsibilities are in
   `docs/v1/02-architecture.md` §Package layout. Create modules there, not
   elsewhere.
-- Work on a branch per task, `feat/<task-id>`, cut from `main`, and land
-  it `--no-ff` on `main` once the gate is green (D68). One merge commit
-  per task, with its work underneath. `main` is never committed to
-  directly.
+- Work on a branch per change, cut from `main` — `feat/<task-id>` for a
+  task, a short descriptive name (`docs/readme-badges`) for anything
+  else — and land it through a pull request on `origin`
+  (`artificer-ai/athanore`) once the PR's CI is green (D68, D260). The
+  PR is merged with a merge commit, so `main` reads as one merge per
+  change with its work underneath. `main` is never committed to or
+  pushed to directly, and nothing lands without a PR, prose included:
+  the PR list is the record of what landed and why, however automated
+  the work was. The steps are under *Landing a change*.
 - The dev stack (`compose.yaml`, `docker/dev/`, `scripts/`) is here, not in
   a separate repository as T000 assumed (D64). It is dev machinery: no
   task may make `athanore/` depend on it.
@@ -77,11 +82,14 @@ starting. Everything that matters is specified in `docs/v1/`:
    against the tasks either side. Do only that task.
 3. Implement, adding tests at the lowest layer that can express the
    behaviour (`docs/v1/13-testing.md` §Pyramid).
-4. Run the gate until it is green (see Commands). A change that touches
-   only prose the gate neither builds nor tests — `docs/v1/`,
-   `docs/plans/`, `AGENTS.md`, `CLAUDE.md`, `TODO.md` — needs no gate;
-   `docs/site/`, `skills/` and `README.md` are built or tested by it and
-   do.
+4. Run the gate until it is green (see Commands). The run that counts
+   is CI on the pull request, which is the gate on a runner (`ci.yml`);
+   run it locally while iterating, in full or `-k` narrowed, so the PR
+   does not go red for something a minute at the keyboard would have
+   caught. A change that touches only prose the gate neither builds nor
+   tests — `docs/v1/`, `docs/plans/`, `AGENTS.md`, `CLAUDE.md`,
+   `TODO.md` — needs no local gate; `docs/site/`, `skills/` and
+   `README.md` are built or tested by it and do.
 5. One commit per task, on the task's branch, message prefixed with the
    task id: `T012: ...`. The merge commit onto `main` carries the same
    prefix. **The message is plain.** No `Co-Authored-By`, no
@@ -93,6 +101,40 @@ starting. Everything that matters is specified in `docs/v1/`:
    `tests/snapshots/openapi.json` regenerated if the wire contract changed;
    a row in `15-decisions.md` if a choice was made; the document that
    specifies the behaviour updated if it changed.
+
+## Landing a change
+
+Every change, a task or a one-line README edit, lands the same way. The
+commands are the whole procedure; an agent runs them as written.
+
+```sh
+git checkout -b feat/T012 main             # or docs/<topic>, fix/<topic>
+# ...commit on the branch...
+git push -u origin HEAD
+gh pr create --fill                        # title = the commit subject, body = its message
+gh pr checks --watch                       # CI is the gate; wait for it
+gh pr merge --merge --delete-branch \
+  --subject "$(gh pr view --json title -q .title)" \
+  --body "$(gh pr view --json body -q .body)"  # a merge commit, never squash or rebase
+git checkout main && git pull origin main  # the branch is gone; main has the merge
+```
+
+- **CI green is the condition for merging.** `gh pr merge` on a red or
+  still-running PR is not done. If CI is red, fix it on the branch, push,
+  and wait again; the PR carries the history of the attempt.
+- **Merge commits only.** Squash would flatten the task's commit;
+  rebase would lose the merge that says where a change starts and ends.
+  `--subject` and `--body` give the merge commit the PR's title and
+  body — GitHub's own default is `Merge pull request #N from ...`,
+  which is why they are not optional — so the title carries the
+  `Txxx:` prefix when the change is a task.
+- **The PR body is plain**, like the commit message: what changed and
+  why, no attribution lines, no checklists, no template.
+- **Delete the branch on merge.** `main` plus the PR list is the whole
+  record; a merged branch adds nothing to it.
+- `main` after the pull is the only place to start the next branch
+  from. An agent that finds itself on `main` with uncommitted work
+  branches first (`git switch -c`), it does not commit.
 
 ## Commands
 
