@@ -136,6 +136,18 @@ ticket leaves `tests/snapshots/openapi.json` byte-identical.
 | A8.4 | Wire: `POST /api/workflows`, `PUT /api/workflows/{name}`, `DELETE /api/workflows/{name}` with `persist`, the registrar port, `workflow_load_failed` / `unknown_pool` / `registration_unavailable` / `persist_failed`, `WorkflowOut.target`; `athanore workflows add|reload|rm [--persist]`; snapshot and TypeScript client regenerated | M | 22 §Wire, §CLI, §Persistence, D223, D227 | A8.3 |
 | A8.5 | SPA and end to end: `workflow.*` invalidation rows, the changed-assets notice, the Playwright add→run→reload→remove→add flow on the fake | M | 22 §SPA, §Testing, D225 | A8.4 |
 
+## Epic 9 — Post-1.0: session continuity
+
+The third post-1.0 phase, specified by 23 and appended to the serial
+plan as Phase 9 (T088–T089), one task per ticket. Façade and fake only:
+no ticket here may change the engine, the store or the wire contract,
+and `tests/snapshots/openapi.json` stays byte-identical throughout.
+
+| Id | Ticket | Size | Spec | Depends |
+|---|---|---|---|---|
+| A9.1 | `FakeACPAgent` persists sessions across processes: the `sessions: {dir, resume?}` scenario key, `loadSession` and `sessionCapabilities.resume` advertised from it, the session file as the verbatim list of updates sent plus one `user_message_chunk` per prompt, `session/load` replaying it, `session/resume` not, `-32602` on an unknown id, `-32601` on an unadvertised method | S | 23 §The fake, §Testing, D257 | |
+| A9.2 | `ACPAgent(session_id=)`: `session/resume` when advertised, else `session/load` with the replay discarded from the transcript and the counters, else `AgentError` before any prompt; the `continuing session` notice; config options set on the continued session; the provider's `stats()` not consulted on a continued run; 05 and 13 folded, the site guide and the workflows skill told | M | 23 §Surface, §Lifecycle of a continued run, §Stats, D254–D256, D258 | A9.1 |
+
 ## Cross-cutting decisions still open (15 §Open questions)
 
 Resolve before the ticket that needs them: open question 4 (git-ignored

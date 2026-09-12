@@ -4216,6 +4216,100 @@ path-less prefixes, `staleAssets` at manifest load into `useUi`, the
 `PluginAssetsBanner`, the host keyed on asset paths, the row's `⊘`,
 `web/e2e/registration.spec.ts`; D253.
 
+## Phase 9 — Post-1.0: session continuity
+
+The third post-1.0 phase, specified by 23 and cut as Epic 9 in 16. The
+façade and the fake change; the engine, the store and the wire do not,
+and `tests/snapshots/openapi.json` and `web/src/api/gen/` are
+byte-identical after both tasks. `docs/plans/<id>-*.md` is written by
+the `planner` of the run that builds each task (`workflows/feature`)
+and fences its scope.
+
+### T088 — `FakeACPAgent`: sessions that survive the process (A9.1)
+
+**Do.** `athanore/testing/fake_acp.py`: the `sessions: {dir, resume?:
+bool}` scenario key (validated like `session_file`: `dir` a string,
+`resume` a bool, nothing else). With it, `initialize` advertises
+`loadSession: true` and — when `resume` — `sessionCapabilities:
+{resume: {}}`; without it, `loadSession: false` and no
+`sessionCapabilities`, as today. `session/new` creates
+`<dir>/<sessionId>.json`, a JSON list; every `session/update` the
+process sends is appended to it as sent, and every `session/prompt`
+received appends a `user_message_chunk` update carrying the prompt's
+text blocks concatenated, before the turn's own updates. `session/load`
+`{sessionId, cwd, mcpServers}`: a known id re-sends every recorded
+update verbatim and in order, then answers `{configOptions}` built as
+`session/new` builds it, adopts the id, records `mcpServers` as
+`session/new` does and keeps appending to the same file; an unknown id
+is `-32602` `no such session: <id>`; without the key it is `-32601` as
+any unknown method. `session/resume`: the same without the re-send,
+and only when `resume` was advertised, else `-32601`. The scenario's
+first-turn script still runs on the second process's first prompt
+(D122). Fold 23 §The fake into 13 §Fakes (the vocabulary sentence) and
+the module docstring's scenario list.
+**Tests.** `tests/testing/test_fake_acp.py`, against a raw ACP client:
+what `initialize` advertises with the key, with `resume`, and without;
+a turn's updates and the `user_message_chunk` land in the file in
+order; a second process's `session/load` re-sends exactly the file's
+updates before its response and a turn after it appends to the same
+file; `session/resume` sends nothing before its response;
+`-32602` on an unknown id; `-32601` on `session/resume` unadvertised
+and on `session/load` without the key; `mcpServers` handed on
+`session/load` is what `mcp_calls` connects to.
+**Done.** The fake persists a session across two processes and speaks
+both re-open methods per 23 §The fake; gate green; snapshot unchanged.
+
+### T089 — `ACPAgent(session_id=)`: one session across runs (A9.2)
+
+**Do.** `athanore/agents/acp.py`: `ACPAgent.__init__(..., session_id:
+str | None = None)`, stored as `self.session_id`. In `_exchange`, after
+`initialize`: with a `session_id`, choose per 23 §Lifecycle step 2 —
+`conn.resume_session(...)` when `sessionCapabilities.resume` is
+present, else `conn.load_session(...)` when `loadSession` is true,
+else `AgentError` (`<Agent> cannot continue a session: the agent
+advertises neither session/resume nor session/load`) before any
+prompt; both calls take the `cwd` and `mcp_servers` `new_session`
+takes; the agent's JSON-RPC error becomes `AgentError` (`the agent
+could not continue session <id>: <message>`); `session.session_id` is
+set to the requested id only after the call returns; the response's
+`config_options` go through `_configure` unchanged. Around the
+`load_session` call, and only there, set `client.replaying`; while it
+is set `ACPClient.session_update` writes no chunk, appends no text,
+counts no tool call, and counts what it dropped, logged once at DEBUG
+(`replay discarded`, `count=`) when the flag clears; permission and
+elicitation callbacks are unaffected by the flag. After the session
+is open, one `notice` chunk `continuing session <session_id>` through
+the client's `append`. `_entry`: skip the provider's `stats()` on a
+continued run; `_truncated` unchanged. Every failure records the
+ordinary entry (`failed/transport`, no `session_id` when the session
+was never joined). Fold 23 §Surface, §Lifecycle of a continued run and
+§Stats into 05 (§Agent classes signature, a §Continuing a session
+subsection under §Session lifecycle, §Stats entry); `docs/site/src/
+guide/agents.md` gains a short section on continuing a session with the
+two-run example; `skills/athanore-workflows/SKILL.md` and the
+generated reference (`uv run scripts/gen_docs.py`) follow.
+**Tests.** `tests/agents/test_acp_lifecycle.py` on the fake (T088's
+`sessions` key), the list of 23 §Testing (façade): load path — the
+fake's `request_log` shows `session/load` with `cwd` and `mcpServers`
+and no `session/new`; the continued attempt's transcript is the
+`notice` then the second turn's chunks and none of the first's;
+`AgentResult.text` and the entry's `tool_calls` are the second turn's;
+the result's and the entry's `session_id` equal the first run's.
+Resume path — `session/resume` and no `session/load`. Config options
+set on the continued session. Refusal — `AgentError` on an agent
+advertising neither, no `session/prompt` in the log, `returncode` set,
+entry `failed/transport` without `session_id`; `AgentError` on an
+unknown id quoting the fake's message. Stats — a `FakeStatsProvider`
+that records its calls: `stats()` not called on the continued run and
+called on the fresh one, `final_stop_reason` called on both, ACP
+`usage` on the continued turn in the entry. `tests/testing/test_mock.py`
+unchanged and green (the doubles have no session). `tests/test_public_
+api.py`: `ACPAgent` and `AthanoreACPAgent` still export.
+**Done.** A body continues an agent's session by handing the last
+result's `session_id` back, on both ACP methods, with the transcript,
+the counters and the stats entry telling the truth about the attempt;
+05 and 13 say so; gate green; snapshot and client unchanged.
+
 ## Traceability
 
 | Doc 16 ticket | Tasks here |
@@ -4231,6 +4325,7 @@ path-less prefixes, `staleAssets` at manifest load into `useUi`, the
 | A6.1–A6.4 | T074–T079 |
 | A7.1–A7.3 | T080–T082 |
 | A8.1–A8.5 | T083–T087 |
+| A9.1–A9.2 | T088–T089 |
 
 Sequencing changes relative to 16, all recorded in 15 when executed:
 the TUI is not deleted at all in this repository — it never lived here
