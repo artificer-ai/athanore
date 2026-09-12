@@ -52,9 +52,9 @@ x-environment: &environment
   - ATHANORE_TEST_PG_URL=postgresql+asyncpg://postgres:athanore@127.0.0.1:${POSTGRES_PORT:-5433}/postgres
   - WORKSPACE=${WORKSPACE}
 
-# The agents get everything above plus a fixed identity, so a commit an
-# agent makes is recognisable as one and your own identity can never leak
-# onto it. Kept off `dev` and `app`: those are you, with your ~/.gitconfig.
+# The agents get exactly the same: a commit an agent makes is yours, under
+# the ~/.gitconfig every service mounts below. The work log says what a
+# run did; the history does not name the tool (AGENTS.md §Conventions).
 x-agent-environment: &agent-environment
   - OPENROUTER_API_KEY
   - ANTHROPIC_API_KEY
@@ -63,10 +63,6 @@ x-agent-environment: &agent-environment
   - ATHANORE_PORT=${ATHANORE_PORT:-4002}
   - ATHANORE_TEST_PG_URL=postgresql+asyncpg://postgres:athanore@127.0.0.1:${POSTGRES_PORT:-5433}/postgres
   - WORKSPACE=${WORKSPACE}
-  - GIT_AUTHOR_NAME=athanore-builder
-  - GIT_AUTHOR_EMAIL=builder@athanore.local
-  - GIT_COMMITTER_NAME=athanore-builder
-  - GIT_COMMITTER_EMAIL=builder@athanore.local
 
 x-volumes: &volumes
   # Same absolute path inside and out (see the header).
@@ -92,6 +88,8 @@ x-volumes: &volumes
   # bind mount of the host ~/.claude: the container authenticates once
   # (`./scripts/dev.sh "claude setup-token"`) and keeps its own state.
   - athanore-claude:/home/agent/.claude
+  # Your git identity, for every service: a commit made in here is yours.
+  - ${HOST_HOME}/.gitconfig:/home/agent/.gitconfig:ro
 
 services:
   # A shell on the image. The workhorse:
@@ -185,10 +183,6 @@ services:
       - ATHANORE_PORT=${ATHANORE_PORT:-4002}
       - ATHANORE_TEST_PG_URL=postgresql+asyncpg://postgres:athanore@127.0.0.1:${POSTGRES_PORT:-5433}/postgres
       - WORKSPACE=${WORKSPACE}
-      - GIT_AUTHOR_NAME=athanore-builder
-      - GIT_AUTHOR_EMAIL=builder@athanore.local
-      - GIT_COMMITTER_NAME=athanore-builder
-      - GIT_COMMITTER_EMAIL=builder@athanore.local
     volumes: *volumes
     stdin_open: true
     tty: false

@@ -77,10 +77,18 @@ starting. Everything that matters is specified in `docs/v1/`:
    against the tasks either side. Do only that task.
 3. Implement, adding tests at the lowest layer that can express the
    behaviour (`docs/v1/13-testing.md` §Pyramid).
-4. Run the gate until it is green (see Commands).
+4. Run the gate until it is green (see Commands). A change that touches
+   only prose the gate neither builds nor tests — `docs/v1/`,
+   `docs/plans/`, `AGENTS.md`, `CLAUDE.md`, `TODO.md` — needs no gate;
+   `docs/site/`, `skills/` and `README.md` are built or tested by it and
+   do.
 5. One commit per task, on the task's branch, message prefixed with the
    task id: `T012: ...`. The merge commit onto `main` carries the same
-   prefix.
+   prefix. **The message is plain.** No `Co-Authored-By`, no
+   `Claude-Session`, no "Generated with", no attribution line of any
+   kind, whatever tool wrote the code; the author and committer are the
+   operator's own git identity. A harness that adds such lines is to be
+   configured not to, not humoured.
 6. Definition of done (`docs/v1/13-testing.md`): tests pass;
    `tests/snapshots/openapi.json` regenerated if the wire contract changed;
    a row in `15-decisions.md` if a choice was made; the document that
@@ -212,9 +220,13 @@ agents run with `permission_policy="auto_allow"` (05 §User-land adapters).
 `compose.yaml` is the one definition of that sandbox, so there is
 nothing to keep in step.
 
-The agent services carry a fixed `athanore-builder` git identity, so a
-commit an agent makes is recognisable as one; `dev` and `app` do not, and
-mount your `~/.gitconfig` instead.
+Every service, the agents included, mounts your `~/.gitconfig`, so a
+commit an agent makes carries your identity and nothing else — the
+work log and the `Txxx:` prefix say what a run did; the history does
+not name the tool. `.claude/settings.json` in the checkout (git-ignored,
+per machine) turns Claude Code's own `Co-Authored-By` trailer off for
+the containerised agent, which reads it because its `cwd` is the
+checkout.
 
 Authenticating them, once each:
 
@@ -311,5 +323,8 @@ Fixed by `docs/v1/02-architecture.md` §Library choices. Do not substitute.
   hand-edit it.
 - Do not commit secrets. `operator_token` lives in `.athanore/token`
   (git-ignored) and is refused in `athanore.toml`.
+- Commit messages carry no agent attribution — no `Co-Authored-By`,
+  `Claude-Session` or "Generated with" lines — and no trailers at all
+  beyond what git itself writes. Whoever runs the tool is the author.
 - `docs/v1/20-carried-findings.md` holds the ACP findings and permission
   decisions the other documents cite, so `docs/v1/` is self-contained.
