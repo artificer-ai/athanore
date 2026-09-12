@@ -4,7 +4,8 @@
                                         ▲          │        │       │
                                         └──────────┴────────┴───────┘
 
-    qa ─▶ approve ─▶ merge
+    qa ─▶ approve ─▶ publish ─▶ merge
+                │        └──▶ implement   (CI red)
                 └──▶ halted
 
 This is the v0 driver's seat, rebuilt on v1 and pointed at v1. The shape
@@ -14,8 +15,8 @@ that worked for seventy-nine tasks; what changed is underneath it.
 **Five nodes spend tokens, and they are not equal.** `prompt` is haiku
 sharpening a sentence; `planner` is opus reading the codebase and filing
 the plan `implement` then follows; the three after it build, judge and
-exercise the work. `prepare`, `gate`, `approve`, `merge` and `halted` are
-pure Python: git and an exit code decide, never a model.
+exercise the work. `prepare`, `gate`, `approve`, `publish`, `merge` and
+`halted` are pure Python: git and an exit code decide, never a model.
 
 **The plan is written per run, on the branch.** `docs/plans/<title>*.md`
 used to be something a human wrote before submitting; `planner` writes it
@@ -23,15 +24,16 @@ inside the run, commits it, and `implement` resolves it by the same glob
 as before. So the plan lands in the same merge commit as the code it
 describes, and the two can never drift.
 
-**The branch lands through a pull request** (AGENTS.md §Landing a
-change, D260). `gate` runs the suite here first — the fast answer, with
-its tail quoted back to the implementer — and then pushes the branch,
-opens the PR (or updates the one an earlier attempt opened) and waits
-for CI on it, which is the same gate on a runner and the run that
-counts. Only then is a paid review spent on the branch. `merge` is
-`gh pr merge --merge`, so the merge commit is GitHub's, titled and
-bodied like the PR, and `main` is pulled back afterwards. The PR list
-is the record of what this workflow landed.
+**The branch lands through a pull request, and only after every
+verdict** (AGENTS.md §Landing a change, D260, D269). `gate` runs the
+suite on the worktree — the fast answer, with its tail quoted back to
+the implementer — and nothing leaves the machine until the review, the
+QA pass and `approve` have all said yes. Then `publish` pushes the
+branch, opens the PR and waits for CI on it, the same gate on a runner
+and the run that counts; a red there goes back to `implement` like a
+red gate does. `merge` is `gh pr merge --merge`, so the merge commit is
+GitHub's, titled and bodied like the PR. The PR list is the record of
+what this workflow landed, one PR per feature and not one per attempt.
 That is the property the whole pipeline is built to have — no agent ever
 rules on its own work, and none of the three verdicts between a branch
 and `main` comes from the model that wrote the code. They also run
@@ -252,10 +254,10 @@ async def implement(gate, *, payload):
 
 @wf.node(retries=0, timeout=None)
 async def gate(review, implement, *, payload):
-    """Deterministic: git, the gate in the worktree, then CI on the PR.
+    """Deterministic: git, then the gate in the worktree.
 
-    The agent's account of any of it is not consulted. `retries=0`: a
-    red gate is not a transient failure, it is an answer, and the answer
+    The agent's account of either is not consulted. `retries=0`: a red
+    gate is not a transient failure, it is an answer, and the answer
     goes back to `implement` with the tail that explains it.
     """
 
@@ -338,7 +340,7 @@ async def qa(approve, implement, *, payload):
 
 
 @wf.node(retries=0, timeout=None)
-async def approve(merge, halted, *, payload):
+async def approve(publish, halted, *, payload):
     """The human gate, and the only node that is optional.
 
     With `FEATURE_ATTENDED=0` the pipeline merges its own passing work
@@ -349,7 +351,7 @@ async def approve(merge, halted, *, payload):
 
     title = _title(payload)
     if not ATTENDED:
-        return merge(payload)
+        return publish(payload)
 
     answer = await human_input(
         f"{title}: gate green, review passed, QA passed on "
@@ -357,7 +359,19 @@ async def approve(merge, halted, *, payload):
         options=["merge", "stop"],
     )
     await _log(f"approve: operator said {answer!r}")
-    return merge(payload) if answer == "merge" else halted(payload)
+    return publish(payload) if answer == "merge" else halted(payload)
+
+
+@wf.node(retries=0, timeout=None)
+async def publish(merge, implement, *, payload):
+    """Push, open the pull request, wait for CI — after every verdict.
+
+    `retries=0` for the reason `gate` has it: a red CI is an answer,
+    and it goes back to `implement` with the failed jobs' log.
+    """
+
+    passed, out = await steps.publish(payload)
+    return merge(out) if passed else implement(out)
 
 
 @wf.node(retries=0, timeout=900)
@@ -373,6 +387,7 @@ async def merge(*, payload):
 
 @wf.node(retries=0, timeout=60)
 async def halted(*, payload):
-    """Terminal: the operator said stop. The worktree, branch and PR stay."""
+    """Terminal: the operator said stop. The worktree and branch stay;
+    nothing was pushed."""
 
     return steps.halt(payload)

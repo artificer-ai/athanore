@@ -1,8 +1,8 @@
 """`quick` — a small change to this repository, from a description to `main`.
 
-    prepare ─▶ implement ─▶ gate ─▶ merge
-                  ▲          │
-                  └──────────┘
+    prepare ─▶ implement ─▶ gate ─▶ publish ─▶ merge
+                  ▲          │         │
+                  └──────────┴─────────┘
 
 The `feature` pipeline spends five model seats on a change — a rewrite,
 an architect, an implementer, a reviewer and a QA engineer — because a
@@ -10,10 +10,11 @@ feature is worth judging three times before it reaches `main`. A LICENSE
 file, a badge, a typo in a docstring, a one-line config change is not,
 and running it through the full pipeline is an hour of wall clock and a
 fair amount of money to reach the same merge commit. This is the short
-form: one implementer on the cheap model, the gate, the pull request,
-CI, the merge. No plan is written, nothing reviews the diff, nobody
-exercises the result, and nothing asks the operator; the gate and CI
-are the whole verdict.
+form: one implementer on the cheap model, the gate, then the push, the
+pull request, CI, the merge. No plan is written, nothing reviews the
+diff, nobody exercises the result, and nothing asks the operator; the
+gate and CI are the whole verdict, and nothing is pushed until the
+gate has passed (D269).
 
 That is the trade, and it is the operator's to make at submission time:
 `athanore submit quick "..."` says "this does not need judging". A
@@ -125,10 +126,18 @@ async def implement(gate, *, payload):
 
 
 @wf.node(retries=0, timeout=None)
-async def gate(merge, implement, *, payload):
-    """git, the gate in the worktree, then CI on the PR — the whole verdict."""
+async def gate(publish, implement, *, payload):
+    """git, then the gate in the worktree — the first half of the verdict."""
 
     passed, out = await steps.gate(payload)
+    return publish(out) if passed else implement(out)
+
+
+@wf.node(retries=0, timeout=None)
+async def publish(merge, implement, *, payload):
+    """Push, open the pull request, wait for CI — the second half."""
+
+    passed, out = await steps.publish(payload)
     return merge(out) if passed else implement(out)
 
 

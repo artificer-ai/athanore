@@ -301,18 +301,21 @@ Authenticating them, once each:
 own, each landing through a pull request as §Landing a change says:
 
 ```sh
-athanore submit feature "T090" "..."     # rewrite, plan, implement, gate, review, QA, merge
-athanore submit quick "MIT license" "..."  # implement (sonnet), gate, merge
+athanore submit feature "T090" "..."     # rewrite, plan, implement, gate, review, QA, publish, merge
+athanore submit quick "MIT license" "..."  # implement (sonnet), gate, publish, merge
 ```
 
 `feature` is for a change worth judging three times before `main`;
 `quick` is for one that is not — a file, a badge, a config line — and
-its only verdicts are the gate and CI. Which one a change is, is the
+its only verdicts are the gate and CI. Neither pushes anything until
+its verdicts are in: `publish` — the push, the PR and the CI wait — is
+the step after the last of them (D269). Which one a change is, is the
 operator's call at submission; a `quick` run that turns out to need a
 plan or a review stops with its worktree and branch intact, to be
 resubmitted as a `feature`. Both share their deterministic steps
 (`workflows/feature/steps.py`). A finished run removes its worktree and
-branch; a failed or halted one leaves both, and its PR, to be read.
+branch; a failed or halted one leaves both to be read, and its PR if it
+got as far as `publish`.
 
 Verify the wire without a workflow:
 
