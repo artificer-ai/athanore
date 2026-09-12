@@ -2,7 +2,7 @@
   "providers": {
     "llama-server": {
       "name": "llama-server (local)",
-      "baseUrl": "http://192.168.50.225:8091/v1",
+      "baseUrl": "http://127.0.0.1:8080/v1",
       "api": "openai-completions",
       "apiKey": "llama-server",
       "compat": {

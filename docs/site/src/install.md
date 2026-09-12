@@ -27,7 +27,7 @@ anywhere yet, so the commands above still fetch the last published
 release. Until it is published, install from a clone:
 
 ```sh
-git clone https://github.com/scrussell24/athanore
+git clone https://github.com/artificer-ai/athanore
 cd athanore
 uv sync --all-packages --all-groups --all-extras
 uv run athanore --help

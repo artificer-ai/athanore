@@ -63,7 +63,7 @@ athanore/web/dist/*
 # because a reader looking for where the site goes should find it.
 docs/site/build/
 
-# Scott's scratch TODO: wants that are deliberately not spec. Ignored
+# The operator's scratch TODO: wants that are deliberately not spec. Ignored
 # rather than untracked so it can be edited *during* a run — `feature`
 # refuses a dirty checkout with `git status --porcelain`, which counts
 # untracked files but never ignored ones.

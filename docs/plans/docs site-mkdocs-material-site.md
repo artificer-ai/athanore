@@ -269,13 +269,13 @@ Fixed by this plan (the implementer chooses wording, not shape):
 - `site_name: Athanore`; `site_description` is `pyproject.toml`'s
   `description`, verbatim: *Code-defined AI agent workflows over the
   Agent Client Protocol*.
-- `site_url: https://scrussell24.github.io/athanore/` and
-  `repo_url: https://github.com/scrussell24/athanore`,
-  `repo_name: scrussell24/athanore`. **This is a guess and the one guess
-  in this plan**: the checkout has no git remote today (`git remote -v`
+- `site_url: https://artificer-ai.github.io/athanore/` and
+  `repo_url: https://github.com/artificer-ai/athanore`,
+  `repo_name: artificer-ai/athanore`. **The owner is the one guess in
+  this plan**: the checkout has no git remote today (`git remote -v`
   is empty) and `README.md` says v1 is tagged here and uploaded nowhere.
-  The owner is taken from the operator's git identity. Both values are
-  in one file; say so in D214 so that a real remote is a two-line change.
+  Both values are in one file; say so in D214 so that a real remote is
+  a two-line change.
   `edit_uri: ""` — no per-page edit links until the remote is real.
 - `docs_dir: src`, `site_dir: build`, `strict: true`.
 - `validation:` — `nav.omitted_files: error`, `nav.not_found: error`,
@@ -328,7 +328,7 @@ nav:
       - HTTP API: reference/http-api.md
       - Error codes: reference/errors.md
       - Settings: reference/settings.md
-  - Design documents: https://github.com/scrussell24/athanore/tree/main/docs/v1
+  - Design documents: https://github.com/artificer-ai/athanore/tree/main/docs/v1
 ```
 
 That last entry is the **only** place `docs/v1` is named anywhere in the
