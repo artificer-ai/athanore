@@ -22,6 +22,16 @@ used to be something a human wrote before submitting; `planner` writes it
 inside the run, commits it, and `implement` resolves it by the same glob
 as before. So the plan lands in the same merge commit as the code it
 describes, and the two can never drift.
+
+**The branch lands through a pull request** (AGENTS.md §Landing a
+change, D260). `gate` runs the suite here first — the fast answer, with
+its tail quoted back to the implementer — and then pushes the branch,
+opens the PR (or updates the one an earlier attempt opened) and waits
+for CI on it, which is the same gate on a runner and the run that
+counts. Only then is a paid review spent on the branch. `merge` is
+`gh pr merge --merge`, so the merge commit is GitHub's, titled and
+bodied like the PR, and `main` is pulled back afterwards. The PR list
+is the record of what this workflow landed.
 That is the property the whole pipeline is built to have — no agent ever
 rules on its own work, and none of the three verdicts between a branch
 and `main` comes from the model that wrote the code. They also run
@@ -79,11 +89,14 @@ from .models import Brief, PlanDoc, QAVerdict, ReviewVerdict, TaskReport
 from .sandbox import (
     GATE_COMMAND,
     branch_name,
+    gh,
+    gh_try,
     git,
     git_try,
     plan_docs,
     run_gate,
     unique_branch,
+    watch_checks,
 )
 
 __all__ = ["MAX_ATTEMPTS", "MAX_LOOPS", "wf"]
@@ -221,7 +234,10 @@ async def prepare(planner, *, payload):
     title = _title(payload)
     await _refuse_dirty()
 
+    # `main` is what `origin` says it is: a PR merged from anywhere else
+    # since the last run is on the remote and not yet here.
     await git("checkout", "main")
+    await git("pull", "--ff-only", "origin", "main")
     base = await git("rev-parse", "HEAD")
     branch = await unique_branch(branch_name(title))
     await git("switch", "-c", branch)
@@ -378,16 +394,93 @@ async def gate(review, implement, *, payload):
 
     code, tail = await run_gate()
     await _log(f"gate: {'PASS' if code == 0 else f'FAIL ({code})'}\n{tail}")
-    if code == 0:
-        return review({**payload, "head": commits[0], "commits": commits, "gate": tail})
-
-    return implement(
-        _bounce(
-            payload,
-            "gate",
-            f"`{GATE_COMMAND}` failed with exit code {code}. Its last lines:\n{tail}",
+    if code:
+        return implement(
+            _bounce(
+                payload,
+                "gate",
+                f"`{GATE_COMMAND}` failed with exit code {code}. Its last "
+                f"lines:\n{tail}",
+            )
         )
+
+    # Green here: publish the branch and let CI say so on a runner. A
+    # loop-back pushes the same branch again and the PR opened for it
+    # follows the branch, so one PR carries every attempt.
+    pr = await _publish(payload)
+    code, ci = await watch_checks(branch)
+    await _log(f"gate: CI {'PASS' if code == 0 else f'FAIL ({code})'} on {pr}\n{ci}")
+    if code:
+        return implement(
+            _bounce(
+                payload,
+                "gate",
+                f"`{GATE_COMMAND}` passed here but CI on the pull request ({pr}) "
+                f"failed with exit code {code}. Its last lines:\n{ci}",
+            )
+        )
+
+    return review(
+        {**payload, "head": commits[0], "commits": commits, "gate": tail, "pr": pr}
     )
+
+
+def _subject(payload: dict[str, Any]) -> str:
+    """`T083: <headline>` — the PR title, and so the merge commit's."""
+
+    report = payload.get("report") or {}
+    headline = str(payload.get("headline") or report.get("headline") or "").strip()
+    title = _title(payload)
+    return f"{title}: {headline}" if headline else title
+
+
+async def _publish(payload: dict[str, Any]) -> str:
+    """Push the branch; open its pull request, or bring the open one up
+    to date. Returns the PR's URL.
+
+    The title and body are the implementer's headline and summary, which
+    can change between attempts, so an existing PR is edited rather
+    than left with the first attempt's words: the merge commit is made
+    from them (AGENTS.md §Landing a change).
+    """
+
+    branch = payload["branch"]
+    report = payload.get("report") or {}
+    subject = _subject(payload)
+    body = str(report.get("summary", "")).strip()
+
+    await git("push", "-u", "origin", branch)
+    url = await gh(
+        "pr",
+        "list",
+        "--head",
+        branch,
+        "--state",
+        "open",
+        "--json",
+        "url",
+        "--jq",
+        ".[0].url // empty",
+    )
+    if url:
+        await gh("pr", "edit", branch, "--title", subject, "--body", body)
+        await _log(f"gate: pushed {branch}; updated {url}")
+        return url
+    url = await gh(
+        "pr",
+        "create",
+        "--head",
+        branch,
+        "--base",
+        "main",
+        "--title",
+        subject,
+        "--body",
+        body,
+    )
+    url = url.splitlines()[-1].strip()
+    await _log(f"gate: pushed {branch}; opened {url}")
+    return url
 
 
 @wf.node(retries=1, timeout=None)
@@ -488,16 +581,19 @@ async def approve(merge, halted, *, payload):
 
 @wf.node(retries=0, timeout=900)
 async def merge(*, payload):
-    """`--no-ff` onto `main`, then the branch is gone.
+    """Merge the pull request, then pull `main` back; the branch is gone.
 
     One merge commit per feature with its work underneath, so reverting a
-    feature is reverting one commit. `retries=0`: a merge that half
-    happened is not improved by doing it again.
+    feature is reverting one commit. GitHub makes it (`--merge`, never
+    squash or rebase) with the PR's title and body as its message, which
+    is why `_publish` keeps those current. `retries=0`: a merge that
+    half happened is not improved by doing it again.
     """
 
     title, branch, base = _title(payload), payload["branch"], payload["base"]
     report = payload.get("report") or {}
-    headline = str(payload.get("headline") or report.get("headline") or "").strip()
+    subject = _subject(payload)
+    pr = str(payload.get("pr", "")).strip()
 
     # QA ran after the gate and may have scribbled on tracked files while
     # exercising the feature. Everything real was committed before the
@@ -507,24 +603,36 @@ async def merge(*, payload):
         await _log(f"merge: discarding post-gate scratch in the tree:\n{scratch}")
         await git("checkout", "--", ".")
 
+    # Off the branch before gh deletes it, so the checkout is never left
+    # on a ref that no longer exists.
     await git("checkout", "main")
-    subject = f"{title}: {headline}" if headline else title
-    code, out = await git_try(
-        "merge", "--no-ff", "-m", subject, "-m", str(report.get("summary", "")), branch
+    code, out = await gh_try(
+        "pr",
+        "merge",
+        branch,
+        "--merge",
+        "--delete-branch",
+        "--subject",
+        subject,
+        "--body",
+        str(report.get("summary", "")),
     )
     if code:
-        await git_try("merge", "--abort")
         await git_try("switch", branch)
-        raise RuntimeError(f"{title}: merge of {branch} into main failed:\n{out}")
+        raise RuntimeError(f"{title}: merge of {pr or branch} failed:\n{out}")
 
+    await git("pull", "--ff-only", "origin", "main")
+    await git_try("branch", "-D", branch)  # gh usually has; make sure
     merge_commit = await git("rev-parse", "HEAD")
-    await git("branch", "-d", branch)
-    await _log(f"merge: {subject}\n{merge_commit[:12]} on main; {branch} deleted")
+    await _log(
+        f"merge: {subject}\n{merge_commit[:12]} on main via {pr}; {branch} deleted"
+    )
 
     return {
         "title": title,
         "merged": True,
         "merge_commit": merge_commit,
+        "pr": pr,
         "base": base,
         "commits": payload.get("commits", []),
         "report": report,
@@ -535,11 +643,12 @@ async def merge(*, payload):
 
 @wf.node(retries=0, timeout=60)
 async def halted(*, payload):
-    """Terminal: the operator said stop. The branch stays, unmerged."""
+    """Terminal: the operator said stop. The branch and its PR stay open."""
 
     return {
         "title": _title(payload),
         "merged": False,
         "branch": payload["branch"],
+        "pr": payload.get("pr"),
         "report": payload.get("report"),
     }
