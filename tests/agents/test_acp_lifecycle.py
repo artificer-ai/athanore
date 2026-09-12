@@ -6,7 +6,7 @@ scenario. Nothing here is mocked, because every assertion is about the
 wire or about the store — what the agent was sent, what it was spawned
 with, and what landed in the transcript.
 
-Five things are being pinned, and four of them are bugs the MVP had:
+Six things are being pinned, and four of them are bugs the MVP had:
 
 - **Config options resolve by category.** The ids differ per agent; the
   MVP sent pi's id to claude-agent-acp and hid the rejection under a bare
@@ -27,6 +27,11 @@ Five things are being pinned, and four of them are bugs the MVP had:
   or ``session/load`` and never a ``session/new``; the replay a load
   produces is not this attempt's transcript and counts nothing (23
   §Lifecycle of a continued run, §Refusal, D254, D255).
+- **A session held open is one process and one entry per prompt.**
+  ``open()`` spawns once and yields a session a body prompts as often as
+  it likes; each prompt records its own stats entry, the exit records
+  none and stops the child on every path, and a dead session refuses
+  every later prompt (23 §A session held open, D264).
 
 The turn loop, the outcomes and the stats are ``test_acp_outcomes.py``;
 the tiers are ``test_tooling.py``.
@@ -36,6 +41,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Any
@@ -50,8 +56,9 @@ from acp.schema import (
     ToolCallStart,
     ToolCallUpdate,
 )
+from pydantic import BaseModel
 
-from athanore.agents.acp import ACPAgent, ACPClient
+from athanore.agents.acp import ACPAgent, ACPClient, AgentSession
 from athanore.agents.base import AgentError
 from athanore.agents.policies import MCP_SERVER_NAME
 from athanore.engine.context import TaskContext, bind
@@ -60,6 +67,9 @@ from athanore.testing.fake_acp import ENV_MARKER
 
 Make = Callable[..., Awaitable[TaskContext]]
 Read = Callable[[TaskContext], Awaitable[list[Any]]]
+
+#: The fuse on every wait here. Reached only when something is broken.
+DEADLINE = 10.0
 
 #: The fake's own config advertisement, with ids that are **not** the
 #: category names — pi calls the second one ``thought_level`` and
@@ -767,6 +777,426 @@ async def test_a_replaying_client_answers_requests_and_drops_updates() -> None:
     )
     assert client.text == ["live"]
     assert client.replayed == 2
+
+
+# --------------------------------------------------------------------------
+# Holding a session (23)
+# --------------------------------------------------------------------------
+
+
+class Verdict(BaseModel):
+    """The shape the missing-submission test asks for."""
+
+    verdict: str
+
+
+class Judged(Spy):
+    """A ``Spy`` that wants a submission and never asks twice for it."""
+
+    output_model = Verdict
+    max_repair_turns = 0
+
+
+async def hold(agent: ACPAgent, ctx: TaskContext, *prompts: str) -> list[Any]:
+    """Open ``agent`` once, prompt it with each text in order, close it."""
+
+    with bind(ctx):
+        async with agent.open() as held:
+            return [await held.prompt(text) for text in prompts]
+
+
+def stopped(agent: Spy) -> bool:
+    """Whether the child the spy kept has been reaped."""
+
+    return agent.process is not None and agent.process.returncode is not None
+
+
+async def test_two_prompts_share_one_process_and_one_session(
+    context: Make, transcript: Read, stats_lines: Read, logs: Path
+) -> None:
+    """23 §Lifecycle of a held session: one spawn, one ``session/new``, two
+    ``session/prompt``; the child alive between the prompts and gone after
+    the block; each result and each entry the prompt's own."""
+
+    ctx = await context()
+    agent = Spy(
+        command=scenario(
+            prompts=[
+                {"text": ["one"], "tool_calls": 1},
+                {"text": ["two"], "tool_calls": 2, "sleep_s": 2},
+            ],
+            request_log=str(logs),
+        )
+    )
+    with bind(ctx):
+        async with agent.open() as held:
+            assert isinstance(held, AgentSession)
+            sid = held.session_id
+            first = await held.prompt("say one")
+            assert agent.process is not None
+            assert agent.process.returncode is None, "alive between the prompts"
+            second = await held.prompt("say two")
+    assert stopped(agent), "and stopped by the exit"
+
+    assert methods(logs).count("initialize") == 1
+    assert methods(logs).count("session/new") == 1
+    assert methods(logs).count("session/prompt") == 2
+    for sent in params_of(logs, "session/prompt"):
+        text = sent["prompt"][0]["text"]
+        assert text.startswith("You are a test agent."), "the full assembly, each time"
+        assert f"Work on task {ctx.task_id}" in text
+
+    assert first.ok and second.ok
+    assert first.text == "one"
+    assert second.text == "two", "the second prompt's text, not both prompts'"
+    assert first.session_id == second.session_id == sid
+    assert await transcript(ctx) == [
+        ("text", "one"),
+        ("tool_call", "fake tool 1"),
+        ("tool_result", "completed"),
+        ("text", "two"),
+        ("tool_call", "fake tool 1"),
+        ("tool_result", "completed"),
+        ("tool_call", "fake tool 2"),
+        ("tool_result", "completed"),
+    ]
+
+    lines = await stats_lines(ctx)
+    assert len(lines) == 2, "one entry per prompt, none at exit"
+    assert all(f"session={sid[:8]}" in line for line in lines)
+    assert first.stats["session_id"] == second.stats["session_id"] == sid
+    assert first.stats["tool_calls"] == 1
+    assert second.stats["tool_calls"] == 2, "the prompt's own, not the session's"
+    assert first.stats["duration_s"] <= 1
+    assert second.stats["duration_s"] >= 2, "the prompt's own, from its send"
+
+
+async def test_run_is_open_plus_one_prompt(
+    context: Make, stats_lines: Read, logs: Path
+) -> None:
+    """23 §Surface: the one-shot form is the held form with one prompt.
+
+    Every other lifecycle and outcomes test is the rest of this assertion;
+    this one says the wire, the child and the entry count are unchanged.
+    """
+
+    ctx = await context()
+    agent = Spy(command=scenario(text=["done"], tool_calls=1, request_log=str(logs)))
+    result = await run(agent, ctx)
+
+    assert methods(logs).count("session/new") == 1
+    assert methods(logs).count("session/prompt") == 1
+    assert stopped(agent)
+    assert result.ok and result.text == "done"
+    assert result.stats["tool_calls"] == 1
+    assert len(await stats_lines(ctx)) == 1
+
+
+async def test_an_exception_in_the_block_stops_the_child_and_records_nothing_more(
+    context: Make, stats_lines: Read
+) -> None:
+    """23 step 5: the exit is a ``finally`` and records no entry of its own —
+    the prompt's is the only one, and a block that asked nothing has none."""
+
+    ctx = await context()
+    agent = Spy(command=scenario(prompts=[{"text": ["one"]}]))
+    with pytest.raises(RuntimeError, match="body"):
+        with bind(ctx):
+            async with agent.open() as held:
+                await held.prompt("say one")
+                raise RuntimeError("body")
+    assert stopped(agent)
+    lines = await stats_lines(ctx)
+    assert len(lines) == 1, "the prompt's entry, and nothing at exit"
+    assert " ok " in lines[0]
+
+    ctx2 = await context()
+    quiet = Spy(command=scenario(prompts=[{"text": ["one"]}]))
+    with pytest.raises(RuntimeError, match="at once"):
+        with bind(ctx2):
+            async with quiet.open():
+                raise RuntimeError("at once")
+    assert stopped(quiet)
+    assert await stats_lines(ctx2) == [], "nothing was asked, nothing is recorded"
+
+
+async def test_a_cancelled_prompt_records_shutdown_and_the_exit_stops_the_child(
+    context: Make, stats_lines: Read
+) -> None:
+    """23 step 5, D266: a prompt in flight when the body is cancelled records
+    ``failed/shutdown`` as any cancelled run does, then the exit stops the
+    child."""
+
+    ctx = await context()
+    agent = Spy(command=scenario(prompts=[{"text": ["one"]}, {"sleep_s": 30}]))
+    parked = asyncio.Event()
+
+    async def body() -> None:
+        with bind(ctx):
+            async with agent.open() as held:
+                await held.prompt("say one")
+                parked.set()
+                await held.prompt("take forever")
+
+    task = asyncio.get_running_loop().create_task(body())
+    async with asyncio.timeout(DEADLINE):
+        await parked.wait()
+        await asyncio.sleep(0.2)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    assert stopped(agent), "no zombie"
+    lines = await stats_lines(ctx)
+    assert len(lines) == 2, "the cancelled prompt pays its bill once, not twice"
+    assert " ok " in lines[0]
+    assert "failed (shutdown)" in lines[1]
+
+
+async def test_a_timeout_closes_the_session_and_the_next_prompt_is_refused(
+    context: Make, stats_lines: Read, logs: Path
+) -> None:
+    """23 step 4: after a timeout the child is stopped **at once** — inside
+    the block — and every later prompt raises ``the session is closed``."""
+
+    ctx = await context()
+    agent = Spy(
+        command=scenario(
+            prompts=[{"sleep_s": 30}, {"text": ["never"]}], request_log=str(logs)
+        )
+    )
+    agent.timeout = 0.5
+    with bind(ctx):
+        async with agent.open() as held:
+            with pytest.raises(AgentError, match="did not finish"):
+                await held.prompt("take forever")
+            assert stopped(agent), "stopped inside the block, not at its exit"
+            with pytest.raises(
+                AgentError,
+                match=r"the session is closed: the agent did not finish within 0\.5s",
+            ):
+                await held.prompt("anything")
+
+    assert methods(logs).count("session/prompt") == 1, "the refusal sent nothing"
+    lines = await stats_lines(ctx)
+    assert len(lines) == 1, "the refused prompt records no entry"
+    assert "failed (timeout)" in lines[0]
+
+
+async def test_a_transport_failure_closes_the_session_and_the_next_prompt_is_refused(
+    context: Make, stats_lines: Read, logs: Path
+) -> None:
+    """23 step 4, the other reason that kills a session: a policy that
+    could not be honoured is the transport failure D10 makes loud."""
+
+    ctx = await context()
+    agent = Spy(
+        command=scenario(
+            prompts=[
+                {"permissions": [{"options": [{"kind": "reject_once"}]}]},
+                {"text": ["never"]},
+            ],
+            request_log=str(logs),
+        )
+    )
+    with bind(ctx):
+        async with agent.open() as held:
+            with pytest.raises(AgentError, match="auto_allow"):
+                await held.prompt("do a thing")
+            assert stopped(agent)
+            with pytest.raises(AgentError, match="the session is closed: .*auto_allow"):
+                await held.prompt("anything")
+
+    assert methods(logs).count("session/prompt") == 1
+    lines = await stats_lines(ctx)
+    assert len(lines) == 1
+    assert "failed (transport)" in lines[0]
+
+
+@pytest.mark.parametrize("stop", ["refusal", "cancelled"])
+async def test_a_refusal_leaves_the_session_open(
+    context: Make, stats_lines: Read, logs: Path, stop: str
+) -> None:
+    """23 step 4: a failed *result* is an answer; the process is fine and the
+    next prompt is answered on the same session."""
+
+    ctx = await context()
+    agent = Fake(
+        command=scenario(
+            prompts=[{"stop_reason": stop}, {"text": ["two"]}], request_log=str(logs)
+        )
+    )
+    first, second = await hold(agent, ctx, "one", "two")
+
+    assert first.ok is False
+    assert first.error == stop
+    assert second.ok
+    assert second.text == "two"
+    assert first.session_id == second.session_id
+    assert methods(logs).count("session/prompt") == 2
+    lines = await stats_lines(ctx)
+    assert len(lines) == 2
+    assert f"failed ({stop})" in lines[0]
+    assert " ok " in lines[1]
+
+
+async def test_a_missing_submission_leaves_the_session_open(
+    served_context: Make, stats_lines: Read
+) -> None:
+    """D266: ``no_submission`` raises, as from ``run()``, and closes nothing —
+    the second prompt submits and the body gets its value."""
+
+    ctx = await served_context()
+    agent = Judged(command=scenario(prompts=[{}, {"submit": {"verdict": "ok"}}]))
+    with bind(ctx):
+        async with agent.open() as held:
+            with pytest.raises(AgentError, match="without a valid submission"):
+                await held.prompt("submit something")
+            assert not stopped(agent), "the process is fine"
+            second = await held.prompt("try again")
+    assert second.ok
+    assert second.output.verdict == "ok"
+    lines = await stats_lines(ctx)
+    assert len(lines) == 2
+    assert "failed (no_submission)" in lines[0]
+    assert " ok " in lines[1]
+
+
+async def test_a_second_prompt_while_one_is_in_flight_is_a_runtime_error(
+    context: Make, stats_lines: Read, logs: Path
+) -> None:
+    """23: one prompt at a time; the second is refused before the wire."""
+
+    ctx = await context()
+    agent = Fake(
+        command=scenario(
+            prompts=[{"text": ["one"], "sleep_s": 1}], request_log=str(logs)
+        )
+    )
+    with bind(ctx):
+        async with agent.open() as held:
+            async with asyncio.timeout(DEADLINE):
+                first = asyncio.get_running_loop().create_task(held.prompt("a"))
+                await asyncio.sleep(0.1)
+                with pytest.raises(RuntimeError, match="already in flight"):
+                    await held.prompt("b")
+                result = await first
+    assert result.ok and result.text == "one"
+    assert methods(logs).count("session/prompt") == 1
+    assert len(await stats_lines(ctx)) == 1, "the refused prompt records nothing"
+
+
+@pytest.mark.parametrize(
+    ("resume", "method"),
+    [(False, "session/load"), (True, "session/resume")],
+)
+async def test_open_with_a_session_id_continues_it_once_then_prompts(
+    context: Make,
+    transcript: Read,
+    logs: Path,
+    sessions: dict[str, Any],
+    tmp_path: Path,
+    resume: bool,
+    method: str,
+) -> None:
+    """23 §Surface: ``open()`` on ``session_id=`` continues the session at
+    entry, once, and holds it for every prompt after."""
+
+    cwd = str(tmp_path)
+    _ctx1, first = await first_run(context, sessions, cwd, text=["one"])
+    sid = first.session_id
+
+    ctx2 = await context()
+    agent = Fake(
+        command=scenario(
+            sessions={**sessions, "resume": resume},
+            prompts=[{"text": ["two"]}, {"text": ["three"]}],
+            request_log=str(logs),
+        ),
+        cwd=cwd,
+        session_id=sid,
+    )
+    with bind(ctx2):
+        async with agent.open() as held:
+            assert held.session_id == sid
+            a = await held.prompt("two?")
+            b = await held.prompt("three?")
+
+    assert methods(logs)[:2] == ["initialize", method]
+    assert methods(logs).count(method) == 1
+    assert "session/new" not in methods(logs)
+    assert methods(logs).count("session/prompt") == 2
+    assert a.text == "two"
+    assert b.text == "three"
+    assert await transcript(ctx2) == [
+        ("notice", f"continuing session {sid}"),
+        ("text", "two"),
+        ("text", "three"),
+    ]
+    assert a.session_id == b.session_id == sid
+    assert a.stats["session_id"] == b.stats["session_id"] == sid
+
+
+async def test_the_provider_gives_a_stop_reason_per_prompt_and_stats_only_to_run(
+    context: Make,
+) -> None:
+    """23 §Stats of a held session, D256: every prompt has a final turn; only
+    a one-shot ``run()`` is the whole session the provider reports."""
+
+    ctx = await context()
+    held_agent = Fake(command=scenario(prompts=[{}, {}]))
+    held_agent.stats_provider = Recording(
+        stats={"cost": 0.25, "input_tokens": 999, "model": "answered-with"},
+        stop_reason=None,
+    )
+    a, b = await hold(held_agent, ctx, "one", "two")
+    sid = a.session_id
+    assert held_agent.stats_provider.called == [
+        ("final_stop_reason", sid),
+        ("final_stop_reason", sid),
+    ]
+    assert "cost" not in a.stats and "cost" not in b.stats
+
+    ctx2 = await context()
+    one_shot = Fake(command=scenario())
+    one_shot.stats_provider = Recording(
+        stats={"cost": 0.25, "input_tokens": 999, "model": "answered-with"},
+        stop_reason=None,
+    )
+    result = await run(one_shot, ctx2)
+    assert one_shot.stats_provider.called == [
+        ("final_stop_reason", result.session_id),
+        ("stats", result.session_id),
+    ]
+    assert result.stats["cost"] == 0.25
+
+
+async def test_an_initialize_failure_raises_from_open_and_never_enters_the_block(
+    context: Make, stats_lines: Read
+) -> None:
+    """23 step 1: an entry that fails stops the child, records one
+    ``failed/transport`` entry naming no session, and raises from
+    ``open()`` — the block is never entered.
+
+    The child reads the ``initialize`` line and exits without answering,
+    so the SDK rejects the pending request when its stdout closes.
+    """
+
+    ctx = await context()
+    agent = Spy(
+        command=[sys.executable, "-c", "import sys; sys.stdin.readline(); sys.exit(1)"]
+    )
+    entered = False
+    with pytest.raises(AgentError, match="connection failed"):
+        with bind(ctx):
+            async with agent.open():
+                entered = True
+    assert not entered
+    assert stopped(agent)
+    lines = await stats_lines(ctx)
+    assert len(lines) == 1
+    assert "failed (transport)" in lines[0]
+    assert "session=" not in lines[0]
 
 
 # --------------------------------------------------------------------------

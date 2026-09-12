@@ -35,12 +35,20 @@ the handshake, the prompt, the repair turns, and the cleanup.
 - **Failure inside a callback is not the agent's to swallow.** An
   exception raised in an ACP callback becomes a JSON-RPC error to the
   agent and never reaches the caller, so a policy that could not be
-  honoured is *recorded* on the client and re-raised by ``run()`` once
-  the turn ends. Failing loudly beats reporting success (D10).
-- **Stats are recorded exactly once, on every exit path, before the
-  exception.** The tokens were spent whether or not the turn worked, and
-  the failure path is where a number is most worth having (05 §Stats
-  entry, T039a).
+  honoured is *recorded* on the client and re-raised by ``prompt()``
+  once the turn ends. Failing loudly beats reporting success (D10).
+- **Stats are recorded exactly once per prompt, on every exit path,
+  before the exception — and never at the exit of a held session.** The
+  tokens were spent whether or not the turn worked, and the failure path
+  is where a number is most worth having (05 §Stats entry, T039a); a
+  block that asked nothing spent nothing and records nothing (05
+  §Holding a session).
+- **A session is held for a block, and ``run()`` is that block with one
+  prompt.** :meth:`ACPAgent.open` spawns, handshakes and opens the
+  session on entry, yields an :class:`AgentSession` whose ``prompt()``
+  is one assignment, and stops the child on exit whatever the path;
+  after a transport failure or a timeout the child is stopped at once
+  and later prompts are refused (23 §A session held open, D264).
 - **A replay is history, not this attempt's transcript.** While the
   client is ``replaying`` — the façade sets it around a ``session/load``
   and nowhere else — the updates an agent re-sends write no chunk, add
@@ -62,9 +70,22 @@ import asyncio
 import os
 import shlex
 import time
-from collections.abc import Iterator, Mapping, Sequence
-from contextlib import contextmanager, suppress
+from collections.abc import (
+    AsyncIterator,
+    Awaitable,
+    Callable,
+    Iterator,
+    Mapping,
+    Sequence,
+)
+from contextlib import (
+    AbstractAsyncContextManager,
+    asynccontextmanager,
+    contextmanager,
+    suppress,
+)
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Any, Literal, NoReturn
 
 from acp import PROTOCOL_VERSION, Client, RequestError, connect_to_agent, text_block
@@ -123,6 +144,7 @@ _log = get_logger(__name__)
 __all__ = [
     "ACPAgent",
     "ACPClient",
+    "AgentSession",
     "CONFIG_CATEGORIES",
     "KILL_AFTER",
     "SCRUBBED_NAMES",
@@ -249,7 +271,14 @@ class ACPClient(Client):
     an :exc:`~athanore.agents.base.AgentError` from a policy would end up
     as an error response and a run that reported ``ok`` — the exact shape
     of 20 §Finding 1. It is therefore recorded in :attr:`failure` on the
-    way past, and ``ACPAgent.run()`` raises it once the turn is over.
+    way past, and the façade's ``prompt()`` raises it once the turn is
+    over.
+
+    **It counts for the whole process.** :attr:`text`, :attr:`tool_calls`
+    and :attr:`denied_permissions` accumulate across every prompt of a
+    held session; a prompt reads its own share by the offset it started
+    at (05 §Holding a session), so a ``client_class`` subclass sees what
+    it always saw.
 
     **The transcript never fails a turn.** A chunk that cannot be
     appended — the attempt's transcript already closed, the store
@@ -275,7 +304,7 @@ class ACPClient(Client):
         self.tool_calls = 0
         #: How many permissions were answered with a ``reject_*`` option.
         self.denied_permissions = 0
-        #: The first policy failure of the turn, re-raised by ``run()``.
+        #: The first policy failure of the turn, re-raised by ``prompt()``.
         self.failure: AgentError | None = None
         #: The connection this client was bound to, from ``on_connect``.
         self.connection: Any = None
@@ -388,7 +417,7 @@ class ACPClient(Client):
         """
 
     async def _guarded(self, resolving: Any) -> Any:
-        """Await a policy, keeping its failure where ``run()`` can find it.
+        """Await a policy, keeping its failure where ``prompt()`` can find it.
 
         The SDK answers the agent with a JSON-RPC error for anything
         raised in here, so an unrecorded :exc:`AgentError` is a run that
@@ -561,47 +590,121 @@ def _content_text(block: Any) -> str:
 
 
 # --------------------------------------------------------------------------
-# What one run() accumulates, and what its `finally` has to deal with
+# What a held session accumulates, and what its exit has to deal with
 # --------------------------------------------------------------------------
 
 
 @dataclass
 class _Session:
-    """The mutable half of a run: the child, the counters, the outcome.
+    """The process half of a held session: what ``open()`` spawned, what
+    the block's exit stops.
 
-    It exists because ``run()``'s ``finally`` has to clean up and account
-    for whatever the ``try`` got as far as — a spawn that failed has no
-    connection, a turn that timed out has no response — and threading six
-    optionals through five methods is how a cleanup path comes to miss
-    one.
+    It exists because the exit has to clean up whatever entry got as far
+    as — a spawn that failed has no connection, a handshake that timed
+    out has no session — and threading four optionals through five
+    methods is how a cleanup path comes to miss one. Every field the
+    cleanup deals with is nulled as it is dealt with, so the cleanup may
+    run twice (once when a prompt kills the session, once at the exit)
+    and the second run finds nothing left to do.
     """
 
-    started: float
     process: asyncio.subprocess.Process | None = None
     connection: ClientSideConnection | None = None
     client: ACPClient | None = None
     stderr: asyncio.Task[None] | None = None
     session_id: str | None = None
+    #: The tooling tier the handshake chose; every prompt renders for it.
+    tier: Tier = "http"
+    #: Whether the block is the one-shot ``run()``: one prompt, so its
+    #: entry describes the whole session and may consult the provider
+    #: (05 §Stats entry, D256).
+    whole: bool = False
+    #: A prompt is in flight. A second one is a programming error.
+    busy: bool = False
+    #: Why the session is dead, once it is. Every later prompt raises it.
+    closed: str | None = None
+
+
+@dataclass
+class _Turn:
+    """The accounting half: one prompt (or the entry handshake) and its entry.
+
+    A held session records one stats entry per prompt (05 §Stats entry),
+    so the counters an entry is built from live here rather than on the
+    session. The client keeps counting for the whole process; a turn
+    remembers where the counters stood when it began and reads its own
+    share as the difference.
+    """
+
+    started: float
+    #: Where the client's whole-session counters stood when this turn
+    #: began; the turn's numbers are the differences.
+    text_at: int = 0
+    tool_calls_at: int = 0
+    denied_at: int = 0
     repair_turns: int = 0
-    #: How the run ended, as 05 §Stats entry spells it. ``failed`` until
-    #: something says otherwise: a run that stopped where nothing set an
+    #: How the turn ended, as 05 §Stats entry spells it. ``failed`` until
+    #: something says otherwise: a turn that stopped where nothing set an
     #: outcome did not succeed.
     status: Literal["ok", "failed"] = "failed"
     reason: StatsReason | None = None
-    #: Token counters summed over every turn of this run, ACP's own.
+    #: Token counters summed over this prompt and its repair turns, ACP's.
     usage: dict[str, int] = field(default_factory=dict)
-    #: The entry that was built for this run, and the guard that keeps it
+    #: The entry that was built for this turn, and the guard that keeps it
     #: to one: :func:`record_entry` deduplicates by identity.
     entry: dict[str, Any] | None = None
 
     def add_usage(self, reported: Any) -> None:
-        """Add one turn's ACP ``usage`` to the run's, if it carried one."""
+        """Add one ACP turn's ``usage`` to this prompt's, if it carried one."""
 
         turn = usage_from_acp(reported)
         if turn is None:
             return
         for key, value in turn.items():
             self.usage[key] = self.usage.get(key, 0) + value
+
+
+# --------------------------------------------------------------------------
+# What open() yields
+# --------------------------------------------------------------------------
+
+
+class AgentSession:
+    """A session held open by :meth:`ACPAgent.open`: its id, and ``prompt()``.
+
+    One process, one ACP session, as many prompts as the block makes (05
+    §Holding a session, 23 §A session held open). Each :meth:`prompt` is
+    one assignment — the full prompt assembly of 19, the turn under the
+    agent's ``timeout``, the repair loop, the outcome — and returns the
+    :class:`~athanore.agents.base.AgentResult` that ``run()`` would, with
+    one stats entry recorded for it. One prompt at a time: a second call
+    while one is in flight is a :exc:`RuntimeError` before anything
+    reaches the wire. After a transport failure or a timeout the session
+    is dead and every later call raises :exc:`~athanore.agents.base.
+    AgentError` (``the session is closed: <reason>``); a refusal, a
+    cancelled turn, a truncated turn or a missing submission leaves it
+    open.
+
+    The lifecycle stays on the agent — this is a handle, not the session
+    — so the class a workflow author sees has a constructor with nothing
+    private in it.
+    """
+
+    #: The id the agent gave, or the one continued. It is the one thing a
+    #: body should write down: a re-executed attempt hands it back as
+    #: ``session_id=`` (23 §Lifecycle of a held session, step 6).
+    session_id: str
+
+    def __init__(
+        self, session_id: str, turn: Callable[[str], Awaitable[AgentResult]]
+    ) -> None:
+        self.session_id = session_id
+        self._turn = turn
+
+    async def prompt(self, prompt: str = "") -> AgentResult:
+        """One assignment on the held session; the result is the prompt's."""
+
+        return await self._turn(prompt)
 
 
 # --------------------------------------------------------------------------
@@ -628,6 +731,20 @@ class ACPAgent(Agent):
     ``examples/`` (02 §Small core). ``settings.agent_command`` replaces it
     on **every** subclass at spawn time, which is how the example suite
     runs on ``FakeACPAgent`` in CI (05, 13 §Running examples on the fake).
+
+    ``run(prompt)`` is one process for one prompt. A body that talks to
+    the same agent turn after turn holds the session open instead, and
+    prompts it as often as it likes on one process (05 §Holding a
+    session, 23 §A session held open, D264):
+
+    .. code-block:: python
+
+        async with ChatAgent(cwd=checkout).open() as agent:
+            while True:
+                said = await human_input(ask)
+                if said == "stop":
+                    return said
+                reply = await agent.prompt(said)
     """
 
     #: The ACP adapter to spawn. Overridden per instance, and by
@@ -742,19 +859,49 @@ class ACPAgent(Agent):
         env.update(self.env)
         return env
 
-    # -- the run ---------------------------------------------------------
+    # -- the session: held for a block, or for one prompt -----------------
+
+    def open(self) -> AbstractAsyncContextManager[AgentSession]:
+        """Hold one session open for a block (05 §Holding a session, D264).
+
+        An async context manager and nothing else — there is no
+        ``close()`` to forget. Its entry declares this agent's
+        ``output_model`` and ``ask_policy`` on the task for the length of
+        the block, spawns the adapter, handshakes, opens the session — a
+        new one, or the one ``session_id`` names — and configures it by
+        category, all under ``timeout``; on any failure there the child
+        is stopped, one stats entry is recorded (``failed/transport``, or
+        ``timeout``), :exc:`AgentError` leaves ``open()`` and the block is
+        never entered. It yields an :class:`AgentSession` whose
+        ``prompt()`` is one assignment with one stats entry of its own.
+        Its exit — return, exception, cancellation — flushes the
+        transcript, closes the connection and stops the child, and
+        records nothing: every prompt already recorded its own entry.
+
+        Nothing bounds the block: ``timeout`` bounds the entry and then
+        each prompt with its repairs, and a chat idles for hours by
+        design. The node's own ``timeout`` is the bound on the whole
+        session, and the engine pauses it while the task is ``waiting``
+        (04 §Timeouts) — which is what a held session spends parked on a
+        person. The pool slot is given back while it is parked too, so
+        the pool caps agents *answering*, not agents alive (04
+        §Waiting, D264).
+        """
+
+        return self._session(whole=False)
 
     async def run(self, prompt: str = "") -> AgentResult:
         """Spawn the agent, hand it the task, and account for what happened.
 
-        The lifecycle of 05, in order: declare this agent's
-        ``output_model`` and ``ask_policy`` on the task for the duration,
-        spawn, handshake, open a session — a new one, or the one
-        ``session_id`` names — configure it by category, prompt,
-        repair while it is worth repairing, map the outcome, and then —
-        on every path, including a cancelled one — flush the transcript,
-        close the connection, stop the child, and record exactly one
-        stats entry.
+        :meth:`open` with one prompt, on one code path: the lifecycle of
+        05, in order — declare, spawn, handshake, open the session,
+        configure it by category, prompt, repair while it is worth
+        repairing, map the outcome, and then, on every path including a
+        cancelled one, flush the transcript, close the connection, stop
+        the child and record exactly one stats entry. The one thing that
+        differs from a held prompt is that this entry describes the whole
+        session, so it is the one that may consult the provider's
+        ``stats()`` (05 §Stats entry, D256).
 
         Returns a **failed** :class:`AgentResult` for a refusal, a
         cancellation or a truncated final turn; raises
@@ -763,55 +910,182 @@ class ACPAgent(Agent):
         §AgentResult).
         """
 
+        async with self._session(whole=True) as held:
+            return await held.prompt(prompt)
+
+    @asynccontextmanager
+    async def _session(self, *, whole: bool) -> AsyncIterator[AgentSession]:
+        """The one context manager behind :meth:`open` and :meth:`run`.
+
+        ``whole`` is the one flag the two need to differ on: a one-shot
+        ``run()`` is the whole session and its entry may consult the
+        provider; a held prompt is a fraction of one and may not (05
+        §Stats entry). ``declare(ctx)`` wraps the block from entry to
+        exit, as it wraps a run: the class is the configuration for as
+        long as the session is open.
+        """
+
         ctx = maybe_current_task()
         settings = AthanoreSettings()
-        session = _Session(started=time.monotonic())
+        session = _Session(whole=whole)
         async with self.declare(ctx):
+            handshake = _Turn(started=time.monotonic())
             try:
-                return await self._converse(prompt, ctx, settings, session)
-            except asyncio.CancelledError:
-                # A shutdown or a cancelled task. The numbers still stand.
-                session.reason = "shutdown"
+                await self._enter(ctx, settings, session, handshake)
+            except BaseException:
+                # The block is never entered: the child is stopped and the
+                # handshake's own entry says why (05 §Holding a session).
+                await self._cleanup(ctx, session)
+                await self._record(ctx, session, handshake)
                 raise
+            assert session.session_id is not None
+            try:
+                yield AgentSession(
+                    session.session_id, partial(self._turn, ctx, settings, session)
+                )
             finally:
                 await self._cleanup(ctx, session)
-                await self._record(ctx, session)
 
-    async def _converse(
-        self,
-        prompt: str,
-        ctx: TaskContext | None,
-        settings: AthanoreSettings,
-        session: _Session,
-    ) -> AgentResult:
-        """One ACP conversation, with every failure named on the way out.
+    def _budget(self, settings: AthanoreSettings) -> float:
+        """This agent's timeout, or the settings' (05 §Session lifecycle)."""
 
-        The timeout covers the whole conversation rather than one
-        ``prompt`` call: ``settings.agent_timeout`` is a run's budget (three
-        hours by default), a repair turn is part of the same run, and a
-        handshake that never answers would otherwise hang with no bound
-        at all.
+        return self.timeout or settings.agent_timeout
+
+    @asynccontextmanager
+    async def _bounded(self, turn: _Turn, budget: float) -> AsyncIterator[None]:
+        """One step of the lifecycle under ``timeout``, every failure named.
+
+        The entry and each prompt run under it. ``budget`` is
+        ``settings.agent_timeout`` unless the agent has its own (three
+        hours by default): a prompt's repair turns are part of the same
+        step, and a handshake that never answers would otherwise hang
+        with no bound at all. Every way out is mapped onto 05 §Stats
+        entry's reasons on ``turn``, so the entry recorded afterwards
+        says what happened whether or not anything answered.
         """
 
         try:
+            async with asyncio.timeout(budget):
+                yield
+        except asyncio.CancelledError:
+            # A shutdown or a cancelled task. The numbers still stand.
+            turn.reason = "shutdown"
+            raise
+        except AgentError:
+            if turn.reason is None:
+                turn.reason = "transport"
+            raise
+        except TimeoutError:
+            turn.reason = "timeout"
+            raise AgentError(f"the agent did not finish within {budget}s") from None
+        except Exception as exc:
+            turn.reason = "transport"
+            raise AgentError(f"the agent connection failed: {exc}") from exc
+
+    async def _enter(
+        self,
+        ctx: TaskContext | None,
+        settings: AthanoreSettings,
+        session: _Session,
+        turn: _Turn,
+    ) -> None:
+        """Spawn, handshake, open the session and configure it, under ``timeout``.
+
+        05 §Session lifecycle, steps 1 and 2, whole: the same steps
+        whether the session is new or continued, and whether the block
+        will make one prompt or fifty. ``turn`` is the handshake's
+        accounting, recorded only if this fails.
+        """
+
+        async with self._bounded(turn, self._budget(settings)):
             client = self.client_class(self, ctx, _policies(self, settings))
             session.client = client
             await self._spawn(session, settings, ctx)
-            async with asyncio.timeout(self.timeout or settings.agent_timeout):
-                return await self._exchange(prompt, ctx, session, client)
-        except AgentError:
-            if session.reason is None:
-                session.reason = "transport"
+            conn = session.connection
+            assert conn is not None
+            initialized = await conn.initialize(
+                protocol_version=PROTOCOL_VERSION,
+                client_capabilities=ClientCapabilities(),
+                client_info=Implementation(name="athanore", version=__version__),
+            )
+            if initialized.protocol_version != PROTOCOL_VERSION:
+                _log.warning(
+                    "the agent answered a different ACP protocol version",
+                    agent=type(self).__name__,
+                    ours=PROTOCOL_VERSION,
+                    theirs=initialized.protocol_version,
+                )
+            session.tier = self._tier(initialized, ctx)
+            options = await self._open_session(
+                session, client, initialized, session.tier, ctx
+            )
+            assert session.session_id is not None
+            await self._configure(conn, client, session.session_id, options)
+
+    async def _turn(
+        self,
+        ctx: TaskContext | None,
+        settings: AthanoreSettings,
+        session: _Session,
+        prompt: str,
+    ) -> AgentResult:
+        """One prompt on the held session, with its own entry (05 §Holding
+        a session).
+
+        The two refusals come first and record nothing, because nothing
+        reached the wire and nothing was spent: a prompt while one is in
+        flight is a programming error (:exc:`RuntimeError`), and a prompt
+        on a dead session is :exc:`AgentError` naming why it died. Then
+        the render, the turn under ``timeout``, the repair loop and the
+        outcome, exactly as ``run()`` does them; then, on every path, the
+        transcript is flushed and this prompt's entry is recorded.
+
+        What kills the session is a transport failure or a timeout: the
+        agent's state is unknown, so the child is stopped at once and
+        every later prompt is refused until the block exits. A
+        cancellation kills it too — the agent was mid-turn — but the exit
+        that follows is what stops the child. A refusal, a cancelled
+        stop reason, a truncated turn and a missing submission leave the
+        session open: the process is fine, and the body may have
+        something to say about it.
+        """
+
+        if session.busy:
+            raise RuntimeError(
+                f"{type(self).__name__}: a prompt is already in flight on session "
+                f"{session.session_id}; one prompt at a time"
+            )
+        if session.closed is not None:
+            raise AgentError(f"the session is closed: {session.closed}")
+        client = session.client
+        assert client is not None
+        turn = _Turn(
+            started=time.monotonic(),
+            text_at=len(client.text),
+            tool_calls_at=client.tool_calls,
+            denied_at=client.denied_permissions,
+        )
+        session.busy = True
+        try:
+            async with self._bounded(turn, self._budget(settings)):
+                text = await self.render_prompt(prompt, ctx, tier=session.tier)
+                response = await self._prompt(session, client, text, turn)
+                response = await self._repair(ctx, session, client, response, turn)
+                return await self._outcome(ctx, session, client, response, turn)
+        except asyncio.CancelledError:
+            session.closed = "the prompt was cancelled"
             raise
-        except TimeoutError:
-            session.reason = "timeout"
-            raise AgentError(
-                f"the agent did not finish within "
-                f"{self.timeout or settings.agent_timeout}s"
-            ) from None
-        except Exception as exc:
-            session.reason = "transport"
-            raise AgentError(f"the agent connection failed: {exc}") from exc
+        except AgentError as exc:
+            if turn.reason in ("transport", "timeout"):
+                session.closed = str(exc)
+            raise
+        finally:
+            session.busy = False
+            if session.closed is not None and turn.reason != "shutdown":
+                await self._cleanup(ctx, session)  # the child is stopped at once
+            else:
+                await self._flush(ctx)  # the transcript, after every prompt
+            await self._record(ctx, session, turn)
 
     async def _spawn(
         self, session: _Session, settings: AthanoreSettings, ctx: TaskContext | None
@@ -850,45 +1124,12 @@ class ACPAgent(Agent):
             use_unstable_protocol=True,
         )
 
-    async def _exchange(
-        self,
-        prompt: str,
-        ctx: TaskContext | None,
-        session: _Session,
-        client: ACPClient,
-    ) -> AgentResult:
-        """Handshake, configure, prompt, repair, and map the outcome."""
-
-        conn = session.connection
-        assert conn is not None
-        initialized = await conn.initialize(
-            protocol_version=PROTOCOL_VERSION,
-            client_capabilities=ClientCapabilities(),
-            client_info=Implementation(name="athanore", version=__version__),
-        )
-        if initialized.protocol_version != PROTOCOL_VERSION:
-            _log.warning(
-                "the agent answered a different ACP protocol version",
-                agent=type(self).__name__,
-                ours=PROTOCOL_VERSION,
-                theirs=initialized.protocol_version,
-            )
-        tier = self._tier(initialized, ctx)
-        options = await self._open_session(session, client, initialized, tier, ctx)
-        assert session.session_id is not None
-        await self._configure(conn, client, session.session_id, options)
-
-        text = await self.render_prompt(prompt, ctx, tier=tier)
-        response = await self._prompt(session, client, text)
-        response = await self._repair(ctx, session, client, response)
-        return await self._outcome(ctx, session, client, response)
-
     async def _prompt(
-        self, session: _Session, client: ACPClient, text: str
+        self, session: _Session, client: ACPClient, text: str, turn: _Turn
     ) -> PromptResponse:
         """One turn: send ``text``, count what it cost, surface a failure.
 
-        The failure check is here rather than at the end of the run
+        The failure check is here rather than at the end of the prompt
         because a policy that could not be honoured must not be followed
         by a repair turn: the next prompt would be spent on a session
         that is already broken.
@@ -899,7 +1140,7 @@ class ACPAgent(Agent):
         response = await conn.prompt(
             session_id=session.session_id, prompt=[text_block(text)]
         )
-        session.add_usage(response.usage)
+        turn.add_usage(response.usage)
         if client.failure is not None:
             raise client.failure
         return response
@@ -1148,6 +1389,7 @@ class ACPAgent(Agent):
         session: _Session,
         client: ACPClient,
         response: PromptResponse,
+        turn: _Turn,
     ) -> PromptResponse:
         """Ask again, on the same session, while it is worth asking (05, 19).
 
@@ -1163,21 +1405,21 @@ class ACPAgent(Agent):
         wins, which is what makes the second one the answer.
         """
 
-        while session.repair_turns < self.max_repair_turns and await needs_repair(
+        while turn.repair_turns < self.max_repair_turns and await needs_repair(
             ctx, response.stop_reason
         ):
             assert ctx is not None  # needs_repair is False without a context
-            session.repair_turns += 1
+            turn.repair_turns += 1
             reason = "rejected" if ctx.last_rejection else "nothing_submitted"
-            await ctx.services.submissions.repair(session.repair_turns, reason)
+            await ctx.services.submissions.repair(turn.repair_turns, reason)
             await client.append(
                 "notice",
                 f"no valid submission ({reason.replace('_', ' ')}); "
-                f"asking again, repair turn {session.repair_turns} of "
+                f"asking again, repair turn {turn.repair_turns} of "
                 f"{self.max_repair_turns}.",
             )
             response = await self._prompt(
-                session, client, repair_prompt(ctx, session.repair_turns)
+                session, client, repair_prompt(ctx, turn.repair_turns), turn
             )
         return response
 
@@ -1189,6 +1431,7 @@ class ACPAgent(Agent):
         session: _Session,
         client: ACPClient,
         response: PromptResponse,
+        turn: _Turn,
     ) -> AgentResult:
         """Map how the turn ended onto a result, and build the stats entry.
 
@@ -1210,7 +1453,7 @@ class ACPAgent(Agent):
 
         stop = response.stop_reason
         result = AgentResult(
-            text="".join(client.text),
+            text="".join(client.text[turn.text_at :]),
             session_id=session.session_id,
             stop_reason=stop,
         )
@@ -1223,15 +1466,15 @@ class ACPAgent(Agent):
         if failure is not None:
             result.status = "failed"
             result.error = failure
-            session.status, session.reason = "failed", failure
+            turn.status, turn.reason = "failed", failure
         else:
             try:
                 await attach(ctx, result)
             except AgentError:
-                session.reason = "no_submission"
+                turn.reason = "no_submission"
                 raise
-            session.status, session.reason = "ok", None
-        result.stats = await self._entry(ctx, session, client)
+            turn.status, turn.reason = "ok", None
+        result.stats = await self._entry(ctx, session, client, turn)
         return result
 
     async def _truncated(self, session: _Session) -> bool:
@@ -1260,58 +1503,78 @@ class ACPAgent(Agent):
 
     # -- cleanup and accounting -------------------------------------------
 
-    async def _cleanup(self, ctx: TaskContext | None, session: _Session) -> None:
-        """Flush the transcript, close the connection, stop the child.
+    async def _flush(self, ctx: TaskContext | None) -> None:
+        """Flush the transcript, so what a prompt said is written when it ends.
 
-        Each step is guarded on its own: a connection that will not close
-        must not leave a subprocess behind, and neither must stop the
-        stats entry from being written. The transcript is **flushed, not
-        closed** — it belongs to the attempt, and the runner closes it
-        when the attempt ends, so a body running two agents in sequence
-        still has somewhere to write.
+        **Flushed, not closed** — the transcript belongs to the attempt,
+        and the runner closes it when the attempt ends, so a body running
+        two agents in sequence, or one agent for fifty prompts, still has
+        somewhere to write.
         """
 
         if ctx is not None:
             with _logged("the transcript could not be flushed"):
                 await ctx.services.stream.flush()
+
+    async def _cleanup(self, ctx: TaskContext | None, session: _Session) -> None:
+        """Flush the transcript, close the connection, stop the child.
+
+        Each step is guarded on its own: a connection that will not close
+        must not leave a subprocess behind, and neither must stop the
+        stats entry from being written. Each resource is nulled as it is
+        dealt with, so this may run twice — once when a prompt kills the
+        session and once at the block's exit — and the second run only
+        flushes (05 §Holding a session).
+        """
+
+        await self._flush(ctx)
         if session.connection is not None:
+            connection, session.connection = session.connection, None
             with _logged("the agent connection could not be closed"):
-                await session.connection.close()
+                await connection.close()
         if session.stderr is not None:
-            session.stderr.cancel()
+            stderr, session.stderr = session.stderr, None
+            stderr.cancel()
             with suppress(asyncio.CancelledError, Exception):
-                await session.stderr
+                await stderr
         if session.process is not None:
+            process, session.process = session.process, None
             with _logged("the agent subprocess could not be stopped"):
-                await _stop(session.process)
+                await _stop(process)
 
     async def _entry(
-        self, ctx: TaskContext | None, session: _Session, client: ACPClient | None
+        self,
+        ctx: TaskContext | None,
+        session: _Session,
+        client: ACPClient | None,
+        turn: _Turn,
     ) -> dict[str, Any]:
-        """Build this run's stats entry, once (05 §Stats entry).
+        """Build one turn's stats entry, once (05 §Stats entry).
 
         Every unknown is left out rather than zero-filled, which is what
         :func:`~athanore.agents.stats.build_entry` is for; what is added
-        here is the second source. ACP's ``usage`` — summed over the
-        turns of this run, repair turns included — wins for tokens, and
-        the provider supplies cost and the model that actually answered
-        (:func:`~athanore.agents.stats.merge_usage`). Not on a continued
-        run: a provider reports a whole *session*, and a continued run is
-        a fraction of one whose size it cannot know, so there the tokens
-        are ACP's or omitted and the model is the class's (23 §Stats,
-        D256).
+        here is the second source. ACP's ``usage`` — summed over this
+        prompt's turns, repair turns included — wins for tokens, and the
+        provider supplies cost and the model that actually answered
+        (:func:`~athanore.agents.stats.merge_usage`). Only when the entry
+        describes the **whole session**: a one-shot ``run()`` on a fresh
+        session. A provider reports a *session*, and a held prompt or a
+        continued run is a fraction of one whose size it cannot know, so
+        there the tokens are ACP's or omitted and the model is the
+        class's (23 §Stats, D256).
 
-        Kept on the session, so the ``finally`` that records it and the
+        Kept on the turn, so the ``finally`` that records it and the
         result that carries it hold the same object and it can only be
         written once.
         """
 
-        if session.entry is not None:
-            return session.entry
+        if turn.entry is not None:
+            return turn.entry
         provider_stats = None
         provider = self.stats_provider
         if (
             provider is not None
+            and session.whole
             and session.session_id is not None
             and self.session_id is None
         ):
@@ -1323,33 +1586,40 @@ class ACPAgent(Agent):
                     session_id=session.session_id,
                     exc_info=True,
                 )
-        session.entry = build_entry(
+        turn.entry = build_entry(
             node="?" if ctx is None else ctx.node,
             attempt=0 if ctx is None else ctx.attempt,
-            status=session.status,
-            reason=session.reason,
-            duration_s=time.monotonic() - session.started,
+            status=turn.status,
+            reason=turn.reason,
+            duration_s=time.monotonic() - turn.started,
             model=self.model,
-            usage=merge_usage(session.usage or None, provider_stats),
-            tool_calls=None if client is None else client.tool_calls,
+            usage=merge_usage(turn.usage or None, provider_stats),
+            tool_calls=(
+                None if client is None else client.tool_calls - turn.tool_calls_at
+            ),
             session_id=session.session_id,
-            repair_turns=session.repair_turns,
-            denied_permissions=0 if client is None else client.denied_permissions,
+            repair_turns=turn.repair_turns,
+            denied_permissions=(
+                0 if client is None else client.denied_permissions - turn.denied_at
+            ),
         )
-        return session.entry
+        return turn.entry
 
-    async def _record(self, ctx: TaskContext | None, session: _Session) -> None:
+    async def _record(
+        self, ctx: TaskContext | None, session: _Session, turn: _Turn
+    ) -> None:
         """Record the entry, exactly once, and never raise (05 §Stats entry).
 
-        Called from ``run()``'s ``finally``, so it runs on the path that
-        returned a result and on the path that is about to raise —
+        Called from a prompt's ``finally`` — and from the entry's, when
+        the handshake fails — so it runs on the path that returned a
+        result and on the path that is about to raise:
         :func:`~athanore.agents.stats.record_entry` deduplicates by the
         identity of the entry, and :meth:`_entry` hands back the same one
         every time.
         """
 
         try:
-            entry = await self._entry(ctx, session, session.client)
+            entry = await self._entry(ctx, session, session.client, turn)
             await record_entry(ctx, entry)
         except Exception:
             _log.error(
@@ -1431,8 +1701,8 @@ async def _stop(process: asyncio.subprocess.Process) -> None:
 def _logged(message: str) -> Iterator[None]:
     """A cleanup step whose failure is a log line, not a lost exit path.
 
-    ``run()``'s ``finally`` has four things to do and every one of them
-    must happen: a connection that will not close must not leave the
+    The block's exit has four things to do and every one of them must
+    happen: a connection that will not close must not leave the
     subprocess running, and neither may stop the stats entry from being
     written. :func:`contextlib.suppress` would hide what went wrong; this
     says what it was. A cancellation is not suppressed — it is the

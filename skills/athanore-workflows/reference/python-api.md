@@ -17,6 +17,9 @@ defined in, its signature, and the first line of its docstring.
 - **`AgentResult`**: class, `athanore/agents/base.py`
   - `AgentResult(status: Literal['complete', 'failed'] = 'complete', output: Any = None, text: str = '', session_id: str | None = None, stop_reason: str | None = None, error: str | None = None, stats: dict[str, Any] = <factory>)`
   - What one ``run()`` produced.
+- **`AgentSession`**: class, `athanore/agents/acp.py`
+  - `AgentSession(session_id: str, turn: Callable[[str], Awaitable[AgentResult]])`
+  - A session held open by :meth:`ACPAgent.open`: its id, and ``prompt()``.
 - **`GraphError`**: class, `athanore/graph/builder.py`
   - Raised for invalid workflow graphs, at finalization or routing time.
 - **`NonRetryable`**: class, `athanore/engine/errors.py`

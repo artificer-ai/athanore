@@ -50,7 +50,7 @@ if TYPE_CHECKING:
     # ``__getattr__``. Kept beside the table below, because a name in one
     # and not the other is a name that either does not type or does not
     # import, and `tests/test_public_api.py` asserts both directions.
-    from athanore.agents.acp import ACPAgent
+    from athanore.agents.acp import ACPAgent, AgentSession
     from athanore.agents.base import Agent, AgentError, AgentResult
     from athanore.engine import NonRetryable, Pool
     from athanore.engine.context import current_task, maybe_current_task
@@ -86,6 +86,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Agent": ("athanore.agents.base", "Agent"),
     "ACPAgent": ("athanore.agents.acp", "ACPAgent"),
     "AgentResult": ("athanore.agents.base", "AgentResult"),
+    "AgentSession": ("athanore.agents.acp", "AgentSession"),
     "AgentError": ("athanore.agents.base", "AgentError"),
     # plugin handlers (09)
     "PluginContext": ("athanore.plugins.context", "PluginContext"),
@@ -110,6 +111,7 @@ __all__ = [
     "Agent",
     "AgentError",
     "AgentResult",
+    "AgentSession",
     "GraphError",
     "NonRetryable",
     "PluginContext",

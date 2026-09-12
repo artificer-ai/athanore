@@ -147,6 +147,44 @@ starting a fresh conversation. A reply from an agent that quietly forgot
 everything would look exactly like success, and that is the one outcome
 this argument exists to rule out.
 
+## Holding a session open
+
+A run is one process for one prompt. That is the right shape for a
+pipeline stage, and the wrong one for a body that talks to the same
+agent turn after turn: every message would spawn the adapter, open the
+session and stop it again, a few seconds and a cold process per reply.
+`open()` holds the session for a block instead:
+
+```python
+@wf.node(pool="talk")
+async def talk(*, checkout: str) -> str:
+    async with ChatAgent(cwd=checkout).open() as agent:
+        while True:
+            said = await human_input("Say something, or `stop`.")
+            if said == "stop":
+                return said
+            reply = await agent.prompt(said)
+```
+
+The block is the conversation. The process lives for it and is stopped
+at its end on every path — a return, an exception, a cancellation — and
+there is no `close()` to forget. Each `prompt()` takes an assignment and
+returns a result exactly as `run()` does, and records a `[stats]` line
+of its own, so the work log reads as one line under each reply. `run()`
+is this with one prompt.
+
+A timeout or a transport failure ends the session: the child is stopped
+at once and every later `prompt()` raises `AgentError` ("the session is
+closed"), so a body that wants to carry on opens a new block rather
+than being handed a new process behind its back. A refusal does not end
+it; the process is fine, and the next prompt is answered.
+
+If the conversation is long, write `agent.session_id` to the log. An
+attempt that crashes re-executes from its first line, and the id is what
+lets it hand the conversation back as `session_id=` instead of starting
+a fresh one. The pool counts agents *answering*, not agents alive, so a
+chat parked on a person holds no slot while it waits.
+
 ## Permissions and elicitations
 
 When an agent asks to run a tool, `permission_policy` decides what
@@ -168,8 +206,9 @@ can stall a pipeline that had nobody watching it.
 
 ## Statistics
 
-One entry is recorded per run, on every exit path, as a `[stats]` line in
-the work log and an event on the stream: the node and attempt, the
+One entry is recorded per run — per prompt, on a held session — on every
+exit path, as a `[stats]` line in the work log and an event on the
+stream: the node and attempt, the
 outcome, the model the provider reported, input and output tokens, tool
 calls, cost, duration, session id, and, when they happened, repair
 turns and denied permissions.

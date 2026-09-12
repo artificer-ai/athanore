@@ -39,7 +39,7 @@ from pydantic import BaseModel
 from typer.main import get_command
 
 import athanore
-from athanore.agents.acp import ACPAgent
+from athanore.agents.acp import ACPAgent, AgentSession
 from athanore.agents.base import Agent, AgentResult
 from athanore.api.errors import ErrorCode
 from athanore.cli import app as cli_app
@@ -345,6 +345,20 @@ def agents() -> list[str]:
     ]
     for name, annotation, value in annotated_attributes(ACPAgent):
         lines.append(declaration(name, annotation, value))
+    lines += [
+        "",
+        "## `AgentSession`",
+        "",
+        "What `open()` yields; `run()` is `open()` plus one `prompt()`.",
+        "",
+    ]
+    # `session_id` is annotated on the class and assigned in `__init__`,
+    # so it has no class-level value to read a default off.
+    for name, annotation in vars(AgentSession).get("__annotations__", {}).items():
+        lines.append(declaration(name, type_name(annotation), None))
+    prompt = AgentSession.prompt
+    lines.append(f"- `await prompt{signature(prompt) or '(...)'}`")
+    lines.append(f"  - {summary(prompt)}")
     lines += ["", "## `AgentResult`", ""]
     for name, annotation, value in dataclass_fields(AgentResult):
         lines.append(declaration(name, annotation, value))

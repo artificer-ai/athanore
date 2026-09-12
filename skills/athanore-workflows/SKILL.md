@@ -84,6 +84,12 @@ athanore show <run>                 # output: {'greeting': 'HELLO WORLD'}
   `session_id` back**: `Reviewer(cwd=checkout, session_id=first.
   session_id)`, same `cwd`. It continues that session or raises
   `AgentError`; it never quietly starts a new one.
+- **To hold one agent open for several turns inside one attempt,
+  `async with Agent(cwd=…).open() as held:` and `await
+  held.prompt(text)` per turn** — one process for the block, one
+  `[stats]` line per prompt, the child stopped at the block's exit on
+  every path; a timeout or transport failure closes the session and
+  later prompts raise `AgentError`.
 - **`human_input(prompt)` returns text, `options=[...]` returns the
   option picked, `output_model=Model` returns an instance** — and the
   worker slot goes back to the pool while the body waits.
@@ -102,9 +108,9 @@ default there is the default that runs.
 - How routing works in full, fan-out and joins, output, registering and
   serving: `reference/guide-workflows.md`.
 - Agent classes, inlined prompts, structured submissions, how an agent
-  reaches its task, continuing a session, permissions and elicitations,
-  stats, testing without a model, vendor adapters:
-  `reference/guide-agents.md`.
+  reaches its task, continuing a session, holding a session open,
+  permissions and elicitations, stats, testing without a model, vendor
+  adapters: `reference/guide-agents.md`.
 - Asking a person from a body, what the wait does to the slot, and how
   an answer is claimed once: `reference/guide-human-in-the-loop.md`.
 - Pools and capacity, dispatch order, retries and dead-letter, steering

@@ -63,7 +63,7 @@ athanore/                      Python package (distribution "athanore")
     errors.py                  the five refusals of the channel
   agents/                      façade (05)
     base.py                    Agent, AgentResult, prompts, kickoff
-    acp.py                     ACPAgent + ACPClient
+    acp.py                     ACPAgent, AgentSession + ACPClient
     policies.py                permission / elicitation / ask policies
     submissions.py             declare/attach/repair
     stats.py                   stats entry building; SessionStatsProvider protocol
@@ -181,7 +181,7 @@ from athanore import (
     Workflow, Pool,                     # graph + capacity
     GraphError, NonRetryable,           # failure-policy exceptions (04)
     human_input, current_task, maybe_current_task,
-    Agent, ACPAgent, AgentResult, AgentError,
+    Agent, ACPAgent, AgentResult, AgentSession, AgentError,
     PluginContext, PluginError,         # plugin handlers (09)
     Server,                             # programmatic host (register + serve)
     __version__,

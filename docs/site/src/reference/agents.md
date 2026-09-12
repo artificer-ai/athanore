@@ -30,6 +30,14 @@ Adds to `Agent`, and inherits the three above.
 - `client_class: type[ACPClient] = ACPClient`
 - `stats_provider: SessionStatsProvider | None = None`
 
+## `AgentSession`
+
+What `open()` yields; `run()` is `open()` plus one `prompt()`.
+
+- `session_id: str`
+- `await prompt(prompt: str = '') -> AgentResult`
+  - One assignment on the held session; the result is the prompt's.
+
 ## `AgentResult`
 
 - `status: Literal['complete', 'failed'] = 'complete'`
