@@ -177,6 +177,14 @@ tool), `busy_timeout=5000`, `foreign_keys=ON`. One writer connection
 serialised by an asyncio lock in the UnitOfWork; readers use a small
 pool. Long-running reads (event history) paginate.
 
+A connection SQLAlchemy invalidates is rolled back before it is closed
+(D262). A cancellation that lands inside a statement is an exit exception
+to SQLAlchemy, which closes the connection without a rollback; closed with
+its interrupted statement still referenced, a SQLite connection is a
+zombie whose transaction — and write lock — outlive it until the cursor is
+garbage-collected, and every writer after it fails at `busy_timeout`. The
+rollback is a pool `invalidate` listener beside the pragmas, SQLite only.
+
 ## Backups
 
 The database is one file plus WAL; `athanore db backup <path>` uses the

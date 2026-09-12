@@ -19,6 +19,7 @@ journal mode that production never runs with.
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any
@@ -58,20 +59,22 @@ async def sqlite_engine(sqlite_url: str) -> AsyncIterator[AsyncEngine]:
         await eng.dispose()
 
 
+def _run_values(run_id: str) -> dict[str, Any]:
+    return {
+        "id": run_id,
+        "workflow": "demo",
+        "status": "queued",
+        "title": "a run",
+        "description": "",
+        "position": 1,
+        "created": NOW,
+        "updated": NOW,
+    }
+
+
 async def _insert_run(engine: AsyncEngine, run_id: str = "01JRUN") -> str:
     async with engine.begin() as conn:
-        await conn.execute(
-            runs.insert().values(
-                id=run_id,
-                workflow="demo",
-                status="queued",
-                title="a run",
-                description="",
-                position=1,
-                created=NOW,
-                updated=NOW,
-            )
-        )
+        await conn.execute(runs.insert().values(_run_values(run_id)))
     return run_id
 
 
@@ -263,6 +266,51 @@ def test_the_pragmas_are_the_four_07_names() -> None:
 def test_is_sqlite(sqlite_url: str) -> None:
     assert is_sqlite(make_engine(sqlite_url))
     assert not is_sqlite(make_engine("postgresql+asyncpg://u:p@localhost/db"))
+
+
+async def test_a_statement_a_cancellation_interrupts_does_not_keep_the_write_lock(
+    sqlite_engine: AsyncEngine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A cancelled connection is rolled back before SQLAlchemy discards it.
+
+    A ``CancelledError`` inside a statement makes SQLAlchemy invalidate
+    the connection: close, no rollback. Closed with a statement still
+    referenced, the SQLite connection is a zombie whose transaction —
+    and write lock — outlives it until the cursor is collected, and the
+    next writer fails after ``busy_timeout``. The cancellation is raised
+    from the await the real one lands on, between the statement running
+    and the adapter closing its cursor, and the exception is held so
+    the cursor stays referenced whatever the garbage collector does.
+    """
+
+    import aiosqlite
+
+    async def cancelled_fetchall(self: aiosqlite.Cursor) -> list[Any]:
+        monkeypatch.undo()
+        raise asyncio.CancelledError
+
+    monkeypatch.setattr(aiosqlite.Cursor, "fetchall", cancelled_fetchall)
+    held: list[BaseException] = []
+
+    async def interrupted_writer() -> None:
+        try:
+            async with sqlite_engine.connect() as conn:
+                await conn.execute(runs.insert().values(_run_values("01JHELD")))
+                await conn.execute(select(runs.c.id))  # cancelled mid-statement
+        except BaseException as exc:
+            held.append(exc)
+            raise
+
+    with pytest.raises(asyncio.CancelledError):
+        await interrupted_writer()
+    assert held
+
+    async with asyncio.timeout(2):
+        async with sqlite_engine.begin() as conn:
+            await conn.execute(runs.insert().values(_run_values("01JNEXT")))
+    async with sqlite_engine.connect() as conn:
+        ids = set((await conn.execute(select(runs.c.id))).scalars())
+    assert ids == {"01JNEXT"}, "the interrupted insert was rolled back"
 
 
 def test_an_in_memory_url_takes_no_pool_size() -> None:
