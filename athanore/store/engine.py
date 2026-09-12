@@ -10,10 +10,23 @@ foreign keys off and no busy timeout. Attaching them to the engine's
 without this listener every cascade in :mod:`athanore.store.tables` is
 decorative: a task could name a run that does not exist and deleting a run
 would leave its tasks behind.
+
+The second listener is for the connection SQLAlchemy throws away. A
+cancellation that lands inside a statement — the engine stopping while
+the dispatch loop is mid-claim, an attempt cancelled while it writes —
+is an "exit exception" to SQLAlchemy, which invalidates the connection:
+closes it, no rollback. CPython closes with ``sqlite3_close_v2``, and a
+connection closed while a statement is still referenced (the cursor the
+cancellation interrupted, kept alive by the exception's traceback) is a
+SQLite *zombie*: its transaction, and the write lock with it, live on
+until the cursor is garbage-collected. Every writer after it then waits
+out ``busy_timeout`` and fails. Rolling back before the close ends the
+transaction on the spot, whatever still references the statement.
 """
 
 from __future__ import annotations
 
+from contextlib import suppress
 from typing import Any
 
 from sqlalchemy import Engine, event
@@ -68,6 +81,21 @@ def _set_sqlite_pragmas(dbapi_connection: Any, connection_record: Any) -> None:
         cursor.close()
 
 
+def _rollback_before_invalidate(
+    dbapi_connection: Any, connection_record: Any, exception: BaseException | None
+) -> None:
+    """End the transaction of a connection about to be discarded.
+
+    Fires on the pool's ``invalidate`` event, before the close. A
+    connection is invalidated because something went wrong with it, so
+    the rollback may itself fail; that is not worth more than the
+    invalidation already underway, and the close still follows.
+    """
+
+    with suppress(Exception):
+        dbapi_connection.rollback()
+
+
 def is_sqlite(engine: AsyncEngine | Engine) -> bool:
     """Whether ``engine`` speaks SQLite.
 
@@ -95,6 +123,7 @@ def make_engine(db_url: str) -> AsyncEngine:
     engine = create_async_engine(url, **kwargs)
     if is_sqlite(engine):
         event.listen(engine.sync_engine, "connect", _set_sqlite_pragmas)
+        event.listen(engine.sync_engine, "invalidate", _rollback_before_invalidate)
     return engine
 
 

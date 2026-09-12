@@ -431,7 +431,13 @@ async def test_a_parked_body_gives_its_slot_up_and_takes_it_back_first(
 
     let_go.set()
     await wait_until(lambda: one.is_completed(asking))
-    assert not last_ran.is_set(), "a ready task overtook a body already running"
+    # `last` may already have run by now — the slot the answered body gave
+    # back is legitimately its next — so what is asserted is the order,
+    # not the moment: nothing ready overtook the body that was queued.
+    resumed_at = order.index("asks-resumed:yes")
+    assert "last" not in order[:resumed_at], (
+        "a ready task overtook a body already running"
+    )
 
     await wait_until(lambda: one.is_completed(lastly))
     assert order == ["asks", "quick", "holds", "asks-resumed:yes", "last"]
