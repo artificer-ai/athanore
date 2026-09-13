@@ -49,6 +49,7 @@ __all__ = [
     "log",
     "merge",
     "prepare",
+    "publish",
     "subject",
     "title_of",
     "tree_of",
@@ -214,17 +215,17 @@ async def implement(
 
 
 async def gate(payload: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
-    """Deterministic, in three parts; ``(passed, payload)``.
+    """Deterministic, in two parts; ``(passed, payload)``.
 
-    git says whether there is anything to test; the gate, run in the
-    worktree, says whether it passes; then the branch is pushed, its
-    pull request opened or brought up to date, and CI on it — the same
-    gate on a runner, and the run that counts (D260) — waited for. The
-    agent's account of any of it is not consulted.
+    git says whether there is anything to test; then the gate, run in
+    the worktree, says whether it passes. The agent's account of either
+    is not consulted. Nothing leaves the machine here: the branch is
+    pushed by :func:`publish`, after the verdicts that come after the
+    gate (D269).
 
-    On a pass the payload carries ``head``, ``commits``, ``gate`` (the
-    local tail) and ``pr``. On a fail it is the :func:`bounce` payload
-    for `implement`, feedback included, or :func:`bounce` has raised.
+    On a pass the payload carries ``head``, ``commits`` and ``gate``
+    (the local tail). On a fail it is the :func:`bounce` payload for
+    `implement`, feedback included, or :func:`bounce` has raised.
     """
 
     branch, base, tree = payload["branch"], payload["base"], tree_of(payload)
@@ -262,30 +263,44 @@ async def gate(payload: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
             f"`{GATE_COMMAND}` failed with exit code {code}. Its last lines:\n{tail}",
         )
 
-    # Green here: publish the branch and let CI say so on a runner. A
-    # loop-back pushes the same branch again and the PR opened for it
-    # follows the branch, so one PR carries every attempt.
-    pr = await _publish(payload)
+    return True, {**payload, "head": commits[0], "commits": commits, "gate": tail}
+
+
+# --------------------------------------------------------------------------
+# publish
+# --------------------------------------------------------------------------
+
+
+async def publish(payload: dict[str, Any]) -> tuple[bool, dict[str, Any]]:
+    """Push the branch, open its pull request, wait for CI; ``(passed,
+    payload)``.
+
+    After every verdict the pipeline has — the gate, and in `feature`
+    the review and the QA pass — so a branch reaches `origin` once, as
+    the thing that was approved, and not once per attempt (D269). CI is
+    the same gate on a runner and the run that counts (D260); a red
+    here is rare, since the gate already passed on the tree, and goes
+    back to `implement` with the failed jobs' log like a red gate does.
+    A loop-back pushes the same branch again and the PR opened for it
+    follows the branch, so one PR carries every attempt that got this
+    far. On a pass the payload carries ``pr``.
+    """
+
+    branch, tree = payload["branch"], tree_of(payload)
+    pr = await _open_pr(payload)
     code, ci = await watch_checks(branch, cwd=tree)
-    await log(f"gate: CI {'PASS' if code == 0 else f'FAIL ({code})'} on {pr}\n{ci}")
+    await log(f"publish: CI {'PASS' if code == 0 else f'FAIL ({code})'} on {pr}\n{ci}")
     if code:
         return False, bounce(
             payload,
-            "gate",
-            f"`{GATE_COMMAND}` passed here but CI on the pull request ({pr}) "
-            f"failed with exit code {code}. Its last lines:\n{ci}",
+            "publish",
+            f"`{GATE_COMMAND}` passed on the branch but CI on the pull request "
+            f"({pr}) failed with exit code {code}. Its last lines:\n{ci}",
         )
-
-    return True, {
-        **payload,
-        "head": commits[0],
-        "commits": commits,
-        "gate": tail,
-        "pr": pr,
-    }
+    return True, {**payload, "pr": pr}
 
 
-async def _publish(payload: dict[str, Any]) -> str:
+async def _open_pr(payload: dict[str, Any]) -> str:
     """Push the branch; open its pull request, or bring the open one up
     to date. Returns the PR's URL.
 
@@ -331,7 +346,7 @@ async def _publish(payload: dict[str, Any]) -> str:
             "--silent",
             cwd=tree,
         )
-        await log(f"gate: pushed {branch}; updated {url.strip()}")
+        await log(f"publish: pushed {branch}; updated {url.strip()}")
         return url.strip()
     url = await gh(
         "pr",
@@ -347,7 +362,7 @@ async def _publish(payload: dict[str, Any]) -> str:
         cwd=tree,
     )
     url = url.splitlines()[-1].strip()
-    await log(f"gate: pushed {branch}; opened {url}")
+    await log(f"publish: pushed {branch}; opened {url}")
     return url
 
 
@@ -362,7 +377,7 @@ async def merge(payload: dict[str, Any]) -> dict[str, Any]:
     One merge commit per feature with its work underneath, so reverting a
     feature is reverting one commit. GitHub makes it (`--merge`, never
     squash or rebase) with the PR's title and body as its message, which
-    is why :func:`_publish` keeps those current. Nothing is checked out
+    is why :func:`_open_pr` keeps those current. Nothing is checked out
     or pulled: the operator's checkout is theirs, and the next `prepare`
     fetches. The branch is deleted on `origin` here rather than by
     `gh --delete-branch`, which would also try to check `main` out in
@@ -429,13 +444,13 @@ async def merge(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def halt(payload: dict[str, Any]) -> dict[str, Any]:
-    """Terminal: the operator said stop. The worktree, branch and PR stay."""
+    """Terminal: the operator said stop. The worktree and branch stay;
+    nothing was pushed."""
 
     return {
         "title": title_of(payload),
         "merged": False,
         "branch": payload["branch"],
         "tree": payload.get("tree"),
-        "pr": payload.get("pr"),
         "report": payload.get("report"),
     }
