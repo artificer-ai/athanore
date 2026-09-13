@@ -73,7 +73,7 @@ import { listWorkflowsApiWorkflowsGetOptions } from '../api/gen/@tanstack/react-
 import type { WorkflowOut } from '../api/gen/types.gen'
 import { useKeyOwner } from '../keys'
 import { queryKeys } from '../realtime/invalidate'
-import { useUi } from '../store/ui'
+import { ALL_WORKFLOWS, useUi } from '../store/ui'
 import { OverlayClose } from './OverlayPanel'
 import {
   isNewRunFailure,
@@ -274,7 +274,8 @@ function NewRunForm({
   onMounted: () => void
 }) {
   const queryClient = useQueryClient()
-  const resetRunFilter = useUi((state) => state.resetRunFilter)
+  const setRunWorkflow = useUi((state) => state.setRunWorkflow)
+  const setRunQuery = useUi((state) => state.setRunQuery)
   // Whether a submission is under way. A ref and not
   // `submission.isPending`, because it has to be true the instant the
   // operator asks for one: ⌘⏎ can arrive again before React has
@@ -303,15 +304,15 @@ function NewRunForm({
    *
    * The list is refetched rather than waited for: `run.submitted` will
    * say the same thing a moment later, but an operator's own submission
-   * must appear whether or not this tab's stream is up. The run list's
-   * filter goes back to its default with it, as the mock clears the chip
-   * and the `/` box, because a run submitted under a filter that hides
-   * it looks like one that was never queued at all — and the default
-   * lists a `queued` run (D268 (5)).
+   * must appear whether or not this tab's stream is up. The chip and the
+   * `/` box are cleared with it, as the mock clears them, because a run
+   * submitted under a filter that hides it looks like one that was never
+   * queued at all.
    */
   const settle = () => {
     void queryClient.invalidateQueries({ queryKey: queryKeys.runs() })
-    resetRunFilter()
+    setRunWorkflow(ALL_WORKFLOWS)
+    setRunQuery('')
     onClose()
   }
 

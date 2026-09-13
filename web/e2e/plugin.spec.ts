@@ -28,9 +28,6 @@ test('a plugin element mounts, fetches, and is fed the event stream', async ({
   page,
 }) => {
   await dashboard.open()
-  // `plugged` finishes at once, and the list hides a completed run by
-  // default (D268): the row has to stay for `select()` to click.
-  await dashboard.showAllStatuses()
   const runId = await dashboard.submitOverApi('plugged', TITLE)
   await dashboard.select(TITLE)
 
@@ -86,8 +83,6 @@ test('the pane still works on every visit, not only the first', async ({
   // `window.athanore` and the element's own bridge too late. Cycling
   // away and back is the ordinary way an operator uses the pane bar.
   await dashboard.open()
-  // `plugged` finishes at once; the completed row is hidden by default (D268).
-  await dashboard.showAllStatuses()
   const runId = await dashboard.submitOverApi('plugged', TITLE)
   await dashboard.select(TITLE)
 

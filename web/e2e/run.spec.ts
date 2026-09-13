@@ -19,9 +19,6 @@ test('submit, watch the graph, answer both questions, complete', async ({
 }) => {
   await dashboard.open()
   await dashboard.submit('probe', TITLE)
-  // The run is watched to `completed`, which the list hides by default;
-  // after the submission, which puts the filter back to that default (D268).
-  await dashboard.showAllStatuses()
   await dashboard.select(TITLE)
 
   // 1. the graph shows progress: the start node is the one in flight.
@@ -65,8 +62,6 @@ test('the panes carry the agent: the dock, the transcript, the work log', async 
   const title = 'read the transcript'
   await dashboard.open()
   await dashboard.submit('probe', title)
-  // Watched to `completed`, which the list hides by default (D268).
-  await dashboard.showAllStatuses()
   await dashboard.select(title)
 
   // 10 §Panes item 3: the request panel docks under the stream, and
