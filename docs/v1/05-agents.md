@@ -143,11 +143,19 @@ long-poll).
 | `mcp` | the agent's `initialize` response advertises `mcpCapabilities.http` | `new_session(mcp_servers=[McpServerHttp(name="athanore", url=f"{public_url}/mcp/agent", headers=[X-Athanore-Token])])`. The server is in-process (08 §MCP) and exposes `get_task`, `append_log`, `submit_result`, `ask_operator`, `wait_answer`. `submit_result`'s input schema **is** the node's `output_model` schema, so the model sees it as a tool definition; a validation failure returns as the tool result and the model fixes it inside the same turn |
 | `native` | the agent harness has its own tool registry and an athanore adapter is installed (pi: `examples/pi/extensions/athanore.ts`, registered with `pi.registerTool()`) | The extension reads `ATHANORE_TASK_URL` / `ATHANORE_TASK_TOKEN` from the environment the façade exports and calls the HTTP API. Cannot be auto-detected; the agent class sets `tooling="native"` |
 | `http` | everything else, `FakeACPAgent`, agents that cannot reach the server over HTTP MCP | The curl block of 19, token in the header line |
+| `none` | the body wants only what the agent *says* — a chat, a summariser, a classifier — and the agent has no business with its task; the class sets `tooling="none"` (D271) | Nothing. The whole `## Your task` section of 19 is omitted, as it is outside a task context; no MCP server goes on the session; `ATHANORE_TASK_URL` / `ATHANORE_TASK_TOKEN` are not exported to the child. The attempt's token still exists — it is the attempt's, and `TaskContext` carries it — it is simply never handed to a process with no use for it |
 
-`auto` picks `mcp` when advertised, else `http`. The kickoff text (19) has
-a tool-agnostic core naming the four capabilities and one tier-specific
-block. In `mcp` and `native` tiers the token never appears in the prompt
-and therefore never reaches the model provider (12 §Task tokens).
+`auto` picks `mcp` when advertised, else `http`; `none` is never picked,
+only declared. The kickoff text (19) has a tool-agnostic core naming
+the four capabilities and one tier-specific block. In `mcp` and
+`native` tiers the token never appears in the prompt and therefore
+never reaches the model provider (12 §Task tokens); in `none` it
+reaches neither the prompt nor the process. An agent on `none` cannot
+submit, so an `output_model` on such a class is a configuration error
+and `AgentError` says so before any prompt: a body that declares both
+has asked for a value from an agent it gave no way to deliver one.
+`AgentResult.text` is what a `none` agent returns, and the repair loop
+never runs for it.
 
 Verified 2026-09-05: pi-acp 0.0.33 advertises `mcpCapabilities: {http:
 false, sse: false}` and pi 0.84 has no MCP client, so pi agents use the

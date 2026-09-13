@@ -31,7 +31,10 @@ Placeholders: `{base}` = `{api_base}/api/agent/tasks/{task_id}`,
 ```
 
 With no `system_prompt` the prompt argument is sent alone, followed by
-the task sections. Sections are joined with a blank line.
+the task sections. Sections are joined with a blank line. On the `none`
+tier (05 §Tooling tiers, D271) the task sections are omitted exactly as
+they are outside a task context — the agent gets the system prompt and
+the assignment, and nothing that names a task, a token or a tool.
 
 ## Kickoff (tool-agnostic core)
 
@@ -119,7 +122,7 @@ Do not redo the work. Fix the result and submit it now.
 `ATHANORE_TASK_URL={base}` and `ATHANORE_TASK_TOKEN={token}` are exported
 so an adapter that can read its environment may keep the token out of
 the transcript; the prompt still carries the curl lines because most
-harnesses cannot.
+harnesses cannot. Neither is exported on the `none` tier.
 
 ## Rules
 
