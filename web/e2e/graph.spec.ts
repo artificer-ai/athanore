@@ -107,7 +107,13 @@ test('the graph is drawn, and drawn usably, at every width from the breakpoint u
 }) => {
   const page = dashboard.page
   await dashboard.open()
-  await dashboard.submit('ladder', TITLE)
+  // `ladder` waits on nothing and is complete at once, and the list hides
+  // a completed run by default (D268): every status is turned on first,
+  // and the run is submitted over the API, because a submission from the
+  // overlay puts the filter back to its default and the row would be gone
+  // before it could be clicked. The overlay is `run.spec.ts`'s subject.
+  await dashboard.showAllStatuses()
+  await dashboard.submitOverApi('ladder', TITLE)
   await dashboard.select(TITLE)
   await dashboard.pane('graph')
 
@@ -169,7 +175,9 @@ test('a pane with room for both columns still draws them side by side', async ({
   const page = dashboard.page
   await page.setViewportSize({ width: 1440, height: 900 })
   await dashboard.open()
-  await dashboard.submit('ladder', TITLE)
+  // As above: `ladder` is complete at once, and the row has to stay.
+  await dashboard.showAllStatuses()
+  await dashboard.submitOverApi('ladder', TITLE)
   await dashboard.select(TITLE)
   await dashboard.pane('graph')
   await expect(dashboard.graphRow('intake')).toBeVisible({ timeout: RUN_TIMEOUT })

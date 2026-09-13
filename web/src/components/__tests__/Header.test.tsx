@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { FONT_SIZES, usePrefs } from '../../store/prefs'
-import { ALL_WORKFLOWS, useUi } from '../../store/ui'
+import { DEFAULT_RUN_FILTER, useUi } from '../../store/ui'
 import type { RunListModel } from '../RunList'
 import { Header } from '../Header'
 
@@ -36,7 +36,7 @@ function header(over: Partial<RunListModel> = {}) {
 
 describe('Header', () => {
   beforeEach(() => {
-    useUi.setState({ runFilter: { workflow: ALL_WORKFLOWS, query: '' } })
+    useUi.setState({ runFilter: { ...DEFAULT_RUN_FILTER } })
     usePrefs.setState({ fontSize: 'default' })
   })
 
@@ -91,6 +91,8 @@ describe('Header', () => {
       'feature_build',
       'gamedev',
     ])
+    expect(screen.getByRole('toolbar', { name: 'filter by status' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'all statuses' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'filter runs' })).toBeInTheDocument()
   })
 
