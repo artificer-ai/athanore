@@ -12,7 +12,7 @@ tests of the same behaviours.
 | Unit | pytest, hypothesis | `graph` (signature parsing, finalization errors, generations — property-tested with random DAGs and cycles), `routing.interpret`, validators, stats builders, formatters |
 | Store | pytest-asyncio, SQLite tmp file, Postgres in nightly | Repositories, claim ordering, cascade delete, outbox ordering, migrations up/down, v0 import on the MVP's fixture databases |
 | Engine | in-process `Server` on a free port, `MockAgent` / `StatsMockAgent` | Fan-out completion, fan-in (join receives branches in index order; nested fan-out/join; dead-lettered branch → `failed`, retry → join fires → `completed`; branch terminating instead of joining → `join_incomplete`; late arrival recorded, not re-fired; recovery mid-fan-out; `output` shape by terminal count), loop-backs, retries/dead-letter, recovery, pools (dedicated/shared/zero), pause/resume, cancel kills, waiting releases the slot, priorities |
-| Agent façade | `FakeACPAgent` subprocess | Session lifecycle, config by category, streaming, permissions by kind, elicitation bridge, HTTP ask, repair turns, truncation via a fake stats provider, env scrubbing, timeout/cancel/refusal exit paths, stats on every path, tooling tier selection (`auto` → `mcp` when advertised, else `http`; the `mcp` tier through `mcp_calls`; the athanore tool server auto-allowed under `ask`); continued sessions (`session_id=` on the fake's `sessions` key: `session/resume` when advertised else `session/load`, the replay discarded from the transcript and the counters, the `continuing session` notice, config options re-set, the refusal before any prompt, the provider's `stats()` not consulted, 23 §Testing); held sessions (`open()` on the fake's `prompts` key: one process for two prompts, one entry per prompt with one `session_id`, exit on exception and on cancellation, a dead session refusing later prompts, a refusal leaving it open, the concurrent `RuntimeError`, `open()` with `session_id=`, the provider's `stats()` only on `run()`, entry failure never entering the block, 23 §A session held open §Testing) |
+| Agent façade | `FakeACPAgent` subprocess | Session lifecycle, config by category, streaming, permissions by kind, elicitation bridge, HTTP ask, repair turns, truncation via a fake stats provider, env scrubbing, timeout/cancel/refusal exit paths, stats on every path, tooling tier selection (`auto` → `mcp` when advertised, else `http`; the `mcp` tier through `mcp_calls`; the athanore tool server auto-allowed under `ask`; the `none` tier: no task section in the prompt, no `mcpServers`, no `ATHANORE_TASK_URL`/`TOKEN` in the `env_echo`, `output` `None`, an `output_model` refused before any child, D271); continued sessions (`session_id=` on the fake's `sessions` key: `session/resume` when advertised else `session/load`, the replay discarded from the transcript and the counters, the `continuing session` notice, config options re-set, the refusal before any prompt, the provider's `stats()` not consulted, 23 §Testing); held sessions (`open()` on the fake's `prompts` key: one process for two prompts, one entry per prompt with one `session_id`, exit on exception and on cancellation, a dead session refusing later prompts, a refusal leaving it open, the concurrent `RuntimeError`, `open()` with `session_id=`, the provider's `stats()` only on `run()`, entry failure never entering the block, 23 §A session held open §Testing) |
 | API | httpx against the live app | Every endpoint, auth matrix (loopback plain / network bind with and without token / task token / expired task token), error shapes, 413, SSE replay and live, OpenAPI snapshot |
 | Plugins | a test workflow with one of each declaration | Manifest, scoping (404 on foreign run), action validation, node liveness, assets served, `on` handlers |
 | SPA unit | Vitest + Testing Library | Renderers per kind, ActionForm round-trips nested schemas and arrays, invalidation table precedence and coalescing, SSE wrapper reconnect and `resync`, keymap scoping |
@@ -107,6 +107,17 @@ configured to do. Two things follow, both enforced rather than asked for
   (23 §The fake). With `prompts` the n-th body prompt runs the n-th
   script's first turn; without it a held session's second prompt is the
   repair script, as `run()`'s tests rely on.
+- A run on the `none` tier needs nothing new from the fake and looks
+  like this on it: `session/new` carries `mcpServers: []`; the prompt
+  has no `## Your task`, so under `ATHANORE_FAKE_SCENARIOS` it resolves
+  to `default.json` (the kickoff line is what names the node); an
+  `env_echo` listing has neither `ATHANORE_TASK_URL` nor
+  `ATHANORE_TASK_TOKEN`; and a `log` or `submit` key in its script
+  cannot post — the fake writes `ATHANORE_TASK_URL/TOKEN are not set`
+  to `response_log` and stderr and the run goes on — so a `none`
+  scenario scripts `text` and nothing that needs a task.
+  `AgentResult.output` is `None` and `.text` is the scripted text (05
+  §Tooling tiers, D271).
 
 ### Running examples on the fake
 

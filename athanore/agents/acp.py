@@ -767,8 +767,9 @@ class ACPAgent(Agent):
     #: ``None``: inherit the scrubbed environment. A list: keep only
     #: these names, allow-nothing-by-default (12 §Agents).
     env_allowlist: list[str] | None = None
-    #: How this agent reaches its task (05 §Tooling tiers, D63).
-    tooling: Literal["auto", "mcp", "native", "http"] = "auto"
+    #: How this agent reaches its task (05 §Tooling tiers, D63) — or
+    #: ``none``: it does not, and is given nothing to (D271).
+    tooling: Literal["auto", "mcp", "native", "http", "none"] = "auto"
     #: The callback class one run is driven through (20 §Finding 3).
     client_class: type[ACPClient] = ACPClient
     #: Where cost and truncation come from, when anything knows (D27).
@@ -839,13 +840,22 @@ class ACPAgent(Agent):
            the names it lists and nothing else;
         2. export ``ATHANORE_TASK_URL`` and ``ATHANORE_TASK_TOKEN``, so
            an adapter that reads its environment can keep the token out
-           of the prompt entirely (19 §Environment);
+           of the prompt entirely (19 §Environment) — unless the class
+           declared ``tooling="none"``, in which case neither is
+           exported: the child has no use for a token and is not handed
+           one (05 §Tooling tiers, D271);
         3. merge the explicit ``env``, which therefore wins: it is the
            one thing the workflow author stated by hand.
 
         A session-scoped variable reaching a child is how one agent comes
         to inherit another's credentials, and it is why the default is a
         scrub rather than a straight inherit.
+
+        Step 2 reads the class's declaration rather than the negotiated
+        tier because the environment is built in :meth:`_spawn`, before
+        the handshake that resolves ``auto`` — and ``none`` is never the
+        product of that handshake, so the declaration is the whole truth
+        about it.
         """
 
         if self.env_allowlist is not None:
@@ -853,7 +863,7 @@ class ACPAgent(Agent):
             env = {k: v for k, v in os.environ.items() if k in allowed}
         else:
             env = {k: v for k, v in os.environ.items() if not _scrubbed(k)}
-        if ctx is not None:
+        if ctx is not None and self.tooling != "none":
             env["ATHANORE_TASK_URL"] = task_base(ctx)
             env["ATHANORE_TASK_TOKEN"] = ctx.token
         env.update(self.env)
@@ -872,7 +882,12 @@ class ACPAgent(Agent):
         category, all under ``timeout``; on any failure there the child
         is stopped, one stats entry is recorded (``failed/transport``, or
         ``timeout``), :exc:`AgentError` leaves ``open()`` and the block is
-        never entered. It yields an :class:`AgentSession` whose
+        never entered. One refusal comes even before that and, unlike
+        those failures, records nothing: a class on the ``none`` tier
+        that declares an ``output_model`` has asked for a value from an
+        agent it gave no way to deliver one, and :exc:`AgentError` says
+        so before any child is spawned (05 §Tooling tiers, D272). It
+        yields an :class:`AgentSession` whose
         ``prompt()`` is one assignment with one stats entry of its own.
         Its exit — return, exception, cancellation — flushes the
         transcript, closes the connection and stops the child, and
@@ -923,8 +938,18 @@ class ACPAgent(Agent):
         §Stats entry). ``declare(ctx)`` wraps the block from entry to
         exit, as it wraps a run: the class is the configuration for as
         long as the session is open.
+
+        The ``none`` refusal is the first statement, before the task is
+        read, the settings built or the agent declared: it is a
+        configuration error, nothing has run, and nothing is recorded
+        (05 §Tooling tiers, D272).
         """
 
+        if self.tooling == "none" and self.output_model is not None:
+            raise AgentError(
+                f"{type(self).__name__} declares an output_model on the none "
+                "tier: it has no way to submit one"
+            )
         ctx = maybe_current_task()
         settings = AthanoreSettings()
         session = _Session(whole=whole)
@@ -1037,8 +1062,11 @@ class ACPAgent(Agent):
         flight is a programming error (:exc:`RuntimeError`), and a prompt
         on a dead session is :exc:`AgentError` naming why it died. Then
         the render, the turn under ``timeout``, the repair loop and the
-        outcome, exactly as ``run()`` does them; then, on every path, the
-        transcript is flushed and this prompt's entry is recorded.
+        outcome, exactly as ``run()`` does them — the repair loop and
+        the outcome's submission lookup both skipped on ``none``, which
+        has nothing to repair or look up (05 §Tooling tiers); then, on
+        every path, the transcript is flushed and this prompt's entry is
+        recorded.
 
         What kills the session is a transport failure or a timeout: the
         agent's state is unknown, so the child is stopped at once and
@@ -1070,7 +1098,8 @@ class ACPAgent(Agent):
             async with self._bounded(turn, self._budget(settings)):
                 text = await self.render_prompt(prompt, ctx, tier=session.tier)
                 response = await self._prompt(session, client, text, turn)
-                response = await self._repair(ctx, session, client, response, turn)
+                if session.tier != "none":
+                    response = await self._repair(ctx, session, client, response, turn)
                 return await self._outcome(ctx, session, client, response, turn)
         except asyncio.CancelledError:
             session.closed = "the prompt was cancelled"
@@ -1248,13 +1277,15 @@ class ACPAgent(Agent):
     # -- the session's configuration -------------------------------------
 
     def _tier(self, initialized: InitializeResponse, ctx: TaskContext | None) -> Tier:
-        """Which of 05's three tooling tiers this run uses (D63).
+        """Which of 05's tooling tiers this run uses (D63, D271).
 
         ``auto`` reads the ``mcpCapabilities`` the agent just advertised:
         ``mcp`` when it can speak HTTP MCP, ``http`` otherwise. Anything
         else is the class's own choice and is honoured as written —
         ``native`` cannot be detected at all, which is why it is a
-        declaration (05 §Tooling tiers).
+        declaration (05 §Tooling tiers). ``none`` is a declaration too,
+        and the only tier ``auto`` never resolves to: an agent is given
+        nothing only when its class says so.
 
         The one thing that is overridden is ``mcp`` with no task: the
         server it names is scoped to a task token, so a façade run
@@ -1282,7 +1313,8 @@ class ACPAgent(Agent):
         — the name the permission exemption matches on — with the task
         token in a header. The token travels here instead of in the
         prompt, which is the whole reason the tier exists (05 §Tooling
-        tiers, 12 §Task tokens).
+        tiers, 12 §Task tokens) — and nothing at all on ``none``, which
+        has no task to point at by declaration.
         """
 
         if tier != "mcp" or ctx is None:
@@ -1448,7 +1480,9 @@ class ACPAgent(Agent):
           §Truncation).
 
         Anything else attaches the submission, and a missing or invalid
-        one is the :exc:`AgentError` the body cannot route on.
+        one is the :exc:`AgentError` the body cannot route on — except on
+        ``none``, where there is no submission to look up: ``output`` is
+        ``None`` and ``text`` is the answer (05 §Tooling tiers, D271).
         """
 
         stop = response.stop_reason
@@ -1468,11 +1502,12 @@ class ACPAgent(Agent):
             result.error = failure
             turn.status, turn.reason = "failed", failure
         else:
-            try:
-                await attach(ctx, result)
-            except AgentError:
-                turn.reason = "no_submission"
-                raise
+            if session.tier != "none":
+                try:
+                    await attach(ctx, result)
+                except AgentError:
+                    turn.reason = "no_submission"
+                    raise
             turn.status, turn.reason = "ok", None
         result.stats = await self._entry(ctx, session, client, turn)
         return result

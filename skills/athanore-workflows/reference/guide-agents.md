@@ -99,10 +99,25 @@ the agent can use:
   environment the façade exports.
 - **HTTP**, for everything else. The prompt carries the request lines,
   with the token in a header.
+- **None**, when the agent has no business with its task at all. Set
+  `tooling="none"` on the class.
 
 `tooling="auto"` picks MCP when it is advertised and HTTP otherwise. In
 the first two the token never appears in prompt text, and so never
 reaches the model provider.
+
+Some agents have no use for any of that. A chat turn, a summariser, a
+classifier — an agent whose whole job is to talk — gets the system
+prompt and the assignment and nothing else on `tooling="none"`: no tool
+listing, no request lines, no server on the session, no task token in
+its environment. What it says comes back as `result.text`, and
+`result.output` is `None`. A class that sets `tooling="none"` and an
+`output_model` is refused with `AgentError` the moment it is opened,
+since it asked for a value from an agent it gave no way to deliver one.
+`auto` never picks this tier; you declare it. An agent handed a tool
+listing tends to use it — reading its task, appending to the log,
+submitting a result nobody asked for — and the way to stop that is not a
+sterner system prompt but giving it nothing to call.
 
 ## Results and exceptions
 
