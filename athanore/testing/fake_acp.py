@@ -78,6 +78,7 @@ import os
 import re
 import sys
 import time
+import traceback
 import urllib.error
 import urllib.request
 import uuid
@@ -841,7 +842,10 @@ class FakeACPAgent:
             elif "repair_submit" in self.script:
                 self.post("submit", self.script["repair_submit"])
         except Exception as exc:  # noqa: BLE001 - reported, never swallowed
-            self.fail(request_id, -32603, f"{type(exc).__name__}: {exc}")
+            # The traceback to stderr, which the façade pumps into its
+            # log; the leaves to the error, which is what a test sees.
+            traceback.print_exc(file=sys.stderr)
+            self.fail(request_id, -32603, _describe(exc))
             return
 
         result: dict[str, Any] = {
@@ -1158,6 +1162,23 @@ def _mcp_results(
         return results
 
     return asyncio.run(call_all())
+
+
+def _describe(exc: BaseException) -> str:
+    """``Type: message`` for ``exc`` — and for every leaf of an exception
+    group, because the group's own message (``unhandled errors in a
+    TaskGroup (1 sub-exception)``) names nothing that happened.
+
+    The real ``mcp`` client runs its transport in an anyio task group, so
+    a failure of ``mcp_calls`` — a refused connection, a dropped stream —
+    always arrives as a group, and the one line a JSON-RPC error carries
+    back to the test has to be the leaf, not the wrapper.
+    """
+
+    if isinstance(exc, BaseExceptionGroup):
+        leaves = "; ".join(_describe(sub) for sub in exc.exceptions)
+        return f"{type(exc).__name__}[{leaves}]"
+    return f"{type(exc).__name__}: {exc}"
 
 
 def _result_text(result: Any) -> str:

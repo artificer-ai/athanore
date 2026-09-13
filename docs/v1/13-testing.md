@@ -118,6 +118,13 @@ configured to do. Two things follow, both enforced rather than asked for
   scenario scripts `text` and nothing that needs a task.
   `AgentResult.output` is `None` and `.text` is the scripted text (05
   §Tooling tiers, D271).
+- A script the fake cannot carry out fails the turn with a JSON-RPC
+  error (`-32603`) rather than a stop reason, and the error's message
+  names the exception — for an exception group, every leaf of it
+  (`ExceptionGroup[ConnectError: All connection attempts failed]`),
+  because the real `mcp` client that `mcp_calls` drives raises one from
+  its task group and the group's own text names nothing. The traceback
+  goes to the fake's stderr, which the façade logs at DEBUG (05).
 
 ### Running examples on the fake
 
