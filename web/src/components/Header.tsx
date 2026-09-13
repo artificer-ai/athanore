@@ -24,12 +24,12 @@
  * button in the app (10 §Components).
  *
  * Below the breakpoint the strip wraps (21 §Narrow layout): the brand,
- * the version, the counts and the three controls above, and the workflow
- * chips and the `/` filter below them as one horizontally scrollable
- * row. Nothing is dropped and nothing shrinks — the strip scrolls
- * *itself*, which is the one horizontal scroll 21 allows, and the page
- * never does. The wrapper around `RunFilters` is `display: contents` at
- * `md` and above, so the two controls stay direct children of this flex
+ * the version, the counts and the three controls above, and the chips
+ * and the `/` filter below them as one horizontally scrollable row.
+ * Nothing is dropped and nothing shrinks — the strip scrolls *itself*,
+ * which is the one horizontal scroll 21 allows, and the page never
+ * does. The wrapper around `RunFilters` is `display: contents` at `md`
+ * and above, so the filter controls stay direct children of this flex
  * box there and the desktop strip is the same box it was.
  *
  * {@link FontSizeMenu} sits beside them: the header is the one chrome

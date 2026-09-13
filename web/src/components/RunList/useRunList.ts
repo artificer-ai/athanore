@@ -1,6 +1,7 @@
 /**
- * The run list's data: `GET /api/runs`, and the view of it the header
- * chips and the `/` input have narrowed.
+ * The run list's data: `GET /api/runs`, and the view of it the header's
+ * three controls — the workflow chips, the status chips and the `/`
+ * input — have narrowed.
  *
  * One query backs the whole left half of the app and the header's two
  * counts. It is the generated one, so its key is the key
@@ -12,14 +13,17 @@
  * §Conventions): `?status` and `?workflow` exist on the endpoint and are
  * deliberately not used, because a second query key per chip would be a
  * second cache entry for the same rows and the invalidation table knows
- * about one.
+ * about one. The model narrows by workflow, by status and by query, AND
+ * across the three and OR within the statuses ({@link matchesFilter});
+ * the counts it hands the header are the server's and never the
+ * filter's.
  */
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 
 import { listRunsApiRunsGetOptions } from '../../api/gen/@tanstack/react-query.gen'
 import type { RunStatus, RunSummary } from '../../api/gen/types.gen'
-import { ALL_WORKFLOWS, useUi } from '../../store/ui'
+import { ALL_WORKFLOWS, useUi, type RunFilter } from '../../store/ui'
 import { humaniseAge } from './age'
 import { statusTone, type StatusTone } from './status'
 
@@ -52,7 +56,7 @@ export type RunRow = {
 
 /** What the run list, the header and the collapsed rail all read. */
 export type RunListModel = {
-  /** The rows the chip and the filter left, in dispatch order. */
+  /** The rows the chips and the `/` input left, in dispatch order. */
   rows: RunRow[]
   /** Every run the server returned, or `null` before it has answered. */
   total: number | null
@@ -98,12 +102,36 @@ export function useNow(intervalMs: number = AGE_TICK_MS): number {
   return now
 }
 
-/** Whether `run` matches the `/` input: its title or its id contains it. */
+/**
+ * Whether `run` matches the `/` input, case-insensitively: its id starts
+ * with it, or its title or its workflow name contains it.
+ *
+ * The id is a prefix match and not a substring one because the RUN
+ * column shows the first {@link SHORT_ID_LENGTH} characters of a ULID
+ * — a prefix is what an operator can read off the screen and type,
+ * and a substring found in the middle of a ULID matched nothing anyone
+ * typed on purpose (D268 (3)).
+ */
 export function matchesQuery(run: RunSummary, query: string): boolean {
   const needle = query.trim().toLowerCase()
   if (needle === '') return true
   return (
-    run.title.toLowerCase().includes(needle) || run.id.toLowerCase().includes(needle)
+    run.id.toLowerCase().startsWith(needle) ||
+    run.title.toLowerCase().includes(needle) ||
+    run.workflow.toLowerCase().includes(needle)
+  )
+}
+
+/**
+ * Whether `run` is one the list shows under `filter`: the workflow chip
+ * agrees, its status is one of the chips that are on, and the `/` input
+ * matches — AND across the three kinds, OR within the statuses.
+ */
+export function matchesFilter(run: RunSummary, filter: RunFilter): boolean {
+  return (
+    (filter.workflow === ALL_WORKFLOWS || run.workflow === filter.workflow) &&
+    filter.statuses.includes(run.status) &&
+    matchesQuery(run, filter.query)
   )
 }
 
@@ -144,11 +172,7 @@ export function useRunListModel(): RunListModel {
     a.localeCompare(b),
   )
   const rows = runs
-    .filter(
-      (run) =>
-        (filter.workflow === ALL_WORKFLOWS || run.workflow === filter.workflow) &&
-        matchesQuery(run, filter.query),
-    )
+    .filter((run) => matchesFilter(run, filter))
     .map((run) => toRow(run, now))
 
   return {

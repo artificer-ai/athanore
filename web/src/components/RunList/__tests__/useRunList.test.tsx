@@ -5,8 +5,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { listRunsApiRunsGetQueryKey } from '../../../api/gen/@tanstack/react-query.gen'
 import type { RunSummary } from '../../../api/gen/types.gen'
 import { queryKeys } from '../../../realtime/invalidate'
-import { ALL_WORKFLOWS, useUi } from '../../../store/ui'
-import { useRunListModel, useRuns } from '../useRunList'
+import {
+  ALL_WORKFLOWS,
+  DEFAULT_RUN_FILTER,
+  RUN_STATUSES,
+  useUi,
+} from '../../../store/ui'
+import { matchesFilter, matchesQuery, useRunListModel, useRuns } from '../useRunList'
 
 function summary(over: Partial<RunSummary> = {}): RunSummary {
   return {
@@ -94,9 +99,128 @@ describe('useRuns', () => {
   })
 })
 
+describe('matchesQuery', () => {
+  const run = summary({ id: '01JD5XABCDEFGHJKMNPQRSTVWX', workflow: 'gamedev' })
+
+  it('matches the id by prefix, which is what the RUN column shows', () => {
+    expect(matchesQuery(run, '01jd5x')).toBe(true)
+    expect(matchesQuery(run, '01JD5XAB')).toBe(true)
+    // A substring from the middle of a ULID is not something anyone read
+    // off the screen (D268 (3)).
+    expect(matchesQuery(run, 'FGHJK')).toBe(false)
+  })
+
+  it('matches the title and the workflow name anywhere, case-insensitively', () => {
+    expect(matchesQuery(run, 'RUN DETAIL')).toBe(true)
+    expect(matchesQuery(run, 'GameDev')).toBe(true)
+    expect(matchesQuery(run, 'dev')).toBe(true)
+    expect(matchesQuery(run, 'feature')).toBe(false)
+  })
+
+  it('trims, and treats blank as a match', () => {
+    expect(matchesQuery(run, '  detail  ')).toBe(true)
+    expect(matchesQuery(run, '')).toBe(true)
+    expect(matchesQuery(run, '   ')).toBe(true)
+  })
+})
+
+describe('matchesFilter', () => {
+  it('is AND across the kinds and OR within the statuses', () => {
+    const completed = summary({ workflow: 'gamedev', status: 'completed' })
+    const running = summary({ workflow: 'gamedev', status: 'running' })
+
+    expect(
+      matchesFilter(completed, { workflow: ALL_WORKFLOWS, statuses: [], query: '' }),
+    ).toBe(false)
+    expect(
+      matchesFilter(completed, {
+        workflow: ALL_WORKFLOWS,
+        statuses: ['completed'],
+        query: '',
+      }),
+    ).toBe(true)
+    expect(
+      matchesFilter(completed, {
+        workflow: 'feature_build',
+        statuses: ['completed'],
+        query: '',
+      }),
+    ).toBe(false)
+    expect(
+      matchesFilter(completed, {
+        workflow: 'gamedev',
+        statuses: ['running', 'completed'],
+        query: 'rebuild',
+      }),
+    ).toBe(true)
+    expect(
+      matchesFilter(running, {
+        workflow: 'gamedev',
+        statuses: ['running', 'completed'],
+        query: 'nothing here',
+      }),
+    ).toBe(false)
+  })
+})
+
 describe('useRunListModel', () => {
   beforeEach(() => {
-    useUi.setState({ runFilter: { workflow: ALL_WORKFLOWS, query: '' } })
+    // Every status on: two of the three fixtures are `completed`, and the
+    // cases below were written against every run. The default is under
+    // test where it says so.
+    useUi.setState({
+      runFilter: { ...DEFAULT_RUN_FILTER, statuses: [...RUN_STATUSES] },
+    })
+  })
+
+  it('hides completed and cancelled runs under the default filter', () => {
+    useUi.setState({ runFilter: { ...DEFAULT_RUN_FILTER } })
+    probe()
+
+    expect(shown()).toEqual(['bbbb2222'])
+    // The header's count is the server's, not the filter's.
+    expect(screen.getByTestId('total')).toHaveTextContent('3')
+  })
+
+  it('narrows on the status chips, OR within the kind', () => {
+    probe()
+
+    act(() => useUi.getState().setRunStatuses(['completed']))
+    expect(shown()).toEqual(['aaaa1111', 'cccc3333'])
+
+    act(() => useUi.getState().setRunStatuses(['running', 'completed']))
+    expect(shown()).toHaveLength(3)
+
+    act(() => useUi.getState().setRunStatuses([]))
+    expect(shown()).toEqual([])
+    expect(screen.getByTestId('total')).toHaveTextContent('3')
+  })
+
+  it('narrows on the status chips and the workflow chip together, AND across', () => {
+    probe()
+
+    act(() => useUi.getState().setRunWorkflow('feature_build'))
+    act(() => useUi.getState().setRunStatuses(['completed']))
+    expect(shown()).toEqual(['cccc3333'])
+  })
+
+  it('narrows on the status chips, the workflow chip and the query together', () => {
+    probe()
+
+    act(() => useUi.getState().setRunWorkflow('feature_build'))
+    act(() => useUi.getState().setRunQuery('append'))
+    act(() => useUi.getState().setRunStatuses(['running']))
+    expect(shown()).toEqual([])
+
+    act(() => useUi.getState().setRunStatuses(['completed']))
+    expect(shown()).toEqual(['cccc3333'])
+  })
+
+  it('narrows on the workflow name', () => {
+    probe()
+
+    act(() => useUi.getState().setRunQuery('gamedev'))
+    expect(shown()).toEqual(['aaaa1111'])
   })
 
   it('shows every run in the order the server sent them', () => {

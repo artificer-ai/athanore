@@ -38,16 +38,42 @@
  */
 import { create } from 'zustand'
 
+import type { RunStatus } from '../api/gen/types.gen'
+
 /** The two regions that take focus: the run list and the detail pane. */
 export type FocusRegion = 'list' | 'detail'
 
 /** The workflow chip that means "do not filter by workflow" (10 §Layout). */
 export const ALL_WORKFLOWS = 'all'
 
+/** Every run status of 03, in the order the status chips are drawn. */
+export const RUN_STATUSES: readonly RunStatus[] = [
+  'queued',
+  'running',
+  'paused',
+  'completed',
+  'failed',
+  'cancelled',
+]
+
 /**
- * What the run list is filtered to: the header's chip and its `/` input.
+ * The statuses on at load: everything that is not finished (D268).
  *
- * Both are client-side (T061): `GET /api/runs` takes `?status` and
+ * `failed` is on deliberately: a failed run is unfinished business, the
+ * thing an operator retries or reruns (04), and hiding it would hide the
+ * one status that most needs a look.
+ */
+export const DEFAULT_RUN_STATUSES: readonly RunStatus[] = [
+  'queued',
+  'running',
+  'paused',
+  'failed',
+]
+
+/**
+ * What the run list is filtered to: the header's chips and its `/` input.
+ *
+ * All of it is client-side (T061): `GET /api/runs` takes `?status` and
  * `?workflow`, but a run list is small and returns whole (08
  * §Conventions), so narrowing it in the browser costs one array pass and
  * keeps the one cached copy of the resource that the invalidation table
@@ -55,12 +81,33 @@ export const ALL_WORKFLOWS = 'all'
  * what makes a view *that view* is `run`, `pane`, `overlay` and `task`,
  * and `src/routes/search.ts` drops everything else.
  *
- * `workflow` is {@link ALL_WORKFLOWS} or a workflow name; `query` is the
- * raw text, matched against a row's title and id.
+ * `workflow` is {@link ALL_WORKFLOWS} or a workflow name; `statuses` is
+ * the set a run may have and still be listed (OR within it, and every
+ * one of them may be off); `query` is the raw text, matched against a
+ * row's id prefix, its title and its workflow name, case-insensitively.
+ * A run is shown when all three agree — AND across the kinds.
+ *
+ * The default is {@link DEFAULT_RUN_FILTER}: every workflow, the four
+ * unfinished statuses, no query. Because this store is not persisted,
+ * that default is what every load starts from (D268).
  */
 export type RunFilter = {
   workflow: string
+  /** The statuses a run may have and still be listed (OR within). */
+  statuses: RunStatus[]
   query: string
+}
+
+/** What every load starts from, and what a submitted run resets to. */
+export const DEFAULT_RUN_FILTER: RunFilter = {
+  workflow: ALL_WORKFLOWS,
+  statuses: [...DEFAULT_RUN_STATUSES],
+  query: '',
+}
+
+/** A copy of the default, so nothing that mutates the store shares it. */
+function defaultRunFilter(): RunFilter {
+  return { ...DEFAULT_RUN_FILTER, statuses: [...DEFAULT_RUN_FILTER.statuses] }
 }
 
 /**
@@ -122,10 +169,19 @@ export type Ui = {
   feed: Feed
   setFeed: (feed: Feed) => void
 
-  /** The run list's chip and `/` input (T061). */
+  /** The run list's chips and `/` input (T061, D268). */
   runFilter: RunFilter
   setRunWorkflow: (workflow: string) => void
+  /**
+   * The status chips that are on. Takes what Radix hands back — a
+   * `string[]` — and keeps only the statuses, in chip order, so the
+   * stored array never holds a value that is not a status and never
+   * depends on the order the chips were pressed in.
+   */
+  setRunStatuses: (statuses: readonly string[]) => void
   setRunQuery: (query: string) => void
+  /** A run was submitted, or the default is wanted back. */
+  resetRunFilter: () => void
 
   /**
    * The run whose log composer has been asked for the caret, or `null`.
@@ -177,10 +233,18 @@ export const useUi = create<Ui>()((set) => ({
   feed: { status: 'reconnecting', retryAt: null },
   setFeed: (feed) => set({ feed }),
 
-  runFilter: { workflow: ALL_WORKFLOWS, query: '' },
+  runFilter: defaultRunFilter(),
   setRunWorkflow: (workflow) =>
     set((state) => ({ runFilter: { ...state.runFilter, workflow } })),
+  setRunStatuses: (statuses) =>
+    set((state) => ({
+      runFilter: {
+        ...state.runFilter,
+        statuses: RUN_STATUSES.filter((status) => statuses.includes(status)),
+      },
+    })),
   setRunQuery: (query) => set((state) => ({ runFilter: { ...state.runFilter, query } })),
+  resetRunFilter: () => set({ runFilter: defaultRunFilter() }),
 
   logComposerFor: null,
   focusLogComposer: (runId) => set({ logComposerFor: runId }),

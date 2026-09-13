@@ -220,8 +220,8 @@ fluid, not a second fixed design. Strips that manage their own overflow
 ### Regions, narrow
 
 - **Header**: wraps — brand, version, counts and the two buttons; then
-  the workflow chips and the `/` filter as a horizontally scrollable
-  strip. As implemented (D201 (1)) that is three rows at 390 px, not
+  the workflow chips, the status chips and the `/` filter as a
+  horizontally scrollable strip. As implemented (D201 (1)) that is three rows at 390 px, not
   two: the chrome measures about 500 px against 362 px of usable width,
   so it takes two lines of its own above the filter strip. Nothing is
   dropped: `＋ new run` and `workflows` stay visible as touch targets.

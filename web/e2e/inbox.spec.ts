@@ -17,6 +17,9 @@ test('the inbox lists open requests across runs, and answers them', async ({
   // Submitting does not select: the New Run overlay leaves the operator
   // where they were (`overlays/NewRun.tsx`), which is this pane.
   await dashboard.submit('probe', 'nobody has selected me')
+  // The run's status is read once it has completed, which the list hides
+  // by default (D268); after the submission, which resets the filter.
+  await dashboard.showAllStatuses()
   await expect(dashboard.page.getByTestId('pane-inbox')).toBeVisible()
 
   const permission = dashboard.openRequest('permission')
