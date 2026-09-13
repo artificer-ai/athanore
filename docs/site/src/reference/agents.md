@@ -26,7 +26,7 @@ Adds to `Agent`, and inherits the three above.
 - `elicitation_policy: Literal['ask', 'decline'] = 'ask'`
 - `max_repair_turns: int = 2`
 - `env_allowlist: list[str] | None = None`
-- `tooling: Literal['auto', 'mcp', 'native', 'http'] = 'auto'`
+- `tooling: Literal['auto', 'mcp', 'native', 'http', 'none'] = 'auto'`
 - `client_class: type[ACPClient] = ACPClient`
 - `stats_provider: SessionStatsProvider | None = None`
 

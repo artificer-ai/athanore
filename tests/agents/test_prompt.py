@@ -31,7 +31,7 @@ import pytest
 from pydantic import BaseModel
 from structlog.testing import capture_logs
 
-from athanore.agents.base import Agent, AgentError, AgentResult
+from athanore.agents.base import Agent, AgentError, AgentResult, tier_block
 from athanore.engine.context import TaskContext
 
 Make = Callable[..., Awaitable[TaskContext]]
@@ -174,6 +174,67 @@ async def test_a_task_context_is_not_warned_about(context: Make) -> None:
         await Plain().render_prompt(ASSIGNMENT, ctx)
 
     assert logged == []
+
+
+async def test_the_none_tier_is_the_system_prompt_and_the_assignment(
+    context: Make,
+) -> None:
+    """05 §Tooling tiers, 19 §Assembly: on ``none`` the task sections are
+    omitted as they are outside a task context — with a task to name.
+
+    ``Everything`` has the most to omit: a tier block, an ask block and a
+    submission block. The whole text is asserted, not a substring, so a
+    stray separator would fail it too.
+    """
+
+    ctx = await context(TITLE)
+
+    prompt = await Everything().render_prompt(ASSIGNMENT, ctx, tier="none")
+
+    assert prompt == "\n\n".join([SYSTEM, "---", f"## Your assignment\n\n{ASSIGNMENT}"])
+    assert "## Your task" not in prompt
+    assert "curl" not in prompt
+    assert ctx.token not in prompt
+    assert "submit" not in prompt
+    assert "ask" not in prompt.lower()
+
+
+async def test_the_none_tier_without_a_system_prompt_is_the_assignment_alone(
+    context: Make,
+) -> None:
+    class Bare(Agent):
+        output_model = Verdict
+
+    ctx = await context()
+
+    assert await Bare().render_prompt(ASSIGNMENT, ctx, tier="none") == ASSIGNMENT
+
+
+async def test_the_none_tier_is_not_warned_about(context: Make) -> None:
+    """The outside-a-task warning does not fire on ``none``, with a task or
+    without one: the absence of the task sections was asked for (D271).
+    """
+
+    ctx = await context()
+
+    with capture_logs() as logged:
+        await Everything().render_prompt(ASSIGNMENT, ctx, tier="none")
+    assert logged == []
+
+    with capture_logs() as logged:
+        await Everything().render_prompt(ASSIGNMENT, tier="none")
+    assert logged == []
+
+
+async def test_the_none_tier_has_no_tier_block(context: Make) -> None:
+    """``render_prompt`` never reaches the block on ``none``; a caller that
+    asks for one anyway has a bug, and gets told rather than a tool list.
+    """
+
+    ctx = await context()
+
+    with pytest.raises(ValueError, match="the none tier has no tier block"):
+        tier_block(ctx, "none", ask=False)
 
 
 # --------------------------------------------------------------------------

@@ -23,7 +23,7 @@ class ACPAgent(Agent):
     elicitation_policy: Literal["ask", "decline"] = "ask"
     max_repair_turns: int = 2
     env_allowlist: list[str] | None = None   # None: inherit (scrubbed); list: allow-nothing-by-default (12)
-    tooling: Literal["auto", "mcp", "native", "http"] = "auto"   # how the agent reaches its task (§Tooling tiers)
+    tooling: Literal["auto", "mcp", "native", "http", "none"] = "auto"   # how the agent reaches its task, or "none" (§Tooling tiers)
     client_class = ACPClient
     stats_provider: SessionStatsProvider | None = None
     def __init__(self, command=None, cwd=None, timeout=None, env=None,

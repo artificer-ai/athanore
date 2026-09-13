@@ -4521,6 +4521,18 @@ api.py` unchanged.
 then gets nothing: no block, no tool, no token; a chat agent on it
 answers in one turn with no tool calls; 05, 13 and 19 say so; gate
 green; snapshot and client unchanged.
+**Status.** Done. `Tier` and `ACPAgent.tooling` carry `"none"`;
+`render_prompt(tier="none")` returns the system prompt and the
+assignment with no warning and `tier_block("none")` raises;
+`_child_env` exports neither variable for it, `_mcp_servers` and
+`_tier` need no change (never from `auto`); the `output_model` refusal
+is the first statement of `_session`, so `open()` and `run()` raise
+before any child with no entry; `_turn` skips `_repair` and `_outcome`
+skips `attach` on it, so `output` is `None` and `text` is the reply.
+The fake already recorded the environment. Tests in
+`tests/agents/test_prompt.py` and `test_acp_lifecycle.py`; 05's
+signature line, 13 §Fakes, the site guide and the regenerated
+reference and skills pages; D272.
 
 ## Traceability
 

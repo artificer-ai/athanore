@@ -17,8 +17,9 @@ Six things are being pinned, and four of them are bugs the MVP had:
   tool call while reporting ``ok`` (20 §Finding 1, D10).
 - **The child's environment is deliberate.** ``CLAUDE_*`` never reaches
   it, an ``env_allowlist`` keeps nothing else, and the task token and URL
-  are exported (20 §Finding 4, 12 §Agents). The fake echoes what it got,
-  so the assertion is over what the process actually had.
+  are exported — except on the ``none`` tier, which is given neither
+  (D271) (20 §Finding 4, 12 §Agents). The fake echoes what it got, so
+  the assertion is over what the process actually had.
 - **``settings.agent_command`` beats a subclass.** It is how every
   example runs on the fake in CI, so it has to override the class
   attribute and not merely a default (05, 13 §Running examples).
@@ -34,7 +35,9 @@ Six things are being pinned, and four of them are bugs the MVP had:
   every later prompt (23 §A session held open, D264).
 
 The turn loop, the outcomes and the stats are ``test_acp_outcomes.py``;
-the tiers are ``test_tooling.py``.
+the tiers are ``test_tooling.py`` — all but ``none``, which is here
+because that file's façade declares an ``output_model`` and a ``none``
+class may not (05 §Tooling tiers, D271).
 """
 
 from __future__ import annotations
@@ -1282,6 +1285,154 @@ async def test_explicit_env_is_merged_last(
     env = echoed(await transcript(ctx))
     assert env["OVERRIDDEN"] == "from the class"
     assert env["CLAUDE_KEPT"] == "stated on purpose"
+
+
+# --------------------------------------------------------------------------
+# The none tier (05 §Tooling tiers, D271)
+# --------------------------------------------------------------------------
+
+
+class Silent(Fake):
+    """A façade that wants nothing from its task (05 §Tooling tiers, D271)."""
+
+    tooling = "none"
+
+
+class Talkative(Spy):
+    """A ``none`` class that asks for a value it gave the agent no way to
+    deliver — the one configuration error the tier names."""
+
+    tooling = "none"
+    output_model = Verdict
+
+
+async def test_a_none_run_sends_the_prompt_alone(context: Make, logs: Path) -> None:
+    """19 §Assembly: the system prompt and the assignment, and nothing that
+    names a task, a token or a tool."""
+
+    ctx = await context()
+    agent = Silent(command=scenario(text=["hello"], request_log=str(logs)))
+    await run(agent, ctx, "say hello")
+
+    prompts = params_of(logs, "session/prompt")
+    assert len(prompts) == 1
+    text = prompts[0]["prompt"][0]["text"]
+    assert text == "You are a test agent.\n\n---\n\n## Your assignment\n\nsay hello"
+    assert "## Your task" not in text
+    assert ctx.token not in text
+    assert "curl" not in text
+
+
+async def test_a_none_session_carries_no_mcp_server(context: Make, logs: Path) -> None:
+    """``none`` is declared, never picked: an agent that advertises MCP
+    still gets no server on its session."""
+
+    ctx = await context()
+    agent = Silent(command=scenario(advertise_mcp=True, request_log=str(logs)))
+    await run(agent, ctx)
+
+    assert params_of(logs, "session/new")[0]["mcpServers"] == []
+
+
+async def test_a_none_child_gets_no_task_url_or_token(
+    context: Make, transcript: Read, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """19 §Environment: neither variable is exported on ``none``. An
+    ordinary inherited variable still is, so this is the tier's scrub and
+    not an empty environment."""
+
+    monkeypatch.setenv("PATH_LIKE_THING", "kept")
+
+    ctx = await context()
+    await run(Silent(command=scenario(env_echo=True)), ctx)
+
+    env = echoed(await transcript(ctx))
+    assert "ATHANORE_TASK_URL" not in env
+    assert "ATHANORE_TASK_TOKEN" not in env
+    assert env["PATH_LIKE_THING"] == "kept"
+
+
+async def test_a_none_result_is_the_text_with_no_output(
+    context: Make, stats_lines: Read
+) -> None:
+    """05 §Tooling tiers: ``text`` is what the agent said, ``output`` is
+    ``None``, and the entry is one ordinary ``ok`` — no repairs, because
+    the loop never ran, and no zero standing in for them."""
+
+    ctx = await context()
+    result = await run(Silent(command=scenario(text=["the", " answer"])), ctx)
+
+    assert result.ok
+    assert result.output is None
+    assert result.text == "the answer"
+    assert result.stop_reason == "end_turn"
+    assert result.stats["status"] == "ok"
+    assert result.stats["tool_calls"] == 0
+    assert "reason" not in result.stats
+    assert "repair_turns" not in result.stats
+
+    lines = await stats_lines(ctx)
+    assert len(lines) == 1
+    assert lines[0].startswith(f"[stats] node={ctx.node} attempt={ctx.attempt} ok")
+
+
+async def test_a_none_refusal_is_still_a_failed_result(context: Make) -> None:
+    """``ok`` is the outcome of the turn: a ``none`` agent that refuses
+    fails like any other, with its text and still no output."""
+
+    ctx = await context()
+    result = await run(
+        Silent(command=scenario(stop_reason="refusal", text=["no"])), ctx
+    )
+
+    assert not result.ok
+    assert result.error == "refusal"
+    assert result.output is None
+    assert result.text == "no"
+
+
+async def test_a_none_class_with_an_output_model_is_refused_before_any_child(
+    context: Make, stats_lines: Read
+) -> None:
+    """05 §Tooling tiers: a body that declares both has asked for a value
+    from an agent it gave no way to deliver one. ``AgentError`` leaves
+    ``open()`` — and ``run()`` — before a child exists, and nothing is
+    recorded because nothing ran."""
+
+    ctx = await context()
+    agent = Talkative(command=scenario(text=["never"]))
+    entered = False
+    with pytest.raises(AgentError, match="declares an output_model on the none tier"):
+        with bind(ctx):
+            async with agent.open():
+                entered = True
+    assert not entered
+    assert agent.process is None
+    assert await stats_lines(ctx) == []
+
+    with pytest.raises(AgentError, match="declares an output_model on the none tier"):
+        await run(agent, ctx)
+    assert agent.process is None
+    assert await stats_lines(ctx) == []
+
+
+async def test_a_none_run_outside_a_task_is_the_same_prompt(logs: Path) -> None:
+    """With no task at all a ``none`` run is the same prompt, the same
+    empty server list and the same ``None`` output — and nothing to warn
+    about, since the absence was asked for."""
+
+    agent = Silent(command=scenario(text=["hi"], request_log=str(logs)))
+    with structlog.testing.capture_logs() as captured:
+        result = await agent.run("say hi")
+
+    events = [entry["event"] for entry in captured]
+    assert "agent prompt rendered outside a task context" not in events
+    text = params_of(logs, "session/prompt")[0]["prompt"][0]["text"]
+    assert text == "You are a test agent.\n\n---\n\n## Your assignment\n\nsay hi"
+    assert params_of(logs, "session/new")[0]["mcpServers"] == []
+    assert result.ok
+    assert result.output is None
+    assert result.text == "hi"
 
 
 # --------------------------------------------------------------------------

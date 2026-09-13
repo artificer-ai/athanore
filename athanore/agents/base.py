@@ -45,7 +45,9 @@ that always works. The assembly is a list of sections joined by a blank
 line precisely so that the tier block is one entry in it — and so that
 in the tool tiers, where the token is not in the prompt at all, the ask
 and submission blocks can be a different entry rather than a variant of
-the same one.
+the same one. On ``none`` there is no tier block at all: the task
+sections are omitted as they are outside a task context, and that is
+the tier's whole text (D271).
 """
 
 from __future__ import annotations
@@ -64,11 +66,13 @@ from athanore.logging import get_logger
 
 _log = get_logger(__name__)
 
-#: The three ways an agent reaches its task (05 §Tooling tiers, D63).
-#: ``http`` is the fallback and the only one this module can pick on its
-#: own; ``mcp`` and ``native`` are chosen by :class:`ACPAgent
-#: <athanore.agents.acp.ACPAgent>` from what a session advertises.
-Tier = Literal["http", "mcp", "native"]
+#: The ways an agent reaches its task (05 §Tooling tiers, D63) — and
+#: ``none``, the declaration that it does not (D271). ``http`` is the
+#: fallback and the only one this module can pick on its own; ``mcp``
+#: and ``native`` are chosen by :class:`ACPAgent
+#: <athanore.agents.acp.ACPAgent>` from what a session advertises, and
+#: ``none`` only ever by the class.
+Tier = Literal["http", "mcp", "native", "none"]
 
 __all__ = [
     "Agent",
@@ -104,7 +108,9 @@ class AgentResult:
     """What one ``run()`` produced (05 §AgentResult).
 
     ``output`` is the validated ``output_model`` instance when the class
-    declared one, and the raw submission when it did not. ``text`` is the
+    declared one, the raw submission when it did not, and ``None`` on the
+    ``none`` tier, where nothing could have been submitted (05 §Tooling
+    tiers). ``text`` is the
     assistant text concatenated, ``stats`` the entry that was recorded for
     this run (T036) — recorded on every exit path, so it is a dict here
     rather than an optional.
@@ -220,7 +226,12 @@ class Agent:
         §Tooling tiers, 12 §Task tokens). The default is ``http``: it is
         the tier that always works, and the only one a base
         :class:`Agent` can pick, since the other two are negotiated over a
-        session this class knows nothing about.
+        session this class knows nothing about. ``none`` omits the task
+        sections altogether — the agent is handed the system prompt and
+        the assignment, and nothing that names a task, a token or a
+        tool; it is the prompt an agent outside a task context gets,
+        without the warning, since here the absence was asked for (05
+        §Tooling tiers, D271).
 
         It is a coroutine because of one word in 19's kickoff: the run's
         title, which is a row in the store and reaches an agent façade the
@@ -235,6 +246,13 @@ class Agent:
                 sections += ["---", f"## Your assignment\n\n{prompt}"]
         elif prompt:
             sections.append(prompt)
+
+        if tier == "none":
+            # The class said it wants nothing from its task: the task
+            # sections are omitted exactly as they are outside a task
+            # context, and there is nothing to warn about (19 §Assembly,
+            # D271).
+            return "\n\n".join(sections)
 
         if ctx is None:
             _log.warning(
@@ -297,9 +315,13 @@ def tier_block(ctx: TaskContext, tier: Tier, *, ask: bool) -> str:
     of tools, because the agent calls them the same way whether the
     server is ours (``mcp``) or its harness's (``native``) — the tier
     picks who provides them, not what they are called (05 §Tooling
-    tiers).
+    tiers). ``none`` has no block — ``render_prompt`` never reaches this
+    on it — so asking for one is a caller bug and raises rather than
+    listing tools nobody asked for.
     """
 
+    if tier == "none":
+        raise ValueError("the none tier has no tier block: nothing is sent")
     if tier == "http":
         return http_tier(ctx)
     return tool_tier(ask=ask)

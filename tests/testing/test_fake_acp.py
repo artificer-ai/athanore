@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import socket
 import time
 from collections.abc import AsyncIterator, Callable, Iterator
 from pathlib import Path
@@ -786,6 +787,32 @@ async def test_mcp_calls_without_a_server_fail_the_turn_loudly() -> None:
         )
     assert message["error"]["code"] == -32603
     assert "no HTTP MCP server" in message["error"]["message"]
+
+
+async def test_an_mcp_failure_names_the_leaf_not_the_task_group() -> None:
+    """The real ``mcp`` client raises an exception *group*; the error the
+    turn fails with names what is inside it, or a red test says nothing."""
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+    # Bound and closed: a port with nothing listening, so the client's
+    # first POST is refused and the group it raises has a leaf worth naming.
+    nobody = {"type": "http", "name": "athanore", "url": f"http://127.0.0.1:{port}/mcp"}
+    command = scenario(
+        advertise_mcp=True, mcp_calls=[{"tool": "append_log", "args": {"text": "x"}}]
+    )
+    async with RawACPClient(command) as client:
+        await client.handshake(mcpServers=[nobody])
+        message = await client.send(
+            "session/prompt",
+            {"sessionId": client.session_id, "prompt": [{"type": "text", "text": "x"}]},
+        )
+    assert message["error"]["code"] == -32603
+    reported = message["error"]["message"]
+    assert reported.startswith("ExceptionGroup[")
+    assert "ConnectError" in reported, reported
+    assert "sub-exception" not in reported.split("[", 1)[1]
 
 
 # --------------------------------------------------------------------------
