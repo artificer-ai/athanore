@@ -75,7 +75,7 @@ from athanore import (
 from athanore.store.rows import ChunkKind, TaskStatus
 from workflows.feature.sandbox import AGENT_SH, CHECKOUT
 
-__all__ = ["AGENT", "STOP_WORDS", "ChatAgent", "Reply", "Say", "wf"]
+__all__ = ["AGENT", "STOP_WORDS", "ChatAgent", "Say", "wf"]
 
 wf = Workflow("chat", assets="./static")
 
@@ -101,39 +101,33 @@ THEM = f"{AGENT}: "
 SESSION = "session "
 
 
-class Reply(BaseModel):
-    """What one turn submits. The reply is the *value*; everything else
-    the agent printed — its banner, its reasoning, its sign-off — is
-    transcript, and stays there. Without this, `AgentResult.text` would
-    be the whole session's output, which is the wrong thing to show the
-    operator."""
-
-    reply: str = Field(min_length=1, description="What you say back, verbatim.")
-
-
 class ChatAgent(ACPAgent):
     """The one agent of a conversation, in the dev container, on this checkout.
 
     ``cwd`` and ``timeout`` are given at construction (05 §Agent classes):
     the checkout, so the session's ``cwd`` is the same on every re-open,
     and one reply's budget, which bounds the handshake and then each
-    prompt with its repairs — never the block, which idles for hours.
+    prompt — never the block, which idles for hours.
     """
 
     command = [str(AGENT_SH), AGENT]
     model = MODEL
     permission_policy = "auto_allow"
     elicitation_policy = "ask"
-    output_model = Reply
 
     system_prompt = """# Chat
 
 You are talking with the operator of this checkout, one message at a time,
 in one session that lasts the whole conversation: what was said before is
 your own memory, and each message you receive is the next thing they said.
-Answer it, briefly. You may read and run things in the checkout if the
-question needs it. Your reply is the `reply` you submit — submit it and
-stop; do not also write it to the work log.
+Answer it, briefly, in plain text. You may read and run things in the
+checkout if the question needs it.
+
+There is no task here for you to finish and nothing for you to submit.
+The conversation ends only when the operator ends it, never on your own
+account: keep answering, one message at a time, until they do. Do not
+write your answer to the work log — say it in your reply, and it is
+recorded for you.
 """
 
 
@@ -218,8 +212,8 @@ async def _reply(session: AgentSession, said: str) -> str:
     ``draft`` pages from (one task carries every reply of the chat), and
     a line a reader of the transcript sees between one reply and the
     next. ``notice`` because it is the kind that is not the model's (03
-    §StreamChunk). The reply itself is what the agent submitted; a
-    failed turn's reply is its error, in parentheses.
+    §StreamChunk). The reply itself is the agent's text; a failed turn's
+    reply is its error, in parentheses.
     """
 
     services = current_task().services
@@ -227,7 +221,7 @@ async def _reply(session: AgentSession, said: str) -> str:
     await services.stream.flush()
     result = await session.prompt(said)
     if result.ok:
-        reply = result.output.reply.strip()
+        reply = result.text.strip()
     else:
         reply = f"(turn {result.error})"
     await _log(f"{THEM}{reply}")
