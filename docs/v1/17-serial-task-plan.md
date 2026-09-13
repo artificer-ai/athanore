@@ -4483,6 +4483,45 @@ message?" correctly after the restart with nothing pasted into the
 prompt. The `replay discarded` line is DEBUG and the root logger is
 fixed at INFO, so it is not observable in a server log; the notice is.
 
+### T092 — The `none` tooling tier (A9.5)
+
+**Do.** `athanore/agents/base.py`: `Tier` gains `"none"`;
+`render_prompt(tier="none")` returns the system prompt and the
+assignment only — the task sections omitted with their separator, as
+for `ctx is None`, without that path's warning. `athanore/agents/
+acp.py`: `tooling` gains `"none"`; `_tier` returns it when declared
+(never from `auto`); `_mcp_servers` returns `None` for it; `_child_env`
+does not export `ATHANORE_TASK_URL` / `ATHANORE_TASK_TOKEN` for it; a
+class with `tooling="none"` and an `output_model` raises `AgentError`
+(`<Agent> declares an output_model on the none tier: it has no way to
+submit one`) from `open()` before the child is spawned, with no stats
+entry, because nothing ran. The repair loop and `_outcome`'s
+submission lookup are skipped on `none`: `AgentResult.output` is
+`None`, `text` is the turn's text, `ok` is the outcome of the turn.
+`Agent` (the base class, `athanore/agents/base.py`) accepts the same
+value in its `tooling`-equivalent if it has one, else the tier is the
+façade's alone. Fold into 05 §Tooling tiers (already the row), 19
+§Assembly (already the sentence), 13 §Fakes (what a `none` run looks
+like on the fake), and `docs/site/src/guide/agents.md` (a paragraph:
+when to give an agent no task API); regenerate the reference.
+**Tests.** `tests/agents/test_prompts.py` (or where `render_prompt` is
+tested): `tier="none"` renders system prompt + `---` + assignment and
+nothing else; with no system prompt, the assignment alone; no `## Your
+task`, no `curl`, no token in the text. `tests/agents/test_acp_
+lifecycle.py` on the fake: a `tooling="none"` run sends a prompt with
+no task section (the fake's `request_log`), `new_session` carries no
+`mcpServers`, the fake's recorded environment has neither
+`ATHANORE_TASK_URL` nor `ATHANORE_TASK_TOKEN` (add the recording to the
+fake if it does not have one), `AgentResult.output` is `None` and
+`.text` is the reply, one ordinary stats entry; `open()` on a class
+with both `tooling="none"` and an `output_model` raises `AgentError`
+before any child (`returncode` never set, no entry). `tests/test_public_
+api.py` unchanged.
+**Done.** An agent class can say it needs nothing from its task, and
+then gets nothing: no block, no tool, no token; a chat agent on it
+answers in one turn with no tool calls; 05, 13 and 19 say so; gate
+green; snapshot and client unchanged.
+
 ## Traceability
 
 | Doc 16 ticket | Tasks here |
@@ -4498,7 +4537,7 @@ fixed at INFO, so it is not observable in a server log; the notice is.
 | A6.1–A6.4 | T074–T079 |
 | A7.1–A7.3 | T080–T082 |
 | A8.1–A8.5 | T083–T087 |
-| A9.1–A9.4 | T088–T091 |
+| A9.1–A9.5 | T088–T092 |
 
 Sequencing changes relative to 16, all recorded in 15 when executed:
 the TUI is not deleted at all in this repository — it never lived here
