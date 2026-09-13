@@ -25,6 +25,15 @@ same reason it is there (05 §User-land adapters, D75). Elicitations are
 *asked* rather than declined, because unlike a build there is a person
 at the other end of this one.
 
+**The agent has nothing to call.** `tooling="none"` (05 §Tooling
+tiers, D271): no task section in its prompt, no MCP server, no task
+URL or token in its environment. A chat wants only what the agent
+*says*, and an agent handed the task API uses it — reads its task,
+appends its answer to the work log, then says the answer again, so
+the turn's text was the reply twice. The body keeps the token
+(`TaskContext` carries it) and is the one that reads and writes the
+log.
+
 **The pane is the chat.** A `run`-slot custom panel, `<athanore-chat>`
 in `static/chat.js`, draws the conversation from the work log and puts a
 composer under it. Sending answers the run's open request, which is all
@@ -107,11 +116,14 @@ class ChatAgent(ACPAgent):
     ``cwd`` and ``timeout`` are given at construction (05 §Agent classes):
     the checkout, so the session's ``cwd`` is the same on every re-open,
     and one reply's budget, which bounds the handshake and then each
-    prompt — never the block, which idles for hours.
+    prompt — never the block, which idles for hours. ``tooling="none"``
+    because the reply is the agent's text and nothing else is wanted of
+    it: given the task API it would log its answer and say it again.
     """
 
     command = [str(AGENT_SH), AGENT]
     model = MODEL
+    tooling = "none"
     permission_policy = "auto_allow"
     elicitation_policy = "ask"
 
@@ -125,9 +137,8 @@ checkout if the question needs it.
 
 There is no task here for you to finish and nothing for you to submit.
 The conversation ends only when the operator ends it, never on your own
-account: keep answering, one message at a time, until they do. Do not
-write your answer to the work log — say it in your reply, and it is
-recorded for you.
+account: keep answering, one message at a time, until they do. Your reply
+is your answer, and it is recorded for you.
 """
 
 
@@ -165,9 +176,10 @@ async def _recorded() -> Recorded:
 
     A body can append to its work log and cannot read it back
     (``TaskServices.log`` is ``append``; 04 §TaskContext), so the read is
-    the one every agent has: ``GET /api/agent/tasks/{id}`` with the task
-    token (05 §Tooling tiers), which returns the whole run's log less its
-    ``stats`` lines. Two things are read from it. The session to
+    the agent API's: ``GET /api/agent/tasks/{id}`` with the task token,
+    which the body has from ``TaskContext`` even though the agent is not
+    given it (05 §Tooling tiers, ``none``). It returns the whole run's
+    log less its ``stats`` lines. Two things are read from it. The session to
     continue is the run's — its last ``session <id>`` line, from any
     attempt, so a rerun carries the conversation on. The turns already
     answered are **this task's** — the ``you:`` and reply lines with
