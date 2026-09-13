@@ -65,7 +65,6 @@ of TOML nobody executes.
 ```
 ┌ header ─────────────────────────────────────────────────────────────────────┐
 │ ▚ ATHANORE v1.0  · 34 runs · ● 1 active    [all][feature_build][gamedev]…   │
-│   │ [all][queued][running][paused][completed][failed][cancelled]            │
 │                                            [/ filter runs] [＋ new run] [workflows] │
 ├ run list ─────────────┬ splitter ┬ detail ─────────────────────────────────┤
 │ RUN WORKFLOW TITLE    │          │ [❮] ◀ OVERVIEW (1/7) ▶ ▬▬▬▬▬▬▬  run a4c8… running │
@@ -79,11 +78,7 @@ of TOML nobody executes.
 
 - **Header**: brand mark and the version; run count and
   a pulsing active-count dot; workflow filter chips (accent-tinted when
-  selected); status filter chips, one per run status of 03, multi-select,
-  with an `all` chip beside them (accessible name `all statuses`) that
-  turns every status on; a `/` filter input matching a run's id prefix,
-  its title or its workflow name, case-insensitively; `＋ new run`
-  (outlined primary);
+  selected); a `/` filter input; `＋ new run` (outlined primary);
   `workflows` (neutral outline) opening the library; an icon-only
   text-size control (`aria-label="text size"`) opening a popover with the
   four steps of §Type and density's ramp as a radio group (21 §Type
@@ -106,23 +101,6 @@ of TOML nobody executes.
   neutral-800 = builtin), then `run <id>` and a status pill.
 - **Footer**: key-hint chips (accent-tinted keycaps) and the
   `^p palette` button.
-
-The run list's filter is those three controls, held in `useUi.runFilter`
-(§Stack) and applied in the browser to the one cached copy of `GET
-/api/runs` (§Realtime and caching): a run is listed when the workflow
-chip agrees, its status is one of the status chips that are on, and the
-`/` text matches — AND across the three kinds, OR within the statuses.
-Every status chip may be off, in which case the list reads `0 shown`.
-**The default, on every load, is the four unfinished statuses on and
-`completed` and `cancelled` off** (D268): a fresh page lists the work
-still going rather than the whole history, and `all` puts the rest back
-in one tap. `runFilter` is not persisted, so that default is what every
-load gets. The header's `n runs` is the server's count and never the
-filter's; the list footer's `n shown` is the filter's. A filter may hide
-the selected run's row: the selection is `?run=` and stays, the row is
-hidden, and a run held by `⏎` is put down (§Keyboard, D204 (2)). A run
-submitted from the New Run overlay puts the filter back to its default,
-so the queued run is in the list it lands in.
 
 That layout is the one at Tailwind's `md` (768 px) and above. Below it —
 "narrow" — the SPA keeps the same four regions and shows **one** middle
@@ -679,7 +657,7 @@ own classes on it is a file to keep in step for nothing (D179).
 
 | Mock element | Component |
 |---|---|
-| Filter chips (workflow, status) | `Toggle` group, outlined, accent-tinted when on: `ToggleGroup` in single mode for the workflow chips, multiple for the status chips, and a `Toggle` for the status group's `all` |
+| Filter / workflow chips | `Toggle` group, outlined, accent-tinted when on |
 | `＋ new run` | `Button variant="outline"` with primary border/text |
 | `workflows`, `cancel`, `open definition` | `Button variant="outline"` neutral |
 | Run list | custom grid rows (not `Table`): fixed column template from the mock |

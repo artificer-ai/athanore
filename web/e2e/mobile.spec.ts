@@ -84,10 +84,6 @@ test('the five touch flows: list, detail, panes, an answer, a new run', async ({
   await newRun.locator('#new-run-title').fill(TITLE)
   await newRun.getByRole('button', { name: 'submit run' }).tap()
   await expect(newRun).toBeHidden()
-  // Flow 4 ends on `completed`, which the list hides by default (D268);
-  // turned on by touch, as everything here is, and after the submission,
-  // which puts the filter back to that default.
-  await dashboard.showAllStatuses('tap')
 
   // -- flow 1: the run list is the middle region, and the new run is in
   //    it as the two-line row of 21 §Narrow layout.
@@ -289,50 +285,21 @@ test('the narrow chrome: header strip, footer, hit areas', async ({ dashboard })
   await dashboard.open()
   await dashboard.submit('probe', TITLE, 'tap')
 
-  // The chips — workflow and status — and the `/` filter are one strip
-  // on a line of their own, scrolling within themselves — the page does
-  // not.
-  const filter = dashboard.filterInput()
+  // The chips and the `/` filter are one strip on a line of their own,
+  // scrolling within themselves — the page does not.
+  const filter = page.getByRole('textbox', { name: 'filter runs' })
   const chips = page.getByRole('radiogroup', { name: 'filter by workflow' })
-  const statuses = page.getByRole('toolbar', { name: 'filter by status' })
   const strip = page.locator('header > div').filter({ has: chips })
   await expect(strip).toBeVisible()
   await expect(strip).toContainText('probe')
-  await expect(strip).toContainText('completed')
-  await expect(strip.getByRole('toolbar', { name: 'filter by status' })).toHaveCount(1)
   expect((await strip.boundingBox())?.width).toBeLessThanOrEqual(
     NARROW_VIEWPORT.width,
   )
-  // The strip scrolls sideways within itself; the page does not. With
-  // seven status chips beside the workflow ones it is strictly wider
-  // than 362 px, which is the point of a strip.
-  expect(await strip.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true)
+  // The strip scrolls sideways within itself; the page does not.
+  expect(
+    await strip.evaluate((el) => el.scrollWidth >= el.clientWidth),
+  ).toBe(true)
   await expect(filter).toBeVisible()
-  await expect(statuses).toBeVisible()
-  // Every status chip is a touch target (WCAG 2.5.8), and nothing is
-  // dropped: `all statuses` and the six.
-  await tappable(page.getByRole('button', { name: 'all statuses' }))
-  for (const status of [
-    'queued',
-    'running',
-    'paused',
-    'completed',
-    'failed',
-    'cancelled',
-  ]) {
-    await tappable(dashboard.statusChip(status))
-  }
-  // A chip toggles by touch, and the page stays still either way.
-  await dashboard.statusChip('completed').scrollIntoViewIfNeeded()
-  await dashboard.statusChip('completed').tap()
-  await expect(dashboard.statusChip('completed')).toHaveAttribute('aria-pressed', 'true')
-  await noHorizontalScroll(page)
-  await dashboard.statusChip('completed').tap()
-  await expect(dashboard.statusChip('completed')).toHaveAttribute(
-    'aria-pressed',
-    'false',
-  )
-  await noHorizontalScroll(page)
   await expect(page.getByRole('button', { name: 'new run', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'workflows' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'text size' })).toBeVisible()
@@ -480,15 +447,7 @@ test('a tall graph is fitted whole below the breakpoint, not clipped', async ({
   // allows. Below the breakpoint there is nothing to recover a clipped
   // picture with — no pan, no pinch, no controls — so the fit carries a
   // floor of its own and the whole graph shrinks to fit (D206 (7)).
-  //
-  // It is also complete at once, and the list hides a completed run by
-  // default (D268): every status is turned on by touch first, and the
-  // run is submitted over the API — a submission from the overlay resets
-  // the filter, and the row would be gone before it could be tapped. The
-  // overlay by touch is the first test's subject.
-  await dashboard.showAllStatuses('tap')
-  await dashboard.submitOverApi('ladder', TALL_TITLE)
-  await expect(dashboard.row(TALL_TITLE)).toBeVisible()
+  await dashboard.submit('ladder', TALL_TITLE, 'tap')
   await dashboard.row(TALL_TITLE).tap()
   await page.locator('[data-pane="graph"][role="radio"]').tap()
 

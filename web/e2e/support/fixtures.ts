@@ -103,36 +103,6 @@ export class Dashboard {
   }
 
   /**
-   * Turn every status chip on: the header's `all statuses` (10 §Layout).
-   *
-   * The list hides finished runs by default (D268), and `status()` reads
-   * the row. A spec that watches a run finish, or submits one that
-   * finishes without a request in the way, turns the chip on first —
-   * here and not in `open()`, so the default is still there for
-   * `../filters.spec.ts` to test.
-   */
-  async showAllStatuses(by: Gesture = 'click'): Promise<void> {
-    const chip = this.page
-      .getByRole('banner')
-      .getByRole('button', { name: 'all statuses' })
-    if (by === 'tap') await chip.tap()
-    else await chip.click()
-    await expect(chip).toHaveAttribute('aria-pressed', 'true')
-  }
-
-  /** One status chip of the header's group, by the status word. */
-  statusChip(status: string): Locator {
-    return this.page
-      .getByRole('toolbar', { name: 'filter by status' })
-      .getByRole('button', { name: status, exact: true })
-  }
-
-  /** The header's `/` input. */
-  filterInput(): Locator {
-    return this.page.getByRole('textbox', { name: 'filter runs' })
-  }
-
-  /**
    * The status pill of a run's row (10 §Components).
    *
    * `data-tone` is the pill and nothing else in a row carries it; the

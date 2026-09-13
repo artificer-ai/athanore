@@ -198,9 +198,6 @@ test('a workflow added, reloaded, removed and added back is followed live', asyn
   await dashboard.closeOverlay()
 
   await dashboard.submit(WORKFLOW, 'first light')
-  // Watched to `completed`, which the list hides by default; after the
-  // submission, which puts the filter back to that default (D268).
-  await dashboard.showAllStatuses()
   await expect(dashboard.status('first light')).toHaveText('completed', {
     timeout: RUN_TIMEOUT,
   })
@@ -225,7 +222,6 @@ test('a workflow added, reloaded, removed and added back is followed live', asyn
   await dashboard.closeOverlay()
 
   await dashboard.submit(WORKFLOW, 'second light')
-  await dashboard.showAllStatuses()
   await expect(dashboard.status('second light')).toHaveText('completed', {
     timeout: RUN_TIMEOUT,
   })
@@ -298,9 +294,6 @@ test('a plugin whose JavaScript changed says so; nothing else does', async ({
   scratch,
 }) => {
   await dashboard.open()
-  // `tempo` finishes as soon as its hold file is absent, and the list
-  // hides a completed run by default (D268).
-  await dashboard.showAllStatuses()
 
   // 1. a workflow with a custom pane, added live: its asset injects as
   //    any workflow's does, and the element draws.
@@ -350,9 +343,6 @@ test('a plugin whose JavaScript changed says so; nothing else does', async ({
   // 3. the banner's reload: a new document, with the new module in it.
   await dashboard.reloadFromBanner()
   await expect(dashboard.pluginAssetsBanner()).toHaveCount(0)
-  // A new document starts the filter over at its default (D268): the
-  // completed row is hidden again until the chip is pressed again.
-  await dashboard.showAllStatuses()
   await dashboard.select('tempo one')
   await dashboard.showPane('Tempo', WORKFLOW)
   await expect(page.getByTestId('tempo-word')).toHaveText('two')

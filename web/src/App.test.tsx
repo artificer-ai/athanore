@@ -33,7 +33,7 @@ import type { AppSearch, Overlay } from './routes/search'
 import { PALETTE_COMMANDS } from './overlays'
 import { capLabel, KEY_BINDINGS } from './lib/keys'
 import { DEFAULT_LIST_WIDTH, usePrefs } from './store/prefs'
-import { DEFAULT_RUN_FILTER, RUN_STATUSES, useUi } from './store/ui'
+import { ALL_WORKFLOWS, useUi } from './store/ui'
 
 const RUNS: RunSummary[] = [
   {
@@ -290,9 +290,7 @@ function freshTab() {
   usePrefs.setState({ listWidth: DEFAULT_LIST_WIDTH, listCollapsed: false })
   useUi.setState({
     focus: 'list',
-    // Every status on: the second fixture is `completed`, and the cases
-    // below read two rows. The default is under test where it says so.
-    runFilter: { ...DEFAULT_RUN_FILTER, statuses: [...RUN_STATUSES] },
+    runFilter: { workflow: ALL_WORKFLOWS, query: '' },
     logComposerFor: null,
     focusedRun: null,
   })
@@ -379,35 +377,6 @@ describe('App', () => {
 
     expect(rows()).toHaveLength(1)
     expect(rows()[0]).toHaveTextContent('squirrels vs chipmunks')
-  })
-
-  it('hides the completed run by default and still counts it', async () => {
-    useUi.setState({ runFilter: { ...DEFAULT_RUN_FILTER } })
-    shell()
-
-    expect(rows()).toHaveLength(1)
-    expect(rows()[0]).toHaveTextContent('rebuild run detail')
-    expect(screen.getByTestId('rows-shown')).toHaveTextContent('1 shown')
-    // The header's count is the server's, not the filter's (D268).
-    expect(screen.getByTestId('run-count')).toHaveTextContent('2 runs')
-
-    await userEvent.click(screen.getByRole('button', { name: 'all statuses' }))
-    expect(rows()).toHaveLength(2)
-    expect(screen.getByTestId('rows-shown')).toHaveTextContent('2 shown')
-  })
-
-  it('keeps the selection when the filter hides its row', () => {
-    useUi.setState({ runFilter: { ...DEFAULT_RUN_FILTER } })
-    const onSelectRun = vi.fn()
-    shell({ run: 'cccc3333dddd' }, { onSelectRun })
-
-    // The completed run is `?run=` and off the list: the selection is
-    // the URL's and stays, the row is hidden (10 §Layout, D204 (2)).
-    expect(rows()).toHaveLength(1)
-    expect(rows()[0]).toHaveTextContent('rebuild run detail')
-    expect(onSelectRun).not.toHaveBeenCalled()
-    expect(screen.getByTestId('selected-run')).toHaveTextContent('cccc3333dddd')
-    expect(screen.getByTestId('pane-label')).toHaveTextContent('OVERVIEW (1/3)')
   })
 
   it('draws the run `?run=` names as the selected one', () => {

@@ -19,9 +19,6 @@ test('a join with a fan-out still open reads `1 of 2 arrived`', async ({
 }) => {
   await dashboard.open()
   await dashboard.submit('spread', TITLE)
-  // The join closes and the run completes, which the list hides by
-  // default (D268); after the submission, which resets the filter.
-  await dashboard.showAllStatuses()
   await dashboard.select(TITLE)
   await dashboard.pane('graph')
 
