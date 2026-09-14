@@ -46,8 +46,7 @@ from fastapi import UploadFile
 from fastapi.responses import FileResponse
 
 from athanore import PluginContext, PluginError, Workflow
-
-from .sandbox import CHECKOUT
+from workflows.shared.sandbox import CHECKOUT
 
 __all__ = ["FILES", "MAX_NAME", "declare", "safe_name", "safe_path"]
 

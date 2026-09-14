@@ -85,7 +85,7 @@ from athanore import (
     human_input,
 )
 from athanore.store.rows import ChunkKind, TaskStatus
-from workflows.feature.sandbox import AGENT_SH, CHECKOUT
+from workflows.shared.sandbox import AGENT_SH, CHECKOUT
 
 __all__ = ["AGENT", "STOP_WORDS", "ChatAgent", "Say", "wf"]
 

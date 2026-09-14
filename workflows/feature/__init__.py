@@ -45,12 +45,12 @@ to live in its own image because it was a second `athanore` distribution
 that must never share an environment with this one (D67). That reason is
 gone — this is v1 maintaining v1 — so the workflow runs in the checkout's
 own venv and reaches the sandbox one way, through `scripts/agent.sh`
-(:mod:`workflows.feature.agents`).
+(:mod:`workflows.shared.agents`).
 
 **Every run builds in a worktree of its own** (`.worktrees/<branch>`,
 D263), cut from `origin/main`, and the operator's checkout is never
 checked out, dirtied or merged into. The deterministic nodes are thin:
-what they do is in :mod:`workflows.feature.steps`, shared with `quick`,
+what they do is in :mod:`workflows.shared.steps`, shared with `quick`,
 and the node here holds the edges and routes on the step's answer.
 
 **The rules do the bookkeeping.** Rule 1: the signature is the graph, so
@@ -82,8 +82,14 @@ from __future__ import annotations
 import os
 
 from athanore import Workflow, human_input
+from workflows.shared import steps
+from workflows.shared.sandbox import GATE_COMMAND, git, plan_docs
+from workflows.shared.steps import MAX_ATTEMPTS, MAX_LOOPS
+from workflows.shared.steps import bounce as _bounce
+from workflows.shared.steps import log as _log
+from workflows.shared.steps import title_of as _title
+from workflows.shared.steps import tree_of as _tree
 
-from . import steps
 from .agents import (
     ImplementerAgent,
     PlannerAgent,
@@ -94,12 +100,6 @@ from .agents import (
 from .cron import declare as declare_cron
 from .files import declare as declare_files
 from .models import Brief, PlanDoc, QAVerdict, ReviewVerdict
-from .sandbox import GATE_COMMAND, git, plan_docs
-from .steps import MAX_ATTEMPTS, MAX_LOOPS
-from .steps import bounce as _bounce
-from .steps import log as _log
-from .steps import title_of as _title
-from .steps import tree_of as _tree
 
 __all__ = ["MAX_ATTEMPTS", "MAX_LOOPS", "wf"]
 
@@ -180,7 +180,7 @@ async def planner(implement, *, payload):
 
     **The plan is read back off the branch, not off the answer.** The
     agent says it wrote a file; git says whether it did, and
-    :func:`~workflows.feature.sandbox.plan_docs` says whether it is the
+    :func:`~workflows.shared.sandbox.plan_docs` says whether it is the
     one `implement` will actually resolve. A plan under a name the glob
     misses is a plan nobody reads, and the first sign of it would be an
     implementer building from nothing.

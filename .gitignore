@@ -70,6 +70,6 @@ docs/site/build/
 TODO.md
 
 # Git worktrees the `feature` and `quick` workflows build in, one per run
-# (`workflows/feature/sandbox.py`). Inside the checkout so the container's
+# (`workflows/shared/sandbox.py`). Inside the checkout so the container's
 # bind mount carries them; a merged run removes its own.
 /.worktrees/
