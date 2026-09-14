@@ -19,9 +19,12 @@ session) rather than a blank one; a rerun does the same from the run's
 log. A session that cannot be continued is a refusal, not a fresh start
 (23 §Refusal).
 
-**The agent is the sandbox's.** `./scripts/agent.sh <pi|claude>` in the
+**The agent is the sandbox's.** `./scripts/agent.sh <claude|pi>` in the
 dev container, like `feature`'s seats, so `auto_allow` is safe for the
-same reason it is there (05 §User-land adapters, D75). Elicitations are
+same reason it is there (05 §User-land adapters, D75). Claude Code by
+default, because it is the agent this repository is set up for — its
+`cwd` is the checkout, so it reads `CLAUDE.md`, `AGENTS.md` and the
+skills under `.claude/` the way it does in a terminal here. Elicitations are
 *asked* rather than declined, because unlike a build there is a person
 at the other end of this one.
 
@@ -88,8 +91,12 @@ __all__ = ["AGENT", "STOP_WORDS", "ChatAgent", "Say", "wf"]
 
 wf = Workflow("chat", assets="./static")
 
-#: Which adapter answers: `pi` (the blank slate) or `claude`.
-AGENT = os.environ.get("CHAT_AGENT", "pi")
+#: Which adapter answers: `claude` (Claude Code, which reads this
+#: checkout's `CLAUDE.md`, `AGENTS.md` and `.claude/skills/` from its
+#: `cwd` as it would in a terminal) or `pi` (the blank slate). The
+#: prefix the work log carries follows it, so a pane reads back only the
+#: replies of the adapter it is configured for.
+AGENT = os.environ.get("CHAT_AGENT", "claude")
 #: The model, resolved by category from what the session advertises (05
 #: §Agent classes); unset leaves the adapter's own default.
 MODEL = os.environ.get("CHAT_MODEL") or None
