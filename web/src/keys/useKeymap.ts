@@ -3,15 +3,15 @@
  * behind it.
  *
  * The map is exhaustive and this hook binds exactly it: `↑`/`↓` or
- * `j`/`k` select — or move the focused run, while one is held — `←`/`→`
- * cycle panes, `1`–`9` jump, `⏎` focus run,
- * `tab` focus, `t` retry task, `m` move task, `x` cancel task, `l`
- * append log, `n` new run, `r` rerun node, `p` pause/resume, `c` cancel
- * run, `D` (shift) delete run, `e` edit run, `w` workflows, `b` toggle
- * list, `?` keys, `^p` palette, `^r` refresh, `esc` close, and — in the
- * request panel alone — `a` allow and `d` deny.
+ * `j`/`k` select, `⇧↑`/`⇧↓` move the selected run in the dispatch
+ * list, `←`/`→` cycle panes, `1`–`9` jump, `tab` focus, `t` retry task,
+ * `m` move task, `x` cancel task, `l` append log, `n` new run, `r`
+ * rerun node, `p` pause/resume, `c` cancel run, `D` (shift) delete run,
+ * `e` edit run, `w` workflows, `b` toggle list, `?` keys, `^p` palette,
+ * `^r` refresh, `esc` close, and — in the request panel alone — `a`
+ * allow and `d` deny.
  *
- * **The commands are not written twice.** Fourteen of those keys are
+ * **The commands are not written twice.** Sixteen of those keys are
  * rows of the palette's catalogue (`overlays/actions.ts`), which already
  * carries the keycap that runs each one, so the map dispatches on that
  * column rather than keeping a second list that could drift from it. The
@@ -45,17 +45,17 @@
  * header's filter, the pane bar or a request's buttons — which 10
  * §Accessibility and quality does not allow. The mock binds every other
  * key of the map and not this one. It is also how the detail pane is
- * reached: `⏎` used to send the keyboard there and now picks a run up
- * instead (D204 (1)).
+ * reached (D176 (1), D204 (1)). `⏎` is not bound either: it picked a
+ * run up for a while (D204) and now belongs to whatever has focus, as
+ * `tab` does (D274).
  *
- * **A held run changes two keys and no others.** While `runFocused`,
- * `↑`/`↓` and `j`/`k` call `moveRun` rather than `select`; everything
- * else in the map does what it always does. Those four caps are not
- * scoped to the run list, exactly as `select` is not — the mode is
- * explicit and drawn on the row it is about — so they fire from
- * wherever the plain keys apply. `⏎` keeps the list scope it has always
- * had, because the list is where a run is picked up from, and `esc`
- * puts one down from anywhere, as `esc` always has.
+ * **A shifted arrow is a chord, and is dispatched like one.** `⇧↑` and
+ * `⇧↓` are the palette's `move run up` / `move run down` rows, so they
+ * reach `actionFor` through the key column like `D` does — except that
+ * a shifted arrow's `event.key` is the plain arrow's, so here the
+ * modifier is *bound* as well as drawn, and `capOf` writes the chip
+ * (D274). There is no mode: `↑` selects and `⇧↑` moves, whatever was
+ * pressed before.
  */
 import { useEffect, useRef } from 'react'
 
@@ -63,11 +63,9 @@ import { useEffect, useRef } from 'react'
 // renderers, and what is wanted here is the one constant the pane host
 // already declares for this binding — how many panes a number key
 // reaches — so that `1`–`9` is written down once.
+import { SHIFT_CAP } from '../lib/keys'
 import { JUMP_KEYS } from '../panes/usePanes'
 import { answerKeysAt, keyboardOwned } from './scope'
-
-/** The run list region, for the one binding that is scoped to it. */
-export const LIST_REGION = '[data-region="list"]'
 
 /** What a key runs: one row of the palette's catalogue, narrowed. */
 export type KeymapAction = {
@@ -89,15 +87,6 @@ export type KeymapHandlers = {
   cyclePane: (delta: number) => void
   /** `1`–`9`: the pane at this zero-based index, if there is one. */
   jumpPane: (index: number) => void
-  /**
-   * Whether a run is held, which is what `↑`/`↓` and `j`/`k` dispatch
-   * on. The shell decides it; the map only reads it.
-   */
-  runFocused: boolean
-  /** `⏎`: pick the selected run up, or put the held one down. */
-  toggleRunFocus: () => void
-  /** `↑`/`↓`/`j`/`k`, while a run is held: move it one place. */
-  moveRun: (delta: -1 | 1) => void
   /** `^p`: the command palette. */
   openPalette: () => void
   /** `esc`: close whatever is open. */
@@ -159,11 +148,22 @@ export function isTyping(event: Event): boolean {
  * strip, the `?` overlay and the palette *draw* is `capLabel` of it
  * (`lib/keys.ts`), so `D` is bound and `⇧D` is shown without a second
  * table to keep in step (D207).
+ *
+ * A shifted arrow is the exception, because `event.key` cannot carry
+ * it: `Shift+ArrowUp` and `ArrowUp` are both `'ArrowUp'`. So the two
+ * the map binds are written with the chip — `⇧↑`, `⇧↓` — which is
+ * both what the catalogue keys them by and what the three views draw
+ * (D274). A shifted letter needs nothing of the kind: it *is* its own
+ * `event.key`, which is how `D` has always arrived.
  */
 export function capOf(event: KeyboardEvent): string | null {
   if (event.altKey) return null
   if (event.ctrlKey || event.metaKey) {
     return event.key.length === 1 ? `^${event.key.toLowerCase()}` : null
+  }
+  if (event.shiftKey) {
+    if (event.key === 'ArrowUp') return `${SHIFT_CAP}↑`
+    if (event.key === 'ArrowDown') return `${SHIFT_CAP}↓`
   }
   return event.key
 }
@@ -175,30 +175,6 @@ function actionFor(
 ): KeymapAction | undefined {
   if (cap === null) return undefined
   return actions.find((action) => action.key === cap)
-}
-
-/**
- * Whether `⏎` is the run list's, which is the only place it is bound.
- *
- * "`⏎` focus run" is what the run list's own footer strip advertises,
- * and that is the scope: from a run row, from the list's chrome, and
- * from the page itself, where nothing has claimed the keyboard and the
- * list is the region a fresh page starts on (`store/ui.ts`). Enter
- * anywhere else belongs to whatever has focus — the header's `＋ new
- * run`, a composer, a pane's own control.
- *
- * It **does** cancel the keystroke, run row or not. A row is a
- * `<button>`, so an uncancelled Enter would also click it, and "does
- * Enter select?" would depend on which element happened to hold focus.
- * `↑`/`↓` and `j`/`k` are what select a run, and they write `?run=`
- * directly; the row is an `option` in a `listbox`, where selection
- * follows the cursor and Enter is not the activation key. So Enter does
- * one thing here, and does it from everywhere in the region.
- */
-function inList(target: EventTarget | null): boolean {
-  if (target === document.body || target === document.documentElement) return true
-  if (!(target instanceof Element)) return false
-  return target.closest(LIST_REGION) !== null
 }
 
 /**
@@ -256,18 +232,19 @@ export function handleKey(event: KeyboardEvent, handlers: KeymapHandlers): boole
     return true
   }
 
-  switch (event.key) {
+  // Dispatched on the cap rather than on `event.key`, so that a shifted
+  // arrow — which `capOf` writes as `⇧↑`/`⇧↓` — falls through to the
+  // catalogue below instead of moving the cursor.
+  switch (cap) {
     case 'ArrowDown':
     case 'j':
       event.preventDefault()
-      if (handlers.runFocused) handlers.moveRun(1)
-      else handlers.select(1)
+      handlers.select(1)
       return true
     case 'ArrowUp':
     case 'k':
       event.preventDefault()
-      if (handlers.runFocused) handlers.moveRun(-1)
-      else handlers.select(-1)
+      handlers.select(-1)
       return true
     case 'ArrowRight':
       event.preventDefault()
@@ -276,11 +253,6 @@ export function handleKey(event: KeyboardEvent, handlers: KeymapHandlers): boole
     case 'ArrowLeft':
       event.preventDefault()
       handlers.cyclePane(-1)
-      return true
-    case 'Enter':
-      if (!inList(event.target)) return false
-      event.preventDefault()
-      handlers.toggleRunFocus()
       return true
     default:
       break

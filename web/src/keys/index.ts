@@ -20,7 +20,6 @@ export {
   handleKey,
   isTyping,
   useKeymap,
-  LIST_REGION,
   type KeymapAction,
   type KeymapHandlers,
 } from './useKeymap'

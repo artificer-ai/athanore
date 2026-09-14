@@ -180,7 +180,7 @@ describe('Palette', () => {
     const actions = [
       act({ id: 'delete run', hint: 'remove the run and its logs', key: 'D' }),
       // No `d` anywhere in this row, so the query below narrows to one.
-      act({ id: 'move run up', hint: 'earlier in the queue', key: KEYLESS }),
+      act({ id: 'font size: small', hint: 'the smallest step', key: KEYLESS }),
     ]
     const { user } = await openPalette(actions)
 
@@ -191,7 +191,7 @@ describe('Palette', () => {
     // A keyless row still prints `—` rather than a key it has not got
     // (D175 (5)).
     expect(
-      within(screen.getByRole('option', { name: /move run up/ })).getByText(KEYLESS),
+      within(screen.getByRole('option', { name: /font size: small/ })).getByText(KEYLESS),
     ).toBeInTheDocument()
 
     await user.keyboard('D')

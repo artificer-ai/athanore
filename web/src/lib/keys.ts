@@ -31,7 +31,10 @@
  * A row's `keys` are the caps that are *bound* — the handler dispatches
  * on them directly — and {@link capLabel} is how they are *drawn*, so
  * none of the three views can advertise a keystroke nothing runs
- * (D207).
+ * (D207). The one cap that carries its modifier in the table is
+ * `⇧↑`/`⇧↓`: a shifted arrow has the same `event.key` as a plain one,
+ * so the chord is what is bound, and `capOf` writes it as the chip
+ * (D274).
  */
 
 /** The headings the `?` overlay draws its sections under. */
@@ -84,9 +87,7 @@ export function capLabel(cap: string): string {
  *
  * Nothing is added and nothing is left out. The sentences that follow
  * the list in 10 are {@link KEY_NOTES}, because they are rules about the
- * map rather than rows in it — including the paragraph that says what
- * `↑`/`↓` mean while a run is focused, which is one binding's condition
- * and not a keycap of its own (D204 (3)).
+ * map rather than rows in it.
  */
 export const KEY_BINDINGS: readonly KeyBinding[] = [
   {
@@ -99,10 +100,10 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   },
   {
     id: 'move-run',
-    keys: ['↑', '↓', 'j', 'k'],
+    keys: [`${SHIFT_CAP}↑`, `${SHIFT_CAP}↓`],
     label: 'move run',
     group: 'navigate',
-    note: 'while a run is focused',
+    note: '',
     footer: false,
   },
   {
@@ -117,14 +118,6 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
     id: 'jump-pane',
     keys: ['1–9'],
     label: 'jump to a pane',
-    group: 'navigate',
-    note: '',
-    footer: false,
-  },
-  {
-    id: 'focus-run',
-    keys: ['⏎'],
-    label: 'focus run',
     group: 'navigate',
     note: '',
     footer: false,
@@ -257,13 +250,11 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
  *
  * They are as much a part of "every binding" as the rows: an operator
  * who cannot find why `t` did nothing while they were typing a title has
- * not been told the map, and neither has one who cannot find why `↑`
- * moved a run instead of the cursor.
+ * not been told the map.
  */
 export const KEY_NOTES: readonly string[] = [
   'shortcuts are suppressed inside inputs',
   'the pane index is clamped to the selected run’s pane count',
-  '⏎ picks the selected run up; ↑↓ then move it in the dispatch list, and ⏎ or esc puts it down',
 ]
 
 /** The footer strip's chips, in the map's order (10 §Layout). */

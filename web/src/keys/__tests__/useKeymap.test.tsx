@@ -16,9 +16,13 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { useRef } from 'react'
 
+import { SHIFT_CAP } from '../../lib/keys'
 import { PALETTE_COMMANDS, KEYLESS } from '../../overlays/actions'
 import { claimKeyboard, useAnswerKeys } from '../scope'
 import { useKeymap, type KeymapAction, type KeymapHandlers } from '../useKeymap'
+
+/** The arrow a chip names, as `event.key` spells it. */
+const ARROWS: Record<string, string> = { '↑': 'ArrowUp', '↓': 'ArrowDown' }
 
 /** The spies every test asserts on. */
 function handlers() {
@@ -26,8 +30,6 @@ function handlers() {
     select: vi.fn(),
     cyclePane: vi.fn(),
     jumpPane: vi.fn(),
-    toggleRunFocus: vi.fn(),
-    moveRun: vi.fn(),
     openPalette: vi.fn(),
     close: vi.fn(),
   }
@@ -96,11 +98,9 @@ let allow: Mock<() => void>
 let deny: Mock<() => void>
 let released: Array<() => void>
 
-/** Mount the harness over `actions`, with or without a run held. */
-function mount(actions: readonly KeymapAction[], runFocused = false) {
-  return render(
-    <Harness keymap={{ ...spies, actions, runFocused }} allow={allow} deny={deny} />,
-  )
+/** Mount the harness over `actions`. */
+function mount(actions: readonly KeymapAction[]) {
+  return render(<Harness keymap={{ ...spies, actions }} allow={allow} deny={deny} />)
 }
 
 /** Nothing in the map ran. */
@@ -139,9 +139,15 @@ describe('the map', () => {
       const view = mount(actions)
 
       const chord = command.key.startsWith('^')
+      const shifted = command.key.startsWith(SHIFT_CAP)
       fireEvent.keyDown(document.body, {
-        key: chord ? command.key.slice(1) : command.key,
+        key: chord
+          ? command.key.slice(1)
+          : shifted
+            ? ARROWS[command.key.slice(SHIFT_CAP.length)]
+            : command.key,
         ctrlKey: chord,
+        shiftKey: shifted,
       })
 
       expect(ran, `\`${command.key}\` runs ${command.name}`).toEqual([command.id])
@@ -149,16 +155,13 @@ describe('the map', () => {
     }
   })
 
-  it('leaves the six keyless rows without a key', () => {
-    // `reorder` is an operator op 10 §Keyboard has no binding for, and
-    // that section is exhaustive: the palette prints `—` for it and the
-    // map has nothing to dispatch (D175). The four font-size steps are
-    // the same: they are the palette's half of the header's chooser and
-    // 10 §Keyboard binds no key to them either (D196).
+  it('leaves the four keyless rows without a key', () => {
+    // The four font-size steps are the palette's half of the header's
+    // chooser, and 10 §Keyboard binds no key to them: the palette prints
+    // `—` and the map has nothing to dispatch (D175, D196). `reorder`
+    // used to be here too, until `⇧↑`/`⇧↓` gave it one (D274).
     const keyless = PALETTE_COMMANDS.filter((command) => command.key === KEYLESS)
     expect(keyless.map((command) => command.id)).toEqual([
-      'move-run-up',
-      'move-run-down',
       'font-size-small',
       'font-size-default',
       'font-size-large',
@@ -302,122 +305,95 @@ describe('the map', () => {
 })
 
 /* -------------------------------------------------------------------- */
-/* `⏎` focus run                                                         */
+/* `⇧↑`/`⇧↓` move run                                                    */
 /* -------------------------------------------------------------------- */
 
-describe('`⏎`', () => {
-  it('picks the highlighted run up, from the run list', () => {
-    const { actions } = catalogue()
+describe('`⇧↑`/`⇧↓`', () => {
+  it('moves the selected run, and never the selection', () => {
+    // A shifted arrow is the palette's `move run up` / `move run down`
+    // row and is dispatched off the key column like `D` is — except
+    // that its `event.key` is the plain arrow's, so the modifier is
+    // bound and not only drawn (D274).
+    const { actions, ran } = catalogue()
     mount(actions)
 
-    fireEvent.keyDown(list(), { key: 'Enter' })
-    expect(spies.toggleRunFocus).toHaveBeenCalledOnce()
+    fireEvent.keyDown(document.body, { key: 'ArrowDown', shiftKey: true })
+    fireEvent.keyDown(document.body, { key: 'ArrowUp', shiftKey: true })
+
+    expect(ran).toEqual(['move-run-down', 'move-run-up'])
+    expect(spies.select).not.toHaveBeenCalled()
   })
 
-  it('does the same from a run row, and does only that', () => {
-    // The row is a `<button>`, so the key is cancelled: `↑`/`↓` and
-    // `j`/`k` select a run — the list's own footer strip says so —
-    // and Enter is the other half of that pair, not a second way to
-    // press the row.
-    const { actions } = catalogue()
+  it('is no mode: the plain arrow still selects, before and after', () => {
+    const { actions, ran } = catalogue()
     mount(actions)
 
-    const cancelled = fireEvent.keyDown(
-      screen.getByRole('button', { name: 'a run row' }),
-      { key: 'Enter' },
-    )
+    fireEvent.keyDown(document.body, { key: 'ArrowDown' })
+    fireEvent.keyDown(document.body, { key: 'ArrowDown', shiftKey: true })
+    fireEvent.keyDown(document.body, { key: 'ArrowDown' })
+    fireEvent.keyDown(document.body, { key: 'k' })
 
-    expect(spies.toggleRunFocus).toHaveBeenCalledOnce()
-    expect(cancelled).toBe(false)
+    expect(spies.select.mock.calls).toEqual([[1], [1], [-1]])
+    expect(ran).toEqual(['move-run-down'])
   })
 
-  it('does the same from the page itself, where a fresh tab starts', () => {
-    const { actions } = catalogue()
+  it('does nothing with no run selected, as a disabled row does', () => {
+    const { actions, ran } = catalogue(true)
     mount(actions)
 
-    fireEvent.keyDown(document.body, { key: 'Enter' })
-    expect(spies.toggleRunFocus).toHaveBeenCalledOnce()
+    fireEvent.keyDown(document.body, { key: 'ArrowUp', shiftKey: true })
+    expect(ran).toEqual([])
   })
 
-  it('puts a held run down again, which is the same key', () => {
-    const { actions } = catalogue()
-    mount(actions, true)
-
-    fireEvent.keyDown(list(), { key: 'Enter' })
-    expect(spies.toggleRunFocus).toHaveBeenCalledOnce()
-  })
-
-  it('belongs to whatever has focus outside the list', () => {
-    const { actions } = catalogue()
+  it('is the two vertical arrows and nothing else', () => {
+    // Shift changes nothing about `←`/`→`, and a shifted letter arrives
+    // as its own `event.key` — `J`, `K` — which the map binds nothing
+    // to: the vim pair selects and does not move.
+    const { actions, ran } = catalogue()
     mount(actions)
 
-    fireEvent.keyDown(panel(), { key: 'Enter' })
-    expect(spies.toggleRunFocus).not.toHaveBeenCalled()
+    fireEvent.keyDown(document.body, { key: 'ArrowRight', shiftKey: true })
+    fireEvent.keyDown(document.body, { key: 'J', shiftKey: true })
+    fireEvent.keyDown(document.body, { key: 'K', shiftKey: true })
+
+    expect(ran).toEqual([])
+    expect(spies.select).not.toHaveBeenCalled()
+    expect(spies.cyclePane.mock.calls).toEqual([[1]])
+  })
+
+  it('moves nothing from inside an input, or under an overlay', () => {
+    const { actions, ran } = catalogue()
+    mount(actions)
+
+    fireEvent.keyDown(filter(), { key: 'ArrowDown', shiftKey: true })
+    expect(ran).toEqual([])
+
+    released.push(claimKeyboard())
+    fireEvent.keyDown(document.body, { key: 'ArrowUp', shiftKey: true })
+    expect(ran).toEqual([])
+    expect(spies.select).not.toHaveBeenCalled()
   })
 })
 
 /* -------------------------------------------------------------------- */
-/* ...and what `↑`/`↓` mean while one is held                            */
+/* `⏎`                                                                   */
 /* -------------------------------------------------------------------- */
 
-describe('while a run is focused', () => {
-  it('moves the run with `↑`/`↓` and `j`/`k`, and never the selection', () => {
-    const { actions } = catalogue()
-    mount(actions, true)
-
-    fireEvent.keyDown(document.body, { key: 'ArrowDown' })
-    fireEvent.keyDown(document.body, { key: 'j' })
-    fireEvent.keyDown(document.body, { key: 'ArrowUp' })
-    fireEvent.keyDown(document.body, { key: 'k' })
-
-    expect(spies.moveRun.mock.calls).toEqual([[1], [1], [-1], [-1]])
-    expect(spies.select).not.toHaveBeenCalled()
-  })
-
-  it('moves nothing while no run is held, which is the other half', () => {
-    const { actions } = catalogue()
+describe('`⏎`', () => {
+  it('is not the map’s: it belongs to whatever has focus', () => {
+    // It picked a run up for a while (D204) and now does nothing here,
+    // from the list, a row or the page — so a row's own Enter is the
+    // button's, and a composer's is the composer's (D274).
+    const { actions, ran } = catalogue()
     mount(actions)
 
-    fireEvent.keyDown(document.body, { key: 'ArrowDown' })
-    fireEvent.keyDown(document.body, { key: 'k' })
+    const row = screen.getByRole('button', { name: 'a run row' })
+    for (const target of [list(), row, document.body]) {
+      const cancelled = fireEvent.keyDown(target, { key: 'Enter' })
+      expect(cancelled).toBe(true)
+    }
 
-    expect(spies.select.mock.calls).toEqual([[1], [-1]])
-    expect(spies.moveRun).not.toHaveBeenCalled()
-  })
-
-  it('leaves every other key of the map exactly as it was', () => {
-    const { actions, ran } = catalogue()
-    mount(actions, true)
-
-    fireEvent.keyDown(document.body, { key: 'ArrowRight' })
-    fireEvent.keyDown(document.body, { key: '1' })
-    fireEvent.keyDown(document.body, { key: 'n' })
-
-    expect(spies.cyclePane.mock.calls).toEqual([[1]])
-    expect(spies.jumpPane.mock.calls).toEqual([[0]])
-    expect(ran).toEqual(['new-run'])
-    expect(spies.moveRun).not.toHaveBeenCalled()
-  })
-
-  it('moves nothing from inside an input, or under an overlay', () => {
-    const { actions } = catalogue()
-    mount(actions, true)
-
-    fireEvent.keyDown(filter(), { key: 'ArrowDown' })
-    expect(spies.moveRun).not.toHaveBeenCalled()
-
-    released.push(claimKeyboard())
-    fireEvent.keyDown(document.body, { key: 'ArrowUp' })
-    expect(spies.moveRun).not.toHaveBeenCalled()
-    expect(spies.select).not.toHaveBeenCalled()
-  })
-
-  it('is put down by `esc`, which the shell reads as its `close`', () => {
-    const { actions } = catalogue()
-    mount(actions, true)
-
-    fireEvent.keyDown(document.body, { key: 'Escape' })
-    expect(spies.close).toHaveBeenCalledOnce()
+    nothingHappened(ran)
   })
 })
 
@@ -541,12 +517,11 @@ describe('a keystroke that came from no element at all', () => {
       window.dispatchEvent(new KeyboardEvent('keydown', { key, cancelable: true }))
     }
 
-    // `n` is the app's own and runs. `⏎` and `a` are both scoped to
-    // somewhere — the run list, a request panel — and a target that is
-    // in neither is in neither, so they do nothing rather than firing
-    // from wherever the last focus happened to be.
+    // `n` is the app's own and runs. `a` is scoped to a request panel,
+    // and a target that is in none is in none, so it does nothing
+    // rather than firing from wherever the last focus happened to be;
+    // `⏎` is not bound at all.
     expect(ran).toEqual(['new-run'])
-    expect(spies.toggleRunFocus).not.toHaveBeenCalled()
     expect(allow).not.toHaveBeenCalled()
   })
 })

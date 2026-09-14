@@ -3,8 +3,8 @@
  * chips, expanded".
  *
  * Expanded in two directions. The footer strip has room for fourteen
- * chips and 10 §Keyboard has twenty-three bindings, so this panel is the
- * whole map — the arrows, the digits, `⏎`, `^p`, `^r`, `esc` and the
+ * chips and 10 §Keyboard has twenty-two bindings, so this panel is the
+ * whole map — the arrows, the digits, `^p`, `^r`, `esc` and the
  * request panel's `a`/`d` that the strip has no room for — and it draws
  * each row's scope beside it, which a chip cannot carry at all.
  *

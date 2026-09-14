@@ -9,8 +9,7 @@
  * graph drawn and a request waiting to be answered, that same dashboard
  * at the largest step of the type ramp, that same dashboard on a phone —
  * all three of its narrow screens — and the run list with a `failed` run
- * picked up by `⏎`. Everything the mock puts on screen is in the second
- * one.
+ * selected. Everything the mock puts on screen is in the second one.
  *
  * The third and the fourth are D197's, which is one floor over three
  * documents: `xlarge` is a 25 % larger base under a layout specified in
@@ -21,15 +20,13 @@
  * rows, a scrolling header strip — and therefore a different tree for
  * axe to walk (21 §Narrow layout).
  *
- * The fifth is D204 (5)'s: the focused row is the one background this
- * app draws that no other state reaches, and `StatusPill` is transparent
- * — it paints `text-status-*` straight onto whatever the row is tinted
- * with. `fail` (`#d9868f`) is the darkest of the seven tones of 10
- * §Status colours and therefore the one that decides the floor, and `⏎`
- * may be pressed on a run in any status (D204 (4)), so the state that
- * enforces it is a `failed` run held in the list. Without it a focused
- * row is a background nothing in the gate ever renders, and the ratios
- * on it are argued rather than measured.
+ * The fifth is the selected row's tint under the darkest pill.
+ * `StatusPill` is transparent — it paints `text-status-*` straight onto
+ * whatever the row is tinted with — and `fail` (`#d9868f`) is the
+ * darkest of the seven tones of 10 §Status colours and therefore the
+ * one that decides the floor (D204 (5)). The second state selects a
+ * `probe` run, which is never `failed`, so without this one the ratio
+ * that matters most is argued rather than measured.
  *
  * The scoring is `support/a11y.ts`'s, and the reason it is written down
  * rather than taken off a tool is there (D178).
@@ -83,21 +80,20 @@ test('the same dashboard passes it at the largest type step', async ({
   expect(axeScore(results), violationReport(results)).toBeGreaterThanOrEqual(A11Y_SCORE)
 })
 
-test('a failed run picked up by `⏎` passes it in the list', async ({ dashboard }) => {
+test('a failed run selected in the list passes it too', async ({ dashboard }) => {
   await dashboard.open()
-  await dashboard.submitOverApi('flop', 'read me while I am held')
-  await expect(dashboard.status('read me while I am held')).toHaveText('failed')
+  await dashboard.submitOverApi('flop', 'read me while I am selected')
+  await expect(dashboard.status('read me while I am selected')).toHaveText('failed')
 
-  await dashboard.select('read me while I am held')
-  await dashboard.page.keyboard.press('Enter')
+  await dashboard.select('read me while I am selected')
   // The click that selected the row left the pointer on it, and
   // `hover:bg-*` outranks the row's own tint — axe would measure the
-  // hover colour and the focused one would go unmeasured.
+  // hover colour and the selected one would go unmeasured.
   await dashboard.page.mouse.move(0, 0)
   // The state axe is about is the row's, so it is asserted before axe
-  // walks the page rather than assumed from the keystroke.
-  await expect(dashboard.row('read me while I am held')).toHaveAttribute(
-    'data-run-focused',
+  // walks the page rather than assumed from the click.
+  await expect(dashboard.row('read me while I am selected')).toHaveAttribute(
+    'aria-selected',
     'true',
   )
 
