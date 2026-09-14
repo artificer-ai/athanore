@@ -34,7 +34,8 @@ const SPEC = [
   'run, `tab` focus, `t` retry task, `m` move task, `x` cancel task, `l`',
   'append log, `n` new run, `r` rerun node, `p` pause/resume, `c` cancel run,',
   '`D` (shift) delete run (with confirm), `e` edit run, `w` workflows, `b`',
-  'toggle list, `?` keys, `^p` palette, `^r` refresh, `esc` close.',
+  'toggle list, `?` keys, `^p` palette, `^r` refresh,',
+  '`esc` close overlay / clear run.',
   'Requests add `a` allow / `d` deny when the request panel has focus.',
 ].join(' ')
 

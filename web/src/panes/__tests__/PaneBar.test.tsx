@@ -150,30 +150,19 @@ describe('PaneBar', () => {
       wideViewport()
     })
 
-    it('draws back beside the collapse toggle, not instead of it', () => {
-      // Wide, both are useful at once: hide the list, and stop looking
-      // at this run, are different wishes (D209). Back is also the only
-      // pointer route to the `global` panes, which are shown when no run
-      // is selected.
+    it('draws only the collapse toggle, no back control: esc clears the selection', () => {
+      // Wide, `esc` is the one route to deselection (D209); a pointer
+      // control beside the collapse toggle read as one confused control.
       usePrefs.setState({ listCollapsed: false })
       render(<PaneBar panes={model()} onBack={vi.fn()} />)
 
       expect(
-        screen.getByRole('button', { name: 'clear the selected run' }),
-      ).toBeInTheDocument()
+        screen.queryByRole('button', { name: 'clear the selected run' }),
+      ).toBeNull()
       expect(screen.getByRole('button', { name: 'hide run list' })).toBeInTheDocument()
     })
 
-    it('clears the selection when back is pressed', async () => {
-      const onBack = vi.fn()
-      render(<PaneBar panes={model()} onBack={onBack} />)
-
-      await userEvent.click(screen.getByRole('button', { name: 'clear the selected run' }))
-
-      expect(onBack).toHaveBeenCalledOnce()
-    })
-
-    it('draws no back control when nothing is selected', () => {
+    it('draws no back control when nothing is selected either', () => {
       render(<PaneBar panes={model({ run: undefined, runId: undefined })} onBack={vi.fn()} />)
 
       expect(

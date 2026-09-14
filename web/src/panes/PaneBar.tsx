@@ -58,16 +58,16 @@ export function PaneBar({
 }: {
   panes: PaneModel
   /**
-   * Clear `?run=`: the back control's whole action, at every width.
+   * Clear `?run=`: the back control's whole action.
    *
-   * Narrow, it is 21 §Narrow layout's back arrow and the list is what
-   * you go back *to*. Wide, the list is already on screen, so it is not
-   * navigation but deselection — and it is the only pointer route to the
-   * `global` panes, which are shown when no run is selected and were
-   * otherwise unreachable once one had been (D209).
+   * Drawn narrow only — 21 §Narrow layout's back arrow, and the list is
+   * what you go back *to*. Above the breakpoint the list is already on
+   * screen, so clearing the selection is not navigation, and `esc`
+   * already does it (D209): a pointer control beside the collapse
+   * toggle read as one confused control, not two.
    *
-   * Absent only when a run is not selected, or in a shell that passes no
-   * handler.
+   * Absent narrow when a run is not selected, or in a shell that passes
+   * no handler; never drawn wide regardless.
    */
   onBack?: (() => void) | undefined
   /**
@@ -85,10 +85,10 @@ export function PaneBar({
 
   return (
     <div className="bg-chrome flex flex-none flex-wrap items-center gap-x-[10px] gap-y-[6px] border-b border-border px-[12px] py-[6px]">
-      {/* Back, whenever there is a selection to clear. Its own control
-          rather than a mode of the collapse toggle: wide, both are
-          useful at once — hide the list, and stop looking at this run
-          are different wishes. */}
+      {/* Back, narrow only: the collapse toggle has no meaning without a
+          split to collapse, so the slot is free for 21 §Narrow layout's
+          back arrow. Above the breakpoint the slot stays the collapse
+          toggle's — `esc` alone clears the selection there (D209). */}
       {leave !== undefined ? (
         // The global screen's own `←`: it clears `?global=` and nothing
         // else, and the list is what shows (D216, D218).
@@ -102,13 +102,14 @@ export function PaneBar({
           ←
         </button>
       ) : (
+        narrow &&
         onBack !== undefined &&
         run !== undefined && (
           <button
             type="button"
             onClick={onBack}
-            aria-label={narrow ? 'back to runs' : 'clear the selected run'}
-            title={narrow ? 'back to runs' : 'clear the selected run (esc)'}
+            aria-label="back to runs"
+            title="back to runs"
             className={`${BACK} ${TOUCH}`}
           >
             ←
