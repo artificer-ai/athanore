@@ -312,8 +312,10 @@ its verdicts are in: `publish` — the push, the PR and the CI wait — is
 the step after the last of them (D269). Which one a change is, is the
 operator's call at submission; a `quick` run that turns out to need a
 plan or a review stops with its worktree and branch intact, to be
-resubmitted as a `feature`. Both share their deterministic steps
-(`workflows/feature/steps.py`). A finished run removes its worktree and
+resubmitted as a `feature`. What the build workflows have in common —
+the sandbox, the deterministic steps, the agent base class — is
+`workflows/shared/`, which no workflow package is imported by and none
+imports another. A finished run removes its worktree and
 branch; a failed or halted one leaves both to be read, and its PR if it
 got as far as `publish`.
 

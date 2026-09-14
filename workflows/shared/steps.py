@@ -22,7 +22,7 @@ from typing import Any
 
 from athanore import current_task
 
-from .agents import ImplementerAgent
+from .agents import SandboxAgent
 from .models import TaskReport
 from .sandbox import (
     GATE_COMMAND,
@@ -167,15 +167,17 @@ async def prepare(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 async def implement(
-    payload: dict[str, Any], agent: type[ImplementerAgent] = ImplementerAgent
+    payload: dict[str, Any], agent: type[SandboxAgent]
 ) -> dict[str, Any]:
     """One attempt of the implementer in the worktree; the report in the
     payload.
 
-    ``agent`` is the seat: `feature` sends its implementer, `quick` its
-    cheaper one. The prompt is the same — the description, the plan if
-    a planner wrote one, and the feedback if a previous attempt was sent
-    back — so the two differ in who reads it and not in what they read.
+    ``agent`` is the seat, and its ``output_model`` must be
+    :class:`~workflows.shared.models.TaskReport`: `feature` sends its
+    implementer, `quick` its cheaper one. The prompt is the same — the
+    description, the plan if a planner wrote one, and the feedback if a
+    previous attempt was sent back — so the two differ in who reads it
+    and not in what they read.
     """
 
     title, branch, tree = title_of(payload), payload["branch"], tree_of(payload)

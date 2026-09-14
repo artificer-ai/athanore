@@ -1,9 +1,10 @@
-"""What the three agents of `feature` submit.
+"""What the seats of `feature` submit, the implementer's report aside.
 
 Each is the `output_model` of the node that routes on it, so a verdict is
 a validated object rather than a sentence somebody has to parse — a stage
 that answered in prose would put the routing decision back in the hands
-of whoever read it (rule 2).
+of whoever read it (rule 2). The implementer's `TaskReport` is
+:mod:`workflows.shared.models`, because the shared steps read it.
 
 None of them carries a commit sha, a branch name or a pass/fail on the
 test suite. Those are facts about the repository, and the nodes read them
@@ -15,7 +16,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-__all__ = ["Brief", "PlanDoc", "QAVerdict", "ReviewVerdict", "TaskReport"]
+__all__ = ["Brief", "PlanDoc", "QAVerdict", "ReviewVerdict"]
 
 
 class Brief(BaseModel):
@@ -70,28 +71,6 @@ class PlanDoc(BaseModel):
         default_factory=list,
         description="The files the change is expected to touch",
     )
-
-
-class TaskReport(BaseModel):
-    """The implementer's account of what it did."""
-
-    headline: str = Field(
-        description=(
-            "One line, imperative mood, no trailing period — the subject "
-            "line of the merge commit this becomes"
-        )
-    )
-    summary: str = Field(description="What was built, in two or three sentences")
-    files: list[str] = Field(default_factory=list, description="Files touched")
-    tests_added: list[str] = Field(default_factory=list, description="Test files added")
-    how_to_exercise: str = Field(
-        default="",
-        description=(
-            "How a reviewer can see this working: the command to run, the "
-            "endpoint to call, the page to open"
-        ),
-    )
-    open_points: str = Field(default="", description="Anything left undecided")
 
 
 class ReviewVerdict(BaseModel):

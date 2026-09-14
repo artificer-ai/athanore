@@ -42,8 +42,7 @@ from typing import TYPE_CHECKING, Any
 from fastapi import Request
 
 from athanore import PluginContext, PluginError, Workflow
-
-from .sandbox import CHECKOUT
+from workflows.shared.sandbox import CHECKOUT
 
 if TYPE_CHECKING:
     from athanore import Server

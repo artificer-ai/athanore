@@ -22,10 +22,11 @@ change that turns out to need it — a red gate three times over — stops
 with its worktree and branch intact, like `feature`, and the way on is
 to resubmit it as one.
 
-Everything deterministic is :mod:`workflows.feature.steps`, shared with
+Everything deterministic is :mod:`workflows.shared.steps`, shared with
 `feature`: the same worktree (D263), the same gate, the same publish and
-merge (D260, D261). The only thing of its own here is the implementer,
-which is `feature`'s with a cheaper model and a shorter brief.
+merge (D260, D261). The only thing of its own here is the implementer:
+the same seat in the same sandbox, on a cheaper model, with a shorter
+brief.
 
 Run it::
 
@@ -38,9 +39,10 @@ from __future__ import annotations
 import os
 
 from athanore import Workflow
-from workflows.feature import steps
-from workflows.feature.agents import ImplementerAgent
-from workflows.feature.sandbox import GATE_COMMAND
+from workflows.shared import steps
+from workflows.shared.agents import SandboxAgent
+from workflows.shared.models import TaskReport
+from workflows.shared.sandbox import GATE_COMMAND
 
 __all__ = ["IMPLEMENT_MODEL", "wf"]
 
@@ -49,16 +51,17 @@ __all__ = ["IMPLEMENT_MODEL", "wf"]
 IMPLEMENT_MODEL = os.environ.get("QUICK_IMPLEMENT_MODEL", "sonnet")
 
 
-class QuickImplementer(ImplementerAgent):
-    """`feature`'s implementer, briefed for a change nobody reviews.
+class QuickImplementer(SandboxAgent):
+    """An implementer briefed for a change nobody reviews.
 
-    The same report, the same rules about committing on the branch and
-    not running the gate itself; what is gone is the account of the
-    stages that do not exist here, replaced by the one thing that
-    changes when nothing reviews the diff — keep it small.
+    The same report as `feature`'s, the same rules about committing on
+    the branch and not running the gate itself; what is gone is the
+    account of the stages that do not exist here, replaced by the one
+    thing that changes when nothing reviews the diff — keep it small.
     """
 
     model = IMPLEMENT_MODEL
+    output_model = TaskReport
 
     system_prompt = f"""# Implementer
 

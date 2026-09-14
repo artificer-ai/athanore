@@ -17,7 +17,7 @@ Run it from the checkout, in this repository's own environment::
 There is no container around this: athanore v1 maintaining athanore v1 is
 one distribution, so there is no second environment to keep it out of
 (D67 was about v0). The agents it dispatches *are* containerised, through
-`scripts/agent.sh` — see :mod:`workflows.feature.agents`.
+`scripts/agent.sh` — see :mod:`workflows.shared.agents`.
 """
 
 from __future__ import annotations
