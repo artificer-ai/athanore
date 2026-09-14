@@ -292,7 +292,6 @@ function freshTab() {
     focus: 'list',
     runFilter: { workflow: ALL_WORKFLOWS, query: '' },
     logComposerFor: null,
-    focusedRun: null,
   })
 }
 
@@ -1126,33 +1125,38 @@ describe('the run operations', () => {
     })
   })
 
-  it('moves the focused run with `↑`/`↓`, and never the selection', async () => {
+  it('moves the selected run with `⇧↑`/`⇧↓`, and never the selection', async () => {
     const onSelectRun = vi.fn()
     shell({ run: 'aaaa1111bbbb' }, { onSelectRun })
 
-    fireEvent.keyDown(screen.getByRole('region', { name: 'runs' }), { key: 'Enter' })
-    fireEvent.keyDown(document.body, { key: 'ArrowUp' })
-    // Still held: one press is one swap, not a move out of the mode.
-    expect(useUi.getState().focusedRun).toBe('aaaa1111bbbb')
+    fireEvent.keyDown(document.body, { key: 'ArrowUp', shiftKey: true })
 
     await waitFor(() => {
       expect(posted()).toEqual(['/api/runs/aaaa1111bbbb/position'])
     })
     // The selection is the run, and the run moved: nothing writes
-    // `?run=` on a swap (D204 (2)).
+    // `?run=` on a swap (D204 (2), D274).
     expect(onSelectRun).not.toHaveBeenCalled()
   })
 
-  it('selects rather than moving once the run is put down', async () => {
+  it('selects with the plain arrow, whatever was pressed before', async () => {
     const onSelectRun = vi.fn()
     shell({ run: 'aaaa1111bbbb' }, { onSelectRun })
 
-    const list = screen.getByRole('region', { name: 'runs' })
-    fireEvent.keyDown(list, { key: 'Enter' })
-    fireEvent.keyDown(list, { key: 'Enter' })
+    fireEvent.keyDown(document.body, { key: 'ArrowUp', shiftKey: true })
     fireEvent.keyDown(document.body, { key: 'ArrowDown' })
 
     expect(onSelectRun).toHaveBeenCalledExactlyOnceWith('cccc3333dddd')
+    await waitFor(() => {
+      expect(posted()).toEqual(['/api/runs/aaaa1111bbbb/position'])
+    })
+  })
+
+  it('moves nothing with `⇧↑` and no run selected', () => {
+    shell()
+
+    fireEvent.keyDown(document.body, { key: 'ArrowUp', shiftKey: true })
+
     expect(posted()).toEqual([])
   })
 
@@ -1418,99 +1422,6 @@ describe('the keyboard map', () => {
 
     fireEvent.keyDown(document.body, { key: 'Escape' })
     expect(onCloseOverlay).not.toHaveBeenCalled()
-  })
-
-  it('picks the highlighted run up on `⏎`, and puts it down again', () => {
-    shell({ run: 'aaaa1111bbbb' })
-    expect(useUi.getState().focusedRun).toBeNull()
-
-    const list = () => screen.getByRole('region', { name: 'runs' })
-    fireEvent.keyDown(list(), { key: 'Enter' })
-
-    expect(useUi.getState().focusedRun).toBe('aaaa1111bbbb')
-    expect(rows()[0]).toHaveAttribute('data-run-focused', 'true')
-    expect(rows()[1]).toHaveAttribute('data-run-focused', 'false')
-
-    fireEvent.keyDown(list(), { key: 'Enter' })
-    expect(useUi.getState().focusedRun).toBeNull()
-    expect(rows()[0]).toHaveAttribute('data-run-focused', 'false')
-  })
-
-  it('picks nothing up with no run selected', () => {
-    shell()
-
-    fireEvent.keyDown(screen.getByRole('region', { name: 'runs' }), { key: 'Enter' })
-
-    expect(useUi.getState().focusedRun).toBeNull()
-  })
-
-  it('puts a held run down on `esc`, over an overlay first', () => {
-    const onCloseOverlay = vi.fn()
-    shell({ run: 'aaaa1111bbbb' }, { onCloseOverlay })
-
-    fireEvent.keyDown(screen.getByRole('region', { name: 'runs' }), { key: 'Enter' })
-    expect(useUi.getState().focusedRun).toBe('aaaa1111bbbb')
-
-    fireEvent.keyDown(document.body, { key: 'Escape' })
-    expect(useUi.getState().focusedRun).toBeNull()
-    // Nothing was open, so nothing was closed: `esc` did the one thing
-    // there was to do.
-    expect(onCloseOverlay).not.toHaveBeenCalled()
-  })
-
-  it('drops a held run when the selection moves, and when it goes narrow', () => {
-    const { rerender, queryClient } = shell({ run: 'aaaa1111bbbb' })
-
-    fireEvent.keyDown(screen.getByRole('region', { name: 'runs' }), { key: 'Enter' })
-    expect(useUi.getState().focusedRun).toBe('aaaa1111bbbb')
-
-    // Focus is a fact about the *selected* run and cannot outlive it.
-    rerender(
-      <QueryClientProvider client={queryClient}>
-        <App
-          search={{ run: 'cccc3333dddd' }}
-          onSelectRun={() => {}}
-          onSelectPane={() => {}}
-          onOpenPalette={() => {}}
-        />
-      </QueryClientProvider>,
-    )
-    expect(useUi.getState().focusedRun).toBeNull()
-
-    // ...and there is no list to move a run in below the breakpoint.
-    cleanup()
-    shell({ run: 'aaaa1111bbbb' })
-    fireEvent.keyDown(screen.getByRole('region', { name: 'runs' }), { key: 'Enter' })
-    expect(useUi.getState().focusedRun).toBe('aaaa1111bbbb')
-
-    narrowViewport()
-    cleanup()
-    shell({ run: 'aaaa1111bbbb' })
-    expect(useUi.getState().focusedRun).toBeNull()
-    wideViewport()
-  })
-
-  it('drops a held run when `b` collapses the list to the rail', () => {
-    shell({ run: 'aaaa1111bbbb' })
-
-    fireEvent.keyDown(screen.getByRole('region', { name: 'runs' }), { key: 'Enter' })
-    expect(useUi.getState().focusedRun).toBe('aaaa1111bbbb')
-
-    // `b` unmounts the whole list (`Splitter`), so the held row, its
-    // tint and the strip's `↑↓ move run` hint all leave the screen —
-    // and a run nobody can see is not under the arrow keys (D204 (2)).
-    fireEvent.keyDown(document.body, { key: 'b' })
-    expect(usePrefs.getState().listCollapsed).toBe(true)
-    expect(screen.queryByRole('region', { name: 'runs' })).toBeNull()
-    expect(useUi.getState().focusedRun).toBeNull()
-
-    fireEvent.keyDown(document.body, { key: 'ArrowUp' })
-    expect(posted()).toEqual([])
-
-    // ...and there is nothing to pick up again while it stays collapsed,
-    // even though `inList()` still answers `true` for the body.
-    fireEvent.keyDown(document.body, { key: 'Enter' })
-    expect(useUi.getState().focusedRun).toBeNull()
   })
 
   it('is off while the operator is typing into the `/` input', () => {

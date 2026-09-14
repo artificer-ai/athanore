@@ -30,8 +30,8 @@ import {
  * this string and the table change together.
  */
 const SPEC = [
-  '`↑`/`↓` or `j`/`k` select, `←`/`→` cycle panes, `1`–`9` jump, `⏎` focus',
-  'run, `tab` focus, `t` retry task, `m` move task, `x` cancel task, `l`',
+  '`↑`/`↓` or `j`/`k` select, `⇧↑`/`⇧↓` move run, `←`/`→` cycle panes,',
+  '`1`–`9` jump, `tab` focus, `t` retry task, `m` move task, `x` cancel task, `l`',
   'append log, `n` new run, `r` rerun node, `p` pause/resume, `c` cancel run,',
   '`D` (shift) delete run (with confirm), `e` edit run, `w` workflows, `b`',
   'toggle list, `?` keys, `^p` palette, `^r` refresh,',
@@ -83,18 +83,19 @@ describe('the keyboard map', () => {
     }
   })
 
-  it('draws `⏎` as focus run, and the four caps it changes the meaning of', () => {
-    // 10 §Keyboard: "`⏎` picks the highlighted run up so that `↑`/`↓` …
-    // move it in the dispatch order instead of moving the selection".
-    // No new keycap: the move is the select row's four caps under a
-    // condition, which is what `note` is for (D204 (3)).
-    const focus = KEY_BINDINGS.find((binding) => binding.id === 'focus-run')
+  it('draws `⇧↑`/`⇧↓` as move run, with the modifier in the cap', () => {
+    // 10 §Keyboard: "`⇧↑`/`⇧↓` move the selected run in the dispatch
+    // order". A shifted arrow's `event.key` is the plain arrow's, so
+    // the chord is what is bound and the chip is in the table itself
+    // rather than added by `capLabel` (D274). It is a row of its own
+    // and not a condition on `select`: there is no mode, and `⏎` binds
+    // nothing any more.
     const move = KEY_BINDINGS.find((binding) => binding.id === 'move-run')
 
-    expect(focus?.keys).toEqual(['⏎'])
-    expect(focus?.label).toBe('focus run')
-    expect(move?.keys).toEqual(['↑', '↓', 'j', 'k'])
-    expect(move?.note).toBe('while a run is focused')
+    expect(move?.keys).toEqual([`${SHIFT_CAP}↑`, `${SHIFT_CAP}↓`])
+    expect(move?.label).toBe('move run')
+    expect(move?.note).toBe('')
+    expect(KEY_BINDINGS.some((binding) => binding.id === 'focus-run')).toBe(false)
     expect(KEY_BINDINGS.some((binding) => binding.id === 'focus-detail')).toBe(false)
   })
 
@@ -170,7 +171,7 @@ describe('capLabel', () => {
   })
 
   it('leaves every other notation of the map alone', () => {
-    for (const cap of ['^p', '^r', '?', '⏎', 'esc', 'tab', '1–9', 'd', '—']) {
+    for (const cap of ['^p', '^r', '?', '⇧↑', 'esc', 'tab', '1–9', 'd', '—']) {
       expect(capLabel(cap), `capLabel(\`${cap}\`)`).toBe(cap)
     }
     for (const arrow of ['↑', '↓', '←', '→']) {

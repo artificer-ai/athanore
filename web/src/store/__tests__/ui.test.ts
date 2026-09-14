@@ -4,7 +4,7 @@ import { useUi } from '../ui'
 
 describe('useUi', () => {
   beforeEach(() => {
-    useUi.setState({ focus: 'list', logComposerFor: null, focusedRun: null })
+    useUi.setState({ focus: 'list', logComposerFor: null })
   })
 
   it('starts on the run list, where the first ↑↓ should land', () => {
@@ -20,31 +20,6 @@ describe('useUi', () => {
 
     useUi.getState().setFocus('detail')
     expect(useUi.getState().focus).toBe('detail')
-  })
-
-  it('holds no run until `⏎` picks one up', () => {
-    expect(useUi.getState().focusedRun).toBeNull()
-
-    useUi.getState().focusRun('aaaa1111bbbb')
-    expect(useUi.getState().focusedRun).toBe('aaaa1111bbbb')
-
-    // A second pick-up replaces the first: one run is held at a time,
-    // and the shell only ever offers it the selected one (D204 (2)).
-    useUi.getState().focusRun('cccc3333dddd')
-    expect(useUi.getState().focusedRun).toBe('cccc3333dddd')
-
-    useUi.getState().blurRun()
-    expect(useUi.getState().focusedRun).toBeNull()
-  })
-
-  it('keeps the held run and the focused region apart', () => {
-    // `tab` moves the region; `⏎` picks a run up. Neither is the other,
-    // and moving one must not move the other.
-    useUi.getState().focusRun('aaaa1111bbbb')
-    useUi.getState().toggleFocus()
-
-    expect(useUi.getState().focus).toBe('detail')
-    expect(useUi.getState().focusedRun).toBe('aaaa1111bbbb')
   })
 
   it('holds one log-composer request, named by its run', () => {
@@ -65,8 +40,8 @@ describe('useUi', () => {
     localStorage.clear()
     useUi.getState().setFocus('detail')
     useUi.getState().toggleFocus()
-    useUi.getState().focusRun('aaaa1111bbbb')
-    useUi.getState().blurRun()
+    useUi.getState().focusLogComposer('aaaa1111bbbb')
+    useUi.getState().clearLogComposer()
     expect(localStorage.length).toBe(0)
   })
 })

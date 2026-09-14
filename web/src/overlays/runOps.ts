@@ -22,13 +22,14 @@
  * reports on the toast what it stopped, which is the `note` only that
  * endpoint fills.
  *
- * **Reorder's palette rows still carry no key, and say so.** They print
- * `—` in the key column rather than a key of their own (D175), because
- * the keyboard's way to this call is a *mode* and not a command: `⏎`
- * picks the selected run up and `↑`/`↓` then move it, which is no row a
- * palette can list (10 §Keyboard, D204 (3)). The New Run overlay's
- * POSITION is the same op with `{index: 0}` (D57), and these three are
- * how a run already in the list moves.
+ * **Reorder's palette rows carry `⇧↑` and `⇧↓`.** They were keyless
+ * while the keyboard's way to this call was a mode — `⏎` picked the
+ * selected run up and `↑`/`↓` then moved it (D204 (3)) — and a mode is
+ * no row a palette can list. A shifted arrow is a chord, and a chord is
+ * a command, so the rows now carry it and the keymap dispatches them
+ * off the key column like every other bound row (10 §Keyboard, D274).
+ * The New Run overlay's POSITION is the same op with `{index: 0}`
+ * (D57), and these three are how a run already in the list moves.
  *
  * Everything here refreshes rather than waiting: `run.paused`,
  * `run.resumed`, `run.cancelled`, `run.reordered` and `run.deleted` all
@@ -91,7 +92,7 @@ export function useRunOps(): RunOps {
    * Refresh the list and the run: both carry the status and the place.
    *
    * `id` names the toast, for the one operation an operator repeats
-   * fast: holding `↓` on a focused run posts a swap per keypress, and
+   * fast: holding `⇧↓` on a run posts a swap per keypress, and
    * without an id that is a stack of eight toasts saying eight
    * positions. With one, there is one toast, reporting the last place
    * the server settled on (D204 (4)).

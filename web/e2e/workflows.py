@@ -23,10 +23,9 @@ Six of them, and between them they are every shape the E2E specs need:
   node that raises with ``retries=0``, so the attempt dead-letters at
   once and the run reaches ``failed`` (04 §Retries, 03 §State machines).
   It is what puts the `fail` tone of 10 §Status colours on a row, which
-  is the tone the a11y gate needs in the list — the run list's focused
-  row is drawn over the selection's tint, and the pill on it is
-  transparent, so `fail` is the tone that decides whether the two are
-  compatible (`a11y.spec.ts`, D204 (5)).
+  is the tone the a11y gate needs in the list — the pill is transparent
+  over the selected row's tint, so `fail`, the darkest tone, is the one
+  that decides whether the two are compatible (`a11y.spec.ts`, D204 (5)).
 
 - :data:`ladder` is a chain of eight nodes, and its only job is to be
   tall. Eight ranks do not fit a 320 px canvas at the zoom the

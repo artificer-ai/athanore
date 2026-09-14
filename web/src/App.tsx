@@ -61,7 +61,6 @@
  * palette's rows and (T067) the `n` and `w` keys.
  */
 import { useQueryClient } from '@tanstack/react-query'
-import { useEffect } from 'react'
 
 import { Detail } from './components/Detail'
 import { Footer } from './components/Footer'
@@ -207,34 +206,8 @@ export default function App({
   )
   const queryClient = useQueryClient()
   const toggleListCollapsed = usePrefs((state) => state.toggleListCollapsed)
-  const listCollapsed = usePrefs((state) => state.listCollapsed)
   const setFontSize = usePrefs((state) => state.setFontSize)
   const focusLogComposer = useUi((state) => state.focusLogComposer)
-  const focusedRun = useUi((state) => state.focusedRun)
-  const focusRun = useUi((state) => state.focusRun)
-  const blurRun = useUi((state) => state.blurRun)
-
-  // Whether a run is held *for this render*: `⏎` picked one up, it is
-  // still the selection, its row is still in the filtered list, the
-  // viewport is still wide enough for that list to be on screen, and
-  // `b` has not collapsed it to the rail — `Splitter` does not mount
-  // `RunList` at all when it is collapsed, so a held run would be as
-  // invisible there as it is below the breakpoint (D204 (2)). Derived
-  // rather than trusted, so the frame between a filter keystroke and
-  // the effect below is never drawn with a mode the operator cannot
-  // see.
-  const runFocused =
-    focusedRun !== null &&
-    focusedRun === search.run &&
-    !narrow &&
-    !listCollapsed &&
-    runs.rows.some((row) => row.id === focusedRun)
-
-  // ...and the housekeeping that follows it, so a stale id cannot spring
-  // back the next time that run is selected.
-  useEffect(() => {
-    if (focusedRun !== null && !runFocused) blurRun()
-  }, [focusedRun, runFocused, blurRun])
 
   // Which pane the log is, in *this* selection's cycle: the manifest
   // decides how many panes there are and a plugin's `log` panel is not
@@ -325,9 +298,11 @@ export default function App({
     ),
   )
 
-  // 10 §Keyboard, bound to exactly the model above. Fourteen of its keys
+  // 10 §Keyboard, bound to exactly the model above. Sixteen of its keys
   // are the palette's rows and are dispatched on that catalogue's key
-  // column; what is left is navigation, which no palette row can be.
+  // column — `⇧↑`/`⇧↓` among them, which are `move run up` / `move run
+  // down` and reach `reorder` above (D274); what is left is navigation,
+  // which no palette row can be.
   useKeymap({
     actions: paletteActions,
     // The mock's `move`: clamped rather than wrapping, so holding `j` at
@@ -351,29 +326,11 @@ export default function App({
       else panes.prev()
     },
     jumpPane: panes.jump,
-    runFocused,
-    // `⏎ focus run`: pick the selected run up, or put the held one
-    // down. There is nothing to pick up with no run selected, and no
-    // list to move it in below the breakpoint or behind the collapsed
-    // rail (D204 (2)) — where `inList()` still answers `true` for the
-    // body, so the guard has to be here rather than in the keymap.
-    toggleRunFocus: () => {
-      if (narrow || listCollapsed || search.run === undefined) return
-      if (runFocused) blurRun()
-      else focusRun(search.run)
-    },
-    // `↑`/`↓`/`j`/`k`, while one is held: one swap per press, against
-    // the true dispatch neighbour, through the endpoint the palette's
-    // two keyless rows already call (`overlays/runOps.ts`, D204 (4)).
-    moveRun: (delta) => {
-      if (!runFocused || search.run === undefined) return
-      runOps.reorder(search.run, delta < 0 ? 'up' : 'down')
-    },
     openPalette: onOpenPalette,
     // `esc close`: the overlay first, because it is the nearer thing —
-    // and while one is up the arrows are suppressed anyway — then a held
-    // run, then the selection itself. Nearest outwards, one rung per
-    // keystroke, so `esc` never skips a step the operator can see.
+    // and while one is up the arrows are suppressed anyway — then the
+    // selection itself. Nearest outwards, one rung per keystroke, so
+    // `esc` never skips a step the operator can see.
     //
     // The last rung is what makes the `global` panes reachable again: a
     // run stays selected until something clears `?run=`, and until now
@@ -384,12 +341,11 @@ export default function App({
     // search would be one history entry per keystroke.
     //
     // The narrow global screen is a rung between the overlay and the
-    // held run (D216): a held run is never narrow and the screen is
-    // never over a selection (D218), so nothing past the rung is ever
-    // reached from it, and it sits where it reads right — one step
-    // outwards from the screen the operator is on. Below the breakpoint
-    // every press after the overlay is one screen back to the list:
-    // global → list, detail → list (D218 (5)).
+    // selection (D216): the screen is never over a selection (D218), so
+    // nothing past the rung is ever reached from it, and it sits where
+    // it reads right — one step outwards from the screen the operator
+    // is on. Below the breakpoint every press after the overlay is one
+    // screen back to the list: global → list, detail → list (D218 (5)).
     close: () => {
       if (search.overlay !== undefined) {
         onCloseOverlay?.()
@@ -397,10 +353,6 @@ export default function App({
       }
       if (showingGlobal) {
         showGlobal(undefined)
-        return
-      }
-      if (runFocused) {
-        blurRun()
         return
       }
       if (search.run !== undefined) onClearRun?.()
@@ -463,7 +415,6 @@ export default function App({
           <RunList
             model={runs}
             selected={search.run}
-            focusedRun={runFocused ? search.run : undefined}
             onSelect={onSelectRun}
           />
         }

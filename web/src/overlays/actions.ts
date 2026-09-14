@@ -17,15 +17,16 @@
  * — joined it with T066e, which is the task whose done condition is that
  * every operator op of 04 is reachable from the UI (D170, D175).
  *
- * **Six rows carry no key, and say so.** `reorder(run, direction)` is an
- * operator op of 04 that 10 §Keyboard has no binding for, and that
- * section is exhaustive — T067 binds exactly it — so the two rows that
- * move a run up and down the dispatch list print `—` in the key column
- * rather than advertising a key this app does not have (D175). The New
- * Run overlay's POSITION is the same op with `{index: 0}` (D57). The
- * four `font size: …` rows are keyless for the same reason: they are the
- * keyboard-first half of the header's chooser (D196), and 10 §Keyboard
- * binds no key to them either.
+ * **Four rows carry no key, and say so.** The `font size: …` rows are
+ * the keyboard-first half of the header's chooser (D196), and 10
+ * §Keyboard — which is exhaustive; T067 binds exactly it — binds no key
+ * to them, so they print `—` in the key column rather than advertising
+ * a key this app does not have (D175). `reorder(run, direction)` used
+ * to be keyless for the same reason and is not any more: `⇧↑`/`⇧↓`
+ * move the selected run in the dispatch list (D274), and the two rows
+ * carry the chord as their key so that the keymap dispatches them off
+ * this column like every other bound row. The New Run overlay's
+ * POSITION is the same op with `{index: 0}` (D57).
  *
  * Two shapes of command live here and they end the palette differently:
  *
@@ -42,6 +43,7 @@
  * a command that exists and is not available, which is what a disabled
  * row says.
  */
+import { SHIFT_CAP } from '../lib/keys'
 import type { Overlay } from '../routes/search'
 import { FONT_SIZES, type FontSize } from '../store/prefs'
 
@@ -256,7 +258,7 @@ export const PALETTE_COMMANDS: readonly PaletteCommand[] = [
     id: 'move-run-up',
     name: 'move run up',
     hint: 'earlier in the dispatch list',
-    key: KEYLESS,
+    key: `${SHIFT_CAP}↑`,
     needsRun: true,
     perform: (ctx) => {
       ctx.close()
@@ -267,7 +269,7 @@ export const PALETTE_COMMANDS: readonly PaletteCommand[] = [
     id: 'move-run-down',
     name: 'move run down',
     hint: 'later in the dispatch list',
-    key: KEYLESS,
+    key: `${SHIFT_CAP}↓`,
     needsRun: true,
     perform: (ctx) => {
       ctx.close()

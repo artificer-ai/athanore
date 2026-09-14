@@ -87,15 +87,8 @@ of TOML nobody executes.
   `window − 340`, collapsible with `b` to a 30 px vertical rail reading
   `RUNS n`): grid columns RUN · WORKFLOW · TITLE · STATUS · NODE · AGE.
   Selected row gets a flat accent tint (`color-mix(accent 12%, surface)`)
-  and a 2 px accent left border; the row `⏎` has focused keeps that tint
-  and takes the second accent in its chrome — a 2 px `accent-2-400` left
-  border and a 1 px inset ring of the same colour — so the two modes are
-  told apart without the column shifting and without moving the ground
-  the status pill is painted on (§Status colours, §Accessibility and
-  quality, D204 (5)). Footer strip: `n shown · ↑↓ select · ⏎ focus run`,
-  and while a run is focused `n shown · ↑↓ move run · ⏎/esc done`; the
-  pair of hints is a live region, so the mode is announced as well as
-  drawn.
+  and a 2 px accent left border; selection is the only state a row
+  draws (D274). Footer strip: `n shown · ↑↓ select · ⇧↑↓ move run`.
 - **Detail** (right): pane bar with the collapse toggle, `◀ PANE (i/n) ▶`,
   one 14×3 px dot per pane (accent = current, accent-800 = plugin pane,
   neutral-800 = builtin), then `run <id>` and a status pill.
@@ -325,7 +318,7 @@ close button (`aria-label="close"`) there in place of its `esc …` hint;
 ## Keyboard
 
 Exactly the mock's map, which is the TUI's: `↑`/`↓` or `j`/`k` select,
-`←`/`→` cycle panes, `1`–`9` jump, `⏎` focus run, `tab` focus, `t`
+`⇧↑`/`⇧↓` move run, `←`/`→` cycle panes, `1`–`9` jump, `tab` focus, `t`
 retry task, `m` move task, `x` cancel task, `l` append log, `n` new run,
 `r` rerun node, `p` pause/resume, `c` cancel run, `D` (shift) delete run
 (with confirm), `e` edit run, `w` workflows, `b` toggle list, `?` keys,
@@ -351,11 +344,11 @@ keyboard-only operator unable to reach the header's `/` input, the
 workflow chips, the pane bar or a request's own buttons, which
 §Accessibility and quality forbids. The two regions follow the browser's
 focus instead, and `tab` is the only way attention reaches the detail
-pane (D176, D179, D204 (1)).
+pane (D176, D179, D204 (1)). `⏎` is not intercepted either: it belongs
+to whatever has focus (D274).
 
 `esc` unwinds one rung at a time, nearest outwards: an open overlay, then
-the narrow global screen (D216), then a run held by `⏎`, then the
-selection itself. Below the breakpoint the rung after the overlay is
+the narrow global screen (D216), then the selection itself. Below the breakpoint the rung after the overlay is
 the way back to the list from whichever outer screen is up — the
 global screen or a run's detail — and no key advances a screen the
 other way (D218 (5)).
@@ -367,19 +360,18 @@ dead end there (D209). With nothing to unwind `esc` does nothing, rather
 than rewriting the same search and spending a history entry per
 keystroke.
 
-`⏎` **focuses a run**: it picks the highlighted run up so that `↑`/`↓`
-— and `j`/`k`, which are the same binding — move it in the dispatch
-order instead of moving the selection, one swap per press, through
-`POST /api/runs/{id}/position` with `{direction: -1 | 1}` (08 §Runs).
-`⏎` again or `esc` puts it down. A run can only be focused while it is
-the selected run, while its row is in the list on screen, and at `md`
-and above: changing the selection, filtering the row away, deleting the
-run, collapsing the list to its rail with `b` or narrowing the window
-past the breakpoint all put it down, so the arrow keys never move a run
-nobody can see. Every other key of the map
-does exactly what it always does while a run is held. The swap is
-against the run's true dispatch neighbour, which an active filter may be
-hiding: the toast reports the position the server settled on (D204).
+`⇧↑`/`⇧↓` **move the selected run** in the dispatch order, one swap per
+press, through `POST /api/runs/{id}/position` with `{direction: -1 | 1}`
+(08 §Runs). There is no mode to enter first: `↑`/`↓` select and
+`⇧↑`/`⇧↓` move, whatever was pressed before, and the selection travels
+with the run because selection *is* the run (`?run=` names an id). The
+two chords are the palette's `move run up` / `move run down` rows, so
+the key column there draws them and the keymap dispatches them off it
+like `⇧D`; a shifted arrow has the plain arrow's `event.key`, so here
+the modifier is bound as well as drawn. With no run selected the chord
+does nothing, like the row it is. The swap is against the run's true
+dispatch neighbour, which an active filter may be hiding: the toast
+reports the position the server settled on (D204 (4), D274).
 
 The pane index is clamped to the selected run's pane count when the
 selection changes (plugin panes differ per workflow).
@@ -520,9 +512,9 @@ with scope attributes.
   five states of that page, because they are five documents: the empty
   dashboard, the loaded one, the loaded one at `xlarge`, the loaded one
   at 390×844 — all three of its narrow screens (D197, D216) — and the
-  run list with a `failed` run picked up by `⏎`, which is the only state
-  that draws a focused row and so the only one that measures what a
-  status pill sits on inside that mode (D204 (5)). The pointer is moved
+  run list with a `failed` run selected, which is the darkest status
+  tone on the one tint the list paints a pill over, and so the state
+  that measures the floor (D204 (5), D274). The pointer is moved
   off the row before axe walks it: `hover:bg-*` outranks a row's own
   tint, so a row still under the cursor that a click selected is
   measured on its hover colour rather than on the tint the assertion is

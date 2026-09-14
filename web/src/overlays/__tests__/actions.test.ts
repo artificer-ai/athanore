@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
+import { SHIFT_CAP } from '../../lib/keys'
 import {
   KEYLESS,
   PALETTE_COMMANDS,
@@ -211,7 +212,7 @@ describe('the palette catalogue', () => {
     expect(ctx.pauseResume).not.toHaveBeenCalled()
   })
 
-  it('reorders in both directions, with no key to advertise', () => {
+  it('reorders in both directions, and carries the shifted arrow as its key', () => {
     const ctx = context()
 
     action(ctx, 'move-run-up').run()
@@ -219,10 +220,10 @@ describe('the palette catalogue', () => {
 
     expect(ctx.reorder).toHaveBeenNthCalledWith(1, 'up')
     expect(ctx.reorder).toHaveBeenNthCalledWith(2, 'down')
-    // 10 §Keyboard has no binding for `reorder` and T067 binds exactly
-    // that table, so the two rows print `—` rather than inventing one.
-    expect(action(ctx, 'move-run-up').key).toBe(KEYLESS)
-    expect(action(ctx, 'move-run-down').key).toBe(KEYLESS)
+    // 10 §Keyboard binds `⇧↑`/`⇧↓` to `reorder`, and the keymap
+    // dispatches on this column, so the rows carry the chord (D274).
+    expect(action(ctx, 'move-run-up').key).toBe(`${SHIFT_CAP}↑`)
+    expect(action(ctx, 'move-run-down').key).toBe(`${SHIFT_CAP}↓`)
   })
 
   it('sets the type scale from four rows, with no run and no key', () => {

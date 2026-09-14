@@ -345,9 +345,6 @@ function underTheKeymap(view: RequestView) {
       select: () => {},
       cyclePane: () => {},
       jumpPane: () => {},
-      runFocused: false,
-      toggleRunFocus: () => {},
-      moveRun: () => {},
       openPalette: () => {},
       close: () => {},
     })

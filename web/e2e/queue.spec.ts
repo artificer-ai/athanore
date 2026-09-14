@@ -30,7 +30,7 @@ test('the palette moves a queued run up the dispatch list', async ({ dashboard }
   await expect(dashboard.page.getByText(/^position \d+$/)).toBeVisible()
 })
 
-test('`⏎` picks a run up and `↑` moves it, until `esc` puts it down', async ({
+test('`⇧↑` moves the selected run, and `↑` still moves the selection', async ({
   dashboard,
 }) => {
   const page = dashboard.page
@@ -41,25 +41,18 @@ test('`⏎` picks a run up and `↑` moves it, until `esc` puts it down', async 
   await expect.poll(() => dashboard.titles()).toEqual(['first', 'second', 'third'])
 
   await dashboard.select('third')
-  await page.keyboard.press('Enter')
-  await expect(dashboard.row('third')).toHaveAttribute('data-run-focused', 'true')
-  // Colour is never the only signal: the list's footer strip says which
-  // mode the arrows are in (10 §Accessibility and quality, D204 (5)).
-  await expect(page.getByTestId('list-hints')).toContainText('↑↓ move run')
+  // The list's footer strip says so, beside the plain arrows' hint.
+  await expect(page.getByTestId('list-hints')).toContainText('⇧↑↓ move run')
 
-  await page.keyboard.press('ArrowUp')
+  await page.keyboard.press('Shift+ArrowUp')
   await expect.poll(() => dashboard.titles()).toEqual(['first', 'third', 'second'])
-  // The selection is the run, so it travelled with it, and the run is
-  // still held: one press is one swap.
+  // The selection is the run, so it travelled with it: one press is one
+  // swap, and nothing writes `?run=` (D204 (2), D274).
   await expect(dashboard.row('third')).toHaveAttribute('aria-selected', 'true')
-  await expect(dashboard.row('third')).toHaveAttribute('data-run-focused', 'true')
 
-  await page.keyboard.press('Escape')
-  await expect(dashboard.row('third')).toHaveAttribute('data-run-focused', 'false')
-  await expect(page.getByTestId('list-hints')).toContainText('⏎ focus run')
-
-  // ...and the assertion that proves the mode is a mode: the same key
-  // now moves the cursor and leaves the dispatch order alone.
+  // ...and the assertion that proves there is no mode: the plain arrow
+  // moves the cursor and leaves the dispatch order alone, with nothing
+  // pressed in between.
   await page.keyboard.press('ArrowUp')
   await expect(dashboard.row('first')).toHaveAttribute('aria-selected', 'true')
   await expect.poll(() => dashboard.titles()).toEqual(['first', 'third', 'second'])
