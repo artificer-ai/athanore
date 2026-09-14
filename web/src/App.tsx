@@ -490,10 +490,9 @@ export default function App({
             }
             // The back control: it clears `?run=` through the same
             // write the delete confirm uses, so "back to the list" and
-            // "nothing is selected" are one state. Drawn at every width
-            // since D209 — below the breakpoint it is 21 §Narrow
-            // layout's back arrow, above it, it is the only pointer
-            // route to the `global` panes.
+            // "nothing is selected" are one state. `PaneBar` draws it
+            // narrow only — 21 §Narrow layout's back arrow; above the
+            // breakpoint `esc` is the route to the same write (D209).
             onBack={onClearRun}
             // The global screen's own way back: `?global=` away, and
             // the list — the one thing beside the screen — is what

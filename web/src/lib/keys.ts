@@ -225,7 +225,14 @@ export const KEY_BINDINGS: readonly KeyBinding[] = [
   { id: 'keys', keys: ['?'], label: 'keys', group: 'app', note: '', footer: true },
   { id: 'palette', keys: ['^p'], label: 'palette', group: 'app', note: '', footer: false },
   { id: 'refresh', keys: ['^r'], label: 'refresh', group: 'app', note: '', footer: false },
-  { id: 'close', keys: ['esc'], label: 'close', group: 'app', note: '', footer: false },
+  {
+    id: 'close',
+    keys: ['esc'],
+    label: 'close overlay / clear run',
+    group: 'app',
+    note: '',
+    footer: false,
+  },
 
   {
     id: 'allow',
