@@ -137,6 +137,15 @@ describe('choiceOptions', () => {
     expect(options.at(-1)!.count).toBe(2)
   })
 
+  it('offers the workflows runs are of, by name, counted over the other columns', () => {
+    const options = choiceOptions('workflow', RUNS, filter({ statuses: ['failed'] }), NOW)
+
+    expect(options.map((option) => [option.value, option.count])).toEqual([
+      ['feature_build', 0],
+      ['gamedev', 1],
+    ])
+  })
+
   it('keeps a chosen node no run is in any more, so it can be turned off', () => {
     const options = choiceOptions('node', RUNS, filter({ nodes: ['gone'] }), NOW)
 

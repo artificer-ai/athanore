@@ -52,12 +52,6 @@ import type { RunListModel, RunRow } from './useRunList'
 const COLUMNS =
   'minmax(0, 108px) minmax(0, 104px) minmax(110px, 1fr) minmax(0, 84px) minmax(0, 92px) 46px'
 
-/**
- * The headings below the breakpoint: every column with a funnel.
- * WORKFLOW's choice is the library's at every width, and a strip is not
- * a grid, so a heading with nothing to open would be a word and no more.
- */
-const NARROW_HEADINGS = FILTER_COLUMNS.filter((column) => column.inHeader)
 
 /** The glyph a run with unanswered requests carries after its node. */
 const PENDING_GLYPH = '⚠'
@@ -292,7 +286,7 @@ function Empty({ model, onClear }: { model: RunListModel; onClear: () => void })
  * What the footer says is filtering: the library's workflow marks, one
  * chip each, and `× clear n filters`.
  *
- * The workflow marks get chips because they are made in an overlay that
+ * The workflow marks get chips because they can be made in an overlay that
  * is closed by the time anyone reads the list; a column's filter shows
  * on its own heading, which is on screen above the rows it narrowed.
  */
@@ -363,7 +357,7 @@ export function RunList({
           data-testid="column-headings"
           className="text-hint bg-chrome flex flex-wrap items-center gap-x-[14px] gap-y-[4px] border-b border-border px-[12px] py-[4px] tracking-[0.1em] text-muted-foreground"
         >
-          {NARROW_HEADINGS.map((column) => (
+          {FILTER_COLUMNS.map((column) => (
             <ColumnHeading key={column.key} column={column} model={model} narrow />
           ))}
         </div>

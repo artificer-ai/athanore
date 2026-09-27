@@ -6,16 +6,17 @@
  * one of three kinds, chosen by what the column holds:
  *
  * - `text` — RUN and TITLE: free text, `contains`, case-folded.
- * - `choice` — STATUS and NODE: a closed set, `any of`. STATUS offers the
+ * - `choice` — WORKFLOW, STATUS and NODE: a closed set, `any of`.
+ *   WORKFLOW offers the workflows there are runs of; STATUS offers the
  *   six statuses of 03 whether or not a run is in one, because the set
  *   is the enum's and not the data's; NODE offers the nodes runs are in
  *   now, since there is no one graph to take a node list from.
  * - `date` — AGE: `created between`, as a rolling window (`last 1h`) or
  *   a fixed range of two local datetimes.
  *
- * WORKFLOW is a choice too, but its column offers no funnel: the
- * workflow library is the list of workflows, so its rows carry the
- * marks (`overlays/Library.tsx`) and write the same field.
+ * WORKFLOW's choices are also the workflow library's marks
+ * (`overlays/Library.tsx`): both write the same field, so the funnel
+ * and the library cannot disagree.
  *
  * The counts a popover shows are *faceted*: every other column's filter
  * applied, this column's own left out — "how many would I get if I
@@ -25,7 +26,7 @@
 import type { RunStatus, RunSummary } from '../../api/gen/types.gen'
 import { EMPTY_RUN_FILTER, NO_NODE_FILTER, type RunFilter } from '../../store/ui'
 
-/** A filterable column's key; `workflow` is the library's. */
+/** A filterable column's key. */
 export type FilterKey = 'id' | 'workflow' | 'title' | 'status' | 'node' | 'age'
 
 /** How a column filters. */
@@ -37,18 +38,16 @@ export type FilterColumn = {
   /** The heading, which is also the popover's title. */
   label: string
   kind: FilterKind
-  /** Whether its funnel is in the header; `false` for WORKFLOW. */
-  inHeader: boolean
 }
 
 /** The six columns, in grid order. */
 export const COLUMNS: readonly FilterColumn[] = [
-  { key: 'id', label: 'RUN', kind: 'text', inHeader: true },
-  { key: 'workflow', label: 'WORKFLOW', kind: 'choice', inHeader: false },
-  { key: 'title', label: 'TITLE', kind: 'text', inHeader: true },
-  { key: 'status', label: 'STATUS', kind: 'choice', inHeader: true },
-  { key: 'node', label: 'NODE', kind: 'choice', inHeader: true },
-  { key: 'age', label: 'AGE', kind: 'date', inHeader: true },
+  { key: 'id', label: 'RUN', kind: 'text' },
+  { key: 'workflow', label: 'WORKFLOW', kind: 'choice' },
+  { key: 'title', label: 'TITLE', kind: 'text' },
+  { key: 'status', label: 'STATUS', kind: 'choice' },
+  { key: 'node', label: 'NODE', kind: 'choice' },
+  { key: 'age', label: 'AGE', kind: 'date' },
 ]
 
 /** The popover's second word for each kind: how the column matches. */
@@ -245,7 +244,7 @@ export type ChoiceOption = {
  * is in any more stays listed, so it can still be turned off.
  */
 export function choiceOptions(
-  key: 'status' | 'node',
+  key: 'workflow' | 'status' | 'node',
   runs: readonly RunSummary[],
   filter: RunFilter,
   now: number,
@@ -259,6 +258,19 @@ export function choiceOptions(
       count: facet.filter((run) => run.status === status).length,
       on: filter.statuses.includes(status),
     }))
+  }
+
+  if (key === 'workflow') {
+    const names = new Set<string>(filter.workflows)
+    for (const run of runs) names.add(run.workflow)
+    return [...names]
+      .sort((a, b) => a.localeCompare(b))
+      .map((workflow) => ({
+        value: workflow,
+        label: workflow,
+        count: facet.filter((run) => run.workflow === workflow).length,
+        on: filter.workflows.includes(workflow),
+      }))
   }
 
   const named = new Set<string>(filter.nodes)

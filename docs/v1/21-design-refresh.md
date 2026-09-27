@@ -232,10 +232,9 @@ themselves.
   line 2: `run id · workflow · node · age` in `text-meta`, with the `⚠`
   open-request glyph kept beside the node (10 §Attention). Same data,
   same query, same selection behaviour; tapping a row opens the detail.
-  Over the rows, the column headings become a strip of the five
-  filterable columns' funnels, always drawn, each a 24 px target (10
-  §Run filters, D275); WORKFLOW's filter is the library's at every
-  width. The list's footer strip keeps `n of m shown` and the active
+  Over the rows, the column headings become a strip of the six
+  columns' funnels, always drawn, each a 24 px target (10 §Run filters,
+  D275, D276). The list's footer strip keeps `n of m shown` and the active
   filters and drops the `↑↓ select · ⇧↑↓ move run` key hints; the keys
   themselves stay bound at every width (10 §Keyboard, D274).
 - **Detail**: the pane bar's left slot shows a back control (`←` with

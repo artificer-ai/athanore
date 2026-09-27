@@ -1,7 +1,7 @@
 /**
  * A run list column heading, and the filter it opens (D275).
  *
- * Every heading but WORKFLOW carries a funnel. It is drawn when the
+ * Every heading carries a funnel. It is drawn when the
  * pointer is over the heading, when it has the keyboard, and whenever
  * the column filters — a filter that is on is never invisible — and it
  * opens a popover anchored to the heading: `FILTER · STATUS` and how the
@@ -10,10 +10,8 @@
  * its heading; a `choice` column's funnel also carries how many choices
  * are on.
  *
- * WORKFLOW is a plain heading that still underlines when the library's
- * marks filter it: the library is the list of workflows, so the choice
- * is made there (`overlays/Library.tsx`), and the heading only says it
- * has been.
+ * WORKFLOW's choices are the same field the library's marks write
+ * (`overlays/Library.tsx`), so a workflow checked here is marked there.
  *
  * Nothing here holds a filter. Every control writes `useUi.runFilter`,
  * which the list reads on its next render, so a row leaves as the key
@@ -82,20 +80,14 @@ export function ColumnHeading({
   const active = columnActive(filter, column.key)
   const right = column.key === 'age' && !narrow
 
-  if (!column.inHeader) {
-    return (
-      <span className="flex min-w-0 items-center">
-        <Label column={column} active={active} />
-      </span>
-    )
-  }
-
   const selected =
-    column.key === 'status'
-      ? filter.statuses.length
-      : column.key === 'node'
-        ? filter.nodes.length
-        : 0
+    column.key === 'workflow'
+      ? filter.workflows.length
+      : column.key === 'status'
+        ? filter.statuses.length
+        : column.key === 'node'
+          ? filter.nodes.length
+          : 0
   const name = column.label.toLowerCase()
 
   return (
@@ -233,7 +225,8 @@ function TextControl({ column, onDone }: { column: FilterColumn; onDone: () => v
 function ChoiceControl({ column, model }: { column: FilterColumn; model: RunListModel }) {
   const filter = useUi((s) => s.runFilter)
   const setRunFilter = useUi((s) => s.setRunFilter)
-  const key = column.key === 'status' ? 'status' : 'node'
+  const key =
+    column.key === 'workflow' ? 'workflow' : column.key === 'status' ? 'status' : 'node'
   const options = choiceOptions(key, model.runs, filter, model.now)
 
   return (
@@ -253,9 +246,11 @@ function ChoiceControl({ column, model }: { column: FilterColumn; model: RunList
           aria-checked={option.on}
           onClick={() =>
             setRunFilter(
-              key === 'status'
-                ? { statuses: toggled(filter.statuses, option.value as RunStatus) }
-                : { nodes: toggled(filter.nodes, option.value) },
+              key === 'workflow'
+                ? { workflows: toggled(filter.workflows, option.value) }
+                : key === 'status'
+                  ? { statuses: toggled(filter.statuses, option.value as RunStatus) }
+                  : { nodes: toggled(filter.nodes, option.value) },
             )
           }
           className={cn(

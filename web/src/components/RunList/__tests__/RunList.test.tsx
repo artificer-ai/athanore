@@ -258,13 +258,12 @@ describe('RunList', () => {
     expect(useUi.getState().runFilter.workflows).toEqual(['probe'])
   })
 
-  it('underlines the WORKFLOW heading while the library filters it, with no funnel', () => {
+  it('gives every column a funnel, and underlines WORKFLOW while the library filters it', () => {
     useUi.setState({ runFilter: { ...EMPTY_RUN_FILTER, workflows: ['gamedev'] } })
     list()
 
     expect(screen.getByText('WORKFLOW')).toHaveClass('underline')
-    expect(screen.queryByRole('button', { name: 'filter workflow' })).toBeNull()
-    for (const name of ['run', 'title', 'status', 'node', 'age']) {
+    for (const name of ['run', 'workflow', 'title', 'status', 'node', 'age']) {
       expect(screen.getByRole('button', { name: `filter ${name}` })).toBeInTheDocument()
     }
   })
@@ -350,12 +349,11 @@ describe('RunList', () => {
       expect(screen.getByTestId('rows-shown')).toHaveTextContent('2 of 2 shown')
     })
 
-    it('keeps every funnel but WORKFLOW’s as a strip over the rows', () => {
+    it('keeps every funnel as a strip over the rows', () => {
       list()
 
       const strip = screen.getByTestId('column-headings')
-      expect(within(strip).queryByText('WORKFLOW')).toBeNull()
-      for (const name of ['run', 'title', 'status', 'node', 'age']) {
+      for (const name of ['run', 'workflow', 'title', 'status', 'node', 'age']) {
         expect(
           within(strip).getByRole('button', { name: `filter ${name}` }),
         ).toBeInTheDocument()
