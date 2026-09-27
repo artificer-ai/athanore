@@ -76,6 +76,7 @@ import {
   type StreamBlock,
   type StreamBlockKind,
 } from './stream'
+import { Frame } from '../../components/Frame'
 
 /** How far from the bottom still counts as "at the end", in pixels. */
 const TAIL_SLACK_PX = 24
@@ -133,7 +134,7 @@ function Block({ block }: { block: StreamBlock }) {
       data-kind={block.kind}
       data-chunk={block.chunk}
       className={cn(
-        'rounded-lg border border-[var(--color-neutral-900)] px-[11px] py-[9px]',
+        'rounded-lg border border-[var(--color-accent-800)] px-[11px] py-[9px]',
         block.kind === 'tool' ? 'bg-zebra' : 'bg-card',
         block.thought && 'opacity-60',
       )}
@@ -374,8 +375,10 @@ export function AgentStream({
 
   return (
     <div data-testid="pane-agent" className="flex min-h-0 flex-1 flex-col">
-      <div className="text-hint flex flex-none flex-wrap items-center gap-x-[10px] gap-y-[6px] border-b border-[var(--color-neutral-800)] px-[14px] py-[6px] tracking-[0.1em] text-muted-foreground">
-        <span className="whitespace-nowrap">AGENT STREAM</span>
+      <div className="text-hint flex flex-none flex-wrap items-center gap-x-[10px] gap-y-[6px] border-b border-[var(--color-accent-800)] px-[14px] py-[6px] tracking-[0.1em] text-muted-foreground">
+        <span className="whitespace-nowrap">
+          <Frame>AGENT STREAM</Frame>
+        </span>
         {task !== undefined && (
           <>
             <Bar />
@@ -427,7 +430,7 @@ export function AgentStream({
       {open.length > 0 && (
         <div
           data-testid="stream-request-dock"
-          className="bg-chrome flex max-h-[45%] flex-none flex-col gap-[8px] overflow-x-hidden overflow-y-auto border-t border-[var(--color-neutral-800)] px-[14px] py-[10px]"
+          className="bg-chrome flex max-h-[45%] flex-none flex-col gap-[8px] overflow-x-hidden overflow-y-auto border-t border-[var(--color-accent-800)] px-[14px] py-[10px]"
         >
           <p className="text-hint tracking-[0.1em] text-status-gate">
             <span aria-hidden="true">⚠ </span>

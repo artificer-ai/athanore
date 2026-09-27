@@ -51,6 +51,7 @@ import { useKeyOwner } from '../keys'
 import { actionError } from '../lib/errors'
 import { queryKeys } from '../realtime/invalidate'
 import { OverlayClose } from './OverlayPanel'
+import { Frame } from '../components/Frame'
 
 /** The dialog's accessible name, and the mock's header kicker. */
 export const EDIT_RUN_TITLE = 'edit run'
@@ -163,11 +164,11 @@ export function EditRun({
             restoreFocusTo.current = null
             opened.current = false
           }}
-          className="text-body fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-48px)] w-[min(600px,94vw)] -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-lg border border-[var(--color-neutral-800)] bg-[var(--color-surface)] text-foreground shadow-[var(--shadow-lg)] max-md:max-h-[calc(100dvh-16px)] max-md:max-w-[calc(100vw-16px)]"
+          className="text-body fixed top-1/2 left-1/2 z-50 max-h-[calc(100dvh-48px)] w-[min(600px,94vw)] -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-lg border border-[var(--color-accent-800)] bg-[var(--color-surface)] text-foreground shadow-[var(--shadow-lg)] max-md:max-h-[calc(100dvh-16px)] max-md:max-w-[calc(100vw-16px)]"
         >
-          <div className="flex items-center gap-[10px] border-b border-[var(--color-neutral-900)] px-[14px] py-[10px]">
+          <div className="flex items-center gap-[10px] border-b border-[var(--color-accent-900)] px-[14px] py-[10px]">
             <Dialog.Title className="text-kicker text-[var(--color-accent-300)]">
-              {EDIT_RUN_TITLE}
+              <Frame>{EDIT_RUN_TITLE}</Frame>
             </Dialog.Title>
             <div className="flex-1" />
             <span className="text-hint text-muted-foreground max-md:hidden">
@@ -377,7 +378,7 @@ function EditRunForm({
           <p
             role="alert"
             data-testid="edit-run-error"
-            className="text-meta rounded-lg border border-[var(--color-neutral-800)] bg-[var(--color-neutral-900)] px-[9px] py-[5px] text-status-fail"
+            className="text-meta rounded-lg border border-[var(--color-accent-800)] bg-[var(--color-neutral-900)] px-[9px] py-[5px] text-status-fail"
           >
             {refusal}
           </p>
@@ -405,7 +406,7 @@ function Footer({
   busy?: boolean
 }) {
   return (
-    <div className="flex justify-end gap-[8px] border-t border-[var(--color-neutral-900)] px-[14px] py-[12px]">
+    <div className="flex justify-end gap-[8px] border-t border-[var(--color-accent-900)] px-[14px] py-[12px]">
       <button
         type="button"
         onClick={onClose}

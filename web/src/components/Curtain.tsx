@@ -15,6 +15,7 @@
  * `Dialog`s and are T066's; they share this look, not this module.
  */
 import type { ReactNode } from 'react'
+import { Frame } from './Frame'
 
 /** A full-screen backdrop with its panel centred. */
 export function Curtain({ children }: { children: ReactNode }) {
@@ -46,9 +47,11 @@ export function CurtainPanel({
     <div
       role="dialog"
       aria-label={kicker}
-      className="flex w-full max-w-[460px] flex-col gap-[10px] rounded-lg border border-[var(--color-neutral-800)] bg-[var(--color-surface)] p-[18px] shadow-[var(--shadow-lg)]"
+      className="flex w-full max-w-[460px] flex-col gap-[10px] rounded-lg border border-[var(--color-accent-800)] bg-[var(--color-surface)] p-[18px] shadow-[var(--shadow-lg)]"
     >
-      <h2 className="text-kicker text-[var(--color-accent-300)]">{kicker}</h2>
+      <h2 className="text-kicker text-[var(--color-accent-300)]">
+        <Frame>{kicker}</Frame>
+      </h2>
       {children}
     </div>
   )

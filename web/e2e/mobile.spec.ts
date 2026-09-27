@@ -110,12 +110,12 @@ test('the five touch flows: list, detail, panes, an answer, a new run', async ({
   expect(new URL(page.url()).searchParams.get('run')).toBeNull()
   await noHorizontalScroll(page)
 
-  // -- flow 3: back into the run, and round the pane cycle with `▶`
+  // -- flow 3: back into the run, and round the pane cycle with `->`
   //    alone. The label advances and wraps.
   await row.tap()
-  await expect(dashboard.paneLabel()).toHaveText(/OVERVIEW \(1\/(\d+)\)/)
+  await expect(dashboard.paneLabel()).toHaveText(/\[1\/(\d+)\] OVERVIEW/)
   const label = await dashboard.paneLabel().textContent()
-  const count = Number(/\((\d+)\/(\d+)\)/.exec(label ?? '')?.[2])
+  const count = Number(/\[(\d+)\/(\d+)\]/.exec(label ?? '')?.[2])
   expect(count).toBeGreaterThan(1)
   await tappable(dashboard.nextPane())
   // Every dot is a hit area in its own right: the 14×3 px bar is the
@@ -132,12 +132,12 @@ test('the five touch flows: list, detail, panes, an answer, a new run', async ({
   for (let i = 2; i <= count; i += 1) {
     await dashboard.nextPane().tap()
     await expect(dashboard.paneLabel()).toHaveText(
-      new RegExp(`\\(${String(i)}/${String(count)}\\)`),
+      new RegExp(`\\[${String(i)}/${String(count)}\\]`),
     )
     await noHorizontalScroll(page)
   }
   await dashboard.nextPane().tap()
-  await expect(dashboard.paneLabel()).toHaveText(new RegExp(`\\(1/${String(count)}\\)`))
+  await expect(dashboard.paneLabel()).toHaveText(new RegExp(`\\[1/${String(count)}\\]`))
   await noHorizontalScroll(page)
 
   // -- flow 4: the request the agent is waiting on, answered by tapping
@@ -199,7 +199,7 @@ test('the sixth touch flow: the three screens — global | list | detail — and
     'data-pane',
     '_builtin:inbox',
   )
-  await expect(dashboard.paneLabel()).toHaveText(/INBOX \(1\/\d+\)/)
+  await expect(dashboard.paneLabel()).toHaveText(/\[1\/\d+\] INBOX/)
   // Nothing is selected — the screen sits beside the list; `?global=`
   // is up.
   let url = new URL(page.url())
@@ -264,10 +264,10 @@ test('the sixth touch flow: the three screens — global | list | detail — and
   expect(runId).not.toBeNull()
   await expect(dashboard.globalPanes()).toHaveCount(0)
   await dashboard.nextPane().tap()
-  await expect(dashboard.paneLabel()).toHaveText(/\(2\/\d+\)/)
+  await expect(dashboard.paneLabel()).toHaveText(/\[2\/\d+\]/)
   await dashboard.swipe('left')
   await expect(detail).toBeVisible()
-  await expect(dashboard.paneLabel()).toHaveText(/\(2\/\d+\)/)
+  await expect(dashboard.paneLabel()).toHaveText(/\[2\/\d+\]/)
   expect(new URL(page.url()).searchParams.get('run')).toBe(runId)
   await noHorizontalScroll(page)
   await dashboard.swipe('right')

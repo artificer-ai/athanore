@@ -89,10 +89,13 @@ export class Dashboard {
     return this.rows().filter({ hasText: title })
   }
 
-  /** The titles on screen, top to bottom. */
+  /**
+   * The titles on screen, top to bottom: the grid's fourth cell, after
+   * the cursor column, RUN and WORKFLOW (D277).
+   */
   async titles(): Promise<string[]> {
     return this.rows().evaluateAll((rows) =>
-      rows.map((row) => (row.children[2]?.textContent ?? '').trim()),
+      rows.map((row) => (row.children[3]?.textContent ?? '').trim()),
     )
   }
 

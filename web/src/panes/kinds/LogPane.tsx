@@ -32,7 +32,7 @@ export function LogPane({ rows }: { rows: readonly LogRow[] }) {
 
   return (
     <div data-testid="pane-log" className="flex min-h-0 flex-1 flex-col">
-      <div className="text-hint flex flex-none items-center gap-[10px] border-b border-[var(--color-neutral-900)] px-[14px] py-[6px] tracking-[0.1em] text-muted-foreground">
+      <div className="text-hint flex flex-none items-center gap-[10px] border-b border-[var(--color-accent-900)] px-[14px] py-[6px] tracking-[0.1em] text-muted-foreground">
         <span data-testid="log-count">{lines.length} lines</span>
         <div className="flex-1" />
         <button

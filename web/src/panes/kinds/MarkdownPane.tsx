@@ -57,11 +57,11 @@ const PROSE = [
   '[&_ol]:my-[6px] [&_ol]:list-decimal [&_ol]:pl-[18px]',
   '[&_li]:my-[2px]',
   '[&_a]:text-[var(--color-accent-300)] [&_a]:underline',
-  '[&_blockquote]:border-l [&_blockquote]:border-[var(--color-neutral-800)] [&_blockquote]:pl-[10px] [&_blockquote]:text-muted-foreground',
+  '[&_blockquote]:border-l [&_blockquote]:border-[var(--color-accent-800)] [&_blockquote]:pl-[10px] [&_blockquote]:text-muted-foreground',
   '[&_table]:my-[8px] [&_table]:w-full [&_table]:border-collapse',
-  '[&_th]:text-hint [&_th]:border-b [&_th]:border-[var(--color-neutral-900)] [&_th]:px-[8px] [&_th]:py-[4px] [&_th]:text-left [&_th]:tracking-[0.06em] [&_th]:text-muted-foreground',
-  '[&_td]:text-row [&_td]:border-b [&_td]:border-[var(--color-neutral-900)] [&_td]:px-[8px] [&_td]:py-[4px]',
-  '[&_hr]:my-[10px] [&_hr]:border-[var(--color-neutral-900)]',
+  '[&_th]:text-hint [&_th]:border-b [&_th]:border-[var(--color-accent-900)] [&_th]:px-[8px] [&_th]:py-[4px] [&_th]:text-left [&_th]:tracking-[0.06em] [&_th]:text-muted-foreground',
+  '[&_td]:text-row [&_td]:border-b [&_td]:border-[var(--color-accent-900)] [&_td]:px-[8px] [&_td]:py-[4px]',
+  '[&_hr]:my-[10px] [&_hr]:border-[var(--color-accent-900)]',
   '[&_img]:max-w-full',
 ].join(' ')
 
@@ -85,7 +85,7 @@ function CodeBlock({ code, lang }: { code: string; lang: string | undefined }) {
   }, [code, lang])
 
   const frame =
-    'bg-zebra my-[8px] overflow-x-auto rounded-lg border border-[var(--color-neutral-900)] p-[10px] [&_pre]:m-0 [&_pre]:whitespace-pre'
+    'bg-zebra my-[8px] overflow-x-auto rounded-lg border border-[var(--color-accent-800)] p-[10px] [&_pre]:m-0 [&_pre]:whitespace-pre'
 
   if (html !== null) {
     return (

@@ -143,8 +143,10 @@ export function Header({
   return (
     <header className="bg-chrome relative flex flex-none flex-wrap items-center gap-x-[14px] gap-y-2 border-b border-border px-[14px] py-[8px]">
       <div className="flex items-baseline gap-[8px]">
-        <h1 className="text-body font-bold tracking-[0.12em] text-[var(--color-accent-300)]">
-          <span aria-hidden>▚ </span>ATHANORE
+        {/* The Terminal mock's frame (D277); the box-drawing is chrome,
+            not the name, so a screen reader hears ATHANORE. */}
+        <h1 className="text-body font-bold tracking-[0.18em] text-[var(--color-accent-200)]">
+          <span aria-hidden>┤ </span>ATHANORE<span aria-hidden> ├</span>
         </h1>
         <span className="text-meta text-muted-foreground">v{VERSION}</span>
       </div>
@@ -162,7 +164,7 @@ export function Header({
           <span
             aria-hidden
             data-active={active > 0}
-            className="h-[6px] w-[6px] flex-none rounded-full bg-[var(--color-neutral-700)] data-[active=true]:bg-[var(--color-accent)] data-[active=true]:animate-ath-pulse group-data-[down=true]:animate-none group-data-[down=true]:bg-[var(--color-neutral-800)]"
+            className="h-[6px] w-[6px] flex-none bg-[var(--color-neutral-700)] data-[active=true]:bg-[var(--color-accent)] data-[active=true]:animate-ath-pulse group-data-[down=true]:animate-none group-data-[down=true]:bg-[var(--color-neutral-800)]"
           />
           {runs.active ?? UNKNOWN} active
         </span>

@@ -30,7 +30,7 @@
   --xy-controls-button-background-color-hover: var(--color-neutral-900);
   --xy-controls-button-color: var(--color-neutral-300);
   --xy-controls-button-color-hover: var(--color-accent-200);
-  --xy-controls-button-border-color: var(--color-neutral-800);
+  --xy-controls-button-border-color: var(--color-accent-800);
   --xy-controls-box-shadow: var(--shadow-sm);
 
   --xy-attribution-background-color: transparent;

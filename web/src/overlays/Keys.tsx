@@ -50,7 +50,7 @@ function Row({ binding }: { binding: KeyBinding }) {
     <div
       data-testid="key-row"
       data-binding={binding.id}
-      className="grid grid-cols-[minmax(0,132px)_minmax(0,1fr)] items-baseline gap-[10px] border-t border-[var(--color-neutral-900)] px-[14px] py-[5px]"
+      className="grid grid-cols-[minmax(0,132px)_minmax(0,1fr)] items-baseline gap-[10px] border-t border-[var(--color-accent-900)] px-[14px] py-[5px]"
     >
       <span className="flex flex-wrap items-center gap-[4px]">
         {binding.keys.map((key) => (
@@ -86,7 +86,7 @@ export function Keys({ open, onClose }: { open: boolean; onClose: () => void }) 
           if (bindings.length === 0) return null
           return (
             <section key={group} data-testid="key-group" data-group={group}>
-              <h3 className="text-kicker border-t border-[var(--color-neutral-900)] px-[14px] pt-[9px] pb-[3px] text-[var(--color-neutral-500)]">
+              <h3 className="text-kicker border-t border-[var(--color-accent-900)] px-[14px] pt-[9px] pb-[3px] text-[var(--color-neutral-500)]">
                 {group}
               </h3>
               {bindings.map((binding) => (
@@ -98,7 +98,7 @@ export function Keys({ open, onClose }: { open: boolean; onClose: () => void }) 
 
         <ul
           data-testid="key-notes"
-          className="text-hint mt-[8px] flex flex-col gap-[3px] border-t border-[var(--color-neutral-900)] px-[14px] pt-[9px] text-muted-foreground"
+          className="text-hint mt-[8px] flex flex-col gap-[3px] border-t border-[var(--color-accent-900)] px-[14px] pt-[9px] text-muted-foreground"
         >
           {KEY_NOTES.map((note) => (
             <li key={note}>{note}</li>

@@ -67,7 +67,7 @@ describe('Palette', () => {
 
     const dialog = screen.getByRole('dialog', { name: PALETTE_TITLE })
     expect(within(dialog).getByPlaceholderText('run a command')).toHaveFocus()
-    expect(within(dialog).getByText('›')).toBeInTheDocument()
+    expect(within(dialog).getByText('$')).toBeInTheDocument()
     expect(within(dialog).getByText('esc')).toBeInTheDocument()
 
     // Every row is `name · hint · key` (10 §Overlays).

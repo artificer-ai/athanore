@@ -726,7 +726,7 @@ describe('App', () => {
       // — nothing is selected.
       expect(screen.getByRole('main')).toHaveAttribute('data-stacked', 'global')
       expect(screen.getByRole('region', { name: 'detail' })).toBeInTheDocument()
-      expect(screen.getByTestId('pane-label')).toHaveTextContent('INBOX (1/1)')
+      expect(screen.getByTestId('pane-label')).toHaveTextContent('[1/1] INBOX')
       expect(screen.getByTestId('pane-body')).toHaveAttribute(
         'data-pane',
         '_builtin:inbox',
@@ -744,7 +744,7 @@ describe('App', () => {
 
       expect(screen.getByRole('main')).toHaveAttribute('data-stacked', 'detail')
       expect(screen.getByRole('region', { name: 'detail' })).toBeInTheDocument()
-      expect(screen.getByTestId('pane-label')).toHaveTextContent('OVERVIEW (1/3)')
+      expect(screen.getByTestId('pane-label')).toHaveTextContent('[1/3] OVERVIEW')
       expect(screen.getByTestId('selected-run')).toHaveTextContent('aaaa1111bbbb')
       expect(screen.getByRole('button', { name: 'back to runs' })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'global panes' })).toBeNull()
@@ -907,7 +907,7 @@ describe('App', () => {
       // names, and narrowing the window again brings the screen back.
       shell({ run: 'aaaa1111bbbb', global: 0 })
 
-      expect(screen.getByTestId('pane-label')).toHaveTextContent('OVERVIEW (1/3)')
+      expect(screen.getByTestId('pane-label')).toHaveTextContent('[1/3] OVERVIEW')
       expect(screen.getByTestId('selected-run')).toHaveTextContent('aaaa1111bbbb')
       expect(screen.queryByRole('button', { name: 'global panes' })).toBeNull()
     })
@@ -918,7 +918,7 @@ describe('App', () => {
       // the URL for the phone that wrote it.
       shell({ global: 0 })
 
-      expect(screen.getByTestId('pane-label')).toHaveTextContent('INBOX (1/1)')
+      expect(screen.getByTestId('pane-label')).toHaveTextContent('[1/1] INBOX')
       expect(screen.getByRole('region', { name: 'runs' })).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'global panes' })).toBeNull()
       expect(screen.queryByRole('button', { name: 'back to runs' })).toBeNull()

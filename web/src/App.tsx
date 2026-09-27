@@ -165,7 +165,7 @@ export default function App({
    * The narrow global screen: `?global=` to this index, or away.
    *
    * `0` opens it on its first pane — a swipe right on the list, or the
-   * footer button while the screen is down; a larger index is `◀ ▶`, a
+   * footer button while the screen is down; a larger index is `<- ->`, a
    * dot or a jump key moving inside it; and `undefined` is a swipe left
    * on the screen, the bar's `←`, the footer button while it is up, or
    * `esc` (21 §Narrow layout, D216, D218). Nothing else in the search

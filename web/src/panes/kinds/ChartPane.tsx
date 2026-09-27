@@ -61,7 +61,7 @@ export function ChartPane({ data }: { data: ChartData }) {
         viewBox={`0 0 ${String(WIDTH)} ${String(HEIGHT)}`}
         preserveAspectRatio="none"
         className={cn(
-          'bg-zebra h-[160px] w-full rounded-lg border border-[var(--color-neutral-900)]',
+          'bg-zebra h-[160px] w-full rounded-lg border border-[var(--color-accent-800)]',
         )}
       >
         {/* The zero line, where zero is inside the extent at all. */}

@@ -153,7 +153,7 @@ function Json({ value, testId }: { value: unknown; testId: string }) {
   return (
     <pre
       data-testid={testId}
-      className="text-meta max-h-[220px] overflow-auto rounded-lg border border-[var(--color-neutral-900)] bg-[var(--color-neutral-900)] px-[9px] py-[7px] whitespace-pre-wrap text-[var(--color-neutral-300)]"
+      className="text-meta max-h-[220px] overflow-auto rounded-lg border border-[var(--color-accent-800)] bg-[var(--color-neutral-900)] px-[9px] py-[7px] whitespace-pre-wrap text-[var(--color-neutral-300)]"
     >
       {jsonBlock(value)}
     </pre>
@@ -390,7 +390,7 @@ function TaskDrawerPanel({
         </span>
       </OverlayHeader>
 
-      <div className="flex flex-none flex-wrap items-center gap-[6px] border-b border-[var(--color-neutral-900)] px-[14px] py-[9px]">
+      <div className="flex flex-none flex-wrap items-center gap-[6px] border-b border-[var(--color-accent-900)] px-[14px] py-[9px]">
         <button
           type="button"
           data-testid="task-retry"
@@ -459,7 +459,7 @@ function TaskDrawerPanel({
       {moving && (
         <div
           data-testid="task-move-list"
-          className="flex-none border-b border-[var(--color-neutral-900)] px-[14px] py-[9px]"
+          className="flex-none border-b border-[var(--color-accent-900)] px-[14px] py-[9px]"
         >
           <h3 className="text-kicker mb-[5px] text-[var(--color-neutral-500)]">
             MOVE TO
@@ -591,7 +591,7 @@ function TaskDrawerPanel({
         <p
           role="alert"
           data-testid="task-drawer-error"
-          className="text-meta flex-none border-t border-[var(--color-neutral-900)] px-[14px] py-[10px] text-status-fail"
+          className="text-meta flex-none border-t border-[var(--color-accent-900)] px-[14px] py-[10px] text-status-fail"
         >
           {refusal}
         </p>

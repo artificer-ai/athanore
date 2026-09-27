@@ -191,8 +191,8 @@ describe('theme.css', () => {
       ['--foreground', 'var(--color-text)'],
       ['--muted-foreground', 'var(--color-neutral-500)'],
       ['--muted', 'var(--color-neutral-900)'],
-      ['--border', 'var(--color-neutral-800)'],
-      ['--input', 'var(--color-neutral-800)'],
+      ['--border', 'var(--color-accent-800)'],
+      ['--input', 'var(--color-accent-800)'],
       ['--primary', 'var(--color-accent)'],
       ['--primary-foreground', 'var(--color-accent-200)'],
       ['--accent', 'color-mix(in srgb, var(--color-accent) 16%, transparent)'],
@@ -209,8 +209,8 @@ describe('theme.css', () => {
     }
   })
 
-  it("leaves the radius at Nocturne's 8 px (D71)", () => {
-    expect(theme).toContain('--radius: 8px;')
+  it('squares every corner, as the Terminal mock does (D277)', () => {
+    expect(theme).toContain('--radius: 0px;')
     expect(theme).not.toContain('--radius: var(--ath-radius)')
   })
 

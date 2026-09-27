@@ -48,7 +48,7 @@ describe('Header', () => {
   it('shows the brand mark and the version vite injected', () => {
     header()
 
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('▚ ATHANORE')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('┤ ATHANORE ├')
     // `__APP_VERSION__` is pyproject.toml's `[project] version`; asserting
     // the literal would pin the test to a release.
     expect(screen.getByText(`v${__APP_VERSION__}`)).toBeInTheDocument()

@@ -77,20 +77,21 @@ export const BRANCH_KEY_CHARS = 24
 /* -------------------------------------------------------------------- */
 
 /**
- * The card's marks (10 §Graph pane): `✓` done, `●` active, `✗` failed,
- * `·` everything else, and `⋈` on a join whatever it is doing.
+ * The card's marks, the Terminal mock's checkbox glyphs (D277): `[x]`
+ * done, `[*]` active, `[!]` failed, `[ ]` everything else, and `[⋈]` on
+ * a join whatever it is doing.
  *
  * A join keeps its own glyph in every state because the glyph is what
  * says the node is a fan-in — it is the node the branches arrive at, and
- * a `✓` there would be indistinguishable from any other completed node.
- * Its *colour* is still its state's, so a failed join is a red `⋈`.
+ * an `[x]` there would be indistinguishable from any other completed node.
+ * Its *colour* is still its state's, so a failed join is a red `[⋈]`.
  */
 export const GLYPHS = {
-  done: '✓',
-  active: '●',
-  failed: '✗',
-  idle: '·',
-  join: '⋈',
+  done: '[x]',
+  active: '[*]',
+  failed: '[!]',
+  idle: '[ ]',
+  join: '[⋈]',
 } as const
 
 /**

@@ -409,16 +409,16 @@ describe('the card one node draws', () => {
     draw()
     const glyph = (node: string) =>
       card(node).querySelector('[data-testid="graph-glyph"]')?.textContent
-    expect(glyph('prompt')).toBe('✓')
-    expect(glyph('engineering')).toBe('●')
-    expect(glyph('review')).toBe('·')
-    expect(glyph('qa')).toBe('·')
+    expect(glyph('prompt')).toBe('[x]')
+    expect(glyph('engineering')).toBe('[*]')
+    expect(glyph('review')).toBe('[ ]')
+    expect(glyph('qa')).toBe('[ ]')
   })
 
-  it('marks a join with ⋈ wherever its state is', () => {
+  it('marks a join with [⋈] wherever its state is', () => {
     draw(JOINED_GRAPH, fannedRun())
     expect(card('merge').querySelector('[data-testid="graph-glyph"]')?.textContent).toBe(
-      '⋈',
+      '[⋈]',
     )
   })
 

@@ -106,16 +106,17 @@ export function Palette({
             restoreFocusTo.current?.focus()
             restoreFocusTo.current = null
           }}
-          className="text-body fixed top-[12vh] left-1/2 z-50 w-[min(560px,92vw)] -translate-x-1/2 overflow-hidden rounded-lg border border-[var(--color-neutral-800)] bg-[var(--color-surface)] text-foreground shadow-[var(--shadow-lg)] max-md:top-[8px] max-md:w-[calc(100vw-16px)] max-md:max-w-[calc(100vw-16px)]"
+          className="text-body fixed top-[12vh] left-1/2 z-50 w-[min(560px,92vw)] -translate-x-1/2 overflow-hidden rounded-lg border border-[var(--color-accent-800)] bg-[var(--color-surface)] text-foreground shadow-[var(--shadow-lg)] max-md:top-[8px] max-md:w-[calc(100vw-16px)] max-md:max-w-[calc(100vw-16px)]"
         >
           <VisuallyHidden.Root asChild>
             <Dialog.Title>{PALETTE_TITLE}</Dialog.Title>
           </VisuallyHidden.Root>
 
           <Command label={PALETTE_TITLE} loop>
-            <div className="flex items-center gap-[8px] border-b border-[var(--color-neutral-900)] px-[12px] py-[9px]">
-              <span aria-hidden className="text-[var(--color-accent-400)]">
-                ›
+            <div className="flex items-center gap-[8px] border-b border-[var(--color-accent-900)] px-[12px] py-[9px]">
+              {/* The Terminal mock's shell prompt (D277). */}
+              <span aria-hidden className="text-[var(--color-accent-300)]">
+                $
               </span>
               <Command.Input
                 ref={input}
@@ -137,7 +138,7 @@ export function Palette({
                   key={section.group ?? '_app'}
                   value={section.group ?? '_app'}
                   {...(section.group === null ? {} : { heading: section.group })}
-                  className="[&_[cmdk-group-heading]]:text-kicker [&_[cmdk-group-heading]]:border-t [&_[cmdk-group-heading]]:border-[var(--color-neutral-900)] [&_[cmdk-group-heading]]:px-[12px] [&_[cmdk-group-heading]]:pt-[8px] [&_[cmdk-group-heading]]:pb-[4px] [&_[cmdk-group-heading]]:text-[var(--color-neutral-500)]"
+                  className="[&_[cmdk-group-heading]]:text-kicker [&_[cmdk-group-heading]]:border-t [&_[cmdk-group-heading]]:border-[var(--color-accent-900)] [&_[cmdk-group-heading]]:px-[12px] [&_[cmdk-group-heading]]:pt-[8px] [&_[cmdk-group-heading]]:pb-[4px] [&_[cmdk-group-heading]]:text-[var(--color-neutral-500)]"
                 >
                   {section.actions.map((action) => (
                     <Command.Item
@@ -149,7 +150,7 @@ export function Palette({
                       keywords={[action.hint, action.key, capLabel(action.key)]}
                       disabled={action.disabled}
                       onSelect={action.run}
-                      className="text-row grid cursor-pointer grid-cols-[minmax(0,170px)_minmax(0,1fr)_40px] items-center gap-[10px] border-t border-[var(--color-neutral-900)] px-[12px] py-[6px] data-[disabled=true]:cursor-default data-[disabled=true]:opacity-45 data-[selected=true]:bg-[var(--color-neutral-900)] max-md:min-h-[32px]"
+                      className="text-row grid cursor-pointer grid-cols-[minmax(0,170px)_minmax(0,1fr)_40px] items-center gap-[10px] border-t border-[var(--color-accent-900)] px-[12px] py-[6px] data-[disabled=true]:cursor-default data-[disabled=true]:opacity-45 data-[selected=true]:bg-[var(--color-neutral-900)] max-md:min-h-[32px]"
                     >
                       <span className="text-[var(--color-neutral-300)]">
                         {action.name}

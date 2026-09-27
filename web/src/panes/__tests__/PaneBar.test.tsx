@@ -6,7 +6,7 @@ import type { RunSummary } from '../../api/gen/types.gen'
 import { narrowViewport, wideViewport } from '../../lib/__tests__/fixtures'
 import { usePrefs } from '../../store/prefs'
 import { PaneBar } from '../PaneBar'
-import type { Pane, PaneModel } from '../usePanes'
+import { paneLabel, type Pane, type PaneModel } from '../usePanes'
 import { panel } from './fixtures'
 
 const RUN: RunSummary = {
@@ -43,7 +43,7 @@ function model(over: Partial<PaneModel> = {}): PaneModel {
     runId: RUN.id,
     index,
     current: panes[index],
-    label: `${panes[index]?.name.toUpperCase() ?? '—'} (${String(index + 1)}/${String(panes.length)})`,
+    label: paneLabel(panes, index),
     run: RUN,
     isPending: false,
     prev: vi.fn(),
@@ -62,10 +62,10 @@ describe('PaneBar', () => {
     usePrefs.setState({ listCollapsed: false })
   })
 
-  it('draws the mock’s ◀ PANE (i/n) ▶', () => {
+  it('draws the Terminal mock’s <- [i/n] PANE ->', () => {
     render(<PaneBar panes={model({ index: 1 })} />)
 
-    expect(screen.getByTestId('pane-label')).toHaveTextContent('LOG (2/3)')
+    expect(screen.getByTestId('pane-label')).toHaveTextContent('[2/3] LOG')
   })
 
   it('cycles from the arrows', async () => {

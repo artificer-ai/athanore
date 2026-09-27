@@ -352,14 +352,17 @@ const SHADCN_MAPPING = `  --background: var(--color-bg);
   --destructive: var(--ath-status-fail);
   --destructive-foreground: var(--color-bg);
 
-  /* Chrome and inputs sit on --color-bg with a neutral-800 rule. */
-  --border: var(--color-neutral-800);
-  --input: var(--color-neutral-800);
+  /* Chrome and inputs sit on --color-bg with an accent-800 rule: the
+     Terminal mock's chrome (D277), which moved every rule the first
+     mock drew in neutral-800 onto the accent ramp. */
+  --border: var(--color-accent-800);
+  --input: var(--color-accent-800);
   --ring: var(--color-accent);
 
-  /* Nocturne's 8 px (its --radius-md). The app does not override it
-     with the mock's old 2 px — that went with the CRT chrome (D71). */
-  --radius: 8px;
+  /* Square: the Terminal mock's \`border-radius: 0\` everywhere (D277),
+     in place of Nocturne's 8 px. Every \`rounded-*\` utility is a
+     multiple of this, so one value squares the whole app. */
+  --radius: 0px;
 
   --chart-1: var(--color-accent);
   --chart-2: var(--color-accent-700);
