@@ -120,7 +120,7 @@ export function Splitter({
           title="show run list (b)"
           className="bg-chrome text-meta flex w-[30px] flex-none flex-col items-center gap-[10px] border-r border-border py-[10px] text-muted-foreground hover:bg-[var(--color-neutral-900)] hover:text-[var(--color-accent-200)]"
         >
-          <span aria-hidden>❯</span>
+          <span aria-hidden>»</span>
           <span
             data-testid="runs-rail"
             className="text-hint tracking-[0.18em] [writing-mode:vertical-rl]"

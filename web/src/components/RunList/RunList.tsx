@@ -48,9 +48,15 @@ import { COLUMNS as FILTER_COLUMNS, activeCount } from './filters'
 import { StatusPill } from './StatusPill'
 import type { RunListModel, RunRow } from './useRunList'
 
-/** The mock's column template, to the pixel. */
+/**
+ * The mock's column template, to the pixel, behind the Terminal mock's
+ * 12 px cursor column (D277).
+ */
 const COLUMNS =
-  'minmax(0, 108px) minmax(0, 104px) minmax(110px, 1fr) minmax(0, 84px) minmax(0, 92px) 46px'
+  '12px minmax(0, 108px) minmax(0, 104px) minmax(110px, 1fr) minmax(0, 84px) minmax(0, 92px) 46px'
+
+/** What the cursor column draws on the selected row. */
+const CURSOR = '>'
 
 
 /** The glyph a run with unanswered requests carries after its node. */
@@ -124,32 +130,31 @@ function Pending({ row }: { row: RunRow }) {
 
 /**
  * The classes every row carries whatever its shape: the zebra stripe,
- * the selected tint and the accent bar down its left edge.
+ * the selected fill, and — below the breakpoint, where there is no
+ * cursor column — the accent bar down its left edge.
  *
- * The tint is the mock's, and `StatusPill` is transparent and paints
- * `text-status-*` straight onto it, so it is also the ground every one
- * of the seven tones of 10 §Status colours is measured on — `fail`
- * (`#d9868f`) at 4.74:1 is the darkest of them and the one that decides
- * the floor (10 §Accessibility and quality, D204 (5)). The border keeps
- * its 2 px when it is transparent, so nothing in the grid shifts when
- * the selection moves.
+ * The fill is the Terminal mock's solid accent step, one step darker
+ * than its `accent-800` (D277): `StatusPill` is transparent and paints
+ * `text-status-*` straight onto it, so it is the ground every one of the
+ * seven tones of 10 §Status colours is measured on, and on `accent-800`
+ * `fail` is 3.79:1 and `muted` 3.55:1. On `accent-900` the darkest,
+ * `muted`, is 4.94:1 (10 §Accessibility and quality, D204 (5)). The
+ * border keeps its 2 px when it is transparent, so nothing in the row
+ * shifts when the selection moves.
  */
 function rowClasses(zebra: boolean, selected: boolean): string {
   return cn(
-    'w-full overflow-hidden border-l-2 border-l-transparent text-left text-[var(--color-neutral-300)] hover:bg-[var(--color-neutral-900)]',
+    'w-full overflow-hidden border-l-2 border-l-transparent text-left text-[var(--color-neutral-300)] hover:bg-[var(--color-neutral-900)] md:border-l-0',
     zebra && 'bg-zebra',
     selected &&
-      'border-l-[var(--color-accent)] bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface))]',
+      'border-l-[var(--color-accent)] bg-[var(--color-accent-900)] text-[var(--color-accent-100)]',
   )
 }
 
 function Row({ row, zebra, selected, onSelect }: RowProps) {
-  // `--muted-foreground` is 4.43:1 on the selected row's accent tint,
-  // which is under AA for text this size; one step brighter clears it.
-  // The tint itself is the mock's and is not touched — these three
-  // columns are muted by the SPA's choice, not the mock's, so this is
-  // the half of the pair that may move (10 §Accessibility and quality).
-  const muted = selected ? 'text-[var(--color-neutral-400)]' : 'text-muted-foreground'
+  // The Terminal mock lifts the selected row's quiet columns to the
+  // accent ramp: RUN, NODE and AGE to accent-200, WORKFLOW to accent-100.
+  const muted = selected ? 'text-[var(--color-accent-200)]' : 'text-muted-foreground'
 
   return (
     <button
@@ -165,8 +170,16 @@ function Row({ row, zebra, selected, onSelect }: RowProps) {
         rowClasses(zebra, selected),
       )}
     >
+      <span aria-hidden className="text-[var(--color-accent-300)]">
+        {selected ? CURSOR : ''}
+      </span>
       <span className={cn('truncate', muted)}>{row.shortId}</span>
-      <span className="truncate text-[var(--color-accent-2-400)]">
+      <span
+        className={cn(
+          'truncate',
+          selected ? 'text-[var(--color-accent-100)]' : 'text-[var(--color-accent-2-400)]',
+        )}
+      >
         {row.workflow}
         <Unregistered row={row} />
       </span>
@@ -190,9 +203,8 @@ function Row({ row, zebra, selected, onSelect }: RowProps) {
  * `title` attribute carries the whole id here as it does on the grid.
  */
 function NarrowRow({ row, zebra, selected, onSelect }: RowProps) {
-  // The same one step of contrast the grid takes on a selected row, for
-  // the same reason (10 §Accessibility and quality).
-  const muted = selected ? 'text-[var(--color-neutral-400)]' : 'text-muted-foreground'
+  // The same accent lift the grid gives a selected row (D277).
+  const muted = selected ? 'text-[var(--color-accent-200)]' : 'text-muted-foreground'
 
   return (
     <button
@@ -355,7 +367,7 @@ export function RunList({
       {narrow ? (
         <div
           data-testid="column-headings"
-          className="text-hint bg-chrome flex flex-wrap items-center gap-x-[14px] gap-y-[4px] border-b border-border px-[12px] py-[4px] tracking-[0.1em] text-muted-foreground"
+          className="text-hint bg-chrome flex flex-wrap items-center gap-x-[14px] gap-y-[4px] border-b border-border px-[12px] py-[4px] tracking-[0.1em] text-[var(--color-accent-300)]"
         >
           {FILTER_COLUMNS.map((column) => (
             <ColumnHeading key={column.key} column={column} model={model} narrow />
@@ -364,9 +376,10 @@ export function RunList({
       ) : (
         <div
           data-testid="column-headings"
-          className="text-hint bg-chrome grid min-h-[30px] items-center gap-[8px] border-b border-border px-[12px] py-[3px] tracking-[0.1em] text-muted-foreground"
+          className="text-hint bg-chrome grid min-h-[30px] items-center gap-[8px] border-b border-border px-[12px] py-[3px] tracking-[0.1em] text-[var(--color-accent-300)]"
           style={{ gridTemplateColumns: COLUMNS }}
         >
+          <span aria-hidden />
           {FILTER_COLUMNS.map((column) => (
             <ColumnHeading key={column.key} column={column} model={model} narrow={false} />
           ))}

@@ -81,7 +81,7 @@ export type PaneModel = {
   index: number
   /** The pane at {@link PaneModel.index}, absent when there are none. */
   current: Pane | undefined
-  /** `◀ OVERVIEW (1/7) ▶`'s middle, or `—` with nothing to cycle. */
+  /** `<- [1/7] OVERVIEW ->`'s middle, or `—` with nothing to cycle. */
   label: string
   /** The selected run, once the run list has answered. */
   run: RunSummary | undefined
@@ -95,11 +95,14 @@ export type PaneModel = {
   jump: (index: number) => void
 }
 
-/** The label a pane carries in the bar and on its dot's tooltip. */
+/**
+ * The label a pane carries in the bar: the Terminal mock's `[i/n] NAME`
+ * (D277).
+ */
 export function paneLabel(panes: readonly Pane[], index: number): string {
   const pane = panes[index]
   if (pane === undefined) return '—'
-  return `${pane.name.toUpperCase()} (${String(index + 1)}/${String(panes.length)})`
+  return `[${String(index + 1)}/${String(panes.length)}] ${pane.name.toUpperCase()}`
 }
 
 /**

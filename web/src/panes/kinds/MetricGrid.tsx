@@ -29,7 +29,7 @@ export function MetricGrid({
     <dl
       aria-label={label}
       data-testid="metric-grid"
-      className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-px overflow-hidden rounded-lg border border-[var(--color-neutral-900)] bg-[var(--color-neutral-900)]"
+      className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-px overflow-hidden rounded-lg border border-[var(--color-accent-800)] bg-[var(--color-neutral-900)]"
     >
       {metrics.map((metric) => (
         <div key={metric.label} className="bg-card px-[10px] py-[8px]">

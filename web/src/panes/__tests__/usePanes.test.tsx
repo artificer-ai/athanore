@@ -204,10 +204,10 @@ function mount(
 }
 
 describe('usePanes', () => {
-  it('labels the pane the mock’s way: NAME (i/n)', () => {
+  it('labels the pane the Terminal mock’s way: [i/n] NAME', () => {
     mount(RUN.id, 1)
 
-    expect(screen.getByTestId('label')).toHaveTextContent('LOG (2/7)')
+    expect(screen.getByTestId('label')).toHaveTextContent('[2/7] LOG')
     expect(screen.getByTestId('current')).toHaveTextContent('log')
   })
 
@@ -278,7 +278,7 @@ describe('usePanes', () => {
     mount(undefined, 0)
 
     expect(screen.getByTestId('names')).toHaveTextContent('inbox,leaderboard')
-    expect(screen.getByTestId('label')).toHaveTextContent('INBOX (1/2)')
+    expect(screen.getByTestId('label')).toHaveTextContent('[1/2] INBOX')
   })
 
   it('reports the run row for the pane bar’s status pill', () => {

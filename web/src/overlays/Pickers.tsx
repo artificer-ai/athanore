@@ -84,6 +84,7 @@ import {
   PICKERS,
   type PickerKind,
 } from './pickers'
+import { Frame } from '../components/Frame'
 
 /** The status an `x` writes (08 §Tasks, `POST /api/tasks/{id}/status`). */
 const CANCELLED = 'cancelled' as const
@@ -188,7 +189,7 @@ export function Pickers({
             restoreFocusTo.current?.focus()
             restoreFocusTo.current = null
           }}
-          className="text-body fixed top-[12vh] left-1/2 z-50 flex max-h-[76vh] w-[min(560px,92vw)] -translate-x-1/2 flex-col overflow-hidden rounded-lg border border-[var(--color-neutral-800)] bg-[var(--color-surface)] text-foreground shadow-[var(--shadow-lg)] max-md:top-[8px] max-md:max-h-[calc(100dvh-16px)] max-md:max-w-[calc(100vw-16px)]"
+          className="text-body fixed top-[12vh] left-1/2 z-50 flex max-h-[76vh] w-[min(560px,92vw)] -translate-x-1/2 flex-col overflow-hidden rounded-lg border border-[var(--color-accent-800)] bg-[var(--color-surface)] text-foreground shadow-[var(--shadow-lg)] max-md:top-[8px] max-md:max-h-[calc(100dvh-16px)] max-md:max-w-[calc(100vw-16px)]"
         >
           {kind !== undefined && (
             // Remounted per picker: the step a move is halfway through
@@ -365,9 +366,9 @@ function PickerPanel({
 
   return (
     <>
-      <div className="flex flex-none items-center gap-[10px] border-b border-[var(--color-neutral-900)] px-[14px] py-[10px]">
+      <div className="flex flex-none items-center gap-[10px] border-b border-[var(--color-accent-900)] px-[14px] py-[10px]">
         <Dialog.Title className="text-kicker whitespace-nowrap text-[var(--color-accent-300)]">
-          {spec.title}
+          <Frame>{spec.title}</Frame>
         </Dialog.Title>
         <span
           data-testid="picker-gloss"
@@ -409,7 +410,7 @@ function PickerPanel({
           loop
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="flex flex-none items-center gap-[8px] border-b border-[var(--color-neutral-900)] px-[12px] py-[9px]">
+          <div className="flex flex-none items-center gap-[8px] border-b border-[var(--color-accent-900)] px-[12px] py-[9px]">
             <span aria-hidden className="text-[var(--color-accent-400)]">
               ›
             </span>
@@ -464,7 +465,7 @@ function PickerPanel({
         <p
           role="alert"
           data-testid="picker-error"
-          className="text-meta flex-none border-t border-[var(--color-neutral-900)] px-[14px] py-[10px] text-status-fail"
+          className="text-meta flex-none border-t border-[var(--color-accent-900)] px-[14px] py-[10px] text-status-fail"
         >
           {refusal}
         </p>
@@ -506,7 +507,7 @@ function Row({
       value={value}
       onSelect={onSelect}
       {...testProps}
-      className="text-row grid cursor-pointer grid-cols-[minmax(0,160px)_minmax(0,1fr)_86px] items-center gap-[10px] border-t border-[var(--color-neutral-900)] px-[12px] py-[6px] data-[selected=true]:bg-[var(--color-neutral-900)]"
+      className="text-row grid cursor-pointer grid-cols-[minmax(0,160px)_minmax(0,1fr)_86px] items-center gap-[10px] border-t border-[var(--color-accent-900)] px-[12px] py-[6px] data-[selected=true]:bg-[var(--color-neutral-900)]"
     >
       <span className="truncate text-[var(--color-neutral-300)]">{name}</span>
       <span className="text-hint truncate text-muted-foreground">{detail}</span>

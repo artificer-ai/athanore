@@ -67,11 +67,11 @@ export function TablePane({
   return (
     <div
       data-testid="pane-table"
-      className="overflow-hidden rounded-lg border border-[var(--color-neutral-900)]"
+      className="overflow-hidden rounded-lg border border-[var(--color-accent-800)]"
     >
       <Table aria-label={label} className="text-row">
         <TableHeader>
-          <TableRow className="border-[var(--color-neutral-900)] hover:bg-transparent">
+          <TableRow className="border-[var(--color-accent-900)] hover:bg-transparent">
             {data.columns.map((column) => {
               const sorted = sort?.key === column.key ? sort.direction : null
               return (

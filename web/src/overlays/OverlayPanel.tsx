@@ -36,6 +36,7 @@ import { Dialog } from 'radix-ui'
 import { useRef, type ReactNode, type RefObject } from 'react'
 
 import { useKeyOwner } from '../keys'
+import { Frame } from '../components/Frame'
 
 /** Where the panel sits: near the top like a palette, or centred. */
 export type OverlayPlacement = 'top' | 'centre'
@@ -162,7 +163,7 @@ export function OverlayDialog({
             restoreFocusTo.current?.focus()
             restoreFocusTo.current = null
           }}
-          className={`text-body fixed z-50 flex flex-col overflow-hidden rounded-lg border border-[var(--color-neutral-800)] bg-[var(--color-surface)] text-foreground shadow-[var(--shadow-lg)] ${PLACEMENTS[placement]} ${width} ${sheet ? SHEET : `${NARROW[placement]} ${NARROW_WIDTH}`}`}
+          className={`text-body fixed z-50 flex flex-col overflow-hidden rounded-lg border border-[var(--color-accent-800)] bg-[var(--color-surface)] text-foreground shadow-[var(--shadow-lg)] ${PLACEMENTS[placement]} ${width} ${sheet ? SHEET : `${NARROW[placement]} ${NARROW_WIDTH}`}`}
         >
           {children}
         </Dialog.Content>
@@ -190,9 +191,9 @@ export function OverlayHeader({
   children?: ReactNode
 }) {
   return (
-    <div className="flex flex-none items-center gap-[10px] border-b border-[var(--color-neutral-900)] px-[14px] py-[10px]">
+    <div className="flex flex-none items-center gap-[10px] border-b border-[var(--color-accent-900)] px-[14px] py-[10px]">
       <Dialog.Title className="text-kicker whitespace-nowrap text-[var(--color-accent-300)]">
-        {title}
+        <Frame>{title}</Frame>
       </Dialog.Title>
       {gloss !== undefined && (
         <span
@@ -227,7 +228,7 @@ export function OverlayClose() {
   return (
     <Dialog.Close
       aria-label="close"
-      className="hidden min-h-[24px] min-w-[24px] items-center justify-center rounded-lg border border-[var(--color-neutral-800)] text-[var(--color-neutral-400)] max-md:inline-flex"
+      className="hidden min-h-[24px] min-w-[24px] items-center justify-center rounded-lg border border-[var(--color-accent-800)] text-[var(--color-neutral-400)] max-md:inline-flex"
     >
       <span aria-hidden>✕</span>
     </Dialog.Close>

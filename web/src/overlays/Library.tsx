@@ -97,6 +97,7 @@ import {
   sourceLines,
   tokenStyle,
 } from './library'
+import { Frame } from '../components/Frame'
 
 /** The dialog's accessible name, and the mock's header kicker. */
 export const LIBRARY_TITLE = 'workflow library'
@@ -204,11 +205,11 @@ export function Library({
             restoreFocusTo.current = null
             opened.current = false
           }}
-          className="text-body fixed top-1/2 left-1/2 z-50 flex h-[min(640px,88vh)] w-[min(880px,96vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-[var(--color-neutral-800)] bg-[var(--color-surface)] text-foreground shadow-[var(--shadow-lg)] max-md:inset-0 max-md:h-auto max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none"
+          className="text-body fixed top-1/2 left-1/2 z-50 flex h-[min(640px,88vh)] w-[min(880px,96vw)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-lg border border-[var(--color-accent-800)] bg-[var(--color-surface)] text-foreground shadow-[var(--shadow-lg)] max-md:inset-0 max-md:h-auto max-md:w-full max-md:max-w-none max-md:translate-x-0 max-md:translate-y-0 max-md:rounded-none"
         >
-          <div className="flex flex-none items-center gap-[10px] border-b border-[var(--color-neutral-900)] px-[14px] py-[10px]">
+          <div className="flex flex-none items-center gap-[10px] border-b border-[var(--color-accent-900)] px-[14px] py-[10px]">
             <Dialog.Title className="text-kicker text-[var(--color-accent-300)]">
-              {LIBRARY_TITLE}
+              <Frame>{LIBRARY_TITLE}</Frame>
             </Dialog.Title>
             <span className="text-hint text-[var(--color-neutral-500)]">
               {LIBRARY_GLOSS}
@@ -378,7 +379,7 @@ function LibraryPanel({
                 data-selected={selected}
                 data-marked={on}
                 className={cn(
-                  'flex items-start gap-[8px] border-b border-l-2 border-[var(--color-neutral-900)] border-l-transparent py-[8px] pl-[10px] hover:bg-[var(--color-neutral-900)]',
+                  'flex items-start gap-[8px] border-b border-l-2 border-[var(--color-accent-900)] border-l-transparent py-[8px] pl-[10px] hover:bg-[var(--color-neutral-900)]',
                   selected && 'bg-[var(--color-neutral-900)]',
                   on && 'border-l-[var(--color-accent)]',
                 )}
@@ -448,7 +449,7 @@ function LibraryPanel({
 
         <div
           data-testid="library-filter"
-          className="text-hint flex flex-none flex-wrap items-center gap-x-[10px] gap-y-[4px] border-t border-[var(--color-neutral-900)] px-[12px] py-[6px] text-[var(--color-neutral-500)]"
+          className="text-hint flex flex-none flex-wrap items-center gap-x-[10px] gap-y-[4px] border-t border-[var(--color-accent-900)] px-[12px] py-[6px] text-[var(--color-neutral-500)]"
         >
           <span>
             {[

@@ -45,6 +45,7 @@ import {
   type FilterColumn,
 } from './filters'
 import type { RunListModel } from './useRunList'
+import { Frame } from '../Frame'
 
 /** A count the server has not given yet (02 §Real data only). */
 const UNKNOWN = '—'
@@ -155,9 +156,9 @@ function FilterPanel({
 
   return (
     <>
-      <div className="flex items-center gap-[8px] border-b border-[var(--color-neutral-900)] px-[10px] py-[7px]">
+      <div className="flex items-center gap-[8px] border-b border-[var(--color-accent-900)] px-[10px] py-[7px]">
         <span className="text-hint tracking-[0.12em] text-[var(--color-accent-200)]">
-          FILTER · {column.label}
+          <Frame>FILTER · {column.label}</Frame>
         </span>
         <div className="flex-1" />
         <span className="text-hint text-muted-foreground">{KIND_MODE[column.kind]}</span>
@@ -167,7 +168,7 @@ function FilterPanel({
       {column.kind === 'choice' && <ChoiceControl column={column} model={model} />}
       {column.kind === 'date' && <DateControl now={model.now} />}
 
-      <div className="flex items-center gap-[8px] border-t border-[var(--color-neutral-900)] px-[10px] py-[6px]">
+      <div className="flex items-center gap-[8px] border-t border-[var(--color-accent-900)] px-[10px] py-[6px]">
         <span data-testid="filter-tally" className="text-hint text-[var(--color-neutral-400)]">
           {model.rows.length} / {model.total ?? UNKNOWN} runs
         </span>

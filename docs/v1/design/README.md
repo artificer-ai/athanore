@@ -20,8 +20,10 @@ re-imported over DesignSync on 2026-09-09 (T080).
   is the operator's ruling and its own task (D200). Re-imported verbatim
   over DesignSync on 2026-09-26, when the operator adopted one behaviour
   of it — the run list filtered from its column headings, and the
-  workflow filter moved into the library (D275). The rest stays
-  unadopted.
+  workflow filter moved into the library (D275). Its chrome — square
+  corners, accent rules, `┤ … ├` frames, the checkbox glyphs — was
+  adopted after (D277); its text-size stepper and its narrow layout
+  stay unadopted.
 
 The 2026-09-09 re-import changed no bytes: `Athanore.dc.html` came back
 identical, and the Nocturne token sheet (`_ds/nocturne-…/styles.css`,

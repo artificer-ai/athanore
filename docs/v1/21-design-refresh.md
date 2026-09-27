@@ -245,7 +245,7 @@ themselves.
   there (D209, D273): a pointer control beside the toggle read as one
   confused control rather than two. Only its label and its placement,
   below the breakpoint, are this section's.
-  The `◀`/`▶` pane buttons and the dots remain and are the touch route
+  The `<-`/`->` pane buttons and the dots remain and are the touch route
   for cycling panes. The docked request panel and every pane render
   full-width; panes scroll vertically as they do today. On the global
   screen the left slot's `←` is the screen's own: labelled `back to

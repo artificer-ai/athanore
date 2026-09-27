@@ -177,7 +177,7 @@ export function ActionRunner({
             it runs on {actionTarget(invocation)}.
           </p>
         </div>
-        <div className="flex justify-end gap-[8px] border-t border-[var(--color-neutral-900)] px-[14px] py-[12px]">
+        <div className="flex justify-end gap-[8px] border-t border-[var(--color-accent-900)] px-[14px] py-[12px]">
           <button
             ref={cancelButton}
             type="button"

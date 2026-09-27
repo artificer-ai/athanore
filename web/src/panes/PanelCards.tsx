@@ -38,9 +38,9 @@ function PanelCard({ pane, ctx }: { pane: Pane; ctx: RenderContext }) {
     <div
       data-testid="panel-card"
       data-panel={pane.id}
-      className="overflow-hidden rounded-lg border border-[var(--color-neutral-900)] bg-card"
+      className="overflow-hidden rounded-lg border border-[var(--color-accent-800)] bg-card"
     >
-      <div className="text-hint flex flex-wrap items-center gap-x-[10px] gap-y-[6px] border-b border-[var(--color-neutral-900)] px-[12px] py-[6px] tracking-[0.1em] text-muted-foreground">
+      <div className="text-hint flex flex-wrap items-center gap-x-[10px] gap-y-[6px] border-b border-[var(--color-accent-900)] px-[12px] py-[6px] tracking-[0.1em] text-muted-foreground">
         <span className="text-[var(--color-neutral-400)]">{pane.name}</span>
         {!pane.builtin && (
           <>
@@ -72,7 +72,7 @@ export function PanelCards({
     <section
       aria-label="panels"
       data-testid="overview-cards"
-      className="flex flex-col gap-[14px] border-b border-[var(--color-neutral-900)] px-[14px] py-[12px] last:border-b-0"
+      className="flex flex-col gap-[14px] border-b border-[var(--color-accent-900)] px-[14px] py-[12px] last:border-b-0"
     >
       {cards.map((card) => (
         <PanelCard key={card.id} pane={card} ctx={{ scope, onOpenTask }} />

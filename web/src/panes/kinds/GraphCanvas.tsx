@@ -84,6 +84,7 @@ import {
 } from './graph'
 import { useRunDetail } from './run'
 import { focusedTask } from './stream'
+import { Frame } from '../../components/Frame'
 
 /** The mock's header separator: a neutral-800 pipe between the parts. */
 function Bar() {
@@ -142,7 +143,7 @@ function LegendDot({ colour, label }: { colour: string; label: string }) {
     <span className="inline-flex items-center gap-[5px] whitespace-nowrap">
       <span
         aria-hidden="true"
-        className="inline-block size-[6px] rounded-full"
+        className="inline-block size-[6px]"
         style={{ background: colour }}
       />
       {label}
@@ -242,7 +243,7 @@ const GraphNodeCard = memo(function GraphNodeCard({
             data-testid="graph-glyph"
             aria-hidden="true"
             className={cn(
-              'w-[14px] flex-none',
+              'w-[26px] flex-none whitespace-pre',
               toneClass(data.tone),
               tonePulses(data.tone) && 'animate-ath-pulse',
             )}
@@ -254,13 +255,13 @@ const GraphNodeCard = memo(function GraphNodeCard({
         {data.detail !== '' && (
           <span
             data-testid="graph-detail"
-            className="text-hint truncate pl-[22px] text-[var(--color-neutral-500)]"
+            className="text-hint truncate pl-[34px] text-[var(--color-neutral-500)]"
           >
             {data.detail}
           </span>
         )}
         {data.branches.length > 0 && (
-          <span className="flex flex-wrap items-center gap-[4px] pl-[22px]">
+          <span className="flex flex-wrap items-center gap-[4px] pl-[34px]">
             {data.branches.map((chip, position) => (
               <span
                 key={`${chip.tag}/${String(position)}`}
@@ -269,7 +270,7 @@ const GraphNodeCard = memo(function GraphNodeCard({
                 data-state={chip.state}
                 title={chip.label}
                 className={cn(
-                  'text-hint rounded border border-[var(--color-neutral-800)] px-[4px] leading-[14px]',
+                  'text-hint rounded-sm border border-[var(--color-accent-800)] px-[4px] leading-[14px]',
                   toneClass(chip.tone),
                 )}
               >
@@ -363,7 +364,7 @@ function NodeMenu({
       onPointerDown={(event) => {
         event.stopPropagation()
       }}
-      className="fixed z-50 min-w-[180px] rounded-lg border border-[var(--color-neutral-800)] bg-popover py-[4px] shadow-[var(--shadow-lg)]"
+      className="fixed z-50 min-w-[180px] rounded-lg border border-[var(--color-accent-800)] bg-popover py-[4px] shadow-[var(--shadow-lg)]"
     >
       <p className="text-hint px-[10px] py-[3px] tracking-[0.1em] text-[var(--color-neutral-600)]">
         {menu.node.name}
@@ -412,9 +413,9 @@ function Aside({
   onOpenLibrary: (() => void) | undefined
 }) {
   return (
-    <div className="min-w-0 max-w-[320px] flex-[1_1_210px] border-t border-[var(--color-neutral-900)] pt-[14px]">
+    <div className="min-w-0 max-w-[320px] flex-[1_1_210px] border-t border-[var(--color-accent-900)] pt-[14px]">
       <p className="text-hint mb-[8px] tracking-[0.14em] text-[var(--color-neutral-500)]">
-        EDGES
+        <Frame>EDGES</Frame>
       </p>
       {legend.length === 0 ? (
         <p className="text-meta text-muted-foreground">this workflow has one node</p>
@@ -440,7 +441,7 @@ function Aside({
       {file !== undefined && (
         <>
           <p className="text-hint mt-[16px] mb-[8px] tracking-[0.14em] text-[var(--color-neutral-500)]">
-            SOURCE
+            <Frame>SOURCE</Frame>
           </p>
           <p
             data-testid="graph-source"
@@ -456,7 +457,7 @@ function Aside({
           type="button"
           data-testid="graph-open-definition"
           onClick={onOpenLibrary}
-          className="text-meta mt-[10px] cursor-pointer rounded-lg border border-[var(--color-neutral-800)] px-[8px] py-[4px] text-[var(--color-neutral-400)] hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)]"
+          className="text-meta mt-[10px] cursor-pointer rounded-lg border border-[var(--color-accent-800)] px-[8px] py-[4px] text-[var(--color-neutral-400)] hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)]"
         >
           open definition
         </button>
@@ -590,8 +591,10 @@ export function GraphCanvas({
 
   return (
     <div data-testid="pane-graph" className="flex min-h-0 flex-1 flex-col">
-      <div className="text-hint flex flex-none flex-wrap items-center gap-x-[10px] gap-y-[6px] border-b border-[var(--color-neutral-800)] px-[14px] py-[6px] tracking-[0.1em] text-muted-foreground">
-        <span className="whitespace-nowrap">WORKFLOW GRAPH</span>
+      <div className="text-hint flex flex-none flex-wrap items-center gap-x-[10px] gap-y-[6px] border-b border-[var(--color-accent-800)] px-[14px] py-[6px] tracking-[0.1em] text-muted-foreground">
+        <span className="whitespace-nowrap">
+          <Frame>WORKFLOW GRAPH</Frame>
+        </span>
         {workflow !== undefined && (
           <>
             <Bar />

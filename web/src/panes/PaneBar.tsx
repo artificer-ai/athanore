@@ -1,5 +1,5 @@
 /**
- * The detail region's bar: the collapse toggle, `◀ PANE (i/n) ▶`, the
+ * The detail region's bar: the collapse toggle, `<- [i/n] PANE ->`, the
  * pane dots, and the selected run's id and status pill (10 §Layout).
  *
  * The dots are a `RadioGroup` styled as 14×3 px bars, which is 10
@@ -12,13 +12,13 @@
  * the workflow they are running.
  *
  * The bar opens with the mock's `❮`, which collapses the run list to the
- * rail `Splitter` draws in its place; collapsed, the rail's own `❯` is
+ * rail `Splitter` draws in its place; collapsed, the rail's own `»` is
  * the way back, so the two are never on screen together.
  *
  * Below the breakpoint that slot holds a back control instead (21
  * §Narrow layout): there is no split to collapse, and the detail is
  * standing where the run list was, so `←` clearing `?run=` is the way
- * back to it. The `◀`/`▶` buttons and the dots stay — they are the touch
+ * back to it. The `<-`/`->` buttons and the dots stay — they are the touch
  * route through the pane cycle — and grow to the 24×24 px hit area WCAG
  * 2.5.8 asks of a touch target, the dots by way of a transparent box
  * around the 14×3 px bar rather than by drawing a bigger bar.
@@ -49,7 +49,7 @@ const TOUCH = 'max-md:min-h-[24px] max-md:min-w-[24px]'
 
 /** The classes the left slot's `←` carries, whichever way it goes. */
 const BACK =
-  'text-hint flex items-center justify-center rounded-lg border border-border px-[6px] py-px text-muted-foreground hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)]'
+  'text-hint flex items-center justify-center rounded-lg border border-border px-[6px] py-px text-[var(--color-accent-200)] hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)]'
 
 export function PaneBar({
   panes,
@@ -99,7 +99,7 @@ export function PaneBar({
           title="back to runs (esc)"
           className={`${BACK} ${TOUCH}`}
         >
-          ←
+          « runs
         </button>
       ) : (
         narrow &&
@@ -112,7 +112,7 @@ export function PaneBar({
             title="back to runs"
             className={`${BACK} ${TOUCH}`}
           >
-            ←
+            « runs
           </button>
         )
       )}
@@ -135,7 +135,7 @@ export function PaneBar({
         aria-label="previous pane"
         className={`text-body px-[4px] text-[var(--color-accent-400)] hover:text-[var(--color-accent-200)] disabled:text-[var(--color-neutral-700)] ${TOUCH}`}
       >
-        ◀
+        {'<-'}
       </button>
       <span
         data-testid="pane-label"
@@ -150,7 +150,7 @@ export function PaneBar({
         aria-label="next pane"
         className={`text-body px-[4px] text-[var(--color-accent-400)] hover:text-[var(--color-accent-200)] disabled:text-[var(--color-neutral-700)] ${TOUCH}`}
       >
-        ▶
+        {'->'}
       </button>
 
       <RadioGroup.Root

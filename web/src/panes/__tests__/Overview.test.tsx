@@ -81,7 +81,10 @@ function bars() {
       active: bar.dataset['active'],
       width: bar.querySelector<HTMLElement>('[data-testid="token-bar-fill"]')?.style
         .width,
-      count: bar.textContent,
+      // The node and the count, around the bar's block glyphs.
+      count:
+        (bar.firstElementChild?.textContent ?? '') +
+        (bar.lastElementChild?.textContent ?? ''),
     }))
 }
 

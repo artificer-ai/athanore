@@ -171,15 +171,16 @@ describe('RunList', () => {
     expect(third).not.toHaveClass('bg-zebra')
   })
 
-  it('gives the selected row the accent tint and the 2 px accent border', () => {
+  it('gives the selected row the accent fill and the `>` cursor', () => {
     list({ rows: [row({ id: 'A' }), row({ id: 'B' })], selected: 'B' })
 
     const [unselected, selected] = rows()
     expect(selected).toHaveAttribute('aria-selected', 'true')
-    expect(selected).toHaveClass(
-      'border-l-[var(--color-accent)]',
-      'bg-[color-mix(in_srgb,var(--color-accent)_12%,var(--color-surface))]',
-    )
+    expect(selected).toHaveClass('bg-[var(--color-accent-900)]', 'text-[var(--color-accent-100)]')
+    // The cursor is chrome: drawn, and hidden from the row's name.
+    expect(selected!.firstElementChild).toHaveTextContent('>')
+    expect(selected!.firstElementChild).toHaveAttribute('aria-hidden', 'true')
+    expect(unselected!.firstElementChild).toHaveTextContent('')
     expect(unselected).toHaveAttribute('aria-selected', 'false')
     expect(unselected).toHaveClass('border-l-transparent')
   })

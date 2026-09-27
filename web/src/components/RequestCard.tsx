@@ -51,7 +51,7 @@ function ToolCall({ tool_call }: { tool_call: unknown }) {
   return (
     <div
       data-testid="request-tool-call"
-      className="bg-zebra mt-[7px] rounded-lg border border-[var(--color-neutral-900)] px-[9px] py-[7px]"
+      className="bg-zebra mt-[7px] rounded-lg border border-[var(--color-accent-800)] px-[9px] py-[7px]"
     >
       {heading !== '' && (
         <p
@@ -83,7 +83,7 @@ function Answer({ request }: { request: RequestView }) {
   return (
     <div
       data-testid="request-answer"
-      className="mt-[7px] border-t border-[var(--color-neutral-900)] pt-[6px]"
+      className="mt-[7px] border-t border-[var(--color-accent-900)] pt-[6px]"
     >
       <p className="text-hint tracking-[0.1em] text-muted-foreground">
         answered by{' '}
@@ -109,7 +109,7 @@ function Stale() {
   return (
     <p
       data-testid="request-stale"
-      className="text-hint mt-[7px] border-t border-[var(--color-neutral-900)] pt-[6px] text-[var(--color-neutral-500)]"
+      className="text-hint mt-[7px] border-t border-[var(--color-accent-900)] pt-[6px] text-[var(--color-neutral-500)]"
     >
       unanswered · the attempt that asked has ended
     </p>
@@ -139,7 +139,7 @@ export function RequestCard({
       data-request={request.id}
       data-state={state}
       data-kind={request.kind}
-      className="rounded-lg border border-[var(--color-neutral-900)] bg-card px-[10px] py-[8px]"
+      className="rounded-lg border border-[var(--color-accent-800)] bg-card px-[10px] py-[8px]"
     >
       <div className="mb-[4px] flex flex-wrap items-center gap-x-[8px] gap-y-[4px]">
         <span data-testid="request-from" className="text-row">
@@ -201,7 +201,7 @@ export function RequestCard({
       ) : (
         <div
           data-testid="request-controls"
-          className="mt-[7px] border-t border-dashed border-[var(--color-neutral-800)] pt-[7px]"
+          className="mt-[7px] border-t border-dashed border-[var(--color-accent-800)] pt-[7px]"
         >
           <RequestPanel request={request} />
         </div>

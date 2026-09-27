@@ -56,6 +56,7 @@ import {
 } from './overview'
 import { useRunDetail } from './run'
 import type { OverviewData, TableColumn, TableRow } from './shape'
+import { Frame } from '../../components/Frame'
 
 /**
  * The mock's NODES template, for the five columns the builtin's route
@@ -87,11 +88,11 @@ function Section({
     <section
       {...(testId === undefined ? {} : { 'data-testid': testId })}
       {...(label === undefined ? {} : { 'aria-label': label })}
-      className="border-b border-[var(--color-neutral-900)] px-[14px] py-[12px] last:border-b-0"
+      className="border-b border-[var(--color-accent-900)] px-[14px] py-[12px] last:border-b-0"
     >
       {label !== undefined && (
-        <h2 className="text-hint mb-[8px] tracking-[0.14em] text-muted-foreground">
-          {label}
+        <h2 className="text-hint mb-[8px] tracking-[0.14em] text-[var(--color-accent-300)]">
+          <Frame>{label}</Frame>
         </h2>
       )}
       {children}
@@ -99,9 +100,15 @@ function Section({
   )
 }
 
+/** How many glyph cells a token bar is: the Terminal mock's 24. */
+const BAR_CELLS = 24
+const BAR_EMPTY = '░'.repeat(BAR_CELLS)
+const BAR_FULL = '█'.repeat(BAR_CELLS)
+
 /**
- * The per-node token bars (10 §Panes: "accent for the active node,
- * accent-700 otherwise", scaled to the largest node total).
+ * The per-node token bars (10 §Panes: "accent for the active node",
+ * accent-600 otherwise in the Terminal mock's blocks, scaled to the
+ * largest node total).
  *
  * The colours are written out rather than built from `active`, because
  * Tailwind only generates a utility it can see the name of in the
@@ -122,19 +129,27 @@ function TokenBars({ bars }: { bars: readonly TokenBar[] }) {
           <span className="text-meta truncate text-right text-muted-foreground">
             {bar.node}
           </span>
-          <span className="block h-[8px] overflow-hidden rounded-lg bg-[var(--color-neutral-900)]">
+          {/* The Terminal mock's block bar (D277): a track of `░` with a
+              run of `█` over it, clipped to the bar's width. Both are
+              drawn to the full {@link BAR_CELLS}, so the fill is the
+              track's own glyph grid and the two line up cell for cell. */}
+          <span
+            aria-hidden
+            className={cn(
+              'text-meta relative block overflow-hidden leading-none tracking-[-0.02em] whitespace-nowrap',
+              bar.active ? 'text-[var(--color-accent)]' : 'text-[var(--color-accent-600)]',
+            )}
+          >
+            {BAR_EMPTY}
             <span
               data-testid="token-bar-fill"
               // The width is data, so it is a style and not a class:
               // Tailwind cannot generate a utility per percentage.
               style={{ width: `${String(bar.percent)}%` }}
-              className={cn(
-                'block h-full',
-                bar.active
-                  ? 'bg-[var(--color-accent)]'
-                  : 'bg-[var(--color-accent-700)]',
-              )}
-            />
+              className="absolute inset-y-0 left-0 block overflow-hidden"
+            >
+              {BAR_FULL}
+            </span>
           </span>
           <span className="text-meta truncate text-right text-muted-foreground">
             {bar.count}
@@ -241,7 +256,7 @@ function NodesTable({
 
       <div
         data-testid="node-rows"
-        className="text-row overflow-hidden rounded-lg border border-[var(--color-neutral-900)]"
+        className="text-row overflow-hidden rounded-lg border border-[var(--color-accent-800)]"
       >
         {rows.map((row, index) => {
           const node = String(row['node'] ?? '')

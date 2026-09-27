@@ -162,14 +162,14 @@ function DeleteRunBody({
           <p
             role="alert"
             data-testid="delete-run-error"
-            className="text-meta rounded-lg border border-[var(--color-neutral-800)] bg-[var(--color-neutral-900)] px-[9px] py-[5px] text-status-fail"
+            className="text-meta rounded-lg border border-[var(--color-accent-800)] bg-[var(--color-neutral-900)] px-[9px] py-[5px] text-status-fail"
           >
             {refusal}
           </p>
         )}
       </div>
 
-      <div className="flex justify-end gap-[8px] border-t border-[var(--color-neutral-900)] px-[14px] py-[12px]">
+      <div className="flex justify-end gap-[8px] border-t border-[var(--color-accent-900)] px-[14px] py-[12px]">
         <button
           ref={cancelRef}
           type="button"

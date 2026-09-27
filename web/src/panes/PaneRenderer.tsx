@@ -21,7 +21,7 @@ import type { Pane } from './usePanes'
 /** The pane's own header: what it is, and where its data comes from. */
 function PaneHeader({ pane }: { pane: Pane }) {
   return (
-    <div className="text-hint flex flex-none flex-wrap items-center gap-x-[10px] gap-y-[6px] border-b border-[var(--color-neutral-900)] px-[14px] py-[6px] tracking-[0.1em] text-muted-foreground">
+    <div className="text-hint flex flex-none flex-wrap items-center gap-x-[10px] gap-y-[6px] border-b border-[var(--color-accent-900)] px-[14px] py-[6px] tracking-[0.1em] text-muted-foreground">
       {!pane.builtin && (
         <>
           <span className="text-[var(--color-accent-300)]">PLUGIN</span>

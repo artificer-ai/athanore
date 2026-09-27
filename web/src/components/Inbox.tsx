@@ -31,6 +31,7 @@ import { usePrefs } from '../store/prefs'
 import { PENDING_GLYPH, RequestCard } from './RequestCard'
 import { notificationsAvailable, requestNotificationPermission } from './attention'
 import { newestFirst, useInbox } from './inbox'
+import { Frame } from './Frame'
 
 /** The mock's header separator: a neutral-800 pipe between the parts. */
 function Bar() {
@@ -100,8 +101,10 @@ export function Inbox() {
 
   return (
     <div data-testid="pane-inbox" className="flex min-h-0 flex-1 flex-col">
-      <div className="text-hint flex flex-none flex-wrap items-center gap-x-[10px] gap-y-[6px] border-b border-[var(--color-neutral-900)] px-[14px] py-[6px] tracking-[0.1em] text-muted-foreground">
-        <span>INBOX</span>
+      <div className="text-hint flex flex-none flex-wrap items-center gap-x-[10px] gap-y-[6px] border-b border-[var(--color-accent-900)] px-[14px] py-[6px] tracking-[0.1em] text-muted-foreground">
+        <span>
+          <Frame>INBOX</Frame>
+        </span>
         <Bar />
         <span>every run</span>
         <div className="flex-1" />

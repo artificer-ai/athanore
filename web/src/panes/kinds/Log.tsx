@@ -41,6 +41,7 @@ import { panelQueryKey } from '../source'
 import { LogRows } from './LogRows'
 import { appendError, isTailing, logLines } from './log'
 import type { LogRow } from './shape'
+import { Frame } from '../../components/Frame'
 
 /** The mock's header separator: a neutral-800 pipe between the parts. */
 function Bar() {
@@ -108,7 +109,7 @@ function Composer({ runId, source }: { runId: string; source?: string | undefine
         event.preventDefault()
         send()
       }}
-      className="flex flex-none flex-col gap-[6px] border-t border-[var(--color-neutral-900)] px-[14px] py-[8px]"
+      className="flex flex-none flex-col gap-[6px] border-t border-[var(--color-accent-900)] px-[14px] py-[8px]"
     >
       <textarea
         ref={box}
@@ -195,8 +196,10 @@ export function Log({
 
   return (
     <div data-testid="pane-log" className="flex min-h-0 flex-1 flex-col">
-      <div className="text-hint flex flex-none flex-wrap items-center gap-x-[10px] gap-y-[6px] border-b border-[var(--color-neutral-900)] px-[14px] py-[6px] tracking-[0.1em] text-muted-foreground">
-        <span>EVENT LOG</span>
+      <div className="text-hint flex flex-none flex-wrap items-center gap-x-[10px] gap-y-[6px] border-b border-[var(--color-accent-900)] px-[14px] py-[6px] tracking-[0.1em] text-muted-foreground">
+        <span>
+          <Frame>EVENT LOG</Frame>
+        </span>
         <Bar />
         <span data-testid="log-count">{lines.length} lines</span>
 

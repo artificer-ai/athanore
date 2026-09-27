@@ -122,7 +122,7 @@ export function ActionForm({
         <p
           data-testid="action-form-message"
           role="alert"
-          className="text-meta rounded-lg border border-[var(--color-neutral-800)] bg-[var(--color-neutral-900)] px-[9px] py-[5px] text-status-fail"
+          className="text-meta rounded-lg border border-[var(--color-accent-800)] bg-[var(--color-neutral-900)] px-[9px] py-[5px] text-status-fail"
         >
           {notice}
         </p>

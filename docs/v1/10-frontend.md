@@ -64,9 +64,9 @@ of TOML nobody executes.
 
 ```
 ┌ header ─────────────────────────────────────────────────────────────────────┐
-│ ▚ ATHANORE v1.0  · 34 runs · ● 1 active         [＋ new run] [workflows · 1] │
+│ ┤ ATHANORE ├ v1.0 · 34 runs · ■ 1 active        [＋ new run] [workflows · 1] │
 ├ run list ─────────────┬ splitter ┬ detail ─────────────────────────────────┤
-│ RUN⏷ WORKFLOW⏷ TITLE⏷ │          │ [❮] ◀ OVERVIEW (1/7) ▶ ▬▬▬▬▬▬▬  run a4c8… running │
+│ RUN⏷ WORKFLOW⏷ TITLE⏷ │          │ [❮] <- [1/7] OVERVIEW -> ▬▬▬▬▬▬▬ run a4c8… running │
 │ STATUS⏷ NODE⏷ AGE⏷    │          │                                         │
 │ … 16 rows …           │          │ pane content (scrolls)                  │
 │ 9 of 34 · × clear 2   │          │                                         │
@@ -86,13 +86,15 @@ of TOML nobody executes.
 - **Run list** (left, default 540 px, drag-resizable 260 px to
   `window − 340`, collapsible with `b` to a 30 px vertical rail reading
   `RUNS n`): grid columns RUN · WORKFLOW · TITLE · STATUS · NODE · AGE.
-  Selected row gets a flat accent tint (`color-mix(accent 12%, surface)`)
-  and a 2 px accent left border; selection is the only state a row
-  draws (D274). The column headings are the filter (§Run filters).
+  A 12 px cursor column leads the grid; the selected row draws `>` in
+  it, is filled `--color-accent-900` with `accent-100` text and its
+  quiet columns lifted to `accent-200`, and below the breakpoint, where
+  there is no cursor column, carries a 2 px accent left border instead;
+  selection is the only state a row draws (D274, D277). The column headings are the filter (§Run filters).
   Footer strip: `n of m shown`, then — while anything filters — one
   `name ×` chip per workflow the library marked and `× clear k filters`,
   then `↑↓ select · ⇧↑↓ move run`.
-- **Detail** (right): pane bar with the collapse toggle, `◀ PANE (i/n) ▶`,
+- **Detail** (right): pane bar with the collapse toggle, `<- [i/n] PANE ->`,
   one 14×3 px dot per pane (accent = current, accent-800 = plugin pane,
   neutral-800 = builtin), then `run <id>` and a status pill.
 - **Footer**: key-hint chips (accent-tinted keycaps) and the
@@ -251,9 +253,9 @@ The pane is a **React Flow canvas**, drawn from `GET
 gate with plain-language descriptions), the `SOURCE` path, and an `open
 definition` button that opens the library on that workflow.
 
-**One card per node**, and never more than one: a glyph (`✓` done in
-status-ok, `●` active in accent with pulse, `✗` failed, `·` idle, `⋈` on
-a join in every state), the node's name, and a detail line (tokens ·
+**One card per node**, and never more than one: a glyph (`[x]` done in
+status-ok, `[*]` active in accent with pulse, `[!]` failed, `[ ]` idle,
+`[⋈]` on a join in every state; D277), the node's name, and a detail line (tokens ·
 duration, or `attempt n · elapsed`, or `waiting`, or `2 of 3 arrived` on
 a join while the fan-out is open, from `arrivals` — 08 §Graph
 semantics). The card carries a fixed size in pixels; what the type ramp
@@ -313,7 +315,8 @@ offers rerun here / move task here (move is disabled for join nodes).
 ## Overlays
 
 All overlays are full-screen backdrops (`rgba(10,11,18,.72)`) with a
-surface panel, 1 px neutral-800 border, 8 px radius, `--shadow-lg`.
+surface panel, 1 px accent-800 border, square corners, `--shadow-lg`,
+and a `┤ TITLE ├` kicker (D277).
 `esc` closes any of them.
 
 - **Command palette** (`^p` / `⌘p`): `›` input, then rows of
@@ -612,14 +615,14 @@ Source: `design/nocturne.css` (tokens) and `design/Athanore.dc.html`
 | `--foreground` | `--color-text` #e9e9ed |
 | `--muted-foreground` | `--color-neutral-500` |
 | `--muted` | `--color-neutral-900` |
-| `--border` | `--color-neutral-800` |
-| `--input` | `--color-neutral-800` on `--color-bg` |
+| `--border` | `--color-accent-800` (D277) |
+| `--input` | `--color-accent-800` on `--color-bg` (D277) |
 | `--primary` | `--color-accent` #9184d9 (used as border and text, never a fill) |
 | `--primary-foreground` | `--color-accent-200` |
 | `--accent` | `color-mix(accent 16%, transparent)` (selected chips, rows) |
 | `--destructive` | `--ath-status-fail` #d9868f |
 | `--ring` | `--color-accent` |
-| `--radius` | 8 px (Nocturne's default; the app does not override it, D71) |
+| `--radius` | 0 — square, the Terminal mock's (D277) |
 | `--chart-1…3` | `--color-accent`, `--color-accent-700`, `--color-accent-2-400` |
 
 ### Status colours
@@ -672,19 +675,29 @@ Source: `design/nocturne.css` (tokens) and `design/Athanore.dc.html`
   headers `6px 14px`, rows `4px 12px`, tiles `8px 10px`, 1 px gaps
   between tiles on a neutral-900 ground). The Nocturne `--space-*`
   scale is available for anything the mock does not size.
-- Radius: Nocturne's 8 px (`--radius`) throughout. The mock's old 2 px
-  override went with the CRT chrome, so the app does not declare one
-  (D71); `--ath-radius` is copied into the theme and left unused.
+- Radius: none. `--radius` is 0, so every `rounded-*` utility is
+  square, and the dots that were `rounded-full` are square too — the
+  Terminal mock's `border-radius: 0` everywhere (D277, superseding
+  D71's 8 px); `--ath-radius` is copied into the theme and left unused.
 - Surfaces: `--color-bg` page; `--color-surface` cards, tiles, overlays;
   `color-mix(surface 45%, bg)` chrome strips (header, list header, pane
   bar, footer); `color-mix(surface 60%, bg)` zebra rows and tool blocks.
-- Borders: neutral-800 for chrome and inputs, neutral-900 for inner
-  dividers and table frames; the header carries a faded accent rule
+- Borders: accent-800 for chrome, inputs and boxed content (tiles,
+  tables, cards, agent blocks), accent-900 for inner dividers; neutral
+  stays only on the secondary `clear` buttons, the library's list
+  divider and an idle graph card (D277). The header carries a faded accent rule
   (transparent → accent 75 % → transparent, 48 px inset each side) as
   the one Nocturne "fading rule" in the app.
 - No glow: the mock carries no `text-shadow` on accent labels, and the
   theme generates no glow utility (D71). Accent labels are
   `--color-accent-300` text and nothing more.
+- Frames and glyphs (D277): section and pane titles are framed in
+  box-drawing — `┤ STATS ├`, `┤ EVENT LOG ├`, `┤ NEW RUN ├`, the brand
+  `┤ ATHANORE ├` in accent-200 at .18em — with the two glyphs
+  `aria-hidden` (`components/Frame.tsx`); the overview's section titles
+  are accent-300. The palette prompt is `$`, the collapsed rail `»`,
+  the narrow back control `« runs`, and the token bars are 24 cells of
+  `█` over `░`.
 
 ### Components (mock → shadcn)
 
