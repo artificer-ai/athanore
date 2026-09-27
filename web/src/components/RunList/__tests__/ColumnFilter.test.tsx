@@ -167,11 +167,22 @@ describe('ColumnHeading', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('draws WORKFLOW as a plain heading', () => {
+  it('checks WORKFLOW choices into the same field the library marks', async () => {
+    useUi.setState({ runFilter: { ...EMPTY_RUN_FILTER, workflows: ['gamedev'] } })
     heading('workflow')
 
-    expect(screen.getByText('WORKFLOW')).toBeInTheDocument()
-    expect(screen.queryByRole('button')).toBeNull()
+    // The badge counts the library's mark before the popover is opened.
+    expect(screen.getByRole('button', { name: 'filter workflow' })).toHaveTextContent('1')
+    const panel = await open('workflow')
+    const options = within(panel).getAllByRole('checkbox')
+    // The workflows there are runs of, plus the one marked, by name.
+    expect(options.map((option) => option.textContent)).toEqual([
+      '[ ]feature_build2',
+      '[x]gamedev0',
+    ])
+
+    await userEvent.click(options[0]!)
+    expect(useUi.getState().runFilter.workflows).toEqual(['gamedev', 'feature_build'])
   })
 
   it('always shows the funnel below the breakpoint', () => {

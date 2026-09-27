@@ -66,7 +66,7 @@ of TOML nobody executes.
 ┌ header ─────────────────────────────────────────────────────────────────────┐
 │ ▚ ATHANORE v1.0  · 34 runs · ● 1 active         [＋ new run] [workflows · 1] │
 ├ run list ─────────────┬ splitter ┬ detail ─────────────────────────────────┤
-│ RUN⏷ WORKFLOW TITLE⏷  │          │ [❮] ◀ OVERVIEW (1/7) ▶ ▬▬▬▬▬▬▬  run a4c8… running │
+│ RUN⏷ WORKFLOW⏷ TITLE⏷ │          │ [❮] ◀ OVERVIEW (1/7) ▶ ▬▬▬▬▬▬▬  run a4c8… running │
 │ STATUS⏷ NODE⏷ AGE⏷    │          │                                         │
 │ … 16 rows …           │          │ pane content (scrolls)                  │
 │ 9 of 34 · × clear 2   │          │                                         │
@@ -134,13 +134,13 @@ Terminal mock draws it (D275). Each column filters by what it holds:
 | Column | Kind | Control | Matches |
 |---|---|---|---|
 | RUN | text | one box | the run's full id contains it, case-folded |
-| WORKFLOW | choice | the library's marks (§Overlays) | any of the marked workflows |
+| WORKFLOW | choice | a checkbox per workflow there are runs of; the same field as the library's marks (§Overlays) | any of the checked workflows |
 | TITLE | text | one box | the title contains it, case-folded |
 | STATUS | choice | a checkbox per status of 03, in lifecycle order | any of the checked statuses |
 | NODE | choice | a checkbox per node a run is in now, then `(none)` | any node the run is in, or none for `(none)` |
 | AGE | date | presets `last 1h / 24h / 7d / 30d`, or FROM and TO local datetimes | `created` within the rolling window, or in `[FROM, the end of TO's minute]` |
 
-Every heading but WORKFLOW carries a funnel, drawn on hover, on focus,
+Every heading carries a funnel, drawn on hover, on focus,
 and always while its column filters; below the breakpoint the headings
 are a strip of funnels over the two-line rows, always drawn, each a
 24 px target. A funnel opens a popover anchored to its heading: `FILTER

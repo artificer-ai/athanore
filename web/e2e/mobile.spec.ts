@@ -303,7 +303,7 @@ test('the narrow chrome: header, filter strip, footer, hit areas', async ({
   expect((await strip.boundingBox())?.width).toBeLessThanOrEqual(
     NARROW_VIEWPORT.width,
   )
-  for (const name of ['run', 'title', 'status', 'node', 'age']) {
+  for (const name of ['run', 'workflow', 'title', 'status', 'node', 'age']) {
     const funnel = strip.getByRole('button', { name: `filter ${name}` })
     await expect(funnel).toBeVisible()
     await tappable(funnel)
