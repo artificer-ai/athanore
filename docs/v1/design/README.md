@@ -17,7 +17,11 @@ re-imported over DesignSync on 2026-09-09 (T080).
   built from it. It restyles the dashboard as a hard-edged terminal and
   prescribes a text-size control and a narrow layout that differ from
   `21-design-refresh.md`, which is the approved design. Adopting any of it
-  is the operator's ruling and its own task (D200).
+  is the operator's ruling and its own task (D200). Re-imported verbatim
+  over DesignSync on 2026-09-26, when the operator adopted one behaviour
+  of it — the run list filtered from its column headings, and the
+  workflow filter moved into the library (D275). The rest stays
+  unadopted.
 
 The 2026-09-09 re-import changed no bytes: `Athanore.dc.html` came back
 identical, and the Nocturne token sheet (`_ds/nocturne-…/styles.css`,

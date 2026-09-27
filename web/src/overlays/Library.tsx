@@ -5,7 +5,18 @@
  *
  * The mock's panel: `WORKFLOW LIBRARY · defined in python` over a
  * 230 px left list — `name · n nodes` and `k runs · file` — and a source
- * viewer beside it. The mock's second clause, "hot-reloaded from
+ * viewer beside it.
+ *
+ * **The left list is also the run list's workflow filter** (D275). Each
+ * row carries a mark, `[x]` or `[ ]`, that adds its workflow to
+ * `useUi.runFilter.workflows` or takes it out; the row itself still
+ * picks what the viewer shows, and the two are sibling buttons so that
+ * neither click is the other's. Its run count is faceted — the runs the
+ * list would show with every other filter applied — and a row with none
+ * is dimmed rather than dropped. A workflow the server no longer has but
+ * runs still name is listed too, marked `unregistered`, because its runs
+ * are still on the list and must stay filterable. The panel's footer
+ * says how many runs the list shows and clears the marks. The mock's second clause, "hot-reloaded from
  * `workflows/`", is still not written: nothing here watches a
  * directory. What the list and the viewer *do* follow is a live
  * registration — `workflow.*` invalidates the list and every source
@@ -63,11 +74,18 @@ import {
   listWorkflowsApiWorkflowsGetOptions,
 } from '../api/gen/@tanstack/react-query.gen'
 import type { RunSummary, SourceOut, WorkflowOut } from '../api/gen/types.gen'
-import { useRuns } from '../components/RunList'
+import {
+  passes,
+  toggled,
+  useNow,
+  useRuns,
+  workflowCounts,
+} from '../components/RunList'
 import { useKeyOwner } from '../keys'
 import { actionError } from '../lib/errors'
 import { tokenize } from '../lib/highlight'
 import { cn } from '../lib/utils'
+import { useUi } from '../store/ui'
 import { OverlayClose } from './OverlayPanel'
 import {
   anchorLine,
@@ -299,6 +317,14 @@ function LibraryPanel({
   onMounted: () => void
 }) {
   const sources = useSources(workflows)
+  // The runs come from the body, which has already waited for them. A
+  // second `useRuns` here would be a second observer, and on a query
+  // that failed that is a refetch on mount — the body goes back to
+  // loading, unmounts this, and the two chase each other.
+  const now = useNow()
+  const filter = useUi((s) => s.runFilter)
+  const setRunFilter = useUi((s) => s.setRunFilter)
+  const marked = filter.workflows
 
   // The selection is the overlay's own and not the URL's: `?overlay=`
   // says which overlay is up, and reading a second workflow's source is
@@ -318,7 +344,12 @@ function LibraryPanel({
     const file = sources[index]?.data?.file
     if (file !== undefined) files.set(workflow.name, file)
   })
-  const rows = libraryRows(workflows, runs, files)
+  const rows = libraryRows(
+    workflows,
+    runs,
+    workflowCounts(runs ?? [], filter, now),
+    files,
+  )
 
   const chosen = workflows.findIndex((workflow) => workflow.name === selection.workflow)
   const source = chosen < 0 ? undefined : sources[chosen]
@@ -329,54 +360,121 @@ function LibraryPanel({
     // the workflow list over the source viewer, each scrolling on its
     // own (21 §Overlays, narrow).
     <div className="grid min-h-0 flex-1 grid-cols-[230px_minmax(0,1fr)] max-md:grid-cols-1 max-md:grid-rows-[minmax(0,40%)_minmax(0,60%)]">
-      <div
-        role="listbox"
-        aria-label="workflows"
-        data-testid="library-list"
-        className="min-h-0 overflow-auto border-r border-[var(--color-neutral-900)] max-md:border-r-0 max-md:border-b"
-      >
-        {rows.map((row) => {
-          const selected = row.name === selection.workflow
-          const detail = rowDetail(row)
-          return (
+      <div className="flex min-h-0 flex-col border-r border-[var(--color-neutral-900)] max-md:border-r-0 max-md:border-b">
+        <ul
+          aria-label="workflows"
+          data-testid="library-list"
+          className="m-0 min-h-0 flex-1 list-none overflow-auto p-0"
+        >
+          {rows.map((row) => {
+            const selected = row.name === selection.workflow
+            const on = marked.includes(row.name)
+            const dim = row.runs === 0
+            const detail = rowDetail(row)
+            return (
+              <li
+                key={row.name}
+                data-workflow={row.name}
+                data-selected={selected}
+                data-marked={on}
+                className={cn(
+                  'flex items-start gap-[8px] border-b border-l-2 border-[var(--color-neutral-900)] border-l-transparent py-[8px] pl-[10px] hover:bg-[var(--color-neutral-900)]',
+                  selected && 'bg-[var(--color-neutral-900)]',
+                  on && 'border-l-[var(--color-accent)]',
+                )}
+              >
+                {/* The mark is the filter; the row beside it is the
+                    viewer's. Two buttons, so neither click does the
+                    other's work. */}
+                <button
+                  type="button"
+                  aria-pressed={on}
+                  aria-label={`filter runs by ${row.name}`}
+                  title={on ? `stop filtering runs by ${row.name}` : `filter runs by ${row.name}`}
+                  onClick={() => setRunFilter({ workflows: toggled(marked, row.name) })}
+                  className={cn(
+                    'text-meta inline-flex min-h-[18px] min-w-[26px] flex-none cursor-pointer items-center justify-center rounded-sm border px-[2px] leading-none max-md:min-h-[24px] max-md:min-w-[30px]',
+                    on
+                      ? 'border-[var(--color-accent-600)] bg-[var(--color-accent-900)] text-[var(--color-accent-100)]'
+                      : 'border-[var(--color-accent-800)] text-[var(--color-accent-300)] hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-100)]',
+                  )}
+                >
+                  <span aria-hidden>{on ? '[x]' : '[ ]'}</span>
+                </button>
+                <button
+                  type="button"
+                  aria-current={selected}
+                  {...(selected ? { id: SELECTED_ROW_ID } : {})}
+                  onClick={() => {
+                    // A workflow the operator picked is not the one the
+                    // anchor was about, so the anchor goes with it and
+                    // the viewer opens at the top of the new file.
+                    setSelection({ workflow: row.name, anchor: undefined })
+                  }}
+                  className="block min-w-0 flex-1 cursor-pointer pr-[12px] text-left"
+                >
+                  <span className="flex items-baseline gap-[8px]">
+                    <span
+                      className={cn(
+                        'truncate',
+                        dim
+                          ? 'text-[var(--color-neutral-500)]'
+                          : on
+                            ? 'text-[var(--color-accent-200)]'
+                            : 'text-[var(--color-neutral-300)]',
+                      )}
+                    >
+                      {row.name}
+                    </span>
+                    {row.nodes !== undefined && (
+                      <span className="text-hint whitespace-nowrap text-[var(--color-neutral-500)]">
+                        {plural(row.nodes, 'node')}
+                      </span>
+                    )}
+                  </span>
+                  {/* Dimming is the name's alone: the detail is already
+                      at the muted step, and one below it is under AA on
+                      the selected row's ground. */}
+                  {detail !== undefined && (
+                    <span className="text-hint mt-[2px] block [overflow-wrap:anywhere] text-[var(--color-neutral-500)]">
+                      {detail}
+                    </span>
+                  )}
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+
+        <div
+          data-testid="library-filter"
+          className="text-hint flex flex-none flex-wrap items-center gap-x-[10px] gap-y-[4px] border-t border-[var(--color-neutral-900)] px-[12px] py-[6px] text-[var(--color-neutral-500)]"
+        >
+          <span>
+            {[
+              runs === undefined
+                ? undefined
+                : `${String(runs.filter((run) => passes(run, filter, now)).length)} of ${String(runs.length)} runs shown`,
+              marked.length > 0 ? `${plural(marked.length, 'workflow')} marked` : undefined,
+            ]
+              .filter((part) => part !== undefined)
+              .join(' · ')}
+          </span>
+          {marked.length > 0 && (
             <button
-              key={row.name}
               type="button"
-              role="option"
-              aria-selected={selected}
-              data-selected={selected}
-              data-workflow={row.name}
-              {...(selected ? { id: SELECTED_ROW_ID } : {})}
-              onClick={() => {
-                // A workflow the operator picked is not the one the
-                // anchor was about, so the anchor goes with it and the
-                // viewer opens at the top of the new file.
-                setSelection({ workflow: row.name, anchor: undefined })
-              }}
-              className={cn(
-                'block w-full cursor-pointer border-b border-[var(--color-neutral-900)] px-[12px] py-[8px] text-left hover:bg-[var(--color-neutral-900)]',
-                selected && 'bg-[var(--color-neutral-900)]',
-              )}
+              onClick={() => setRunFilter({ workflows: [] })}
+              className="min-h-[20px] cursor-pointer rounded-sm border border-[var(--color-neutral-800)] px-[8px] text-[var(--color-neutral-400)] hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-100)] max-md:min-h-[24px]"
             >
-              <span className="flex items-baseline gap-[8px]">
-                <span className="truncate text-[var(--color-neutral-300)]">
-                  {row.name}
-                </span>
-                <span className="text-hint whitespace-nowrap text-[var(--color-neutral-500)]">
-                  {plural(row.nodes, 'node')}
-                </span>
-              </span>
-              {detail !== undefined && (
-                <span className="text-hint mt-[2px] block [overflow-wrap:anywhere] text-[var(--color-neutral-500)]">
-                  {detail}
-                </span>
-              )}
+              × clear workflow filter
             </button>
-          )
-        })}
+          )}
+        </div>
       </div>
 
-      {source === undefined ? (
+      {selection.workflow !== undefined && chosen < 0 ? (
+        <Notice>this server has no workflow of that name, so no source to show</Notice>
+      ) : source === undefined ? (
         <Notice>select a workflow to read its definition</Notice>
       ) : source.isPending ? (
         <Notice>loading the source…</Notice>
@@ -450,8 +548,13 @@ function SourceView({
       <p className="text-hint flex-none [overflow-wrap:anywhere] px-[14px] pt-[12px] pb-[8px] tracking-[0.14em] text-[var(--color-neutral-500)]">
         {source.file}
       </p>
+      {/* A scroller with nothing focusable in it is one a keyboard
+          cannot scroll, so the region itself takes focus. */}
       <pre
         ref={viewport}
+        tabIndex={0}
+        role="region"
+        aria-label={`source of ${source.file}`}
         className="text-row m-0 min-h-0 flex-1 overflow-auto px-[14px] pb-[14px] leading-[1.65] whitespace-pre-wrap [overflow-wrap:anywhere] text-[var(--color-neutral-300)]"
       >
         <code>

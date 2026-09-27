@@ -27,12 +27,21 @@ const STRIKETHROUGH = 8
 export type LibraryRow = {
   /** The workflow's name, which is also its key. */
   name: string
-  /** How many nodes its finalized graph has. */
-  nodes: number
   /**
-   * How many runs of it this server holds, or `undefined` when the run
-   * list could not be read — which is not the same fact as none, and is
-   * not written as one (01 §Real data only).
+   * Whether this server has the workflow registered. A row that is not
+   * is a name runs still carry after the workflow was removed (22
+   * §Remove): it has no graph and no source, but its runs are still on
+   * the list and still have to be filterable.
+   */
+  registered: boolean
+  /** How many nodes its finalized graph has; `undefined` unregistered. */
+  nodes: number | undefined
+  /**
+   * How many runs of it the list would show with every filter but the
+   * workflow marks applied — the faceted count, so a row reads what
+   * marking it would add — or `undefined` when the run list could not be
+   * read, which is not the same fact as none and is not written as one
+   * (01 §Real data only).
    */
   runs: number | undefined
   /**
@@ -45,32 +54,47 @@ export type LibraryRow = {
 }
 
 /**
- * The rows, in the order `GET /api/workflows` sent them — which is by
- * name, and is the one order that does not reshuffle when a run is
- * submitted.
+ * The rows, by name — the order `GET /api/workflows` sends them in, and
+ * the one order that does not reshuffle when a run is submitted.
+ *
+ * They are the registered workflows and every other workflow a run is
+ * of: the library's marks are the run list's workflow filter (D275), and
+ * a workflow removed from the server must not leave its runs impossible
+ * to filter to.
  *
  * The run count is taken from the run list the whole app already shares
  * (10 §Realtime and caching) rather than from a per-workflow request:
  * `GET /api/runs` returns them whole (08 §Conventions), so counting here
  * is counting the same rows the list on the left of the app is drawing.
+ * `counts` is that list's faceted tally (`workflowCounts`); `runs` is
+ * the list itself, or `undefined` when it could not be read.
  */
 export function libraryRows(
   workflows: readonly WorkflowOut[],
   runs: readonly RunSummary[] | undefined,
+  counts: ReadonlyMap<string, number>,
   files: ReadonlyMap<string, string>,
 ): LibraryRow[] {
-  const counts = new Map<string, number>()
-  for (const run of runs ?? []) {
-    counts.set(run.workflow, (counts.get(run.workflow) ?? 0) + 1)
-  }
+  const registered = new Map(workflows.map((workflow) => [workflow.name, workflow]))
+  const names = new Set(registered.keys())
+  for (const run of runs ?? []) names.add(run.workflow)
 
-  return workflows.map((workflow) => ({
-    name: workflow.name,
-    nodes: Object.keys(workflow.nodes).length,
-    runs: runs === undefined ? undefined : (counts.get(workflow.name) ?? 0),
-    file: files.get(workflow.name),
-  }))
+  return [...names]
+    .sort((a, b) => a.localeCompare(b))
+    .map((name) => {
+      const workflow = registered.get(name)
+      return {
+        name,
+        registered: workflow !== undefined,
+        nodes: workflow === undefined ? undefined : Object.keys(workflow.nodes).length,
+        runs: runs === undefined ? undefined : (counts.get(name) ?? 0),
+        file: files.get(name),
+      }
+    })
 }
+
+/** What an unregistered row reads where a registered one has its file. */
+export const UNREGISTERED = 'unregistered'
 
 /** `1 node`, `8 nodes`: the mock's counts, with the `s` earned. */
 export function plural(count: number, noun: string): string {
@@ -84,7 +108,7 @@ export function plural(count: number, noun: string): string {
 export function rowDetail(row: LibraryRow): string | undefined {
   const parts = [
     row.runs === undefined ? undefined : plural(row.runs, 'run'),
-    row.file,
+    row.registered ? row.file : UNREGISTERED,
   ].filter((part): part is string => part !== undefined)
 
   return parts.length === 0 ? undefined : parts.join(' · ')

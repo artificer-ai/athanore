@@ -30,13 +30,11 @@ test('the header chooser rescales the whole ramp, and it survives a reload', asy
 
   const metric = page.locator('[data-testid="metric-grid"] dd').first()
   const row = dashboard.row('read me larger')
-  // The two sizes written at a call site rather than in the ramp, each
-  // beside a size that is in it: the status pill inside that row, and a
-  // workflow chip in the header beside the run counts. Absolute pixels
-  // here are invisible at the default base and are the mixed-scale text
+  // A size written at a call site rather than in the ramp, beside a
+  // size that is in it: the status pill inside that row. Absolute pixels
+  // there are invisible at the default base and are the mixed-scale text
   // 21 §Type scale forbids at every other step.
   const pill = dashboard.status('read me larger')
-  const chip = page.locator('header').getByRole('radio', { name: 'all' })
   const meta = page.getByTestId('header-counts')
   await expect(metric).toBeVisible()
 
@@ -47,7 +45,6 @@ test('the header chooser rescales the whole ramp, and it survives a reload', asy
   expect(await dashboard.fontSize(metric)).toBe(15)
   expect(await dashboard.fontSize(row)).toBe(11.5)
   expect(await dashboard.fontSize(pill)).toBe(10.5)
-  expect(await dashboard.fontSize(chip)).toBe(10.5)
   expect(await dashboard.fontSize(meta)).toBe(11)
 
   await dashboard.chooseFontSize('xlarge')
@@ -58,11 +55,10 @@ test('the header chooser rescales the whole ramp, and it survives a reload', asy
   expect(await dashboard.fontSize(row)).toBe(14.375)
 
   // Including the text no utility of the ramp names: the pill grew with
-  // the row it sits in (10.5/12 × 15), the chip with the counts beside
-  // it (11/12 × 15). Text at two scales in one row is what 21 §Type
-  // scale forbids, and it is what an absolute `px` at a call site does.
+  // the row it sits in (10.5/12 × 15), as the counts did (11/12 × 15).
+  // Text at two scales in one row is what 21 §Type scale forbids, and it
+  // is what an absolute `px` at a call site does.
   expect(await dashboard.fontSize(pill)).toBe(13.125)
-  expect(await dashboard.fontSize(chip)).toBe(13.125)
   expect(await dashboard.fontSize(meta)).toBe(13.75)
 
   // Density did not (D195, D199). `--spacing` is pinned to the 3 px

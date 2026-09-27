@@ -58,11 +58,25 @@ test('the map moves the selection, the panes and the overlays', async ({
   await page.keyboard.press('b')
   await expect(page.getByTestId('runs-rail')).toBeHidden()
 
-  // `^p` is a chord, so it fires wherever the caret is — including the
-  // header's `/` box, which swallows every plain key.
-  await page.getByRole('textbox', { name: 'filter runs' }).fill('alpha')
+  // A column filter's popover owns the keyboard, text box or not: `n`
+  // typed into TITLE's is text, and `n` on a STATUS checkbox is not the
+  // New Run key either.
+  await dashboard.openColumnFilter('title')
+  await page.getByRole('textbox', { name: 'title contains' }).fill('alpha')
   await page.keyboard.press('n')
   await expect(page.getByTestId('new-run')).toBeHidden()
+  await page.keyboard.press('Escape')
+  await dashboard.openColumnFilter('status')
+  await page.getByRole('checkbox', { name: /running/ }).focus()
+  await page.keyboard.press('n')
+  await expect(page.getByTestId('new-run')).toBeHidden()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog', { name: 'filter status' })).toBeHidden()
+
+  // `^p` is a chord, so it fires wherever the caret is — including the
+  // TITLE filter's box, which swallows every plain key.
+  await dashboard.openColumnFilter('title')
+  await page.getByRole('textbox', { name: 'title contains' }).focus()
   await page.keyboard.press('Control+p')
   await expect(page.getByTestId('palette')).toBeVisible()
   await page.keyboard.press('Escape')

@@ -237,10 +237,28 @@ export class Dashboard {
 
   /** Open the workflow library from the header's `workflows` button. */
   async openLibrary(): Promise<Locator> {
-    await this.page.getByRole('button', { name: 'workflows', exact: true }).click()
+    // `workflows · k` while the library has workflows marked (D275).
+    await this.page.getByRole('button', { name: /^workflows( · \d+)?$/ }).click()
     const library = this.page.getByTestId('library')
     await expect(library).toBeVisible()
     return library
+  }
+
+  /**
+   * Open a run list column's filter, as a pointer does: over the
+   * heading, which is what draws its funnel, then the funnel (10 §Run
+   * filters, D275). `column` is the heading's word, lower-cased.
+   */
+  async openColumnFilter(column: string): Promise<Locator> {
+    const name = `filter ${column}`
+    const funnel = this.page
+      .getByTestId('column-headings')
+      .getByRole('button', { name, exact: true })
+    await funnel.locator('..').hover()
+    await funnel.click()
+    const popover = this.page.getByRole('dialog', { name })
+    await expect(popover).toBeVisible()
+    return popover
   }
 
   /** The library's row for a workflow, by name (10 §Overlays). */

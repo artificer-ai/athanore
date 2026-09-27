@@ -27,7 +27,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createAppQueryClient } from '../../api/client'
 import type { WorkflowOut } from '../../api/gen/types.gen'
-import { ALL_WORKFLOWS, useUi } from '../../store/ui'
+import { EMPTY_RUN_FILTER, useUi } from '../../store/ui'
 import { NewRun, NEW_RUN_TITLE } from '../NewRun'
 
 const { toast } = vi.hoisted(() => ({ toast: vi.fn() }))
@@ -168,7 +168,7 @@ beforeEach(() => {
     queries: { retry: false, staleTime: Infinity },
     mutations: { retry: false },
   })
-  useUi.setState({ runFilter: { workflow: ALL_WORKFLOWS, query: '' } })
+  useUi.setState({ runFilter: EMPTY_RUN_FILTER })
   stubServer()
 })
 
@@ -367,18 +367,23 @@ describe('NewRun', () => {
     expect(onClose).not.toHaveBeenCalled()
   })
 
-  it('clears the run list’s filter so the queued run is in it', async () => {
-    useUi.setState({ runFilter: { workflow: 'gamedev', query: 'boss' } })
+  it('clears the run list’s filters so the queued run is in it', async () => {
+    useUi.setState({
+      runFilter: {
+        ...EMPTY_RUN_FILTER,
+        workflows: ['gamedev'],
+        title: 'boss',
+        statuses: ['failed'],
+        within: 3_600_000,
+      },
+    })
     const { user } = await open()
 
     await user.type(screen.getByLabelText('TITLE'), 'port the settings module')
     await user.click(screen.getByRole('button', { name: 'submit run' }))
 
     await waitFor(() => {
-      expect(useUi.getState().runFilter).toEqual({
-        workflow: ALL_WORKFLOWS,
-        query: '',
-      })
+      expect(useUi.getState().runFilter).toEqual(EMPTY_RUN_FILTER)
     })
   })
 

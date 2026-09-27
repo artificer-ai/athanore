@@ -3,16 +3,17 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { FONT_SIZES, usePrefs } from '../../store/prefs'
-import { ALL_WORKFLOWS, useUi } from '../../store/ui'
+import { EMPTY_RUN_FILTER, useUi } from '../../store/ui'
 import type { RunListModel } from '../RunList'
 import { Header } from '../Header'
 
 /** A model the server has not answered for yet: what a fresh page holds. */
 const UNANSWERED: RunListModel = {
   rows: [],
+  runs: [],
+  now: 0,
   total: null,
   active: null,
-  workflows: [],
   isPending: true,
   isError: false,
 }
@@ -36,7 +37,7 @@ function header(over: Partial<RunListModel> = {}) {
 
 describe('Header', () => {
   beforeEach(() => {
-    useUi.setState({ runFilter: { workflow: ALL_WORKFLOWS, query: '' } })
+    useUi.setState({ runFilter: EMPTY_RUN_FILTER })
     usePrefs.setState({ fontSize: 'default' })
   })
 
@@ -83,15 +84,23 @@ describe('Header', () => {
     )
   })
 
-  it('carries the run list’s chips and its `/` input', () => {
-    header({ workflows: ['feature_build', 'gamedev'], total: 3, isPending: false })
+  it('carries no run filter of its own: the list’s headings are the filter', () => {
+    header({ total: 3, isPending: false })
 
-    expect(screen.getAllByRole('radio').map((chip) => chip.textContent)).toEqual([
-      'all',
-      'feature_build',
-      'gamedev',
-    ])
-    expect(screen.getByRole('textbox', { name: 'filter runs' })).toBeInTheDocument()
+    expect(screen.queryByRole('textbox')).toBeNull()
+    expect(screen.queryByRole('radio')).toBeNull()
+  })
+
+  it('says on `workflows` how many workflows the library has marked', () => {
+    useUi.setState({ runFilter: { ...EMPTY_RUN_FILTER, workflows: ['a', 'b'] } })
+    header({ total: 3, isPending: false })
+
+    const button = screen.getByRole('button', { name: 'workflows · 2' })
+    expect(button).toHaveAttribute('data-filtered', 'true')
+    expect(button).toHaveAttribute(
+      'title',
+      '2 workflow filters on — change them in the library (w)',
+    )
   })
 
   it('greys the counts out when the server is down', () => {

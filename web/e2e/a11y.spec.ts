@@ -3,7 +3,7 @@
  * (`docs/v1/17-serial-task-plan.md` § T068a, 10 §Accessibility and
  * quality).
  *
- * Five states of the one page, because they are five different
+ * Six states of the one page, because they are six different
  * documents: the dashboard an operator opens — an empty list and the
  * global inbox — the dashboard they work in, with a run selected, a
  * graph drawn and a request waiting to be answered, that same dashboard
@@ -27,6 +27,11 @@
  * one that decides the floor (D204 (5)). The second state selects a
  * `probe` run, which is never `failed`, so without this one the ratio
  * that matters most is argued rather than measured.
+ *
+ * The sixth is the run list's filters (D275): the library with a
+ * workflow marked, and a column's popover open over a filtered list —
+ * a dialog of checkboxes, presets and datetime inputs that is on no
+ * other page.
  *
  * The scoring is `support/a11y.ts`'s, and the reason it is written down
  * rather than taken off a tool is there (D178).
@@ -101,6 +106,45 @@ test('a failed run selected in the list passes it too', async ({ dashboard }) =>
 
   expect(blocking(results), violationReport(results)).toEqual([])
   expect(axeScore(results), violationReport(results)).toBeGreaterThanOrEqual(A11Y_SCORE)
+})
+
+test('the run list filtered, with a filter and the library open, passes it too', async ({
+  dashboard,
+}) => {
+  const page = dashboard.page
+  await dashboard.open()
+  await dashboard.submitOverApi('flop', 'read me through a filter')
+  await expect(dashboard.status('read me through a filter')).toHaveText('failed')
+
+  // A workflow marked in the library: the row's mark, and the footer
+  // chip and `× clear` it leaves behind on the list (D275).
+  await dashboard.openLibrary()
+  await page.getByRole('button', { name: 'filter runs by flop' }).click()
+  const library = await new AxeBuilder({ page }).analyze()
+  expect(blocking(library), violationReport(library)).toEqual([])
+  expect(axeScore(library), violationReport(library)).toBeGreaterThanOrEqual(A11Y_SCORE)
+  await dashboard.closeOverlay()
+  await expect(page.getByRole('button', { name: 'remove flop from the filter' })).toBeVisible()
+
+  // A choice column's popover open, one choice on: its checkboxes and
+  // counts, and the heading's badge and underline under it.
+  await dashboard.openColumnFilter('status')
+  await page.getByRole('checkbox', { name: /failed/ }).click()
+  await expect(page.getByRole('checkbox', { name: /failed/ })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  )
+  const popover = await new AxeBuilder({ page }).analyze()
+  expect(blocking(popover), violationReport(popover)).toEqual([])
+  expect(axeScore(popover), violationReport(popover)).toBeGreaterThanOrEqual(A11Y_SCORE)
+
+  // And AGE's, whose control is two datetime inputs and four presets.
+  await page.keyboard.press('Escape')
+  await dashboard.openColumnFilter('age')
+  await expect(page.getByLabel('created from')).toBeVisible()
+  const age = await new AxeBuilder({ page }).analyze()
+  expect(blocking(age), violationReport(age)).toEqual([])
+  expect(axeScore(age), violationReport(age)).toBeGreaterThanOrEqual(A11Y_SCORE)
 })
 
 test.describe('on a phone', () => {

@@ -215,15 +215,15 @@ narrow adds touch routes and removes none.
 At 390 px there MUST be no horizontal scroll on the page in any of the
 flows below, and there SHOULD be none at 360 px — the narrow layout is
 fluid, not a second fixed design. Strips that manage their own overflow
-(the header's chip row) MAY scroll horizontally within themselves.
+(a strip whose content outgrows it) MAY scroll horizontally within
+themselves.
 
 ### Regions, narrow
 
-- **Header**: wraps — brand, version, counts and the two buttons; then
-  the workflow chips and the `/` filter as a horizontally scrollable
-  strip. As implemented (D201 (1)) that is three rows at 390 px, not
-  two: the chrome measures about 500 px against 362 px of usable width,
-  so it takes two lines of its own above the filter strip. Nothing is
+- **Header**: wraps — brand, version and counts, then the three
+  buttons. It carried the workflow chips and the `/` filter as a third,
+  scrolling row until D275 moved the run filters into the list's
+  headings and the library; it is two rows at 390 px now. Nothing is
   dropped: `＋ new run` and `workflows` stay visible as touch targets.
   Interactive controls in the narrow chrome MUST have hit areas of at
   least 24×24 CSS px (WCAG 2.5.8); visual size may stay the mock's.
@@ -232,9 +232,12 @@ fluid, not a second fixed design. Strips that manage their own overflow
   line 2: `run id · workflow · node · age` in `text-meta`, with the `⚠`
   open-request glyph kept beside the node (10 §Attention). Same data,
   same query, same selection behaviour; tapping a row opens the detail.
-  The list's footer strip keeps `n shown` and drops the `↑↓ select ·
-  ⇧↑↓ move run` key hints; the keys themselves stay bound at every
-  width (10 §Keyboard, D274).
+  Over the rows, the column headings become a strip of the five
+  filterable columns' funnels, always drawn, each a 24 px target (10
+  §Run filters, D275); WORKFLOW's filter is the library's at every
+  width. The list's footer strip keeps `n of m shown` and the active
+  filters and drops the `↑↓ select · ⇧↑↓ move run` key hints; the keys
+  themselves stay bound at every width (10 §Keyboard, D274).
 - **Detail**: the pane bar's left slot shows a back control (`←` with
   an accessible "back to runs" label) in place of the list-collapse
   toggle, which has no meaning without the split; it clears `?run=`.
