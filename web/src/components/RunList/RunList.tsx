@@ -3,9 +3,13 @@
  *
  * The mock's six-column grid, to the pixel: the column header, the
  * scrolling rows, and the footer strip that reports how many of them the
- * filter left. The 30 px rail it collapses to is `../Splitter`'s, and
- * the workflow chips and the `/` input are `./RunFilters`, which the
- * header strip renders — this is the grid and nothing else.
+ * filter left. The 30 px rail it collapses to is `../Splitter`'s.
+ *
+ * The column headings are the filter (D275): each carries a funnel that
+ * opens its popover (`./ColumnFilter`), and the footer says what is on —
+ * the library's workflow marks as chips, each removable, and `× clear n
+ * filters` for all of it — so a filter is never on without the strip
+ * under the rows saying so.
  *
  * Selection is the URL's: a click calls `onSelect`, the route writes
  * `?run=`, and the row that draws itself as selected is the one the
@@ -31,14 +35,16 @@
  * lines are a different shape, not a different width. Everything else
  * about the list is one thing at both widths — the same model, the same
  * `listbox`, the same selection handler, the same `⚠` (10 §Attention).
- * The column headings go with the columns, and the footer keeps
- * `n shown` and drops the key hints, which are not what a touch device
- * is operated by.
+ * The column headings become a strip of funnels over the two-line rows,
+ * and the footer keeps `n of m shown` and the filters and drops the key
+ * hints, which are not what a touch device is operated by.
  */
 import { SHIFT_CAP } from '../../lib/keys'
 import { useIsNarrow } from '../../lib/useIsNarrow'
 import { cn } from '../../lib/utils'
 import { useUi } from '../../store/ui'
+import { ColumnHeading } from './ColumnFilter'
+import { COLUMNS as FILTER_COLUMNS, activeCount } from './filters'
 import { StatusPill } from './StatusPill'
 import type { RunListModel, RunRow } from './useRunList'
 
@@ -46,7 +52,12 @@ import type { RunListModel, RunRow } from './useRunList'
 const COLUMNS =
   'minmax(0, 108px) minmax(0, 104px) minmax(110px, 1fr) minmax(0, 84px) minmax(0, 92px) 46px'
 
-const HEADINGS = ['RUN', 'WORKFLOW', 'TITLE', 'STATUS', 'NODE', 'AGE']
+/**
+ * The headings below the breakpoint: every column with a funnel.
+ * WORKFLOW's choice is the library's at every width, and a strip is not
+ * a grid, so a heading with nothing to open would be a word and no more.
+ */
+const NARROW_HEADINGS = FILTER_COLUMNS.filter((column) => column.inHeader)
 
 /** The glyph a run with unanswered requests carries after its node. */
 const PENDING_GLYPH = '⚠'
@@ -245,7 +256,7 @@ function NarrowRow({ row, zebra, selected, onSelect }: RowProps) {
  * runs" and "we could not ask" are different facts (02 §Real data only),
  * and only one of them is the operator's cue to look at the server.
  */
-function Empty({ model }: { model: RunListModel }) {
+function Empty({ model, onClear }: { model: RunListModel; onClear: () => void }) {
   if (model.isPending) {
     return (
       <p role="status" className="text-meta px-[12px] py-[8px] text-muted-foreground">
@@ -260,10 +271,62 @@ function Empty({ model }: { model: RunListModel }) {
       </p>
     )
   }
+  if (model.total === 0) {
+    return <p className="text-meta px-[12px] py-[8px] text-muted-foreground">no runs yet</p>
+  }
   return (
-    <p className="text-meta px-[12px] py-[8px] text-muted-foreground">
-      {model.total === 0 ? 'no runs yet' : 'no runs match the filter'}
+    <p className="text-meta flex items-baseline gap-[10px] px-[12px] py-[8px] text-muted-foreground">
+      no runs match the current filters
+      <button
+        type="button"
+        onClick={onClear}
+        className="text-hint min-h-[24px] cursor-pointer rounded-sm border border-[var(--color-accent-700)] px-[8px] text-[var(--color-accent-200)] hover:bg-[var(--color-accent-900)]"
+      >
+        clear
+      </button>
     </p>
+  )
+}
+
+/**
+ * What the footer says is filtering: the library's workflow marks, one
+ * chip each, and `× clear n filters`.
+ *
+ * The workflow marks get chips because they are made in an overlay that
+ * is closed by the time anyone reads the list; a column's filter shows
+ * on its own heading, which is on screen above the rows it narrowed.
+ */
+function ActiveFilters() {
+  const filter = useUi((s) => s.runFilter)
+  const setRunFilter = useUi((s) => s.setRunFilter)
+  const clearRunFilter = useUi((s) => s.clearRunFilter)
+  const count = activeCount(filter)
+
+  if (count === 0) return null
+  return (
+    <>
+      {filter.workflows.map((workflow) => (
+        <button
+          key={workflow}
+          type="button"
+          title={`remove ${workflow} from the filter`}
+          aria-label={`remove ${workflow} from the filter`}
+          onClick={() =>
+            setRunFilter({ workflows: filter.workflows.filter((each) => each !== workflow) })
+          }
+          className="max-w-[120px] cursor-pointer truncate rounded-sm border border-[var(--color-accent-800)] bg-[var(--color-accent-900)] px-[6px] text-[var(--color-accent-200)] hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-100)] max-md:min-h-[24px]"
+        >
+          {workflow} ×
+        </button>
+      ))}
+      <button
+        type="button"
+        onClick={clearRunFilter}
+        className="cursor-pointer text-[var(--color-accent-300)] hover:text-[var(--color-accent-100)] max-md:min-h-[24px]"
+      >
+        × clear {count} {count === 1 ? 'filter' : 'filters'}
+      </button>
+    </>
   )
 }
 
@@ -280,6 +343,7 @@ export function RunList({
   const focused = useUi((s) => s.focus === 'list')
   const setFocus = useUi((s) => s.setFocus)
   const narrow = useIsNarrow()
+  const clearRunFilter = useUi((s) => s.clearRunFilter)
 
   return (
     <section
@@ -290,19 +354,30 @@ export function RunList({
       onFocusCapture={() => setFocus('list')}
       className="flex h-full min-h-0 min-w-0 flex-col border-r border-border data-[focused=true]:border-r-[var(--color-accent-800)] max-md:flex-1 max-md:border-r-0"
     >
-      {/* The headings go with the columns: a two-line row has none to
-          head, and a strip reading RUN WORKFLOW TITLE over rows shaped
-          like neither would be a legend for a grid that is not there. */}
-      <div
-        className="text-hint bg-chrome grid gap-[8px] overflow-hidden border-b border-border px-[12px] py-[6px] tracking-[0.1em] text-muted-foreground max-md:hidden"
-        style={{ gridTemplateColumns: COLUMNS }}
-      >
-        {HEADINGS.map((heading) => (
-          <span key={heading} className={heading === 'AGE' ? 'text-right' : undefined}>
-            {heading}
-          </span>
-        ))}
-      </div>
+      {/* Wide, the headings are the grid's first row and line up with
+          its columns. Narrow, a two-line row has no columns to head, so
+          they are a strip of funnels instead: the filters stay, the
+          legend for a grid that is not there goes. */}
+      {narrow ? (
+        <div
+          data-testid="column-headings"
+          className="text-hint bg-chrome flex flex-wrap items-center gap-x-[14px] gap-y-[4px] border-b border-border px-[12px] py-[4px] tracking-[0.1em] text-muted-foreground"
+        >
+          {NARROW_HEADINGS.map((column) => (
+            <ColumnHeading key={column.key} column={column} model={model} narrow />
+          ))}
+        </div>
+      ) : (
+        <div
+          data-testid="column-headings"
+          className="text-hint bg-chrome grid min-h-[30px] items-center gap-[8px] border-b border-border px-[12px] py-[3px] tracking-[0.1em] text-muted-foreground"
+          style={{ gridTemplateColumns: COLUMNS }}
+        >
+          {FILTER_COLUMNS.map((column) => (
+            <ColumnHeading key={column.key} column={column} model={model} narrow={false} />
+          ))}
+        </div>
+      )}
 
       {/* The `listbox` is drawn only when it has `option`s to hold: a
           role that requires particular children and is given a status
@@ -312,7 +387,7 @@ export function RunList({
           quality). */}
       <div className="text-row min-h-0 flex-1 overflow-x-hidden overflow-y-auto">
         {model.rows.length === 0 ? (
-          <Empty model={model} />
+          <Empty model={model} onClear={clearRunFilter} />
         ) : (
           <div role="listbox" aria-label="run rows">
             {model.rows.map((row, index) => {
@@ -332,8 +407,13 @@ export function RunList({
         )}
       </div>
 
-      <div className="text-hint bg-chrome flex gap-[14px] border-t border-border px-[12px] py-[5px] text-muted-foreground">
-        <span data-testid="rows-shown">{model.rows.length} shown</span>
+      <div className="text-hint bg-chrome flex flex-wrap items-center gap-x-[14px] gap-y-[4px] border-t border-border px-[12px] py-[5px] text-muted-foreground">
+        <span data-testid="rows-shown">
+          {model.total === null
+            ? `${String(model.rows.length)} shown`
+            : `${String(model.rows.length)} of ${String(model.total)} shown`}
+        </span>
+        <ActiveFilters />
         {/* Keycaps are noise on a touchscreen; the keys they name stay
             bound at every width (21 §Narrow layout). */}
         <span data-testid="list-hints" className="flex gap-[14px] max-md:hidden">

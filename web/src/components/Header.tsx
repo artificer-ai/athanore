@@ -1,6 +1,6 @@
 /**
- * The header strip: brand mark, version, the two counts, and the run
- * list's filters.
+ * The header strip: brand mark, version, the two counts, and the
+ * controls that open the app's two overlays.
  *
  * The counts are `GET /api/runs`, which is also what the list draws, so
  * the number in the strip and the number of rows under it can never
@@ -23,14 +23,14 @@
  * outline rather than the accent one, because there is one primary
  * button in the app (10 §Components).
  *
+ * `workflows` is also the workflow filter's way in: the library's rows
+ * carry the marks (D275), so while any is on the button says how many,
+ * in the accent outline, and a tooltip says what clicking it is for.
+ * The run list's other filters are its column headings.
+ *
  * Below the breakpoint the strip wraps (21 §Narrow layout): the brand,
- * the version, the counts and the three controls above, and the workflow
- * chips and the `/` filter below them as one horizontally scrollable
- * row. Nothing is dropped and nothing shrinks — the strip scrolls
- * *itself*, which is the one horizontal scroll 21 allows, and the page
- * never does. The wrapper around `RunFilters` is `display: contents` at
- * `md` and above, so the two controls stay direct children of this flex
- * box there and the desktop strip is the same box it was.
+ * the version and the counts, then the three controls. Nothing is
+ * dropped and nothing shrinks.
  *
  * {@link FontSizeMenu} sits beside them: the header is the one chrome
  * that is always on screen, which is why the type-size chooser lives
@@ -41,7 +41,6 @@
 import { TextAaIcon } from '@phosphor-icons/react'
 import { Popover, RadioGroup } from 'radix-ui'
 
-import { RunFilters } from './RunList'
 import type { RunListModel } from './RunList'
 import { FONT_SIZES, usePrefs, type FontSize } from '../store/prefs'
 import { useUi } from '../store/ui'
@@ -138,6 +137,7 @@ export function Header({
   onOpenLibrary: () => void
 }) {
   const down = useUi((state) => state.feed.status === 'down')
+  const workflowFilters = useUi((state) => state.runFilter.workflows.length)
   const active = runs.active ?? 0
 
   return (
@@ -170,16 +170,6 @@ export function Header({
 
       <div className="flex-1" />
 
-      {/* `contents` above the breakpoint: the chips and the `/` box are
-          the header's own flex children there, and this element draws
-          nothing. Below it they are one strip on a line of their own
-          (`basis-full`), scrolling sideways within itself — `order-last`
-          because the two buttons stay above it whatever the wrap does.
-          The scrollbar is hidden, not the scrolling. */}
-      <div className="contents max-md:order-last max-md:flex max-md:basis-full max-md:items-center max-md:gap-[8px] max-md:overflow-x-auto max-md:pb-[2px] max-md:[scrollbar-width:none] max-md:[&::-webkit-scrollbar]:hidden">
-        <RunFilters workflows={runs.workflows} />
-      </div>
-
       {/* The one primary button in the app: outlined with the accent as
           border and text, never as a fill (10 §Components, §Tokens). */}
       <button
@@ -195,9 +185,15 @@ export function Header({
       <button
         type="button"
         onClick={onOpenLibrary}
-        className={`text-meta cursor-pointer rounded-lg border border-border px-[10px] py-[4px] text-[var(--color-neutral-400)] hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)] ${TOUCH}`}
+        title={
+          workflowFilters > 0
+            ? `${String(workflowFilters)} workflow ${workflowFilters === 1 ? 'filter' : 'filters'} on — change them in the library (w)`
+            : 'workflow library (w)'
+        }
+        data-filtered={workflowFilters > 0}
+        className={`text-meta cursor-pointer rounded-lg border border-border px-[10px] py-[4px] text-[var(--color-neutral-400)] hover:border-[var(--color-accent-600)] hover:text-[var(--color-accent-200)] data-[filtered=true]:border-[var(--color-accent-600)] data-[filtered=true]:text-[var(--color-accent-200)] ${TOUCH}`}
       >
-        workflows
+        {workflowFilters > 0 ? `workflows · ${String(workflowFilters)}` : 'workflows'}
       </button>
 
       <FontSizeMenu />

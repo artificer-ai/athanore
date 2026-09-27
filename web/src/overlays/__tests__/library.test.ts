@@ -72,66 +72,95 @@ const SOURCE: SourceOut = {
   nodes: { prompt: { line: 3 } },
 }
 
+/** The unfiltered tally `workflowCounts` gives for {@link RUNS}. */
+const COUNTS = new Map([
+  ['feature_build', 2],
+  ['gamedev', 1],
+])
+
 describe('libraryRows', () => {
   it('is the mock’s row: the name, its nodes, its runs and its file', () => {
     const rows = libraryRows(
       WORKFLOWS,
       RUNS,
+      COUNTS,
       new Map([['feature_build', '/srv/workflows/feature_build.py']]),
     )
 
     expect(rows).toEqual([
       {
         name: 'feature_build',
+        registered: true,
         nodes: 2,
         runs: 2,
         file: '/srv/workflows/feature_build.py',
       },
-      { name: 'gamedev', nodes: 1, runs: 1, file: undefined },
+      { name: 'gamedev', registered: true, nodes: 1, runs: 1, file: undefined },
     ])
   })
 
-  it('keeps the order the server sent, which is by name', () => {
-    const rows = libraryRows([...WORKFLOWS].reverse(), RUNS, new Map())
+  it('lists by name whatever order it was given', () => {
+    const rows = libraryRows([...WORKFLOWS].reverse(), RUNS, COUNTS, new Map())
 
-    expect(rows.map((row) => row.name)).toEqual(['gamedev', 'feature_build'])
+    expect(rows.map((row) => row.name)).toEqual(['feature_build', 'gamedev'])
   })
 
   it('counts no runs for a workflow nobody has run', () => {
-    const rows = libraryRows([workflow('msgtest', ['send'])], RUNS, new Map())
+    const rows = libraryRows([workflow('msgtest', ['send'])], [], new Map(), new Map())
 
     expect(rows[0]?.runs).toBe(0)
+  })
+
+  it('takes its counts from the faceted tally, not the whole list', () => {
+    const rows = libraryRows(WORKFLOWS, RUNS, new Map([['gamedev', 1]]), new Map())
+
+    expect(rows.map((row) => row.runs)).toEqual([0, 1])
+  })
+
+  it('lists a workflow runs still name after the server dropped it', () => {
+    // 22 §Remove: the runs stay, so their workflow must stay filterable.
+    const rows = libraryRows(
+      [workflow('gamedev', ['design'])],
+      RUNS,
+      COUNTS,
+      new Map(),
+    )
+
+    expect(rows).toEqual([
+      { name: 'feature_build', registered: false, nodes: undefined, runs: 2, file: undefined },
+      { name: 'gamedev', registered: true, nodes: 1, runs: 1, file: undefined },
+    ])
   })
 
   it('leaves the count unknown when the run list could not be read', () => {
     // 01 §Real data only: a list nobody answered is not a server with no
     // runs, and `0 runs` would say it was.
-    const rows = libraryRows(WORKFLOWS, undefined, new Map())
+    const rows = libraryRows(WORKFLOWS, undefined, new Map(), new Map())
 
     expect(rows.map((row) => row.runs)).toEqual([undefined, undefined])
   })
 })
 
 describe('rowDetail', () => {
+  const row = { name: 'a', registered: true, nodes: 2 }
+
   it('is `k runs · file`', () => {
-    expect(rowDetail({ name: 'a', nodes: 2, runs: 12, file: 'a.py' })).toBe(
-      '12 runs · a.py',
-    )
+    expect(rowDetail({ ...row, runs: 12, file: 'a.py' })).toBe('12 runs · a.py')
   })
 
   it('drops the half it does not know', () => {
-    expect(rowDetail({ name: 'a', nodes: 2, runs: 12, file: undefined })).toBe(
-      '12 runs',
-    )
-    expect(rowDetail({ name: 'a', nodes: 2, runs: undefined, file: 'a.py' })).toBe(
-      'a.py',
-    )
+    expect(rowDetail({ ...row, runs: 12, file: undefined })).toBe('12 runs')
+    expect(rowDetail({ ...row, runs: undefined, file: 'a.py' })).toBe('a.py')
+  })
+
+  it('says `unregistered` where an unregistered row has no file', () => {
+    expect(
+      rowDetail({ name: 'a', registered: false, nodes: undefined, runs: 3, file: undefined }),
+    ).toBe('3 runs · unregistered')
   })
 
   it('is nothing at all when it knows neither', () => {
-    expect(
-      rowDetail({ name: 'a', nodes: 2, runs: undefined, file: undefined }),
-    ).toBeUndefined()
+    expect(rowDetail({ ...row, runs: undefined, file: undefined })).toBeUndefined()
   })
 })
 

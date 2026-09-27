@@ -38,22 +38,13 @@
       <span style="display: inline-flex; align-items: center; gap: 5px;"><span style="width: 6px; height: 6px; border-radius: 0; background: var(--color-accent); box-shadow: 0 0 8px var(--color-accent); animation: ath-pulse 1.6s ease-in-out infinite;"></span>{{ activeCount }} active</span>
     </div>
     <div style="flex: 1;"></div>
-    <div style="{{ filterRowStyle }}">
-      <sc-for list="{{ workflowFilters }}" as="f" hint-placeholder-count="4">
-        <button type="button" onClick="{{ f.onClick }}" style="{{ f.style }}" style-hover="border-color: var(--color-accent-600); color: var(--color-accent-200);">{{ f.label }}</button>
-      </sc-for>
-    </div>
-    <div style="display: flex; align-items: center; gap: 8px; border: 1px solid var(--color-accent-800); border-radius: 0; padding: 4px 8px; background: var(--color-surface); min-width: 0; flex: 1 1 150px; max-width: 240px;">
-      <span style="color: var(--color-neutral-500);">/</span>
-      <input value="{{ query }}" onChange="{{ onQuery }}" placeholder="filter runs" style="{{ searchInput }}">
-    </div>
     <div style="display: flex; align-items: center; border: 1px solid var(--color-accent-800);">
       <button type="button" onClick="{{ uiDown }}" title="smaller text" style="{{ iconBtn }}" style-hover="color: var(--color-accent-200);">a−</button>
       <span style="color: var(--color-neutral-500); font-size: 10px; padding: 0 2px; min-width: 30px; text-align: center;">{{ uiLabel }}</span>
       <button type="button" onClick="{{ uiUp }}" title="larger text" style="{{ iconBtn }}" style-hover="color: var(--color-accent-200);">A+</button>
     </div>
     <button type="button" onClick="{{ openNewRun }}" class="btn btn-primary" style="{{ actionBtn }}" style-hover="background: color-mix(in srgb, var(--color-accent) 14%, transparent);">＋ new run</button>
-    <button type="button" onClick="{{ openLibrary }}" style="{{ ghostBtn }}" style-hover="border-color: var(--color-accent-600); color: var(--color-accent-200);">workflows</button>
+    <button type="button" onClick="{{ openLibrary }}" title="{{ libraryBtnTitle }}" style="{{ libraryBtn }}" style-hover="border-color: var(--color-accent-600); color: var(--color-accent-200);">workflows{{ libraryBtnBadge }}</button>
   </header>
 
   <div style="flex: 1; display: flex; align-items: stretch; min-height: 0;">
@@ -69,7 +60,69 @@
     <section style="{{ listStyle }}">
       <div style="{{ headRowStyle }}">
         <span></span>
-        <span style="{{ colId }}">RUN</span><span style="{{ colWf }}">WORKFLOW</span><span>TITLE</span><span>STATUS</span><span style="{{ colNode }}">NODE</span><span style="text-align: right;">AGE</span>
+        <sc-for list="{{ headCells }}" as="h" hint-placeholder-count="6">
+          <div data-hcell="1" onMouseEnter="{{ h.onEnter }}" onMouseLeave="{{ h.onLeave }}" style="{{ h.style }}">
+            <span style="{{ h.labelStyle }}">{{ h.label }}</span>
+            <sc-if value="{{ h.filterable }}" hint-placeholder-val="{{ true }}">
+              <button type="button" onClick="{{ h.onToggle }}" title="{{ h.title }}" style="{{ h.iconStyle }}" style-hover="background: var(--color-accent-800); color: var(--color-accent-100);">
+                <svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M2 3h12l-4.6 5.6V13l-2.8-1.4V8.6z"></path></svg>
+                <sc-if value="{{ h.hasBadge }}" hint-placeholder-val="{{ false }}">
+                  <span style="font-size: 9.5px; line-height: 1; letter-spacing: 0;">{{ h.badge }}</span>
+                </sc-if>
+              </button>
+            </sc-if>
+          </div>
+        </sc-for>
+        <sc-if value="{{ fpOpen }}" hint-placeholder-val="{{ false }}">
+          <div onClick="{{ closeFilter }}" style="position: fixed; inset: 0; z-index: 1;"></div>
+          <div onClick="{{ stop }}" style="{{ fpStyle }}">
+            <div style="display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-bottom: 1px solid var(--color-accent-900);">
+              <span style="color: var(--color-accent-200); font-size: 10px; letter-spacing: .12em;">{{ fp.title }}</span>
+              <div style="flex: 1;"></div>
+              <span style="color: var(--color-neutral-500); font-size: 10px;">{{ fp.mode }}</span>
+            </div>
+            <sc-if value="{{ fp.isText }}" hint-placeholder-val="{{ false }}">
+              <div style="padding: 10px;">
+                <div style="display: flex; align-items: center; gap: 8px; border: 1px solid var(--color-accent-800); background: var(--color-bg); padding: 6px 8px;">
+                  <span style="color: var(--color-accent-300);">~</span>
+                  <input value="{{ fp.text }}" onChange="{{ fp.onText }}" onKeyDown="{{ fp.onKey }}" placeholder="{{ fp.placeholder }}" autoFocus="{{ true }}" style="flex: 1; min-width: 0; background: transparent; border: 0; outline: none; color: var(--color-text); font-family: inherit; font-size: 12px;">
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ fp.isChoice }}" hint-placeholder-val="{{ false }}">
+              <div style="max-height: 260px; overflow-y: auto; padding: 4px 0;">
+                <sc-for list="{{ fp.options }}" as="o" hint-placeholder-count="5">
+                  <button type="button" onClick="{{ o.onClick }}" style="{{ o.style }}" style-hover="background: var(--color-neutral-900);">
+                    <span style="{{ o.markStyle }}">{{ o.mark }}</span>
+                    <span style="flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ o.label }}</span>
+                    <span style="color: var(--color-neutral-500); font-size: 10.5px;">{{ o.count }}</span>
+                  </button>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ fp.isDate }}" hint-placeholder-val="{{ false }}">
+              <div style="padding: 10px; display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; flex-wrap: wrap; gap: 4px;">
+                  <sc-for list="{{ fp.presets }}" as="p" hint-placeholder-count="4">
+                    <button type="button" onClick="{{ p.onClick }}" style="{{ p.style }}" style-hover="border-color: var(--color-accent-600); color: var(--color-accent-100);">{{ p.label }}</button>
+                  </sc-for>
+                </div>
+                <div style="display: grid; grid-template-columns: 38px minmax(0, 1fr); gap: 6px 8px; align-items: center;">
+                  <span style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .1em;">FROM</span>
+                  <input type="datetime-local" value="{{ fp.after }}" max="{{ fp.maxDate }}" onChange="{{ fp.onAfter }}" style="min-width: 0; background: var(--color-bg); border: 1px solid var(--color-accent-800); color: var(--color-text); font-family: inherit; font-size: 11px; padding: 5px 6px; color-scheme: dark; outline: none;">
+                  <span style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .1em;">TO</span>
+                  <input type="datetime-local" value="{{ fp.before }}" max="{{ fp.maxDate }}" onChange="{{ fp.onBefore }}" style="min-width: 0; background: var(--color-bg); border: 1px solid var(--color-accent-800); color: var(--color-text); font-family: inherit; font-size: 11px; padding: 5px 6px; color-scheme: dark; outline: none;">
+                </div>
+              </div>
+            </sc-if>
+            <div style="display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-top: 1px solid var(--color-accent-900);">
+              <span style="color: var(--color-neutral-400); font-size: 10.5px;">{{ fp.matchNote }}</span>
+              <div style="flex: 1;"></div>
+              <button type="button" onClick="{{ fp.onClear }}" style="background: transparent; border: 1px solid var(--color-neutral-800); color: var(--color-neutral-400); font-family: inherit; font-size: 10.5px; padding: 3px 8px; cursor: pointer;" style-hover="border-color: var(--color-accent-700); color: var(--color-accent-200);">clear</button>
+              <button type="button" onClick="{{ closeFilter }}" style="background: transparent; border: 1px solid var(--color-accent-600); color: var(--color-accent-200); font-family: inherit; font-size: 10.5px; padding: 3px 10px; cursor: pointer;" style-hover="background: color-mix(in srgb, var(--color-accent) 16%, transparent);">done</button>
+            </div>
+          </div>
+        </sc-if>
       </div>
       <div style="flex: 1; overflow-y: auto; overflow-x: hidden; min-height: 0;">
         <sc-for list="{{ rows }}" as="r" hint-placeholder-count="16">
@@ -80,12 +133,28 @@
             <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ r.title }}</span>
             <span style="{{ r.statusStyle }}">{{ r.status }}</span>
             <span style="{{ r.nodeStyle }}">{{ r.node }}</span>
-            <span style="{{ r.ageStyle }}">{{ r.age }}</span>
+            <span title="{{ r.created }}" style="{{ r.ageStyle }}">{{ r.age }}</span>
           </div>
         </sc-for>
+        <sc-if value="{{ noRows }}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 24px 14px; color: var(--color-neutral-400); display: flex; gap: 10px; align-items: baseline;">
+            <span>no runs match the current filters</span>
+            <button type="button" onClick="{{ clearFilters }}" style="background: transparent; border: 1px solid var(--color-accent-700); color: var(--color-accent-200); font-family: inherit; font-size: 10.5px; padding: 3px 8px; cursor: pointer;">clear</button>
+          </div>
+        </sc-if>
       </div>
-      <div style="padding: 5px 12px; border-top: 1px solid var(--color-accent-800); color: var(--color-neutral-500); font-size: 10px; display: flex; gap: 14px; background: color-mix(in srgb, var(--color-surface) 45%, var(--color-bg));">
-        <span>{{ rowCount }} shown</span>
+      <div style="padding: 5px 12px; border-top: 1px solid var(--color-accent-800); color: var(--color-neutral-500); font-size: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px; background: color-mix(in srgb, var(--color-surface) 45%, var(--color-bg));">
+        <span>{{ rowCount }} of {{ runCount }} shown</span>
+        <sc-if value="{{ hasWorkflowChips }}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; align-items: center; gap: 5px; min-width: 0;">
+            <sc-for list="{{ workflowChips }}" as="c" hint-placeholder-count="2">
+              <button type="button" onClick="{{ c.onClear }}" title="{{ c.title }}" style="{{ c.style }}" style-hover="border-color: var(--color-accent-600); color: var(--color-accent-100);">{{ c.label }}</button>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ hasFilters }}" hint-placeholder-val="{{ false }}">
+          <button type="button" onClick="{{ clearFilters }}" style="background: transparent; border: 0; padding: 0; color: var(--color-accent-300); font-family: inherit; font-size: 10px; cursor: pointer;" style-hover="color: var(--color-accent-100);">× clear {{ filterCount }} filter(s)</button>
+        </sc-if>
         <span>↑↓ select</span>
         <span>⏎ focus detail</span>
       </div>
@@ -444,22 +513,32 @@
           <div style="flex: 1;"></div>
           <span style="color: var(--color-neutral-500); font-size: 10px;">esc close</span>
         </div>
-        <div style="flex: 1; display: grid; grid-template-columns: 230px minmax(0, 1fr); min-height: 0;">
+        <div style="flex: 1; display: grid; grid-template-columns: {{ libraryGrid }}; min-height: 0;">
           <div style="border-right: 1px solid var(--color-neutral-900); overflow: auto;">
             <sc-for list="{{ libraryList }}" as="w" hint-placeholder-count="6">
-              <div onClick="{{ w.onClick }}" style="{{ w.style }}" style-hover="background: var(--color-neutral-900);">
+              <div onClick="{{ w.onSelect }}" style="{{ w.style }}" style-hover="background: var(--color-neutral-900);">
                 <div style="display: flex; align-items: baseline; gap: 8px;">
-                  <span style="color: var(--color-neutral-300);">{{ w.name }}</span>
+                  <button type="button" onClick="{{ w.onToggle }}" title="{{ w.toggleTitle }}" style="{{ w.markStyle }}" style-hover="border-color: var(--color-accent-600); color: var(--color-accent-100);">{{ w.mark }}</button>
+                  <span style="{{ w.nameStyle }}">{{ w.name }}</span>
                   <span style="color: var(--color-neutral-500); font-size: 10px;">{{ w.nodes }} nodes</span>
                 </div>
-                <div style="color: var(--color-neutral-500); font-size: 10px; margin-top: 2px;">{{ w.runs }} runs · {{ w.file }}</div>
+                <div style="{{ w.metaStyle }}">{{ w.runs }} runs · {{ w.file }}</div>
               </div>
             </sc-for>
           </div>
-          <div style="overflow: auto; padding: 12px 14px;">
-            <div style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .14em; margin-bottom: 8px;">{{ libraryFile }}</div>
-            <pre style="margin: 0; color: var(--color-neutral-300); font-family: inherit; font-size: 11px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere;">{{ librarySource }}</pre>
-          </div>
+          <sc-if value="{{ librarySourceVisible }}" hint-placeholder-val="{{ true }}">
+            <div style="overflow: auto; padding: 12px 14px;">
+              <div style="color: var(--color-neutral-500); font-size: 10px; letter-spacing: .14em; margin-bottom: 8px;">{{ libraryFile }}</div>
+              <pre style="margin: 0; color: var(--color-neutral-300); font-family: inherit; font-size: 11px; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere;">{{ librarySource }}</pre>
+            </div>
+          </sc-if>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; padding: 6px 14px; border-top: 1px solid var(--color-accent-900); color: var(--color-neutral-500); font-size: 10px;">
+          <span>{{ libraryNote }}</span>
+          <div style="flex: 1;"></div>
+          <sc-if value="{{ libraryFiltered }}" hint-placeholder-val="{{ false }}">
+            <button type="button" onClick="{{ clearWorkflowFilter }}" style="{{ libraryClearBtn }}" style-hover="border-color: var(--color-accent-600); color: var(--color-accent-100);">× clear workflow filter</button>
+          </sc-if>
         </div>
       </div>
     </div>
@@ -524,6 +603,30 @@ const RUNS = [
 ];
 
 const PANES = ['overview', 'log', 'agent', 'graph', 'messages'];
+
+const NOW = new Date('2026-09-26T12:00:00').getTime();
+const ageMs = a => { const m = /^([\d.]+)([mhd])$/.exec(a || ''); return m ? parseFloat(m[1]) * { m: 6e4, h: 36e5, d: 864e5 }[m[2]] : 0; };
+const createdAt = r => NOW - ageMs(r.age);
+const pad = n => String(n).padStart(2, '0');
+const fmtLocal = ms => { const d = new Date(ms); return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()); };
+// One descriptor per column: the label the header draws, the predicate visible()
+// applies, and the grid track it occupies (w wide / wNarrow narrow, null = hidden).
+// Deriving the track list from these is what keeps the header, the row <span>s and
+// grid-template-columns from drifting apart when the column set changes.
+const COL_ID     = { key: 'id',       label: 'RUN',      type: 'text',   placeholder: 'e.g. a4c8',       w: 'minmax(0, 108px)',   wNarrow: null };
+const COL_WF     = { key: 'workflow', label: 'WORKFLOW', type: 'choice', inLibrary: true,                w: 'minmax(0, 104px)',   wNarrow: null };
+const COL_TITLE  = { key: 'title',    label: 'TITLE',    type: 'text',   placeholder: 'e.g. permission', w: 'minmax(110px, 1fr)', wNarrow: 'minmax(110px, 1fr)' };
+const COL_STATUS = { key: 'status',   label: 'STATUS',   type: 'choice',                                 w: 'minmax(0, 84px)',    wNarrow: 'minmax(0, 76px)' };
+const COL_NODE   = { key: 'node',     label: 'NODE',     type: 'choice',                                 w: 'minmax(0, 92px)',    wNarrow: null };
+const COL_AGE    = { key: 'age',      label: 'AGE',      type: 'date',   align: 'right',                 w: '46px',               wNarrow: '44px' };
+
+// grid order: what the header labels, what the rows line up against
+const COLS = [COL_ID, COL_WF, COL_TITLE, COL_STATUS, COL_NODE, COL_AGE];
+// the subset the header still offers a funnel for — WORKFLOW moved to the library
+const FILTER_COLS = COLS.filter(c => !c.inLibrary);
+const hideNarrow = c => c.wNarrow == null;
+const gridCols = narrow => '12px ' + COLS.map(c => (narrow ? c.wNarrow : c.w)).filter(Boolean).join(' ');
+const EMPTY_FILTERS = { id: '', workflow: [], title: '', status: [], node: [], after: '', before: '' };
 
 const PLUGINS = {
   feature_build: [
@@ -612,12 +715,12 @@ const MESSAGES = [
 ];
 
 const LIBRARY = {
-  feature_build: { nodes: 8, runs: 12, file: 'workflows/feature_build.py', src: 'from athanore import Workflow, node, gate\n\nwf = Workflow("feature_build", priority=8)\n\n@wf.node(entry=True)\ndef prompt(ctx):\n    return ctx.expand(ctx.run.description)\n\n@wf.node(after="prompt")\ndef product(ctx):\n    return ctx.agent("product", acceptance_criteria=True)\n\n@wf.node(after="product")\ndef architecture(ctx):\n    return ctx.agent("architecture")\n\n@wf.node(after="architecture", retries=3)\ndef engineering(ctx):\n    return ctx.acp("claude", cwd=ctx.workspace)\n\n@wf.node(after="engineering")\ndef review(ctx):\n    if finding := ctx.agent("review").finding:\n        return ctx.loop_to("engineering", finding)\n\n@wf.node(after="review")\ndef qa(ctx):\n    if not ctx.tests().passed:\n        return ctx.loop_to("engineering", ctx.tests().report)\n\n@wf.node(after="qa")\ndef gate(ctx):\n    return gate.human(ctx, message="ready to merge?")\n\n@wf.node(after="gate")\ndef git(ctx):\n    ctx.commit(); ctx.push()' },
-  gamedev: { nodes: 5, runs: 9, file: 'workflows/gamedev.py', src: 'from athanore import Workflow\n\nwf = Workflow("gamedev", priority=5)\n\n@wf.node(entry=True)\ndef design(ctx):\n    return ctx.agent("game_design")\n\n@wf.node(after="design")\ndef build(ctx):\n    return ctx.acp("claude", cwd=ctx.workspace)\n\n@wf.node(after="build", retries=2)\ndef playtest(ctx):\n    if not ctx.tests("playtest").passed:\n        return ctx.loop_to("build", ctx.tests("playtest").report)\n\n@wf.node(after="playtest")\ndef polish(ctx):\n    return ctx.acp("claude", prompt="juice and balance")\n\n@wf.node(after="polish")\ndef ship(ctx):\n    ctx.commit(); ctx.publish("itch")' },
-  claude_acp: { nodes: 2, runs: 5, file: 'workflows/claude_acp.py', src: 'from athanore import Workflow\n\nwf = Workflow("claude_acp", priority=6)\n\n@wf.node(entry=True)\ndef agent(ctx):\n    return ctx.acp("claude", cwd=ctx.workspace, permission="ask")\n\n@wf.node(after="agent")\ndef verify(ctx):\n    return ctx.tests()' },
-  docker_acp: { nodes: 3, runs: 6, file: 'workflows/docker_acp.py', src: 'from athanore import Workflow, sandbox\n\nwf = Workflow("docker_acp", priority=4)\n\n@wf.node(entry=True)\n@sandbox(image="athanore/agent:py312")\ndef agent(ctx):\n    return ctx.acp("claude", cwd="/work")\n\n@wf.node(after="agent")\ndef tests(ctx):\n    return ctx.shell("uv run pytest -q")\n\n@wf.node(after="tests")\ndef collect(ctx):\n    ctx.artifacts("/work/dist")' },
-  projects: { nodes: 3, runs: 2, file: 'workflows/projects.py', src: 'from athanore import Workflow, projects\n\nwf = Workflow("projects", priority=7)\n\n@wf.node(entry=True)\ndef resolve(ctx):\n    return projects.checkout(ctx.run.params["project"])\n\n@wf.node(after="resolve")\ndef agent(ctx):\n    return ctx.acp("claude", cwd=ctx.workspace)\n\n@wf.node(after="agent")\ndef pr(ctx):\n    ctx.open_pr(title=ctx.run.title)' },
-  msgtest: { nodes: 2, runs: 1, file: 'workflows/msgtest.py', src: 'from athanore import Workflow\n\nwf = Workflow("msgtest", priority=1)\n\n@wf.node(entry=True)\ndef send(ctx):\n    ctx.message("receive", "ping")\n\n@wf.node(after="send")\ndef receive(ctx):\n    assert ctx.inbox()[0].body == "ping"' }
+  feature_build: { nodes: 8, file: 'workflows/feature_build.py', src: 'from athanore import Workflow, node, gate\n\nwf = Workflow("feature_build", priority=8)\n\n@wf.node(entry=True)\ndef prompt(ctx):\n    return ctx.expand(ctx.run.description)\n\n@wf.node(after="prompt")\ndef product(ctx):\n    return ctx.agent("product", acceptance_criteria=True)\n\n@wf.node(after="product")\ndef architecture(ctx):\n    return ctx.agent("architecture")\n\n@wf.node(after="architecture", retries=3)\ndef engineering(ctx):\n    return ctx.acp("claude", cwd=ctx.workspace)\n\n@wf.node(after="engineering")\ndef review(ctx):\n    if finding := ctx.agent("review").finding:\n        return ctx.loop_to("engineering", finding)\n\n@wf.node(after="review")\ndef qa(ctx):\n    if not ctx.tests().passed:\n        return ctx.loop_to("engineering", ctx.tests().report)\n\n@wf.node(after="qa")\ndef gate(ctx):\n    return gate.human(ctx, message="ready to merge?")\n\n@wf.node(after="gate")\ndef git(ctx):\n    ctx.commit(); ctx.push()' },
+  gamedev: { nodes: 5, file: 'workflows/gamedev.py', src: 'from athanore import Workflow\n\nwf = Workflow("gamedev", priority=5)\n\n@wf.node(entry=True)\ndef design(ctx):\n    return ctx.agent("game_design")\n\n@wf.node(after="design")\ndef build(ctx):\n    return ctx.acp("claude", cwd=ctx.workspace)\n\n@wf.node(after="build", retries=2)\ndef playtest(ctx):\n    if not ctx.tests("playtest").passed:\n        return ctx.loop_to("build", ctx.tests("playtest").report)\n\n@wf.node(after="playtest")\ndef polish(ctx):\n    return ctx.acp("claude", prompt="juice and balance")\n\n@wf.node(after="polish")\ndef ship(ctx):\n    ctx.commit(); ctx.publish("itch")' },
+  claude_acp: { nodes: 2, file: 'workflows/claude_acp.py', src: 'from athanore import Workflow\n\nwf = Workflow("claude_acp", priority=6)\n\n@wf.node(entry=True)\ndef agent(ctx):\n    return ctx.acp("claude", cwd=ctx.workspace, permission="ask")\n\n@wf.node(after="agent")\ndef verify(ctx):\n    return ctx.tests()' },
+  docker_acp: { nodes: 3, file: 'workflows/docker_acp.py', src: 'from athanore import Workflow, sandbox\n\nwf = Workflow("docker_acp", priority=4)\n\n@wf.node(entry=True)\n@sandbox(image="athanore/agent:py312")\ndef agent(ctx):\n    return ctx.acp("claude", cwd="/work")\n\n@wf.node(after="agent")\ndef tests(ctx):\n    return ctx.shell("uv run pytest -q")\n\n@wf.node(after="tests")\ndef collect(ctx):\n    ctx.artifacts("/work/dist")' },
+  projects: { nodes: 3, file: 'workflows/projects.py', src: 'from athanore import Workflow, projects\n\nwf = Workflow("projects", priority=7)\n\n@wf.node(entry=True)\ndef resolve(ctx):\n    return projects.checkout(ctx.run.params["project"])\n\n@wf.node(after="resolve")\ndef agent(ctx):\n    return ctx.acp("claude", cwd=ctx.workspace)\n\n@wf.node(after="agent")\ndef pr(ctx):\n    ctx.open_pr(title=ctx.run.title)' },
+  msgtest: { nodes: 2, file: 'workflows/msgtest.py', src: 'from athanore import Workflow\n\nwf = Workflow("msgtest", priority=1)\n\n@wf.node(entry=True)\ndef send(ctx):\n    ctx.message("receive", "ping")\n\n@wf.node(after="send")\ndef receive(ctx):\n    assert ctx.inbox()[0].body == "ping"' }
 };
 
 const COMMANDS = [
@@ -641,8 +744,10 @@ class Component extends DCLogic {
   state = {
     selected: 'a4c81f20b91e',
     pane: 0,
-    query: '',
-    wf: 'all',
+    filters: EMPTY_FILTERS,
+    openFilter: null,
+    hoverCol: null,
+    filterLeft: 0,
     extra: [],
     overlay: null,
     paletteQuery: '',
@@ -748,9 +853,13 @@ class Component extends DCLogic {
       });
     }, 2600);
     this._keys = (e) => {
-      if (e.key === 'Escape') return this.setState({ overlay: null });
+      if (e.key === 'Escape') return this.setState({ overlay: null, openFilter: null });
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') { e.preventDefault(); return this.setState({ overlay: 'palette' }); }
       if (e.target && /input|textarea/i.test(e.target.tagName)) return;
+      // Escape and ^p stay above this gate; everything else must not fire through
+      // an open overlay — the library is now a place people dwell while reading
+      // faceted run counts, and j/k/b/n would move the list behind it.
+      if (this.state.overlay) return;
       const k = e.key;
       if (k === 'ArrowRight') { e.preventDefault(); return this.cycle(1); }
       if (k === 'ArrowLeft') { e.preventDefault(); return this.cycle(-1); }
@@ -787,12 +896,34 @@ class Component extends DCLogic {
     this.setState(s => ({ pane: (s.pane + d + n) % n }));
   }
 
-  visible() {
-    const q = this.state.query.trim().toLowerCase();
-    return RUNS.filter(r =>
-      (this.state.wf === 'all' || r.workflow === this.state.wf) &&
-      (!q || (r.title + ' ' + r.id + ' ' + r.workflow + ' ' + r.status).toLowerCase().includes(q))
-    );
+  // except: skip one column's filter, so an open dropdown can show faceted counts
+  visible(except) {
+    const f = this.state.filters;
+    return RUNS.filter(r => {
+      // every column's predicate, including WORKFLOW — the header no longer offers
+      // that funnel but the library sidebar still writes filters.workflow
+      for (const c of COLS) {
+        if (c.key === except) continue;
+        if (c.type === 'text') {
+          const q = f[c.key].trim().toLowerCase();
+          if (q && !String(r[c.key]).toLowerCase().includes(q)) return false;
+        } else if (c.type === 'choice') {
+          if (f[c.key].length && !f[c.key].includes(r[c.key])) return false;
+        } else {
+          const t = createdAt(r);
+          if (f.after && t < Date.parse(f.after)) return false;
+          if (f.before && t > Date.parse(f.before)) return false;
+        }
+      }
+      return true;
+    });
+  }
+
+  setFilter(patch) { this.setState(s => ({ filters: Object.assign({}, s.filters, patch) })); }
+
+  filterActive(c) {
+    const f = this.state.filters;
+    return c.type === 'text' ? !!f[c.key].trim() : c.type === 'choice' ? f[c.key].length > 0 : !!(f.after || f.before);
   }
 
   move(d) {
@@ -824,6 +955,174 @@ class Component extends DCLogic {
     return st === 'running' ? base + ' animation: ath-pulse 1.8s ease-in-out infinite;' : base;
   }
 
+  filterVals(narrow, list) {
+    const st = this.state, f = st.filters;
+    // FILTER_COLS excludes the in-library columns, so a stale openFilter: 'workflow'
+    // renders as "no popover open" rather than reopening the removed dropdown
+    const openCol = FILTER_COLS.find(c => c.key === st.openFilter && !(narrow && hideNarrow(c)));
+    const facet = openCol ? this.visible(openCol.key) : [];
+    // counts every column, so "× clear N filter(s)" includes the library selection
+    const activeCount = COLS.filter(c => this.filterActive(c)).length;
+    const clearCol = c => this.setFilter(c.type === 'text' ? { [c.key]: '' } : c.type === 'choice' ? { [c.key]: [] } : { after: '', before: '' });
+    let fp = {};
+    if (openCol) {
+      const k = openCol.key;
+      fp = {
+        title: '┤ FILTER · ' + openCol.label + ' ├',
+        mode: { text: 'contains', choice: 'any of', date: 'created between' }[openCol.type],
+        isText: openCol.type === 'text', isChoice: openCol.type === 'choice', isDate: openCol.type === 'date',
+        matchNote: list.length + ' / ' + RUNS.length + ' runs',
+        onClear: () => clearCol(openCol)
+      };
+      if (fp.isText) Object.assign(fp, {
+        text: f[k], placeholder: openCol.placeholder,
+        onText: e => this.setFilter({ [k]: e.target.value }),
+        onKey: e => { if (e.key === 'Enter' || e.key === 'Escape') this.setState({ openFilter: null }); }
+      });
+      if (fp.isChoice) {
+        const values = [...new Set(RUNS.map(r => r[k]))].sort((a, b) => (a === '-') - (b === '-') || a.localeCompare(b));
+        fp.options = values.map(v => {
+          const on = f[k].includes(v);
+          const count = facet.filter(r => r[k] === v).length;
+          return {
+            label: v === '-' ? '(none)' : v, count: String(count), mark: on ? '[x]' : '[ ]',
+            markStyle: 'flex: none; color: var(--color-accent-' + (on ? '200' : '500') + ');',
+            style: 'display: flex; align-items: center; gap: 8px; width: 100%; box-sizing: border-box; padding: ' + (narrow ? '12px 10px' : '5px 10px') + '; border: 0; background: ' + (on ? 'color-mix(in srgb, var(--color-accent) 12%, transparent)' : 'transparent') + '; color: var(--color-neutral-' + (count ? '300' : '500') + '); font-family: inherit; font-size: 11.5px; text-align: left; cursor: pointer;',
+            onClick: () => this.setFilter({ [k]: on ? f[k].filter(x => x !== v) : f[k].concat([v]) })
+          };
+        });
+      }
+      if (fp.isDate) Object.assign(fp, {
+        after: f.after, before: f.before, maxDate: fmtLocal(NOW),
+        onAfter: e => this.setFilter({ after: e.target.value }),
+        onBefore: e => this.setFilter({ before: e.target.value }),
+        presets: [['1h', 36e5], ['24h', 864e5], ['7d', 7 * 864e5], ['30d', 30 * 864e5]].map(([l, ms]) => {
+          const on = !f.before && f.after === fmtLocal(NOW - ms);
+          return {
+            label: 'last ' + l,
+            onClick: () => this.setFilter({ after: fmtLocal(NOW - ms), before: '' }),
+            style: 'font-family: inherit; font-size: 10.5px; padding: ' + (narrow ? '10px 10px' : '3px 8px') + '; cursor: pointer; background: ' + (on ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent') + '; color: var(--color-accent-' + (on ? '100' : '300') + '); border: 1px solid var(--color-accent-' + (on ? '600' : '800') + ');'
+          };
+        })
+      });
+    }
+    return {
+      headCells: COLS.map(c => {
+        const active = this.filterActive(c), open = st.openFilter === c.key;
+        const show = active || open || narrow || st.hoverCol === c.key;
+        const sz = narrow ? '32px' : '18px';
+        const right = c.align === 'right';
+        const cellStyle = narrow && hideNarrow(c) ? 'display: none;' : 'position: relative; display: flex; align-items: center; min-width: 0; padding: 3px 0; min-height: ' + (narrow ? '44px' : '24px') + ';' + (right ? ' justify-content: flex-end;' : '');
+        const labelStyle = 'overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--color-accent-' + (active ? '100' : '300') + ');' + (active ? ' text-decoration: underline; text-decoration-color: var(--color-accent-500); text-underline-offset: 3px;' : '');
+        // an in-library column is a bare label: no funnel, no popover, but it still
+        // underlines when the library selection is active, and it still shares hover
+        if (c.inLibrary) return {
+          label: c.label, filterable: false, hasBadge: false,
+          style: cellStyle, labelStyle,
+          onEnter: () => this.setState({ hoverCol: c.key }),
+          onLeave: () => this.setState(s => s.hoverCol === c.key ? { hoverCol: null } : null)
+        };
+        return {
+          label: c.label,
+          filterable: true,
+          hasBadge: c.type === 'choice' && active,
+          badge: c.type === 'choice' ? String(f[c.key].length) : '',
+          title: 'filter ' + c.label.toLowerCase(),
+          style: cellStyle,
+          labelStyle,
+          iconStyle: 'position: absolute; top: 50%; transform: translateY(-50%); ' + (right ? 'left: 0;' : 'right: 0;') + ' display: inline-flex; align-items: center; justify-content: center; gap: 3px; min-width: ' + sz + '; height: ' + sz + '; box-sizing: border-box; padding: 0 3px; cursor: pointer; font-family: inherit; border: 1px solid ' + (open || active ? 'var(--color-accent-600)' : 'var(--color-accent-800)') + '; background: ' + (active || open ? 'var(--color-accent-900)' : 'var(--color-neutral-900)') + '; color: var(--color-accent-' + (active ? '100' : '300') + '); opacity: ' + (show ? 1 : 0) + '; pointer-events: ' + (show ? 'auto' : 'none') + '; transition: opacity .12s;',
+          onEnter: () => this.setState({ hoverCol: c.key }),
+          onLeave: () => this.setState(s => s.hoverCol === c.key ? { hoverCol: null } : null),
+          onToggle: e => {
+            e.stopPropagation();
+            const cell = e.currentTarget.closest('[data-hcell]') || e.currentTarget.parentElement, row = cell.parentElement;
+            const left = Math.max(12, Math.min(cell.offsetLeft, row.clientWidth - 268));
+            this.setState(s => ({ openFilter: s.openFilter === c.key ? null : c.key, filterLeft: left }));
+          }
+        };
+      }),
+      fpOpen: !!openCol,
+      fp,
+      fpStyle: 'position: absolute; top: calc(100% + 3px); left: ' + st.filterLeft + 'px; width: 256px; max-width: calc(100% - 24px); z-index: 2; background: var(--color-surface); border: 1px solid var(--color-accent-700); box-shadow: var(--shadow-lg); color: var(--color-neutral-300); font-size: 11.5px; letter-spacing: normal;',
+      closeFilter: () => this.setState({ openFilter: null }),
+      hasFilters: activeCount > 0,
+      filterCount: activeCount,
+      noRows: list.length === 0,
+      clearFilters: () => this.setState({ filters: EMPTY_FILTERS, openFilter: null })
+    };
+  }
+
+  // The library sidebar *is* the workflow filter: its marks read and write
+  // filters.workflow — the same array the removed header dropdown wrote — so
+  // clearFilters, the active-filter count and the empty state all keep working.
+  libraryVals(list, narrow, ghostBtn) {
+    const st = this.state, sel = st.filters.workflow;
+    const open = st.overlay === 'library';
+    // Faceted exactly like the old dropdown: every other filter applied, the
+    // workflow filter excluded ("how many would I get if I picked this?").
+    // Only paid while the modal is up, so a closed library costs what it did
+    // before this change — do not simplify the guard away.
+    const facet = open ? this.visible('workflow') : null;
+    // The union of registered workflows and workflow names present in RUNS: an
+    // unregistered workflow's runs must not become permanently unfilterable.
+    const names = open
+      ? [...new Set(Object.keys(LIBRARY).concat(RUNS.map(r => r.workflow)))].sort((a, b) => a.localeCompare(b))
+      : [];
+    // libSel is only ever written for a registered workflow, but an unguarded
+    // LIBRARY[st.libSel] throws, and a throw in renderVals blanks the whole UI.
+    const def = LIBRARY[st.libSel] || LIBRARY[Object.keys(LIBRARY)[0]];
+    const chip = 'font-family: inherit; font-size: 10px; padding: ' + (narrow ? '4px 8px' : '1px 6px') + '; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; background: var(--color-accent-900); border: 1px solid var(--color-accent-800); color: var(--color-accent-200);';
+    return {
+      libraryList: names.map(name => {
+        const wf = LIBRARY[name];
+        const on = sel.includes(name);
+        const count = facet ? facet.filter(r => r.workflow === name).length : 0;
+        const dim = count === 0;
+        return {
+          name,
+          nodes: wf ? String(wf.nodes) : '—',
+          file: wf ? wf.file : 'unregistered',
+          runs: String(count),
+          mark: on ? '[x]' : '[ ]',
+          toggleTitle: (on ? 'stop filtering runs by ' : 'filter runs by ') + name,
+          markStyle: 'flex: none; display: inline-flex; align-items: center; justify-content: center; font-family: inherit; font-size: 11px; line-height: 1; padding: 0 2px; cursor: pointer; min-height: ' + (narrow ? '44px' : '18px') + '; min-width: ' + (narrow ? '44px' : '26px') + '; border: 1px solid var(--color-accent-' + (on ? '600' : '800') + '); color: var(--color-accent-' + (on ? '100' : '300') + '); background: ' + (on ? 'var(--color-accent-900)' : 'transparent') + ';',
+          nameStyle: 'color: var(--color-' + (dim ? 'neutral-500' : on ? 'accent-200' : 'neutral-300') + ');',
+          metaStyle: 'color: var(--color-neutral-' + (dim ? '600' : '500') + '); font-size: 10px; margin-top: 2px;',
+          // the transparent border keeps the row from shifting 2px when toggled
+          style: 'padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--color-accent-900); border-left: 2px solid ' + (on ? 'var(--color-accent)' : 'transparent') + '; background: ' + (st.libSel === name ? 'var(--color-neutral-900)' : 'transparent') + ';',
+          // stopPropagation is load-bearing: the mark is a button inside the row's
+          // onClick, so without it every toggle also retargets the source pane
+          onToggle: e => { e.stopPropagation(); this.setFilter({ workflow: on ? sel.filter(x => x !== name) : sel.concat([name]) }); },
+          onSelect: () => { if (LIBRARY[name]) this.setState({ libSel: name }); }
+        };
+      }),
+      // below 760px the WORKFLOW column is hidden, so the modal is the only route
+      // to a workflow filter — it gets the full width and drops the source pane
+      libraryGrid: narrow ? 'minmax(0, 1fr)' : '230px minmax(0, 1fr)',
+      librarySourceVisible: !narrow,
+      libraryNote: list.length + ' of ' + RUNS.length + ' runs shown'
+        + (sel.length ? ' · ' + sel.length + ' workflow' + (sel.length > 1 ? 's' : '') + ' selected' : ''),
+      libraryFiltered: sel.length > 0,
+      libraryClearBtn: 'font-family: inherit; font-size: 10px; padding: ' + (narrow ? '8px 10px' : '2px 8px') + '; cursor: pointer; background: transparent; border: 1px solid var(--color-neutral-800); color: var(--color-neutral-400);',
+      clearWorkflowFilter: () => this.setFilter({ workflow: [] }),
+      // the filter has to be visible and clearable without opening the modal
+      hasWorkflowChips: sel.length > 0,
+      workflowChips: sel.map(name => ({
+        label: name + ' ×',
+        title: 'remove ' + name + ' from the filter',
+        onClear: () => this.setFilter({ workflow: sel.filter(x => x !== name) }),
+        style: chip
+      })),
+      libraryBtn: ghostBtn + (sel.length ? ' border-color: var(--color-accent-600); color: var(--color-accent-200);' : ''),
+      libraryBtnBadge: sel.length ? ' · ' + sel.length : '',
+      libraryBtnTitle: sel.length
+        ? sel.length + ' workflow filter(s) active — click to change (w)'
+        : 'workflow library (w)',
+      libraryFile: def.file,
+      librarySource: def.src
+    };
+  }
+
   renderVals() {
     const st = this.state;
     const list = this.visible();
@@ -834,15 +1133,16 @@ class Component extends DCLogic {
     this.ensureWidthWatch();
     // vw stays 0 until the first tick — treat unmeasured as wide so desktop never flashes mobile
     const narrow = st.vw > 0 && st.vw < 760;
-    const cols = narrow
-      ? '12px minmax(110px, 1fr) minmax(0, 76px) 44px'
-      : '12px minmax(0, 108px) minmax(0, 104px) minmax(110px, 1fr) minmax(0, 84px) minmax(0, 92px) 46px';
+    const cols = gridCols(narrow);
     const rowBase = 'display: grid; grid-template-columns: ' + cols + '; gap: 8px; padding: ' + (narrow ? '14px 12px' : '3px 12px') + '; cursor: pointer; align-items: center; font-size: 11.5px; color: var(--color-neutral-300); overflow: hidden;';
     // 44px minimum touch targets once the layout goes single-pane
     const tap = narrow ? 'min-height: 44px; display: inline-flex; align-items: center; justify-content: center; ' : '';
     const tapSq = narrow ? tap + 'min-width: 44px; ' : '';
     const hide = 'display: none;';
     const cell = 'overflow: hidden; text-overflow: ellipsis; white-space: nowrap; ';
+    // hoisted out of the returned literal so libraryVals can build the badged
+    // variant from it without mutating the shared style
+    const ghostBtn = tap + 'font-family: inherit; font-size: 11px; padding: ' + (narrow ? '0 14px' : '4px 10px') + '; background: transparent; color: var(--color-neutral-400); border: 1px solid var(--color-accent-800); border-radius: 0; cursor: pointer;';
 
     const raw = LOG_SEED.concat(sel.id === 'a4c81f20b91e' ? st.extra.map((l, i) => ['03:' + (44 + i * 3) + '.2', l[0], l[1], l[2]]) : []);
     const logLines = raw.map(([t, src, msg, tone]) => ({
@@ -859,26 +1159,17 @@ class Component extends DCLogic {
       runCount: RUNS.length,
       activeCount: 1,
       rowCount: list.length,
-      query: st.query,
-      onQuery: e => this.setState({ query: e.target.value }),
       openNewRun: () => this.setState({ overlay: 'new' }),
       openLibrary: () => this.setState({ overlay: 'library' }),
       openPalette: () => this.setState({ overlay: 'palette' }),
       closeOverlay: () => this.setState({ overlay: null }),
       stop: e => e.stopPropagation(),
 
-      workflowFilters: ['all', 'feature_build', 'gamedev', 'claude_acp', 'docker_acp', 'projects'].map(w => ({
-        label: w,
-        onClick: () => this.setState({ wf: w }),
-        style: tap + 'font-family: inherit; font-size: 10.5px; padding: ' + (narrow ? '0 12px' : '3px 8px') + '; border-radius: 0; cursor: pointer; white-space: nowrap; background: ' +
-          (st.wf === w ? 'color-mix(in srgb, var(--color-accent) 16%, transparent)' : 'transparent') +
-          '; color: ' + (st.wf === w ? 'var(--color-accent-200)' : 'var(--color-neutral-500)') +
-          '; border: 1px solid ' + (st.wf === w ? 'var(--color-accent-600)' : 'var(--color-neutral-800)') + ';'
-      })),
 
       rows: list.map(r => ({
         id: r.id, workflow: r.workflow, title: r.title, status: r.status, node: r.node, age: r.age,
         cursor: r.id === st.selected ? '>' : ' ',
+        created: 'created ' + fmtLocal(createdAt(r)).replace('T', ' '),
         // muted greys are tuned for the transparent row ground; the lifted selected row needs accent light steps
         idStyle: narrow ? hide : cell + 'color: var(--color-' + (r.id === st.selected ? 'accent-200' : 'neutral-500') + ');',
         wfStyle: narrow ? hide : cell + 'color: var(--color-accent-' + (r.id === st.selected ? '100' : '2-400') + ');',
@@ -913,14 +1204,15 @@ class Component extends DCLogic {
         }))
       } : null,
 
-      headRowStyle: 'display: grid; grid-template-columns: ' + cols + '; gap: 8px; padding: 6px 12px; border-bottom: 1px solid var(--color-accent-800); color: var(--color-accent-300); font-size: 10px; letter-spacing: .1em; background: color-mix(in srgb, var(--color-surface) 45%, var(--color-bg)); overflow: hidden;',
+      headRowStyle: 'position: relative; z-index: 20; display: grid; grid-template-columns: ' + cols + '; gap: 8px; padding: 0 12px; border-bottom: 1px solid var(--color-accent-800); color: var(--color-accent-300); font-size: 10px; letter-spacing: .1em; background: color-mix(in srgb, var(--color-surface) 45%, var(--color-bg));',
       colId: narrow ? hide : '',
       colWf: narrow ? hide : '',
       colNode: narrow ? hide : '',
+      ...this.filterVals(narrow, list),
 
       iconBtn: tapSq + 'background: transparent; border: 0; color: var(--color-neutral-400); cursor: pointer; font-family: inherit; font-size: 11px; padding: ' + (narrow ? '0 10px' : '4px 7px') + ';',
       actionBtn: tap + 'font-family: inherit; font-size: 11px; padding: ' + (narrow ? '0 14px' : '4px 10px') + ';',
-      ghostBtn: tap + 'font-family: inherit; font-size: 11px; padding: ' + (narrow ? '0 14px' : '4px 10px') + '; background: transparent; color: var(--color-neutral-400); border: 1px solid var(--color-accent-800); border-radius: 0; cursor: pointer;',
+      ghostBtn,
       searchInput: 'background: transparent; border: 0; outline: none; color: var(--color-text); font-family: inherit; font-size: 11px; width: 100%; ' + (narrow ? 'min-height: 40px;' : ''),
       arrowBtn: tapSq + 'background: transparent; border: 0; color: var(--color-accent-400); cursor: pointer; font-family: inherit; font-size: 12px; padding: 0 4px;',
       backBtn: tap + 'background: transparent; border: 1px solid var(--color-accent-800); color: var(--color-accent-200); cursor: pointer; font-family: inherit; font-size: 10px; padding: ' + (narrow ? '0 12px' : '3px 8px') + '; margin-right: 2px;',
@@ -1053,15 +1345,9 @@ class Component extends DCLogic {
       onNewTitle: e => this.setState({ newTitle: e.target.value }),
       onNewDesc: e => this.setState({ newDesc: e.target.value }),
       onNewPriority: e => this.setState({ newPriority: Number(e.target.value) }),
-      submitNewRun: () => this.setState({ overlay: null, wf: 'all', query: '' }),
+      submitNewRun: () => this.setState({ overlay: null }),
 
-      libraryList: Object.keys(LIBRARY).map(name => ({
-        name, nodes: LIBRARY[name].nodes, runs: LIBRARY[name].runs, file: LIBRARY[name].file,
-        onClick: () => this.setState({ libSel: name }),
-        style: 'padding: 8px 12px; cursor: pointer; border-bottom: 1px solid var(--color-accent-900); background: ' + (st.libSel === name ? 'var(--color-neutral-900)' : 'transparent') + ';'
-      })),
-      libraryFile: LIBRARY[st.libSel].file,
-      librarySource: LIBRARY[st.libSel].src
+      ...this.libraryVals(list, narrow, ghostBtn)
     };
   }
 }

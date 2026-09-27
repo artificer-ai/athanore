@@ -27,6 +27,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { createAppQueryClient } from '../../api/client'
 import type { RunSummary, SourceOut, WorkflowOut } from '../../api/gen/types.gen'
+import { EMPTY_RUN_FILTER, useUi } from '../../store/ui'
 import { Library, LIBRARY_GLOSS, LIBRARY_TITLE } from '../Library'
 
 const { tokenize } = vi.hoisted(() => ({
@@ -255,6 +256,7 @@ beforeEach(() => {
   ) {
     scrolled.push(this)
   })
+  useUi.setState({ runFilter: EMPTY_RUN_FILTER })
   stubServer()
 })
 
@@ -263,6 +265,22 @@ afterEach(() => {
   vi.restoreAllMocks()
   tokenize.mockReset()
 })
+
+/** A row's own button: the one that picks what the viewer shows. */
+function pick(workflow: string): HTMLElement {
+  const row = screen
+    .getByRole('list', { name: 'workflows' })
+    .querySelector<HTMLElement>(`[data-workflow="${workflow}"]`)
+  if (row === null) throw new Error(`no row for ${workflow}`)
+  const button = row.querySelector<HTMLElement>('button[aria-current]')
+  if (button === null) throw new Error(`no picker on ${workflow}`)
+  return button
+}
+
+/** A row's mark: the button that adds its workflow to the run filter. */
+function mark(workflow: string): HTMLElement {
+  return screen.getByRole('button', { name: `filter runs by ${workflow}` })
+}
 
 describe('Library', () => {
   it('is the mock’s panel: the header, the list and the viewer', async () => {
@@ -275,8 +293,8 @@ describe('Library', () => {
     // make: reload is a restart (D35).
     expect(panel.textContent).not.toContain('hot-reloaded')
 
-    const rows = within(screen.getByRole('listbox', { name: 'workflows' })).getAllByRole(
-      'option',
+    const rows = within(screen.getByRole('list', { name: 'workflows' })).getAllByRole(
+      'listitem',
     )
     expect(rows.map((row) => row.getAttribute('data-workflow'))).toEqual([
       'feature_build',
@@ -290,13 +308,72 @@ describe('Library', () => {
     expect(rows[1]).toHaveTextContent('1 run · /srv/workflows/gamedev.py')
   })
 
+  it('marks a workflow into the run filter without moving the viewer', async () => {
+    const { user } = await open({ runId: 'bbbb2222' })
+
+    await user.click(mark('feature_build'))
+    expect(useUi.getState().runFilter.workflows).toEqual(['feature_build'])
+    expect(mark('feature_build')).toHaveAttribute('aria-pressed', 'true')
+    // The mark is not the row: the viewer is still on gamedev.
+    expect(pick('gamedev')).toHaveAttribute('aria-current', 'true')
+    expect(screen.getByTestId('library-filter')).toHaveTextContent(
+      '2 of 3 runs shown · 1 workflow marked',
+    )
+
+    await user.click(mark('feature_build'))
+    expect(useUi.getState().runFilter.workflows).toEqual([])
+  })
+
+  it('clears every mark from its footer', async () => {
+    useUi.setState({ runFilter: { ...EMPTY_RUN_FILTER, workflows: ['gamedev', 'feature_build'] } })
+    const { user } = await open()
+
+    await user.click(screen.getByRole('button', { name: '× clear workflow filter' }))
+    expect(useUi.getState().runFilter.workflows).toEqual([])
+    expect(screen.queryByRole('button', { name: '× clear workflow filter' })).toBeNull()
+  })
+
+  it('counts each row over the other columns’ filters', async () => {
+    // RUNS: two feature_build, one gamedev — an id only gamedev's run has
+    // leaves feature_build's row at none, dimmed rather than dropped.
+    useUi.setState({ runFilter: { ...EMPTY_RUN_FILTER, id: 'bbbb' } })
+    await open()
+
+    const rows = within(screen.getByRole('list', { name: 'workflows' })).getAllByRole(
+      'listitem',
+    )
+    expect(rows[0]).toHaveTextContent('0 runs')
+    expect(rows[1]).toHaveTextContent('1 run')
+  })
+
+  it('lists a workflow the server no longer has, so its runs stay filterable', async () => {
+    stubServer({
+      runs: {
+        status: 200,
+        body: [...RUNS, { ...RUNS[0]!, id: 'dddd4444', workflow: 'retired' }],
+      },
+    })
+    const { user } = await open()
+
+    const row = screen
+      .getByRole('list', { name: 'workflows' })
+      .querySelector('[data-workflow="retired"]')
+    expect(row).toHaveTextContent('1 run · unregistered')
+    expect(row).not.toHaveTextContent('node')
+
+    await user.click(mark('retired'))
+    expect(useUi.getState().runFilter.workflows).toEqual(['retired'])
+
+    await user.click(pick('retired'))
+    expect(screen.getByTestId('library-notice')).toHaveTextContent(
+      'this server has no workflow of that name',
+    )
+  })
+
   it('opens on the selected run’s workflow and draws its module', async () => {
     await open({ runId: 'bbbb2222' })
 
-    expect(screen.getByRole('option', { name: /gamedev/ })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    )
+    expect(pick('gamedev')).toHaveAttribute('aria-current', 'true')
     const viewer = screen.getByTestId('library-source')
     expect(within(viewer).getByText('/srv/workflows/gamedev.py')).toBeInTheDocument()
     expect(viewer).toHaveTextContent('def design(ctx):')
@@ -305,7 +382,7 @@ describe('Library', () => {
   it('loads the source of the workflow that was selected', async () => {
     const { user } = await open({ runId: 'bbbb2222' })
 
-    await user.click(screen.getByRole('option', { name: /feature_build/ }))
+    await user.click(pick('feature_build'))
 
     await waitFor(() => {
       expect(screen.getByTestId('library-source')).toHaveTextContent(
@@ -364,7 +441,7 @@ describe('Library', () => {
     const { user } = await open({ runId: 'aaaa1111', node: 'review' })
     expect(scrolled).toHaveLength(1)
 
-    await user.click(screen.getByRole('option', { name: /gamedev/ }))
+    await user.click(pick('gamedev'))
 
     await waitFor(() => {
       expect(screen.getByTestId('library-source')).toHaveTextContent('def design(ctx):')
@@ -416,8 +493,8 @@ describe('Library', () => {
       'no source is available for workflow: exec()',
     )
     // The row still lists the workflow; only its file is unknown.
-    expect(screen.getByRole('option', { name: /gamedev/ })).toHaveTextContent('1 run')
-    expect(screen.getByRole('option', { name: /gamedev/ }).textContent).not.toContain(
+    expect(pick('gamedev')).toHaveTextContent('1 run')
+    expect(pick('gamedev').textContent).not.toContain(
       '.py',
     )
   })
@@ -448,7 +525,7 @@ describe('Library', () => {
     stubServer({ runs: { status: 500, body: { error: 'boom' } } })
     await open()
 
-    const row = screen.getByRole('option', { name: /feature_build/ })
+    const row = pick('feature_build')
     expect(row).toHaveTextContent('/srv/workflows/feature_build.py')
     expect(row.textContent).not.toContain('runs')
   })
@@ -461,7 +538,7 @@ describe('Library', () => {
     // at `md`, two rows below it" in one place, and that the sheet has
     // dropped its margin. Whether the panel then fits a 390 px screen is
     // Playwright's (`web/e2e/mobile.spec.ts`).
-    const body = screen.getByRole('listbox', { name: 'workflows' }).parentElement
+    const body = screen.getByRole('list', { name: 'workflows' }).parentElement?.parentElement
     expect(body).toHaveClass('grid-cols-[230px_minmax(0,1fr)]')
     expect(body).toHaveClass('max-md:grid-cols-1')
     expect(body).toHaveClass('max-md:grid-rows-[minmax(0,40%)_minmax(0,60%)]')
@@ -481,7 +558,10 @@ describe('Library', () => {
 
     // The caret is on the selected workflow, which is where an operator
     // arrows on from.
-    expect(document.activeElement).toHaveAttribute('data-workflow', 'feature_build')
+    expect(document.activeElement?.closest('[data-workflow]')).toHaveAttribute(
+      'data-workflow',
+      'feature_build',
+    )
 
     await user.keyboard('{Escape}')
 

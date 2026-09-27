@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { listRunsApiRunsGetQueryKey } from '../../../api/gen/@tanstack/react-query.gen'
 import type { RunSummary } from '../../../api/gen/types.gen'
 import { queryKeys } from '../../../realtime/invalidate'
-import { ALL_WORKFLOWS, useUi } from '../../../store/ui'
+import { EMPTY_RUN_FILTER, useUi } from '../../../store/ui'
 import { useRunListModel, useRuns } from '../useRunList'
 
 function summary(over: Partial<RunSummary> = {}): RunSummary {
@@ -41,7 +41,6 @@ function Probe() {
       <span data-testid="ids">{model.rows.map((row) => row.id).join(',')}</span>
       <span data-testid="total">{String(model.total)}</span>
       <span data-testid="active">{String(model.active)}</span>
-      <span data-testid="workflows">{model.workflows.join(',')}</span>
       <span data-testid="pending">{String(model.isPending)}</span>
     </>
   )
@@ -96,7 +95,7 @@ describe('useRuns', () => {
 
 describe('useRunListModel', () => {
   beforeEach(() => {
-    useUi.setState({ runFilter: { workflow: ALL_WORKFLOWS, query: '' } })
+    useUi.setState({ runFilter: EMPTY_RUN_FILTER })
   })
 
   it('shows every run in the order the server sent them', () => {
@@ -120,48 +119,57 @@ describe('useRunListModel', () => {
     expect(screen.getByTestId('pending')).toHaveTextContent('true')
   })
 
-  it('offers one chip per workflow there are runs of, by name', () => {
+  it('narrows to the workflows the library marked', () => {
     probe()
 
-    expect(screen.getByTestId('workflows')).toHaveTextContent('feature_build,gamedev')
-  })
-
-  it('narrows to one workflow when a chip is on', () => {
-    probe()
-
-    act(() => useUi.getState().setRunWorkflow('feature_build'))
+    act(() => useUi.getState().setRunFilter({ workflows: ['feature_build'] }))
     expect(shown()).toEqual(['bbbb2222', 'cccc3333'])
 
-    act(() => useUi.getState().setRunWorkflow(ALL_WORKFLOWS))
+    act(() => useUi.getState().setRunFilter({ workflows: ['feature_build', 'gamedev'] }))
     expect(shown()).toHaveLength(3)
   })
 
-  it('narrows on the title', () => {
+  it('narrows on the title, case-folded', () => {
     probe()
 
-    act(() => useUi.getState().setRunQuery('SQUIRRELS'))
+    act(() => useUi.getState().setRunFilter({ title: 'SQUIRRELS' }))
     expect(shown()).toEqual(['aaaa1111'])
   })
 
-  it('narrows on the id', () => {
+  it('narrows on the id, and only the id', () => {
     probe()
 
-    act(() => useUi.getState().setRunQuery('cccc'))
+    act(() => useUi.getState().setRunFilter({ id: 'cccc' }))
+    expect(shown()).toEqual(['cccc3333'])
+
+    // RUN is not TITLE: a title word typed into it matches nothing.
+    act(() => useUi.getState().setRunFilter({ id: 'append' }))
+    expect(shown()).toEqual([])
+  })
+
+  it('ANDs the columns together', () => {
+    probe()
+
+    act(() =>
+      useUi.getState().setRunFilter({ workflows: ['feature_build'], title: 'append' }),
+    )
     expect(shown()).toEqual(['cccc3333'])
   })
 
-  it('narrows on the chip and the query together', () => {
+  it('treats blank text as no filter at all', () => {
     probe()
 
-    act(() => useUi.getState().setRunWorkflow('feature_build'))
-    act(() => useUi.getState().setRunQuery('append'))
-    expect(shown()).toEqual(['cccc3333'])
+    act(() => useUi.getState().setRunFilter({ title: '   ', id: ' ' }))
+    expect(shown()).toHaveLength(3)
   })
 
-  it('treats a blank query as no filter at all', () => {
+  it('clears every column at once', () => {
     probe()
 
-    act(() => useUi.getState().setRunQuery('   '))
+    act(() => useUi.getState().setRunFilter({ statuses: ['failed'], title: 'x' }))
+    expect(shown()).toEqual([])
+
+    act(() => useUi.getState().clearRunFilter())
     expect(shown()).toHaveLength(3)
   })
 

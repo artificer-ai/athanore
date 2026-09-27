@@ -32,29 +32,69 @@
  */
 import { create } from 'zustand'
 
+import type { RunStatus } from '../api/gen/types.gen'
+
 /** The two regions that take focus: the run list and the detail pane. */
 export type FocusRegion = 'list' | 'detail'
 
-/** The workflow chip that means "do not filter by workflow" (10 §Layout). */
-export const ALL_WORKFLOWS = 'all'
-
 /**
- * What the run list is filtered to: the header's chip and its `/` input.
+ * What the run list is filtered to: one field per filterable column.
  *
- * Both are client-side (T061): `GET /api/runs` takes `?status` and
+ * The column headers write every field but `workflows`, which the
+ * workflow library's marks write (10 §Layout, §Overlays, D275). Each
+ * field is empty when its column does not filter, and the fields are
+ * ANDed: a run is shown when it passes every one of them.
+ *
+ * All of it is client-side (T061): `GET /api/runs` takes `?status` and
  * `?workflow`, but a run list is small and returns whole (08
  * §Conventions), so narrowing it in the browser costs one array pass and
  * keeps the one cached copy of the resource that the invalidation table
- * refreshes. They are not search parameters either: 10 §Layout's list of
- * what makes a view *that view* is `run`, `pane`, `overlay` and `task`,
- * and `src/routes/search.ts` drops everything else.
- *
- * `workflow` is {@link ALL_WORKFLOWS} or a workflow name; `query` is the
- * raw text, matched against a row's title and id.
+ * refreshes. None of it is a search parameter either: 10 §Layout's list
+ * of what makes a view *that view* is `run`, `pane`, `overlay` and
+ * `task`, and `src/routes/search.ts` drops everything else.
  */
 export type RunFilter = {
-  workflow: string
-  query: string
+  /** RUN: text the run's id contains, case-folded. */
+  id: string
+  /** TITLE: text the run's title contains, case-folded. */
+  title: string
+  /** WORKFLOW: the workflows a run may be of; empty is any. */
+  workflows: readonly string[]
+  /** STATUS: the statuses a run may be in; empty is any. */
+  statuses: readonly RunStatus[]
+  /**
+   * NODE: the nodes a run may be in, {@link NO_NODE_FILTER} standing for
+   * a run in none; empty is any.
+   */
+  nodes: readonly string[]
+  /**
+   * AGE, as a rolling window: created within this many milliseconds of
+   * now, or `null`. A preset writes it, and it moves with the clock, so
+   * `last 1h` means the last hour for as long as it stays on.
+   */
+  within: number | null
+  /**
+   * AGE, as a fixed range: created at or after this local
+   * `datetime-local` value (`YYYY-MM-DDTHH:mm`), or `''`.
+   */
+  after: string
+  /** …and within the minute this one names, or `''`. */
+  before: string
+}
+
+/** The NODE filter's value for a run that is in no node. */
+export const NO_NODE_FILTER = ''
+
+/** A filter that shows every run. */
+export const EMPTY_RUN_FILTER: RunFilter = {
+  id: '',
+  title: '',
+  workflows: [],
+  statuses: [],
+  nodes: [],
+  within: null,
+  after: '',
+  before: '',
 }
 
 /**
@@ -101,10 +141,12 @@ export type Ui = {
   feed: Feed
   setFeed: (feed: Feed) => void
 
-  /** The run list's chip and `/` input (T061). */
+  /** The run list's column filters and the library's marks (D275). */
   runFilter: RunFilter
-  setRunWorkflow: (workflow: string) => void
-  setRunQuery: (query: string) => void
+  /** Change some of the filter's fields and leave the rest. */
+  setRunFilter: (patch: Partial<RunFilter>) => void
+  /** Show every run again. */
+  clearRunFilter: () => void
 
   /**
    * The run whose log composer has been asked for the caret, or `null`.
@@ -152,10 +194,10 @@ export const useUi = create<Ui>()((set) => ({
   feed: { status: 'reconnecting', retryAt: null },
   setFeed: (feed) => set({ feed }),
 
-  runFilter: { workflow: ALL_WORKFLOWS, query: '' },
-  setRunWorkflow: (workflow) =>
-    set((state) => ({ runFilter: { ...state.runFilter, workflow } })),
-  setRunQuery: (query) => set((state) => ({ runFilter: { ...state.runFilter, query } })),
+  runFilter: EMPTY_RUN_FILTER,
+  setRunFilter: (patch) =>
+    set((state) => ({ runFilter: { ...state.runFilter, ...patch } })),
+  clearRunFilter: () => set({ runFilter: EMPTY_RUN_FILTER }),
 
   logComposerFor: null,
   focusLogComposer: (runId) => set({ logComposerFor: runId }),

@@ -260,8 +260,11 @@ test('a workflow added, reloaded, removed and added back is followed live', asyn
   await expect(dashboard.status('held light')).toHaveText('running')
   await expectAccessible(dashboard.page)
 
+  // Its runs are still on the list, so the library still lists it — as
+  // a name to filter by, with no graph and no source (D275).
   await dashboard.openLibrary()
-  await expect(dashboard.libraryRow(WORKFLOW)).toHaveCount(0)
+  await expect(dashboard.libraryRow(WORKFLOW)).toContainText('unregistered')
+  await expect(dashboard.libraryRow(WORKFLOW)).not.toContainText('node')
   // The six the server booted with are untouched by it.
   await expect(dashboard.libraryRow('probe')).toBeVisible()
   await expect(dashboard.libraryRow('plugged')).toBeVisible()

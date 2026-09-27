@@ -64,22 +64,22 @@ of TOML nobody executes.
 
 ```
 ┌ header ─────────────────────────────────────────────────────────────────────┐
-│ ▚ ATHANORE v1.0  · 34 runs · ● 1 active    [all][feature_build][gamedev]…   │
-│                                            [/ filter runs] [＋ new run] [workflows] │
+│ ▚ ATHANORE v1.0  · 34 runs · ● 1 active         [＋ new run] [workflows · 1] │
 ├ run list ─────────────┬ splitter ┬ detail ─────────────────────────────────┤
-│ RUN WORKFLOW TITLE    │          │ [❮] ◀ OVERVIEW (1/7) ▶ ▬▬▬▬▬▬▬  run a4c8… running │
-│ STATUS NODE AGE       │          │                                         │
+│ RUN⏷ WORKFLOW TITLE⏷  │          │ [❮] ◀ OVERVIEW (1/7) ▶ ▬▬▬▬▬▬▬  run a4c8… running │
+│ STATUS⏷ NODE⏷ AGE⏷    │          │                                         │
 │ … 16 rows …           │          │ pane content (scrolls)                  │
-│ 34 shown ↑↓ select    │          │                                         │
+│ 9 of 34 · × clear 2   │          │                                         │
 ├ footer ───────────────┴──────────┴─────────────────────────────────────────┤
 │ [tab] focus [t] retry task [m] move task … [?] keys            [^p palette] │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 - **Header**: brand mark and the version; run count and
-  a pulsing active-count dot; workflow filter chips (accent-tinted when
-  selected); a `/` filter input; `＋ new run` (outlined primary);
-  `workflows` (neutral outline) opening the library; an icon-only
+  a pulsing active-count dot; `＋ new run` (outlined primary);
+  `workflows` (neutral outline) opening the library, which reads
+  `workflows · k` in the accent outline while the library has `k`
+  workflows marked (§Run filters); an icon-only
   text-size control (`aria-label="text size"`) opening a popover with the
   four steps of §Type and density's ramp as a radio group (21 §Type
   scale, D196).
@@ -88,7 +88,10 @@ of TOML nobody executes.
   `RUNS n`): grid columns RUN · WORKFLOW · TITLE · STATUS · NODE · AGE.
   Selected row gets a flat accent tint (`color-mix(accent 12%, surface)`)
   and a 2 px accent left border; selection is the only state a row
-  draws (D274). Footer strip: `n shown · ↑↓ select · ⇧↑↓ move run`.
+  draws (D274). The column headings are the filter (§Run filters).
+  Footer strip: `n of m shown`, then — while anything filters — one
+  `name ×` chip per workflow the library marked and `× clear k filters`,
+  then `↑↓ select · ⇧↑↓ move run`.
 - **Detail** (right): pane bar with the collapse toggle, `◀ PANE (i/n) ▶`,
   one 14×3 px dot per pane (accent = current, accent-800 = plugin pane,
   neutral-800 = builtin), then `run <id>` and a status pill.
@@ -107,9 +110,9 @@ finger moves: right on the list opens the global screen, left on the
 global screen and right on the detail return to the list, and the
 detail is reached only by tapping a row. The splitter is not
 mounted there and `listWidth` / `listCollapsed` are inert, kept rather
-than cleared; the run list's rows become two lines; the header wraps,
-with the chips and the `/` filter as a strip that scrolls horizontally
-within itself; the footer drops the keycaps and keeps the palette
+than cleared; the run list's rows become two lines, under a strip of
+the column filters' funnels (§Run filters); the header wraps; the
+footer drops the keycaps and keeps the palette
 button, with a `global panes` toggle beside it on the list and the
 global screen; interactive chrome carries a 24×24 px hit area (WCAG
 2.5.8).
@@ -118,10 +121,49 @@ normative for all of it, D194 for the breakpoint, and the shell reads
 the width through one `matchMedia` hook (`lib/useIsNarrow.ts`) so the
 CSS's breakpoint and JavaScript's cannot drift.
 
-At 390 px the header's first block occupies two lines of its own — the
-brand, version and counts, then `＋ new run`, `workflows` and the
-text-size button — with the filter strip below them, because nothing in
-it is dropped or shrunk to make one line of it (D201).
+At 390 px the header occupies two lines — the brand, version and
+counts, then `＋ new run`, `workflows` and the text-size button —
+because nothing in it is dropped or shrunk to make one line of it
+(D201).
+
+### Run filters
+
+The run list is filtered from its own column headings, as the
+Terminal mock draws it (D275). Each column filters by what it holds:
+
+| Column | Kind | Control | Matches |
+|---|---|---|---|
+| RUN | text | one box | the run's full id contains it, case-folded |
+| WORKFLOW | choice | the library's marks (§Overlays) | any of the marked workflows |
+| TITLE | text | one box | the title contains it, case-folded |
+| STATUS | choice | a checkbox per status of 03, in lifecycle order | any of the checked statuses |
+| NODE | choice | a checkbox per node a run is in now, then `(none)` | any node the run is in, or none for `(none)` |
+| AGE | date | presets `last 1h / 24h / 7d / 30d`, or FROM and TO local datetimes | `created` within the rolling window, or in `[FROM, the end of TO's minute]` |
+
+Every heading but WORKFLOW carries a funnel, drawn on hover, on focus,
+and always while its column filters; below the breakpoint the headings
+are a strip of funnels over the two-line rows, always drawn, each a
+24 px target. A funnel opens a popover anchored to its heading: `FILTER
+· <COLUMN>` and how it matches (`contains`, `any of`, `created
+between`) over the column's control, then `n / m runs`, `clear` (this
+column) and `done`. A text box closes on `⏎`. A choice's count is
+faceted — the runs every *other* column leaves — and a choice with none
+is dimmed, not dropped. A column that filters underlines its heading,
+and a choice column's funnel carries how many are checked. The popover
+owns the keyboard while it is open (§Keyboard), and `esc` closes it and
+nothing else.
+
+The columns AND together. A preset and a FROM/TO range are one filter:
+picking a preset clears the range, typing a bound drops the preset. A
+preset is a rolling window and moves with the AGE column's clock. A run
+whose `created` does not parse passes only while AGE is off (02 §Real
+data only).
+
+The filter is `useUi.runFilter`: client-side, not persisted, not in the
+URL, as the header's controls were (T061). Submitting a run clears all
+of it, because a run queued under a filter that hides it reads as one
+that was never queued. `n of m shown` and the header's `m runs` stay
+the server's count.
 
 ## Panes (cycle order)
 
@@ -298,7 +340,15 @@ surface panel, 1 px neutral-800 border, 8 px radius, `--shadow-lg`.
   a left list (name, node count, run count, file) and a right source
   viewer (`GET /api/workflows/{name}/source`, 08). The list and the
   viewer follow `workflow.*` live (22 §SPA, §Realtime and caching);
-  registering from the overlay is a later seam.
+  registering from the overlay is a later seam. The list is also the run
+  list's WORKFLOW filter (§Run filters, D275): each row carries a mark,
+  `[x]` / `[ ]` (`aria-pressed`), beside the button that picks what the
+  viewer shows, and a marked row has an accent left border. Its run
+  count is faceted, as a popover's is, and a row with none is dimmed. A
+  workflow runs still name after the server dropped it is listed too,
+  by name and `unregistered`, with no node count and no source, so its
+  runs stay filterable. The list's footer reads `n of m runs shown · k
+  workflows marked` and carries `× clear workflow filter`.
 - **Edit run** (`e`): title and description only.
 - **Pickers** (`t`, `m`, `x`, `r`): a palette-style list of the selected
   run's tasks (node, attempt, status) and, for move/rerun, a second list
@@ -340,8 +390,8 @@ bound (D207).
 `tab` is the one row in that list the app does **not** intercept. It is
 drawn in the footer strip because `tab` is how focus moves, but the key
 itself stays the browser's: a handler that took it would leave a
-keyboard-only operator unable to reach the header's `/` input, the
-workflow chips, the pane bar or a request's own buttons, which
+keyboard-only operator unable to reach the column filters, the
+library's marks, the pane bar or a request's own buttons, which
 §Accessibility and quality forbids. The two regions follow the browser's
 focus instead, and `tab` is the only way attention reaches the detail
 pane (D176, D179, D204 (1)). `⏎` is not intercepted either: it belongs
@@ -650,7 +700,7 @@ own classes on it is a file to keep in step for nothing (D179).
 
 | Mock element | Component |
 |---|---|
-| Filter / workflow chips | `Toggle` group, outlined, accent-tinted when on |
+| Column filters | Radix `Popover` anchored to the heading; STATUS/NODE choices are `role="checkbox"` buttons, AGE presets `aria-pressed` buttons |
 | `＋ new run` | `Button variant="outline"` with primary border/text |
 | `workflows`, `cancel`, `open definition` | `Button variant="outline"` neutral |
 | Run list | custom grid rows (not `Table`): fixed column template from the mock |

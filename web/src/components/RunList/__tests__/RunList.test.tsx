@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { RunStatus, RunSummary } from '../../../api/gen/types.gen'
 import { narrowViewport, wideViewport } from '../../../lib/__tests__/fixtures'
-import { useUi } from '../../../store/ui'
+import { EMPTY_RUN_FILTER, useUi } from '../../../store/ui'
 import { RunList } from '../RunList'
 import { toRow, type RunListModel, type RunRow } from '../useRunList'
 
@@ -31,9 +31,10 @@ function row(over: Partial<RunSummary> = {}): RunRow {
 function model(rows: RunRow[], over: Partial<RunListModel> = {}): RunListModel {
   return {
     rows,
+    runs: [],
+    now: NOW,
     total: rows.length,
     active: 0,
-    workflows: [],
     isPending: false,
     isError: false,
     ...over,
@@ -63,7 +64,7 @@ function rows() {
 
 describe('RunList', () => {
   beforeEach(() => {
-    useUi.setState({ focus: 'list' })
+    useUi.setState({ focus: 'list', runFilter: EMPTY_RUN_FILTER })
   })
 
   it('renders the six columns of the mock and the footer strip', () => {
@@ -72,7 +73,7 @@ describe('RunList', () => {
     for (const heading of ['RUN', 'WORKFLOW', 'TITLE', 'STATUS', 'NODE', 'AGE']) {
       expect(screen.getByText(heading)).toBeInTheDocument()
     }
-    expect(screen.getByTestId('rows-shown')).toHaveTextContent('2 shown')
+    expect(screen.getByTestId('rows-shown')).toHaveTextContent('2 of 2 shown')
     expect(screen.getByText('↑↓ select')).toBeInTheDocument()
     expect(screen.getByText('⇧↑↓ move run')).toBeInTheDocument()
   })
@@ -205,7 +206,8 @@ describe('RunList', () => {
     // The strip's hints are a live region too, so the empty state is
     // named rather than taken as "the one status on screen".
     expect(screen.getByText('loading runs…')).toHaveAttribute('role', 'status')
-    expect(screen.getByTestId('rows-shown')).toHaveTextContent('0 shown')
+    // No total to be "of" yet (02 §Real data only).
+    expect(screen.getByTestId('rows-shown')).toHaveTextContent(/^0 shown$/)
   })
 
   it('says a failed request failed rather than reading as no runs', () => {
@@ -219,7 +221,52 @@ describe('RunList', () => {
     expect(screen.getByText('no runs yet')).toBeInTheDocument()
 
     list({ rows: [], model: { total: 12 } })
-    expect(screen.getByText('no runs match the filter')).toBeInTheDocument()
+    expect(screen.getByText('no runs match the current filters')).toBeInTheDocument()
+  })
+
+  it('clears every filter from the empty state', async () => {
+    useUi.setState({ runFilter: { ...EMPTY_RUN_FILTER, title: 'nothing', statuses: ['failed'] } })
+    list({ rows: [], model: { total: 12 } })
+
+    await userEvent.click(screen.getByRole('button', { name: 'clear' }))
+    expect(useUi.getState().runFilter).toEqual(EMPTY_RUN_FILTER)
+  })
+
+  it('says nothing about filters in the footer while none is on', () => {
+    list()
+
+    expect(screen.queryByRole('button', { name: /clear \d filter/ })).toBeNull()
+  })
+
+  it('counts the filters on and clears them all from the footer', async () => {
+    useUi.setState({
+      runFilter: { ...EMPTY_RUN_FILTER, title: 'x', statuses: ['failed'], within: 3_600_000 },
+    })
+    list()
+
+    await userEvent.click(screen.getByRole('button', { name: '× clear 3 filters' }))
+    expect(useUi.getState().runFilter).toEqual(EMPTY_RUN_FILTER)
+  })
+
+  it('carries the library’s workflow marks as chips that remove themselves', async () => {
+    useUi.setState({ runFilter: { ...EMPTY_RUN_FILTER, workflows: ['gamedev', 'probe'] } })
+    list()
+
+    // Two workflows is one filter: the WORKFLOW column's.
+    expect(screen.getByRole('button', { name: '× clear 1 filter' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'remove gamedev from the filter' }))
+    expect(useUi.getState().runFilter.workflows).toEqual(['probe'])
+  })
+
+  it('underlines the WORKFLOW heading while the library filters it, with no funnel', () => {
+    useUi.setState({ runFilter: { ...EMPTY_RUN_FILTER, workflows: ['gamedev'] } })
+    list()
+
+    expect(screen.getByText('WORKFLOW')).toHaveClass('underline')
+    expect(screen.queryByRole('button', { name: 'filter workflow' })).toBeNull()
+    for (const name of ['run', 'title', 'status', 'node', 'age']) {
+      expect(screen.getByRole('button', { name: `filter ${name}` })).toBeInTheDocument()
+    }
   })
 
   describe('below the breakpoint', () => {
@@ -297,10 +344,22 @@ describe('RunList', () => {
       expect(rows()[1]).toHaveAttribute('aria-selected', 'false')
     })
 
-    it('keeps `n shown` in the footer strip', () => {
+    it('keeps `n of m shown` in the footer strip', () => {
       list({ rows: [row(), row({ id: 'B' })] })
 
-      expect(screen.getByTestId('rows-shown')).toHaveTextContent('2 shown')
+      expect(screen.getByTestId('rows-shown')).toHaveTextContent('2 of 2 shown')
+    })
+
+    it('keeps every funnel but WORKFLOW’s as a strip over the rows', () => {
+      list()
+
+      const strip = screen.getByTestId('column-headings')
+      expect(within(strip).queryByText('WORKFLOW')).toBeNull()
+      for (const name of ['run', 'title', 'status', 'node', 'age']) {
+        expect(
+          within(strip).getByRole('button', { name: `filter ${name}` }),
+        ).toBeInTheDocument()
+      }
     })
   })
 })

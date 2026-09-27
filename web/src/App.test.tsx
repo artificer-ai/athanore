@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -33,7 +34,7 @@ import type { AppSearch, Overlay } from './routes/search'
 import { PALETTE_COMMANDS } from './overlays'
 import { capLabel, KEY_BINDINGS } from './lib/keys'
 import { DEFAULT_LIST_WIDTH, usePrefs } from './store/prefs'
-import { ALL_WORKFLOWS, useUi } from './store/ui'
+import { EMPTY_RUN_FILTER, useUi } from './store/ui'
 
 const RUNS: RunSummary[] = [
   {
@@ -290,7 +291,7 @@ function freshTab() {
   usePrefs.setState({ listWidth: DEFAULT_LIST_WIDTH, listCollapsed: false })
   useUi.setState({
     focus: 'list',
-    runFilter: { workflow: ALL_WORKFLOWS, query: '' },
+    runFilter: EMPTY_RUN_FILTER,
     logComposerFor: null,
   })
 }
@@ -349,7 +350,7 @@ describe('App', () => {
     expect(screen.getByTestId('runs-rail')).toHaveTextContent('RUNS 2')
   })
 
-  it('narrows the rows as the header’s `/` input is typed into', () => {
+  it('narrows the rows as the TITLE heading’s filter is typed into', () => {
     shell()
     expect(rows()).toHaveLength(2)
 
@@ -357,25 +358,28 @@ describe('App', () => {
     // element's box is 0×0 at the origin and the resizable group reads a
     // pointer press anywhere as a press on its handle, taking the focus
     // the keystrokes would have gone to. Typing itself is exercised on
-    // `RunFilters`, which has no splitter beside it.
-    fireEvent.change(screen.getByRole('textbox', { name: 'filter runs' }), {
+    // `ColumnHeading`, which has no splitter beside it.
+    fireEvent.click(screen.getByRole('button', { name: 'filter title' }))
+    fireEvent.change(screen.getByRole('textbox', { name: 'title contains' }), {
       target: { value: 'squirrels' },
     })
 
     expect(rows()).toHaveLength(1)
     expect(rows()[0]).toHaveTextContent('squirrels vs chipmunks')
-    expect(screen.getByTestId('rows-shown')).toHaveTextContent('1 shown')
+    expect(screen.getByTestId('rows-shown')).toHaveTextContent('1 of 2 shown')
     // The header's count is the server's, not the filter's.
     expect(screen.getByTestId('run-count')).toHaveTextContent('2 runs')
   })
 
-  it('narrows the rows from a workflow chip', async () => {
+  it('narrows the rows to the workflows the library marked', () => {
     shell()
 
-    await userEvent.click(screen.getByRole('radio', { name: 'gamedev' }))
+    act(() => useUi.getState().setRunFilter({ workflows: ['gamedev'] }))
 
     expect(rows()).toHaveLength(1)
     expect(rows()[0]).toHaveTextContent('squirrels vs chipmunks')
+    expect(screen.getByRole('button', { name: 'remove gamedev from the filter' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'workflows · 1' })).toBeInTheDocument()
   })
 
   it('draws the run `?run=` names as the selected one', () => {
@@ -1424,13 +1428,36 @@ describe('the keyboard map', () => {
     expect(onCloseOverlay).not.toHaveBeenCalled()
   })
 
-  it('is off while the operator is typing into the `/` input', () => {
+  it('spends `esc` in a column filter on the filter, not on the selection', () => {
+    // Radix prevents the `esc` it dismisses on, and the keymap skips a
+    // prevented key (`keys/useKeymap.ts`): one `esc`, one step.
+    const onClearRun = vi.fn()
+    shell({ run: 'aaaa1111bbbb' }, { onClearRun })
+
+    fireEvent.click(screen.getByRole('button', { name: 'filter title' }))
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'title contains' }), {
+      key: 'Escape',
+    })
+
+    expect(screen.queryByRole('dialog', { name: 'filter title' })).toBeNull()
+    expect(onClearRun).not.toHaveBeenCalled()
+
+    // The next `esc`, with no popover up, is the app's again.
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(onClearRun).toHaveBeenCalledOnce()
+  })
+
+  it('is off while a column filter is open', () => {
     const onOpenOverlay = vi.fn()
     const onSelectRun = vi.fn()
     shell({ run: 'aaaa1111bbbb' }, { onOpenOverlay, onSelectRun })
 
-    const input = screen.getByRole('textbox', { name: 'filter runs' })
+    fireEvent.click(screen.getByRole('button', { name: 'filter title' }))
+    const input = screen.getByRole('textbox', { name: 'title contains' })
     for (const key of ['n', 'D', 'j', 'w']) fireEvent.keyDown(input, { key })
+    // A choice is a button, not a text field: the popover's own claim on
+    // the keyboard is what keeps `n` from reaching the app there.
+    for (const key of ['n', 'j']) fireEvent.keyDown(document.body, { key })
 
     expect(onOpenOverlay).not.toHaveBeenCalled()
     expect(onSelectRun).not.toHaveBeenCalled()

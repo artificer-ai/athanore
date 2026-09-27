@@ -280,33 +280,53 @@ test('the sixth touch flow: the three screens — global | list | detail — and
   await noHorizontalScroll(page)
 })
 
-test('the narrow chrome: header strip, footer, hit areas', async ({ dashboard }) => {
+test('the narrow chrome: header, filter strip, footer, hit areas', async ({
+  dashboard,
+}) => {
   const page = dashboard.page
   await dashboard.open()
   await dashboard.submit('probe', TITLE, 'tap')
 
-  // The chips and the `/` filter are one strip on a line of their own,
-  // scrolling within themselves — the page does not.
-  const filter = page.getByRole('textbox', { name: 'filter runs' })
-  const chips = page.getByRole('radiogroup', { name: 'filter by workflow' })
-  const strip = page.locator('header > div').filter({ has: chips })
-  await expect(strip).toBeVisible()
-  await expect(strip).toContainText('probe')
-  expect((await strip.boundingBox())?.width).toBeLessThanOrEqual(
-    NARROW_VIEWPORT.width,
-  )
-  // The strip scrolls sideways within itself; the page does not.
-  expect(
-    await strip.evaluate((el) => el.scrollWidth >= el.clientWidth),
-  ).toBe(true)
-  await expect(filter).toBeVisible()
+  // The header carries no filter any more: its three controls, each a
+  // touch target.
   await expect(page.getByRole('button', { name: 'new run', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'workflows' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'text size' })).toBeVisible()
   for (const name of ['new run', 'workflows', 'text size']) {
     await tappable(page.getByRole('button', { name, exact: name === 'new run' }))
   }
-  await tappable(page.getByRole('radio', { name: 'probe', exact: true }))
+
+  // The column filters are a strip over the two-line rows, every funnel
+  // drawn and tappable, and the strip fits the screen (D275).
+  const strip = page.getByTestId('column-headings')
+  await expect(strip).toBeVisible()
+  expect((await strip.boundingBox())?.width).toBeLessThanOrEqual(
+    NARROW_VIEWPORT.width,
+  )
+  for (const name of ['run', 'title', 'status', 'node', 'age']) {
+    const funnel = strip.getByRole('button', { name: `filter ${name}` })
+    await expect(funnel).toBeVisible()
+    await tappable(funnel)
+  }
+
+  // A popover opens by touch, fits, narrows the list and closes by touch.
+  await strip.getByRole('button', { name: 'filter status' }).tap()
+  const popover = page.getByRole('dialog', { name: 'filter status' })
+  await expect(popover).toBeVisible()
+  const box = await popover.boundingBox()
+  expect(box).not.toBeNull()
+  expect((box?.x ?? -1) >= 0 && (box?.x ?? 0) + (box?.width ?? 0) <= NARROW_VIEWPORT.width).toBe(
+    true,
+  )
+  const failed = popover.getByRole('checkbox', { name: /failed/ })
+  await tappable(failed)
+  await failed.tap()
+  await expect(page.getByText('no runs match the current filters')).toBeVisible()
+  await popover.getByRole('button', { name: 'done' }).tap()
+  await expect(popover).toBeHidden()
+  await page.getByRole('button', { name: '× clear 1 filter' }).tap()
+  await expect(dashboard.row(TITLE)).toBeVisible()
+  await noHorizontalScroll(page)
 
   // The footer keeps the palette button and drops the keycaps.
   const palette = page.getByRole('button', { name: 'palette' })
